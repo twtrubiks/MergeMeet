@@ -6,7 +6,8 @@ psycopg2-binary==2.9.9
 alembic==1.13.1
 redis==5.0.1
 python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
+passlib==1.7.4
+bcrypt==3.2.2
 python-multipart==0.0.6
 pillow==10.2.0
 pydantic==2.5.3
