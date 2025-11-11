@@ -1,6 +1,7 @@
 """安全相關工具：JWT 認證、密碼加密"""
 from datetime import datetime, timedelta
 from typing import Optional
+import hashlib
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
@@ -10,14 +11,48 @@ from app.core.config import settings
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
+def _pre_hash_password(password: str) -> str:
+    """
+    對密碼進行預處理（SHA256），避免 bcrypt 的 72 bytes 限制
+
+    Args:
+        password: 原始密碼
+
+    Returns:
+        SHA256 哈希後的十六進制字串
+    """
+    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """驗證密碼"""
-    return pwd_context.verify(plain_password, hashed_password)
+    """
+    驗證密碼
+
+    Args:
+        plain_password: 明文密碼
+        hashed_password: bcrypt 加密後的密碼
+
+    Returns:
+        密碼是否正確
+    """
+    # 先對密碼進行 SHA256 預處理，再用 bcrypt 驗證
+    pre_hashed = _pre_hash_password(plain_password)
+    return pwd_context.verify(pre_hashed, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
-    """將密碼加密"""
-    return pwd_context.hash(password)
+    """
+    將密碼加密
+
+    Args:
+        password: 明文密碼
+
+    Returns:
+        bcrypt 加密後的密碼
+    """
+    # 先對密碼進行 SHA256 預處理，避免 bcrypt 的 72 bytes 限制
+    pre_hashed = _pre_hash_password(password)
+    return pwd_context.hash(pre_hashed)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
