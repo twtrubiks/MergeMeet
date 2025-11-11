@@ -2,7 +2,7 @@
   <div class="home">
     <div class="container">
       <h1>🎉 歡迎使用 MergeMeet</h1>
-      <p class="subtitle">交友平台 Week 1 - 認證系統</p>
+      <p class="subtitle">現代化交友平台 - Week 3 探索與配對</p>
 
       <!-- 認證狀態卡片 -->
       <div class="card auth-card">
@@ -11,8 +11,12 @@
           <p class="success">✅ 已登入</p>
           <p class="user-email">{{ userStore.userEmail }}</p>
           <div class="button-group">
-            <router-link to="/profile" class="btn-primary">個人檔案</router-link>
-            <button @click="handleLogout" class="btn-secondary">登出</button>
+            <router-link to="/discovery" class="btn-primary">🔍 開始探索</router-link>
+            <router-link to="/matches" class="btn-primary">💕 我的配對</router-link>
+          </div>
+          <div class="button-group" style="margin-top: 12px;">
+            <router-link to="/profile" class="btn-secondary">個人檔案</router-link>
+            <button @click="handleLogout" class="btn-outline">登出</button>
           </div>
         </div>
         <div v-else class="auth-actions">
@@ -62,6 +66,18 @@
               <li>✅ 地理位置（PostGIS）</li>
               <li>✅ 配對偏好設定</li>
               <li>✅ 檔案完整度檢查</li>
+            </ul>
+          </div>
+          <div class="feature-section">
+            <h4>Week 3: 探索與配對</h4>
+            <ul>
+              <li>✅ 智能配對演算法（多因素評分）</li>
+              <li>✅ 卡片滑動介面</li>
+              <li>✅ 喜歡/跳過操作</li>
+              <li>✅ 互相喜歡自動配對</li>
+              <li>✅ 配對列表管理</li>
+              <li>✅ 配對成功彈窗</li>
+              <li>✅ 取消配對功能</li>
             </ul>
           </div>
         </div>

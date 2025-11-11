@@ -4,6 +4,8 @@ import Home from '@/views/Home.vue'
 import Login from '@/views/Login.vue'
 import Register from '@/views/Register.vue'
 import Profile from '@/views/Profile.vue'
+import Discovery from '@/views/Discovery.vue'
+import Matches from '@/views/Matches.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -30,6 +32,18 @@ const router = createRouter({
       path: '/profile',
       name: 'profile',
       component: Profile,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/discovery',
+      name: 'discovery',
+      component: Discovery,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/matches',
+      name: 'matches',
+      component: Matches,
       meta: { requiresAuth: true }
     }
   ]
