@@ -33,6 +33,26 @@ def calculate_age(date_of_birth: date) -> int:
     return age
 
 
+def check_profile_completeness(profile: Profile) -> bool:
+    """
+    檢查個人檔案完整度
+
+    完整的檔案需要：
+    - 基本資料：顯示名稱、性別、自我介紹
+    - 至少 1 張照片
+    - 3-10 個興趣標籤
+    """
+    has_basic_info = bool(
+        profile.display_name and
+        profile.gender and
+        profile.bio
+    )
+    has_photos = len(profile.photos) >= 1
+    has_interests = 3 <= len(profile.interests) <= 10
+
+    return has_basic_info and has_photos and has_interests
+
+
 @router.post("/", response_model=ProfileResponse, status_code=status.HTTP_201_CREATED)
 async def create_profile(
     request: ProfileCreateRequest,
@@ -211,8 +231,7 @@ async def update_profile(
         profile.gender_preference = request.gender_preference.value
 
     # 檢查檔案完整度
-    if profile.display_name and profile.gender and profile.bio:
-        profile.is_complete = True
+    profile.is_complete = check_profile_completeness(profile)
 
     await db.commit()
     await db.refresh(profile)
@@ -288,9 +307,18 @@ async def update_interests(
             detail="個人檔案不存在，請先建立"
         )
 
+    # 轉換字串 ID 為 UUID 對象
+    try:
+        interest_uuids = [uuid.UUID(id_str) for id_str in request.interest_ids]
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="無效的標籤 ID 格式"
+        )
+
     # 驗證所有標籤都存在
     result = await db.execute(
-        select(InterestTag).where(InterestTag.id.in_(request.interest_ids))
+        select(InterestTag).where(InterestTag.id.in_(interest_uuids))
     )
     tags = result.scalars().all()
 
@@ -302,6 +330,10 @@ async def update_interests(
 
     # 更新興趣標籤
     profile.interests = list(tags)
+
+    # 檢查檔案完整度
+    profile.is_complete = check_profile_completeness(profile)
+
     await db.commit()
     await db.refresh(profile)
 
@@ -413,6 +445,11 @@ async def upload_photo(
     await db.commit()
     await db.refresh(new_photo)
 
+    # 重新載入 profile 以檢查完整度
+    await db.refresh(profile, ["photos", "interests"])
+    profile.is_complete = check_profile_completeness(profile)
+    await db.commit()
+
     return PhotoResponse(
         id=str(new_photo.id),
         url=new_photo.url,
@@ -447,8 +484,25 @@ async def delete_photo(
             detail="照片不存在"
         )
 
+    # 取得 profile 以便檢查完整度
+    profile_id = photo.profile_id
     await db.delete(photo)
     await db.commit()
+
+    # 重新檢查檔案完整度
+    result = await db.execute(
+        select(Profile)
+        .options(
+            selectinload(Profile.photos),
+            selectinload(Profile.interests)
+        )
+        .where(Profile.id == profile_id)
+    )
+    profile = result.scalar_one_or_none()
+
+    if profile:
+        profile.is_complete = check_profile_completeness(profile)
+        await db.commit()
 
 
 @router.get("/interest-tags", response_model=List[InterestTagResponse])

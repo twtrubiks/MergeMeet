@@ -9,13 +9,15 @@ class GenderEnum(str, Enum):
     """性別枚舉"""
     MALE = "male"
     FEMALE = "female"
-    OTHER = "other"
+    NON_BINARY = "non_binary"
+    PREFER_NOT_TO_SAY = "prefer_not_to_say"
 
 
 class GenderPreferenceEnum(str, Enum):
     """性別偏好枚舉"""
     MALE = "male"
     FEMALE = "female"
+    BOTH = "both"
     ALL = "all"
 
 

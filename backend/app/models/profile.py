@@ -18,7 +18,7 @@ class Profile(Base):
 
     # 基本資訊
     display_name = Column(String(100), nullable=False)
-    gender = Column(String(20))  # male, female, other
+    gender = Column(String(20))  # male, female, non_binary, prefer_not_to_say
     bio = Column(Text)
 
     # 地理位置 (PostGIS)
@@ -29,7 +29,7 @@ class Profile(Base):
     min_age_preference = Column(Integer, default=18)
     max_age_preference = Column(Integer, default=99)
     max_distance_km = Column(Integer, default=50)
-    gender_preference = Column(String(20), nullable=True)  # male, female, all
+    gender_preference = Column(String(20), nullable=True)  # male, female, both, all
 
     # 狀態
     is_complete = Column(Boolean, default=False)
@@ -38,7 +38,7 @@ class Profile(Base):
 
     # 時間戳記
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # 關聯
     user = relationship("User", back_populates="profile")
