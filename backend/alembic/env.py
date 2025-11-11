@@ -17,7 +17,10 @@ if config.config_file_name is not None:
 
 # 導入所有模型（這樣 Alembic 才能偵測到）
 from app.core.database import Base
-from app.models import User, Profile, Photo, InterestTag, profile_interests
+from app.models import (
+    User, Profile, Photo, InterestTag, profile_interests,
+    Like, Match, Message, BlockedUser
+)
 
 # 設定 MetaData
 target_metadata = Base.metadata

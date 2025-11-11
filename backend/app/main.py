@@ -73,13 +73,13 @@ async def hello_world():
 
 
 # ==================== API 路由 ====================
-from app.api import auth, profile
+from app.api import auth, profile, discovery
 
 app.include_router(auth.router, prefix=f"{settings.API_V1_PREFIX}/auth", tags=["認證"])
 app.include_router(profile.router, prefix=f"{settings.API_V1_PREFIX}/profile", tags=["個人檔案"])
+app.include_router(discovery.router, tags=["探索配對"])
 
 # 未來將加入的路由
-# app.include_router(discovery.router, prefix=f"{settings.API_V1_PREFIX}/discovery", tags=["探索配對"])
 # app.include_router(matches.router, prefix=f"{settings.API_V1_PREFIX}/matches", tags=["配對管理"])
 # app.include_router(messages.router, prefix=f"{settings.API_V1_PREFIX}/messages", tags=["聊天訊息"])
 # app.include_router(safety.router, prefix=f"{settings.API_V1_PREFIX}/safety", tags=["安全功能"])
