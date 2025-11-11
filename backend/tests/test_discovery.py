@@ -40,36 +40,60 @@ async def test_users(client: AsyncClient):
 async def completed_profiles(client: AsyncClient, test_users: dict, test_db: AsyncSession):
     """創建完整的個人檔案（包含照片和興趣）"""
     # Alice 的檔案
-    await client.post("/api/profile",
+    response = await client.post("/api/profile",
         headers={"Authorization": f"Bearer {test_users['alice']['token']}"},
         json={
             "display_name": "Alice",
             "gender": "female",
             "bio": "喜歡旅遊和美食",
-            "location": {"lat": 25.0330, "lng": 121.5654},
-            "location_name": "台北市信義區",
+            "location": {
+                "latitude": 25.0330,
+                "longitude": 121.5654,
+                "location_name": "台北市信義區"
+            }
+        }
+    )
+    assert response.status_code == 201, f"Failed to create Alice profile: {response.json()}"
+
+    # 更新 Alice 的偏好設定
+    response = await client.patch("/api/profile",
+        headers={"Authorization": f"Bearer {test_users['alice']['token']}"},
+        json={
             "min_age_preference": 25,
             "max_age_preference": 40,
             "max_distance_km": 50,
             "gender_preference": "male"
         }
     )
+    assert response.status_code == 200, f"Failed to update Alice preferences: {response.json()}"
 
     # Bob 的檔案
-    await client.post("/api/profile",
+    response = await client.post("/api/profile",
         headers={"Authorization": f"Bearer {test_users['bob']['token']}"},
         json={
             "display_name": "Bob",
             "gender": "male",
             "bio": "熱愛運動和旅遊",
-            "location": {"lat": 25.0500, "lng": 121.5500},
-            "location_name": "台北市大安區",
+            "location": {
+                "latitude": 25.0500,
+                "longitude": 121.5500,
+                "location_name": "台北市大安區"
+            }
+        }
+    )
+    assert response.status_code == 201, f"Failed to create Bob profile: {response.json()}"
+
+    # 更新 Bob 的偏好設定
+    response = await client.patch("/api/profile",
+        headers={"Authorization": f"Bearer {test_users['bob']['token']}"},
+        json={
             "min_age_preference": 22,
             "max_age_preference": 35,
             "max_distance_km": 30,
             "gender_preference": "female"
         }
     )
+    assert response.status_code == 200, f"Failed to update Bob preferences: {response.json()}"
 
     # 建立測試用的興趣標籤
     from app.models.profile import InterestTag
@@ -99,32 +123,51 @@ async def completed_profiles(client: AsyncClient, test_users: dict, test_db: Asy
     tag_ids = [str(tag.id) for tag in existing_tags[:5]]
 
     # 為 Alice 和 Bob 設定興趣標籤
-    await client.put("/api/profile/interests",
+    response = await client.put("/api/profile/interests",
         headers={"Authorization": f"Bearer {test_users['alice']['token']}"},
         json={"interest_ids": tag_ids[:4]}  # 使用前 4 個標籤
     )
+    assert response.status_code == 200, f"Failed to set Alice interests: {response.json()}"
 
-    await client.put("/api/profile/interests",
+    response = await client.put("/api/profile/interests",
         headers={"Authorization": f"Bearer {test_users['bob']['token']}"},
         json={"interest_ids": tag_ids[1:5]}  # 使用後 4 個標籤（有共同興趣）
     )
+    assert response.status_code == 200, f"Failed to set Bob interests: {response.json()}"
 
     # 上傳假照片
     from io import BytesIO
 
     # Alice 上傳照片
     fake_image = BytesIO(b"fake image content")
-    await client.post("/api/profile/photos",
+    response = await client.post("/api/profile/photos",
         headers={"Authorization": f"Bearer {test_users['alice']['token']}"},
         files={"file": ("photo.jpg", fake_image, "image/jpeg")}
     )
+    assert response.status_code == 201, f"Failed to upload Alice photo: {response.json()}"
 
     # Bob 上傳照片
     fake_image = BytesIO(b"fake image content")
-    await client.post("/api/profile/photos",
+    response = await client.post("/api/profile/photos",
         headers={"Authorization": f"Bearer {test_users['bob']['token']}"},
         files={"file": ("photo.jpg", fake_image, "image/jpeg")}
     )
+    assert response.status_code == 201, f"Failed to upload Bob photo: {response.json()}"
+
+    # 驗證檔案完整度
+    response = await client.get("/api/profile",
+        headers={"Authorization": f"Bearer {test_users['alice']['token']}"}
+    )
+    alice_profile = response.json()
+    print(f"Alice profile is_complete: {alice_profile.get('is_complete')}")
+    assert alice_profile.get('is_complete') == True, f"Alice profile not complete: {alice_profile}"
+
+    response = await client.get("/api/profile",
+        headers={"Authorization": f"Bearer {test_users['bob']['token']}"}
+    )
+    bob_profile = response.json()
+    print(f"Bob profile is_complete: {bob_profile.get('is_complete')}")
+    assert bob_profile.get('is_complete') == True, f"Bob profile not complete: {bob_profile}"
 
     return test_users
 

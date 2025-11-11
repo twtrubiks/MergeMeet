@@ -77,10 +77,17 @@ curl -X POST "http://localhost:8000/api/profile" \
     "gender": "female",
     "bio": "喜歡旅遊和美食",
     "location": {
-      "lat": 25.0330,
-      "lng": 121.5654
-    },
-    "location_name": "台北市信義區",
+      "latitude": 25.0330,
+      "longitude": 121.5654,
+      "location_name": "台北市信義區"
+    }
+  }'
+
+# 更新偏好設定
+curl -X PATCH "http://localhost:8000/api/profile" \
+  -H "Authorization: Bearer TOKEN_A" \
+  -H "Content-Type: application/json" \
+  -d '{
     "min_age_preference": 25,
     "max_age_preference": 35,
     "max_distance_km": 50,
@@ -123,10 +130,17 @@ curl -X POST "http://localhost:8000/api/profile" \
     "gender": "male",
     "bio": "熱愛運動和旅遊",
     "location": {
-      "lat": 25.0500,
-      "lng": 121.5500
-    },
-    "location_name": "台北市大安區",
+      "latitude": 25.0500,
+      "longitude": 121.5500,
+      "location_name": "台北市大安區"
+    }
+  }'
+
+# 更新 Bob 的偏好設定
+curl -X PATCH "http://localhost:8000/api/profile" \
+  -H "Authorization: Bearer TOKEN_B" \
+  -H "Content-Type: application/json" \
+  -d '{
     "min_age_preference": 22,
     "max_age_preference": 32,
     "max_distance_km": 30,
