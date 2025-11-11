@@ -34,18 +34,18 @@ services:
       retries: 5
 
   # pgAdmin（資料庫管理介面，選用）
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: mergemeet_pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@mergemeet.com
-      PGADMIN_DEFAULT_PASSWORD: admin123
-    ports:
-      - "5050:80"
-    depends_on:
-      - postgres
-    profiles:
-      - admin
+  # pgadmin:
+  #   image: dpage/pgadmin4:latest
+  #   container_name: mergemeet_pgadmin
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: admin@mergemeet.com
+  #     PGADMIN_DEFAULT_PASSWORD: admin123
+  #   ports:
+  #     - "5050:80"
+  #   depends_on:
+  #     - postgres
+  #   profiles:
+  #     - admin
 
 volumes:
   postgres_data:
