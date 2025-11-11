@@ -1,16 +1,21 @@
 """測試配置與 Fixtures"""
 import pytest
 import asyncio
+import os
 from typing import AsyncGenerator
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.pool import NullPool
+from sqlalchemy import text
 
 from app.main import app
 from app.core.database import Base, get_db
 
-# 測試資料庫 URL（使用記憶體資料庫）
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+# 測試資料庫 URL（使用獨立的 PostgreSQL 測試資料庫）
+TEST_DATABASE_URL = os.getenv(
+    "TEST_DATABASE_URL",
+    "postgresql+asyncpg://mergemeet:YOUR_DB_PASSWORD_HERE@localhost:5432/mergemeet_test"
+)
 
 
 @pytest.fixture(scope="session")
@@ -28,12 +33,13 @@ async def test_db() -> AsyncGenerator[AsyncSession, None]:
     engine = create_async_engine(
         TEST_DATABASE_URL,
         echo=False,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
+        poolclass=NullPool,  # 測試環境不使用連接池
     )
 
-    # 建立所有表格
+    # 建立所有表格（包含 PostGIS 擴展）
     async with engine.begin() as conn:
+        # 確保 PostGIS 擴展已啟用
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
         await conn.run_sync(Base.metadata.create_all)
 
     # 建立 Session
@@ -47,7 +53,7 @@ async def test_db() -> AsyncGenerator[AsyncSession, None]:
         yield session
         await session.rollback()
 
-    # 清理
+    # 清理（刪除所有表格）
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
