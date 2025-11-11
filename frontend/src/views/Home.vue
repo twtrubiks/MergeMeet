@@ -10,7 +10,10 @@
         <div v-if="userStore.isAuthenticated" class="auth-info">
           <p class="success">✅ 已登入</p>
           <p class="user-email">{{ userStore.userEmail }}</p>
-          <button @click="handleLogout" class="btn-secondary">登出</button>
+          <div class="button-group">
+            <router-link to="/profile" class="btn-primary">個人檔案</router-link>
+            <button @click="handleLogout" class="btn-secondary">登出</button>
+          </div>
         </div>
         <div v-else class="auth-actions">
           <p class="info-text">請登入或註冊以使用完整功能</p>
@@ -36,16 +39,32 @@
 
       <!-- 開發資訊 -->
       <div class="info">
-        <h3>Week 1 已完成功能</h3>
-        <ul>
-          <li>✅ 用戶註冊 API</li>
-          <li>✅ 用戶登入 API</li>
-          <li>✅ JWT 認證機制</li>
-          <li>✅ Token 刷新功能</li>
-          <li>✅ Email 驗證</li>
-          <li>✅ 密碼強度驗證</li>
-          <li>✅ 年齡驗證（18+）</li>
-        </ul>
+        <h3>已完成功能</h3>
+        <div class="features-grid">
+          <div class="feature-section">
+            <h4>Week 1: 認證系統</h4>
+            <ul>
+              <li>✅ 用戶註冊 API</li>
+              <li>✅ 用戶登入 API</li>
+              <li>✅ JWT 認證機制</li>
+              <li>✅ Token 刷新功能</li>
+              <li>✅ Email 驗證</li>
+              <li>✅ 密碼強度驗證</li>
+              <li>✅ 年齡驗證（18+）</li>
+            </ul>
+          </div>
+          <div class="feature-section">
+            <h4>Week 2: 個人檔案</h4>
+            <ul>
+              <li>✅ 個人檔案建立與編輯</li>
+              <li>✅ 照片上傳管理（最多 6 張）</li>
+              <li>✅ 興趣標籤選擇（47 種標籤）</li>
+              <li>✅ 地理位置（PostGIS）</li>
+              <li>✅ 配對偏好設定</li>
+              <li>✅ 檔案完整度檢查</li>
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -159,6 +178,18 @@ h1 {
 
 .info li:last-child {
   border-bottom: none;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.feature-section h4 {
+  margin-bottom: 0.75rem;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 1.1rem;
 }
 
 .auth-card {
