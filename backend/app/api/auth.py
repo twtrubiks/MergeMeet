@@ -79,6 +79,7 @@ async def register(
         password_hash=get_password_hash(request.password),
         date_of_birth=request.date_of_birth,
         email_verified=False,
+        is_active=True,  # 明確設置為啟用狀態
     )
 
     db.add(new_user)
