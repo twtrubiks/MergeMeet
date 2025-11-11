@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, not_, func, case
+from sqlalchemy.orm import selectinload
 from geoalchemy2.functions import ST_Distance, ST_DWithin
 from typing import Optional, List
 from datetime import datetime, timedelta
@@ -33,9 +34,11 @@ async def browse_users(
     - 排除已喜歡、已配對、已封鎖的用戶
     - 按配對分數排序
     """
-    # 取得當前用戶的 profile
+    # 取得當前用戶的 profile（預先加載 interests）
     result = await db.execute(
-        select(Profile).where(Profile.user_id == current_user.id)
+        select(Profile)
+        .options(selectinload(Profile.interests))
+        .where(Profile.user_id == current_user.id)
     )
     my_profile = result.scalar_one_or_none()
 
@@ -62,10 +65,15 @@ async def browse_users(
     max_birth_date = today - relativedelta(years=min_age)
     min_birth_date = today - relativedelta(years=max_age + 1)
 
-    # 建立主查詢
+    # 建立主查詢（預先加載 relationships）
     query = (
         select(Profile)
         .join(User, Profile.user_id == User.id)
+        .options(
+            selectinload(Profile.user),
+            selectinload(Profile.photos),
+            selectinload(Profile.interests)
+        )
         .where(
             and_(
                 Profile.user_id != current_user.id,
@@ -373,9 +381,15 @@ async def get_matches(
         # 取得配對對象的 user_id
         matched_user_id = match.user2_id if match.user1_id == current_user.id else match.user1_id
 
-        # 取得對方的 profile
+        # 取得對方的 profile（預先加載 relationships）
         result = await db.execute(
-            select(Profile).where(Profile.user_id == matched_user_id)
+            select(Profile)
+            .options(
+                selectinload(Profile.user),
+                selectinload(Profile.photos),
+                selectinload(Profile.interests)
+            )
+            .where(Profile.user_id == matched_user_id)
         )
         matched_profile = result.scalar_one_or_none()
 
