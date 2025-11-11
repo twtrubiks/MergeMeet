@@ -304,7 +304,7 @@ const resetFormData = () => {
 /**
  * 下一步
  */
-const nextStep = () => {
+const nextStep = async () => {
   // 驗證步驟 1
   if (currentStep.value === 1) {
     if (!formData.value.display_name || !formData.value.gender || !formData.value.bio) {
@@ -313,7 +313,24 @@ const nextStep = () => {
     }
     // 如果是建立模式，先儲存基本資料
     if (isCreating.value) {
-      saveBasicInfo()
+      await saveBasicInfo()
+      // 如果建立失敗，不繼續下一步
+      if (!profileStore.profile) {
+        return
+      }
+      // 建立成功後直接進入下一步
+      currentStep.value++
+      return
+    }
+  }
+
+  // 驗證步驟 2（可選提示）
+  if (currentStep.value === 2) {
+    if (profileStore.profilePhotos.length === 0) {
+      const confirmed = confirm('建議至少上傳 1 張照片以提高配對成功率，確定要跳過嗎？')
+      if (!confirmed) {
+        return
+      }
     }
   }
 

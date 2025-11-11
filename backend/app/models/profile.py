@@ -82,7 +82,7 @@ class InterestTag(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(50), unique=True, nullable=False, index=True)
-    category = Column(String(50), nullable=False)  # sports, music, food, travel, etc.
+    category = Column(String(50), nullable=False, index=True)  # sports, music, food, travel, etc.
     icon = Column(String(10))  # emoji icon
     is_active = Column(Boolean, default=True)
 

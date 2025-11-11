@@ -395,9 +395,14 @@ async def upload_photo(
 
     注意：此版本暫不實際處理圖片，僅模擬上傳流程
     """
-    # 取得檔案
+    # 取得檔案（一次性載入照片和興趣以便後續檢查完整度）
     result = await db.execute(
-        select(Profile).where(Profile.user_id == current_user.id)
+        select(Profile)
+        .options(
+            selectinload(Profile.photos),
+            selectinload(Profile.interests)
+        )
+        .where(Profile.user_id == current_user.id)
     )
     profile = result.scalar_one_or_none()
 
@@ -408,10 +413,7 @@ async def upload_photo(
         )
 
     # 檢查照片數量（最多 6 張）
-    result = await db.execute(
-        select(Photo).where(Photo.profile_id == profile.id)
-    )
-    existing_photos = result.scalars().all()
+    existing_photos = profile.photos
 
     if len(existing_photos) >= 6:
         raise HTTPException(
@@ -445,7 +447,7 @@ async def upload_photo(
     await db.commit()
     await db.refresh(new_photo)
 
-    # 重新載入 profile 以檢查完整度
+    # 重新載入 profile 的關聯以檢查完整度
     await db.refresh(profile, ["photos", "interests"])
     profile.is_complete = check_profile_completeness(profile)
     await db.commit()
@@ -484,12 +486,14 @@ async def delete_photo(
             detail="照片不存在"
         )
 
-    # 取得 profile 以便檢查完整度
+    # 取得 profile 以便檢查完整度和重新排序
     profile_id = photo.profile_id
+    deleted_order = photo.display_order
+
     await db.delete(photo)
     await db.commit()
 
-    # 重新檢查檔案完整度
+    # 重新載入 profile 及其照片
     result = await db.execute(
         select(Profile)
         .options(
@@ -501,6 +505,20 @@ async def delete_photo(
     profile = result.scalar_one_or_none()
 
     if profile:
+        # 重新排序照片（讓順序連續）
+        remaining_photos = sorted(profile.photos, key=lambda p: p.display_order)
+        for index, photo_item in enumerate(remaining_photos):
+            photo_item.display_order = index
+
+        # 如果刪除的是第一張照片，且還有其他照片，將第一張照片設為主頭像
+        if deleted_order == 0 and remaining_photos:
+            # 先清除所有照片的主頭像標記
+            for photo_item in remaining_photos:
+                photo_item.is_profile_picture = False
+            # 將第一張設為主頭像
+            remaining_photos[0].is_profile_picture = True
+
+        # 檢查檔案完整度
         profile.is_complete = check_profile_completeness(profile)
         await db.commit()
 
