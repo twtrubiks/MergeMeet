@@ -1,0 +1,36 @@
+# Alembic 資料庫遷移
+
+這個目錄包含所有資料庫遷移腳本。
+
+## 常用指令
+
+### 建立新的遷移
+```bash
+alembic revision --autogenerate -m "描述變更內容"
+```
+
+### 執行遷移（升級到最新版本）
+```bash
+alembic upgrade head
+```
+
+### 回滾一個版本
+```bash
+alembic downgrade -1
+```
+
+### 查看當前版本
+```bash
+alembic current
+```
+
+### 查看遷移歷史
+```bash
+alembic history
+```
+
+## 目錄結構
+
+- `env.py` - Alembic 環境配置
+- `script.py.mako` - 遷移腳本模板
+- `versions/` - 所有遷移腳本
