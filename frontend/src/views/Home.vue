@@ -2,8 +2,26 @@
   <div class="home">
     <div class="container">
       <h1>🎉 歡迎使用 MergeMeet</h1>
-      <p class="subtitle">交友平台開發環境已就緒</p>
+      <p class="subtitle">交友平台 Week 1 - 認證系統</p>
 
+      <!-- 認證狀態卡片 -->
+      <div class="card auth-card">
+        <h2>認證狀態</h2>
+        <div v-if="userStore.isAuthenticated" class="auth-info">
+          <p class="success">✅ 已登入</p>
+          <p class="user-email">{{ userStore.userEmail }}</p>
+          <button @click="handleLogout" class="btn-secondary">登出</button>
+        </div>
+        <div v-else class="auth-actions">
+          <p class="info-text">請登入或註冊以使用完整功能</p>
+          <div class="button-group">
+            <router-link to="/login" class="btn-primary">登入</router-link>
+            <router-link to="/register" class="btn-outline">註冊</router-link>
+          </div>
+        </div>
+      </div>
+
+      <!-- API 狀態卡片 -->
       <div class="card">
         <h2>後端 API 狀態</h2>
         <div v-if="loading">載入中...</div>
@@ -16,13 +34,17 @@
         </div>
       </div>
 
+      <!-- 開發資訊 -->
       <div class="info">
-        <h3>開發資訊</h3>
+        <h3>Week 1 已完成功能</h3>
         <ul>
-          <li>前端: Vue 3 + Vite</li>
-          <li>後端: FastAPI + Python</li>
-          <li>資料庫: PostgreSQL + PostGIS</li>
-          <li>快取: Redis</li>
+          <li>✅ 用戶註冊 API</li>
+          <li>✅ 用戶登入 API</li>
+          <li>✅ JWT 認證機制</li>
+          <li>✅ Token 刷新功能</li>
+          <li>✅ Email 驗證</li>
+          <li>✅ 密碼強度驗證</li>
+          <li>✅ 年齡驗證（18+）</li>
         </ul>
       </div>
     </div>
@@ -31,7 +53,12 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import axios from 'axios'
+import { useUserStore } from '@/stores/user'
+
+const router = useRouter()
+const userStore = useUserStore()
 
 const loading = ref(true)
 const apiStatus = ref(null)
@@ -46,6 +73,14 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+/**
+ * 處理登出
+ */
+const handleLogout = () => {
+  userStore.logout()
+  router.push('/login')
+}
 </script>
 
 <style scoped>
@@ -124,5 +159,83 @@ h1 {
 
 .info li:last-child {
   border-bottom: none;
+}
+
+.auth-card {
+  text-align: center;
+}
+
+.auth-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+}
+
+.user-email {
+  color: #667eea;
+  font-weight: 600;
+}
+
+.info-text {
+  color: #666;
+  margin-bottom: 1rem;
+}
+
+.auth-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.button-group {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.btn-primary,
+.btn-outline,
+.btn-secondary {
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  border: none;
+  font-size: 1rem;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+}
+
+.btn-outline {
+  background: transparent;
+  color: #667eea;
+  border: 2px solid #667eea;
+}
+
+.btn-outline:hover {
+  background: #667eea;
+  color: white;
+  transform: translateY(-2px);
+}
+
+.btn-secondary {
+  background: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #5a6268;
+  transform: translateY(-2px);
 }
 </style>

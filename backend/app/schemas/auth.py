@@ -1,0 +1,113 @@
+"""認證相關的 Pydantic Schemas"""
+from pydantic import BaseModel, EmailStr, Field, validator
+from datetime import date, datetime
+from typing import Optional
+import re
+
+
+class RegisterRequest(BaseModel):
+    """註冊請求"""
+    email: EmailStr = Field(..., description="Email 地址")
+    password: str = Field(..., min_length=8, max_length=50, description="密碼（至少 8 個字元）")
+    date_of_birth: date = Field(..., description="出生日期（用於年齡驗證）")
+
+    @validator("password")
+    def validate_password(cls, v):
+        """驗證密碼強度"""
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("密碼必須包含至少一個大寫字母")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("密碼必須包含至少一個小寫字母")
+        if not re.search(r"\d", v):
+            raise ValueError("密碼必須包含至少一個數字")
+        return v
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "email": "user@example.com",
+                "password": "Password123",
+                "date_of_birth": "1995-01-01"
+            }
+        }
+
+
+class LoginRequest(BaseModel):
+    """登入請求"""
+    email: EmailStr = Field(..., description="Email 地址")
+    password: str = Field(..., description="密碼")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "email": "user@example.com",
+                "password": "Password123"
+            }
+        }
+
+
+class TokenResponse(BaseModel):
+    """Token 回應"""
+    access_token: str = Field(..., description="存取 Token（JWT）")
+    refresh_token: str = Field(..., description="刷新 Token（JWT）")
+    token_type: str = Field(default="bearer", description="Token 類型")
+    expires_in: int = Field(..., description="過期時間（秒）")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                "token_type": "bearer",
+                "expires_in": 900
+            }
+        }
+
+
+class RefreshTokenRequest(BaseModel):
+    """刷新 Token 請求"""
+    refresh_token: str = Field(..., description="刷新 Token")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            }
+        }
+
+
+class UserResponse(BaseModel):
+    """用戶回應"""
+    id: str = Field(..., description="用戶 ID")
+    email: str = Field(..., description="Email 地址")
+    email_verified: bool = Field(..., description="Email 是否已驗證")
+    is_active: bool = Field(..., description="帳號是否啟用")
+    is_admin: bool = Field(..., description="是否為管理員")
+    created_at: datetime = Field(..., description="建立時間")
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "id": "550e8400-e29b-41d4-a716-446655440000",
+                "email": "user@example.com",
+                "email_verified": False,
+                "is_active": True,
+                "is_admin": False,
+                "created_at": "2024-01-01T00:00:00Z"
+            }
+        }
+
+
+class EmailVerificationRequest(BaseModel):
+    """Email 驗證請求"""
+    email: EmailStr = Field(..., description="Email 地址")
+    verification_code: str = Field(..., min_length=6, max_length=6, description="6 位數驗證碼")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "email": "user@example.com",
+                "verification_code": "123456"
+            }
+        }
