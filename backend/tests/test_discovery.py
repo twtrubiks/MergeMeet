@@ -53,7 +53,7 @@ async def completed_profiles(client: AsyncClient, test_users: dict, test_db: Asy
             }
         }
     )
-    assert response.status_code == 201, f"Failed to create Alice profile: {response.json()}"
+    assert response.status_code == 201, f"Failed to create Alice profile: status={response.status_code}, body={response.text}"
 
     # 更新 Alice 的偏好設定
     response = await client.patch("/api/profile",
@@ -65,7 +65,7 @@ async def completed_profiles(client: AsyncClient, test_users: dict, test_db: Asy
             "gender_preference": "male"
         }
     )
-    assert response.status_code == 200, f"Failed to update Alice preferences: {response.json()}"
+    assert response.status_code == 200, f"Failed to update Alice preferences: status={response.status_code}, body={response.text}"
 
     # Bob 的檔案
     response = await client.post("/api/profile",
@@ -81,7 +81,7 @@ async def completed_profiles(client: AsyncClient, test_users: dict, test_db: Asy
             }
         }
     )
-    assert response.status_code == 201, f"Failed to create Bob profile: {response.json()}"
+    assert response.status_code == 201, f"Failed to create Bob profile: status={response.status_code}, body={response.text}"
 
     # 更新 Bob 的偏好設定
     response = await client.patch("/api/profile",
@@ -93,7 +93,7 @@ async def completed_profiles(client: AsyncClient, test_users: dict, test_db: Asy
             "gender_preference": "female"
         }
     )
-    assert response.status_code == 200, f"Failed to update Bob preferences: {response.json()}"
+    assert response.status_code == 200, f"Failed to update Bob preferences: status={response.status_code}, body={response.text}"
 
     # 建立測試用的興趣標籤
     from app.models.profile import InterestTag
@@ -127,13 +127,13 @@ async def completed_profiles(client: AsyncClient, test_users: dict, test_db: Asy
         headers={"Authorization": f"Bearer {test_users['alice']['token']}"},
         json={"interest_ids": tag_ids[:4]}  # 使用前 4 個標籤
     )
-    assert response.status_code == 200, f"Failed to set Alice interests: {response.json()}"
+    assert response.status_code == 200, f"Failed to set Alice interests: status={response.status_code}, body={response.text}"
 
     response = await client.put("/api/profile/interests",
         headers={"Authorization": f"Bearer {test_users['bob']['token']}"},
         json={"interest_ids": tag_ids[1:5]}  # 使用後 4 個標籤（有共同興趣）
     )
-    assert response.status_code == 200, f"Failed to set Bob interests: {response.json()}"
+    assert response.status_code == 200, f"Failed to set Bob interests: status={response.status_code}, body={response.text}"
 
     # 上傳假照片
     from io import BytesIO
@@ -144,7 +144,7 @@ async def completed_profiles(client: AsyncClient, test_users: dict, test_db: Asy
         headers={"Authorization": f"Bearer {test_users['alice']['token']}"},
         files={"file": ("photo.jpg", fake_image, "image/jpeg")}
     )
-    assert response.status_code == 201, f"Failed to upload Alice photo: {response.json()}"
+    assert response.status_code == 201, f"Failed to upload Alice photo: status={response.status_code}, body={response.text}"
 
     # Bob 上傳照片
     fake_image = BytesIO(b"fake image content")
@@ -152,7 +152,7 @@ async def completed_profiles(client: AsyncClient, test_users: dict, test_db: Asy
         headers={"Authorization": f"Bearer {test_users['bob']['token']}"},
         files={"file": ("photo.jpg", fake_image, "image/jpeg")}
     )
-    assert response.status_code == 201, f"Failed to upload Bob photo: {response.json()}"
+    assert response.status_code == 201, f"Failed to upload Bob photo: status={response.status_code}, body={response.text}"
 
     # 驗證檔案完整度
     response = await client.get("/api/profile",
