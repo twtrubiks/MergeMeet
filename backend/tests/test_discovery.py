@@ -37,8 +37,8 @@ async def test_users(client: AsyncClient):
 
 
 @pytest.fixture
-async def completed_profiles(client: AsyncClient, test_users: dict):
-    """創建完整的個人檔案"""
+async def completed_profiles(client: AsyncClient, test_users: dict, test_db: AsyncSession):
+    """創建完整的個人檔案（包含照片和興趣）"""
     # Alice 的檔案
     await client.post("/api/profile",
         headers={"Authorization": f"Bearer {test_users['alice']['token']}"},
@@ -69,6 +69,61 @@ async def completed_profiles(client: AsyncClient, test_users: dict):
             "max_distance_km": 30,
             "gender_preference": "female"
         }
+    )
+
+    # 建立測試用的興趣標籤
+    from app.models.profile import InterestTag
+    from sqlalchemy import select
+
+    result = await test_db.execute(select(InterestTag).limit(5))
+    existing_tags = result.scalars().all()
+
+    # 如果沒有興趣標籤，先建立一些
+    if len(existing_tags) < 5:
+        tags_to_create = [
+            InterestTag(name="旅遊", category="lifestyle", icon="✈️"),
+            InterestTag(name="美食", category="lifestyle", icon="🍔"),
+            InterestTag(name="運動", category="sports", icon="⚽"),
+            InterestTag(name="音樂", category="entertainment", icon="🎵"),
+            InterestTag(name="電影", category="entertainment", icon="🎬"),
+        ]
+        for tag in tags_to_create:
+            test_db.add(tag)
+        await test_db.commit()
+
+        # 重新取得標籤
+        result = await test_db.execute(select(InterestTag).limit(5))
+        existing_tags = result.scalars().all()
+
+    # 取得標籤 ID
+    tag_ids = [str(tag.id) for tag in existing_tags[:5]]
+
+    # 為 Alice 和 Bob 設定興趣標籤
+    await client.put("/api/profile/interests",
+        headers={"Authorization": f"Bearer {test_users['alice']['token']}"},
+        json={"interest_ids": tag_ids[:4]}  # 使用前 4 個標籤
+    )
+
+    await client.put("/api/profile/interests",
+        headers={"Authorization": f"Bearer {test_users['bob']['token']}"},
+        json={"interest_ids": tag_ids[1:5]}  # 使用後 4 個標籤（有共同興趣）
+    )
+
+    # 上傳假照片
+    from io import BytesIO
+
+    # Alice 上傳照片
+    fake_image = BytesIO(b"fake image content")
+    await client.post("/api/profile/photos",
+        headers={"Authorization": f"Bearer {test_users['alice']['token']}"},
+        files={"file": ("photo.jpg", fake_image, "image/jpeg")}
+    )
+
+    # Bob 上傳照片
+    fake_image = BytesIO(b"fake image content")
+    await client.post("/api/profile/photos",
+        headers={"Authorization": f"Bearer {test_users['bob']['token']}"},
+        files={"file": ("photo.jpg", fake_image, "image/jpeg")}
     )
 
     return test_users
