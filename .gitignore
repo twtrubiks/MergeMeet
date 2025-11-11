@@ -11,6 +11,7 @@ ENV/
 *.egg-info/
 dist/
 build/
+.python-version
 
 # FastAPI
 .env
