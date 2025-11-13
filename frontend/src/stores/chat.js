@@ -1,0 +1,372 @@
+/**
+ * Chat Store
+ * 管理聊天相關狀態和 API 呼叫
+ */
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import apiClient from '@/api/client'
+import { useWebSocket } from '@/composables/useWebSocket'
+
+export const useChatStore = defineStore('chat', () => {
+  // WebSocket instance
+  const ws = useWebSocket()
+
+  // State
+  const conversations = ref([]) // 對話列表
+  const messages = ref({}) // matchId -> messages array
+  const currentMatchId = ref(null)
+  const loading = ref(false)
+  const error = ref(null)
+  const typingUsers = ref({}) // matchId -> userId (正在打字的用戶)
+
+  // Getters
+  const currentConversation = computed(() => {
+    return conversations.value.find(c => c.match_id === currentMatchId.value)
+  })
+
+  const currentMessages = computed(() => {
+    if (!currentMatchId.value) return []
+    return messages.value[currentMatchId.value] || []
+  })
+
+  const unreadCount = computed(() => {
+    return conversations.value.reduce((sum, conv) => sum + conv.unread_count, 0)
+  })
+
+  const isTyping = computed(() => {
+    if (!currentMatchId.value) return false
+    return !!typingUsers.value[currentMatchId.value]
+  })
+
+  /**
+   * 初始化 WebSocket 連接和訊息處理器
+   */
+  const initWebSocket = () => {
+    // 連接 WebSocket
+    ws.connect()
+
+    // 註冊訊息處理器
+    ws.onMessage('new_message', handleNewMessage)
+    ws.onMessage('typing', handleTypingIndicator)
+    ws.onMessage('read_receipt', handleReadReceipt)
+  }
+
+  /**
+   * 關閉 WebSocket 連接
+   */
+  const closeWebSocket = () => {
+    ws.disconnect()
+  }
+
+  /**
+   * 獲取對話列表
+   */
+  const fetchConversations = async () => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await apiClient.get('/messages/conversations/')
+      conversations.value = response.data
+      return response.data
+    } catch (err) {
+      error.value = err.response?.data?.detail || '無法取得對話列表'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * 獲取聊天記錄
+   */
+  const fetchChatHistory = async (matchId, page = 1, pageSize = 50) => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await apiClient.get(`/messages/matches/${matchId}/messages/`, {
+        params: { page, page_size: pageSize }
+      })
+
+      // 合併訊息 (避免重複)
+      if (!messages.value[matchId]) {
+        messages.value[matchId] = []
+      }
+
+      const existingIds = new Set(messages.value[matchId].map(m => m.id))
+      const newMessages = response.data.messages.filter(m => !existingIds.has(m.id))
+
+      // 按時間排序 (舊的在前)
+      messages.value[matchId] = [...messages.value[matchId], ...newMessages].sort(
+        (a, b) => new Date(a.sent_at) - new Date(b.sent_at)
+      )
+
+      return response.data
+    } catch (err) {
+      error.value = err.response?.data?.detail || '無法取得聊天記錄'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * 發送訊息
+   */
+  const sendMessage = async (matchId, content, messageType = 'TEXT') => {
+    if (!content.trim()) {
+      return
+    }
+
+    try {
+      // 透過 WebSocket 發送
+      const success = ws.sendChatMessage(matchId, content, messageType)
+
+      if (!success) {
+        throw new Error('WebSocket 未連接')
+      }
+
+      // 訊息會透過 WebSocket 的 new_message 事件返回並加入到列表中
+    } catch (err) {
+      error.value = err.message || '發送訊息失敗'
+      throw err
+    }
+  }
+
+  /**
+   * 標記訊息為已讀
+   */
+  const markAsRead = async (messageIds) => {
+    if (!messageIds || messageIds.length === 0) {
+      return
+    }
+
+    try {
+      await apiClient.post('/messages/messages/read/', {
+        message_ids: messageIds
+      })
+
+      // 更新本地狀態
+      messageIds.forEach(msgId => {
+        // 發送已讀回條
+        ws.sendReadReceipt(msgId)
+      })
+    } catch (err) {
+      console.error('標記訊息為已讀失敗:', err)
+    }
+  }
+
+  /**
+   * 標記對話中所有未讀訊息為已讀
+   */
+  const markConversationAsRead = async (matchId) => {
+    if (!messages.value[matchId]) return
+
+    const unreadMessages = messages.value[matchId]
+      .filter(m => !m.is_read && m.sender_id !== currentUserId())
+      .map(m => m.id)
+
+    if (unreadMessages.length > 0) {
+      await markAsRead(unreadMessages)
+
+      // 更新對話列表中的未讀數
+      const conv = conversations.value.find(c => c.match_id === matchId)
+      if (conv) {
+        conv.unread_count = 0
+      }
+    }
+  }
+
+  /**
+   * 刪除訊息
+   */
+  const deleteMessage = async (messageId) => {
+    try {
+      await apiClient.delete(`/messages/messages/${messageId}/`)
+
+      // 從本地狀態移除
+      for (const matchId in messages.value) {
+        const index = messages.value[matchId].findIndex(m => m.id === messageId)
+        if (index > -1) {
+          messages.value[matchId].splice(index, 1)
+          break
+        }
+      }
+    } catch (err) {
+      error.value = err.response?.data?.detail || '刪除訊息失敗'
+      throw err
+    }
+  }
+
+  /**
+   * 發送打字指示器
+   */
+  const sendTyping = (matchId, isTyping) => {
+    ws.sendTypingIndicator(matchId, isTyping)
+  }
+
+  /**
+   * 加入配對聊天室
+   */
+  const joinMatchRoom = (matchId) => {
+    currentMatchId.value = matchId
+    ws.joinMatch(matchId)
+
+    // 獲取聊天記錄
+    if (!messages.value[matchId]) {
+      fetchChatHistory(matchId)
+    }
+
+    // 標記已讀
+    markConversationAsRead(matchId)
+  }
+
+  /**
+   * 離開配對聊天室
+   */
+  const leaveMatchRoom = () => {
+    if (currentMatchId.value) {
+      ws.leaveMatch(currentMatchId.value)
+      currentMatchId.value = null
+    }
+  }
+
+  /**
+   * 處理新訊息事件
+   */
+  const handleNewMessage = (data) => {
+    const message = data.message
+    const matchId = message.match_id
+
+    // 確保該配對的訊息陣列存在
+    if (!messages.value[matchId]) {
+      messages.value[matchId] = []
+    }
+
+    // 檢查是否已存在 (避免重複)
+    const exists = messages.value[matchId].some(m => m.id === message.id)
+    if (!exists) {
+      messages.value[matchId].push(message)
+    }
+
+    // 更新對話列表中的最後一條訊息
+    const conv = conversations.value.find(c => c.match_id === matchId)
+    if (conv) {
+      conv.last_message = message
+
+      // 如果不是當前用戶發送的，增加未讀計數
+      if (message.sender_id !== currentUserId() && matchId !== currentMatchId.value) {
+        conv.unread_count = (conv.unread_count || 0) + 1
+      }
+
+      // 將對話移到列表頂部
+      conversations.value = [
+        conv,
+        ...conversations.value.filter(c => c.match_id !== matchId)
+      ]
+    }
+  }
+
+  /**
+   * 處理打字指示器
+   */
+  const handleTypingIndicator = (data) => {
+    const { match_id, user_id, is_typing } = data
+
+    if (is_typing) {
+      typingUsers.value[match_id] = user_id
+      // 3 秒後自動清除
+      setTimeout(() => {
+        if (typingUsers.value[match_id] === user_id) {
+          delete typingUsers.value[match_id]
+        }
+      }, 3000)
+    } else {
+      delete typingUsers.value[match_id]
+    }
+  }
+
+  /**
+   * 處理已讀回條
+   */
+  const handleReadReceipt = (data) => {
+    const { message_id, read_at } = data
+
+    // 更新訊息狀態
+    for (const matchId in messages.value) {
+      const message = messages.value[matchId].find(m => m.id === message_id)
+      if (message) {
+        message.is_read = read_at
+        break
+      }
+    }
+  }
+
+  /**
+   * 獲取當前用戶 ID (從 user store)
+   */
+  const currentUserId = () => {
+    // 這裡應該從 user store 獲取
+    const userStore = useAuthStore()
+    return userStore.user?.id
+  }
+
+  /**
+   * 清除錯誤訊息
+   */
+  const clearError = () => {
+    error.value = null
+  }
+
+  /**
+   * 重置 Store
+   */
+  const $reset = () => {
+    conversations.value = []
+    messages.value = {}
+    currentMatchId.value = null
+    loading.value = false
+    error.value = null
+    typingUsers.value = {}
+    closeWebSocket()
+  }
+
+  return {
+    // State
+    conversations,
+    messages,
+    currentMatchId,
+    loading,
+    error,
+    typingUsers,
+
+    // Getters
+    currentConversation,
+    currentMessages,
+    unreadCount,
+    isTyping,
+
+    // WebSocket
+    ws,
+    initWebSocket,
+    closeWebSocket,
+
+    // Actions
+    fetchConversations,
+    fetchChatHistory,
+    sendMessage,
+    markAsRead,
+    markConversationAsRead,
+    deleteMessage,
+    sendTyping,
+    joinMatchRoom,
+    leaveMatchRoom,
+    clearError,
+    $reset
+  }
+})
+
+// 需要導入 useUserStore (避免循環依賴，在函數內部導入)
+function useAuthStore() {
+  const { useUserStore } = require('./user')
+  return useUserStore()
+}

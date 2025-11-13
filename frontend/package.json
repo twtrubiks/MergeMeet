@@ -12,20 +12,21 @@
     "test:coverage": "vitest --coverage"
   },
   "dependencies": {
-    "vue": "^3.4.0",
-    "vue-router": "^4.2.5",
-    "pinia": "^2.1.7",
+    "@vicons/ionicons5": "^0.13.0",
     "axios": "^1.6.5",
     "naive-ui": "^2.38.1",
-    "socket.io-client": "^4.6.1"
+    "pinia": "^2.1.7",
+    "socket.io-client": "^4.6.1",
+    "vue": "^3.4.0",
+    "vue-router": "^4.2.5"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.3",
-    "vite": "^5.0.12",
-    "vitest": "^1.2.0",
     "@vue/test-utils": "^2.4.3",
-    "tailwindcss": "^3.4.1",
+    "autoprefixer": "^10.4.17",
     "postcss": "^8.4.33",
-    "autoprefixer": "^10.4.17"
+    "tailwindcss": "^3.4.1",
+    "vite": "^5.0.12",
+    "vitest": "^1.2.0"
   }
 }

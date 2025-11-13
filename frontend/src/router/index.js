@@ -7,6 +7,8 @@ import Profile from '@/views/Profile.vue'
 import Discovery from '@/views/Discovery.vue'
 import Matches from '@/views/Matches.vue'
 import Blocked from '@/views/Blocked.vue'
+import ChatList from '@/views/ChatList.vue'
+import Chat from '@/views/Chat.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -51,6 +53,18 @@ const router = createRouter({
       path: '/blocked',
       name: 'blocked',
       component: Blocked,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/messages',
+      name: 'messages',
+      component: ChatList,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/messages/:matchId',
+      name: 'chat',
+      component: Chat,
       meta: { requiresAuth: true }
     }
   ]
