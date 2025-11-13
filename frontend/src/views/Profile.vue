@@ -346,11 +346,50 @@ const nextStep = async () => {
 }
 
 /**
+ * 將地點名稱轉換為經緯度（簡易版）
+ */
+const geocodeLocation = (locationName) => {
+  // 常見台灣城市的經緯度（僅供測試使用）
+  const cityCoordinates = {
+    '台北市': { latitude: 25.0330, longitude: 121.5654 },
+    '新北市': { latitude: 25.0120, longitude: 121.4659 },
+    '桃園市': { latitude: 24.9936, longitude: 121.3010 },
+    '台中市': { latitude: 24.1477, longitude: 120.6736 },
+    '台南市': { latitude: 22.9997, longitude: 120.2270 },
+    '高雄市': { latitude: 22.6273, longitude: 120.3014 },
+    '新竹市': { latitude: 24.8138, longitude: 120.9675 },
+    '基隆市': { latitude: 25.1276, longitude: 121.7392 },
+  }
+
+  // 查找匹配的城市
+  for (const [city, coords] of Object.entries(cityCoordinates)) {
+    if (locationName.includes(city)) {
+      return coords
+    }
+  }
+
+  // 如果找不到，返回台北市座標作為預設
+  return { latitude: 25.0330, longitude: 121.5654 }
+}
+
+/**
  * 儲存基本資料
  */
 const saveBasicInfo = async () => {
   try {
-    await profileStore.createProfile(formData.value)
+    // 如果有填寫地點，轉換為經緯度
+    const profileData = { ...formData.value }
+    if (profileData.location_name) {
+      const coords = geocodeLocation(profileData.location_name)
+      profileData.location = {
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        location_name: profileData.location_name
+      }
+      delete profileData.location_name // 移除純文字欄位
+    }
+
+    await profileStore.createProfile(profileData)
     isCreating.value = false
     isEditing.value = true // 切換到編輯模式
   } catch (error) {
@@ -365,7 +404,19 @@ const submitProfile = async () => {
   try {
     // 更新基本資料（如果有修改）
     if (isEditing.value) {
-      await profileStore.updateProfile(formData.value)
+      // 如果有填寫地點，轉換為經緯度
+      const profileData = { ...formData.value }
+      if (profileData.location_name) {
+        const coords = geocodeLocation(profileData.location_name)
+        profileData.location = {
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          location_name: profileData.location_name
+        }
+        delete profileData.location_name // 移除純文字欄位
+      }
+
+      await profileStore.updateProfile(profileData)
     }
 
     // 更新興趣標籤
