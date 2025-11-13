@@ -82,6 +82,7 @@ async def handle_chat_message(data: dict, sender_id: str):
         sender_id: 發送者 ID
     """
     from app.core.database import AsyncSessionLocal
+    from app.services.content_moderation import ContentModerationService
 
     async with AsyncSessionLocal() as db:
         try:
@@ -90,6 +91,31 @@ async def handle_chat_message(data: dict, sender_id: str):
 
             if not match_id or not content:
                 logger.warning(f"Invalid message data from {sender_id}: {data}")
+                return
+
+            # 內容審核：檢查敏感詞
+            is_safe, violations = ContentModerationService.check_message_content(content)
+            if not is_safe:
+                logger.warning(f"Unsafe content detected from {sender_id}: {violations}")
+                await manager.send_personal_message(
+                    sender_id,
+                    {
+                        "type": "error",
+                        "message": "訊息包含不當內容，已被系統拒絕",
+                        "violations": violations
+                    }
+                )
+
+                # 記錄違規行為（可選：增加警告次數）
+                result = await db.execute(
+                    select(User).where(User.id == sender_id)
+                )
+                user = result.scalar_one_or_none()
+                if user:
+                    user.warning_count += 1
+                    await db.commit()
+                    logger.info(f"User {sender_id} warning count increased to {user.warning_count}")
+
                 return
 
             # 驗證配對是否存在且為活躍狀態

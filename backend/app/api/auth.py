@@ -155,6 +155,65 @@ async def login(
     )
 
 
+@router.post("/admin-login", response_model=TokenResponse)
+async def admin_login(
+    request: LoginRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    管理員登入
+
+    - 驗證 Email 和密碼
+    - 檢查管理員權限
+    - 返回 JWT Token
+    """
+    # 查找用戶
+    result = await db.execute(
+        select(User).where(User.email == request.email)
+    )
+    user = result.scalar_one_or_none()
+
+    # 驗證用戶存在且密碼正確
+    if not user or not verify_password(request.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email 或密碼錯誤",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 檢查是否為管理員
+    if not user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="沒有管理員權限"
+        )
+
+    # 檢查帳號是否啟用
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="帳號已被停用"
+        )
+
+    # 檢查是否被封禁
+    if user.banned_until and user.banned_until > date.today():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"帳號已被封禁至 {user.banned_until}"
+        )
+
+    # 生成 JWT Token
+    access_token = create_access_token(data={"sub": str(user.id)})
+    refresh_token = create_refresh_token(data={"sub": str(user.id)})
+
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer",
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+
+
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(
     request: RefreshTokenRequest,

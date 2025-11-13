@@ -83,3 +83,23 @@ async def get_current_active_user(
     這是 get_current_user 的別名，用於明確表示需要啟用的用戶
     """
     return current_user
+
+
+async def get_current_admin_user(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """
+    取得當前管理員用戶
+
+    檢查用戶是否具有管理員權限
+
+    Raises:
+        HTTPException: 如果用戶不是管理員
+    """
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="需要管理員權限"
+        )
+
+    return current_user

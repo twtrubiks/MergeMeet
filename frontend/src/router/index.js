@@ -9,6 +9,8 @@ import Matches from '@/views/Matches.vue'
 import Blocked from '@/views/Blocked.vue'
 import ChatList from '@/views/ChatList.vue'
 import Chat from '@/views/Chat.vue'
+import AdminLogin from '@/views/admin/AdminLogin.vue'
+import AdminDashboard from '@/views/admin/AdminDashboard.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -66,6 +68,18 @@ const router = createRouter({
       name: 'chat',
       component: Chat,
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/admin/login',
+      name: 'admin-login',
+      component: AdminLogin,
+      meta: { requiresAuth: false, requiresAdmin: false }
+    },
+    {
+      path: '/admin',
+      name: 'admin-dashboard',
+      component: AdminDashboard,
+      meta: { requiresAuth: true, requiresAdmin: true }
     }
   ]
 })

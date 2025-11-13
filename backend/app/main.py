@@ -73,7 +73,7 @@ async def hello_world():
 
 
 # ==================== API 路由 ====================
-from app.api import auth, profile, discovery, safety, websocket, messages
+from app.api import auth, profile, discovery, safety, websocket, messages, admin
 
 app.include_router(auth.router, prefix=f"{settings.API_V1_PREFIX}/auth", tags=["認證"])
 app.include_router(profile.router, prefix=f"{settings.API_V1_PREFIX}/profile", tags=["個人檔案"])
@@ -81,10 +81,10 @@ app.include_router(discovery.router, tags=["探索配對"])
 app.include_router(websocket.router, tags=["WebSocket"])
 app.include_router(messages.router, prefix=f"{settings.API_V1_PREFIX}/messages", tags=["聊天訊息"])
 app.include_router(safety.router, prefix=f"{settings.API_V1_PREFIX}/safety", tags=["安全功能"])
+app.include_router(admin.router, prefix=f"{settings.API_V1_PREFIX}/admin", tags=["管理後台"])
 
 # 未來將加入的路由
 # app.include_router(matches.router, prefix=f"{settings.API_V1_PREFIX}/matches", tags=["配對管理"])
-# app.include_router(admin.router, prefix=f"{settings.API_V1_PREFIX}/admin", tags=["管理後台"])
 
 
 if __name__ == "__main__":
