@@ -13,8 +13,17 @@
 </template>
 
 <script setup>
+import { onMounted } from 'vue'
 import { RouterView } from 'vue-router'
 import { NConfigProvider, NMessageProvider, NDialogProvider, NNotificationProvider } from 'naive-ui'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
+
+// 初始化：從 token 恢復用戶資料
+onMounted(() => {
+  userStore.initializeFromToken()
+})
 </script>
 
 <style>

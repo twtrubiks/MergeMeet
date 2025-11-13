@@ -171,6 +171,34 @@ export const useUserStore = defineStore('user', () => {
     error.value = null
   }
 
+  /**
+   * 從 JWT Token 解析用戶資料並初始化
+   */
+  const initializeFromToken = () => {
+    if (!accessToken.value) {
+      return
+    }
+
+    try {
+      // 解析 JWT token (格式: header.payload.signature)
+      const payload = accessToken.value.split('.')[1]
+      const decodedPayload = JSON.parse(atob(payload))
+
+      // 從 token 提取用戶資訊
+      if (decodedPayload.sub) {
+        user.value = {
+          id: decodedPayload.sub,
+          email: decodedPayload.email || null,
+          email_verified: decodedPayload.email_verified || false
+        }
+      }
+    } catch (err) {
+      console.error('Failed to decode token:', err)
+      // Token 無效，清除
+      clearTokens()
+    }
+  }
+
   return {
     // 狀態
     user,
@@ -190,5 +218,6 @@ export const useUserStore = defineStore('user', () => {
     clearError,
     saveTokens,
     clearTokens,
+    initializeFromToken,
   }
 })
