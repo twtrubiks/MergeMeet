@@ -49,6 +49,16 @@
               <span class="score-icon">💕</span>
               <span class="score-value">{{ candidate.match_score }}%</span>
             </div>
+
+            <!-- 舉報按鈕 -->
+            <button
+              v-if="index === 0"
+              class="report-btn"
+              @click.stop="handleOpenReportModal(candidate)"
+              title="舉報此用戶"
+            >
+              🚨
+            </button>
           </div>
 
           <!-- 卡片資訊 -->
@@ -126,6 +136,14 @@
       :matched-user="discoveryStore.lastMatchedUser"
       @close="handleCloseMatchModal"
     />
+
+    <!-- 舉報彈窗 -->
+    <ReportModal
+      :show="showReportModal"
+      :reported-user="reportTarget"
+      @close="handleCloseReportModal"
+      @reported="handleReported"
+    />
   </div>
 </template>
 
@@ -133,6 +151,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useDiscoveryStore } from '@/stores/discovery'
 import MatchModal from '@/components/MatchModal.vue'
+import ReportModal from '@/components/ReportModal.vue'
 
 const discoveryStore = useDiscoveryStore()
 
@@ -146,6 +165,10 @@ const isAnimating = ref(false)
 
 // 配對成功彈窗
 const showMatchModal = ref(false)
+
+// 舉報彈窗
+const showReportModal = ref(false)
+const reportTarget = ref(null)
 
 // 顯示的候選人（最多顯示 3 張卡片）
 const visibleCandidates = computed(() => {
@@ -283,6 +306,32 @@ const animateCardExit = (direction) => {
 const handleCloseMatchModal = () => {
   showMatchModal.value = false
   discoveryStore.clearLastMatch()
+}
+
+/**
+ * 開啟舉報彈窗
+ */
+const handleOpenReportModal = (candidate) => {
+  reportTarget.value = candidate
+  showReportModal.value = true
+}
+
+/**
+ * 關閉舉報彈窗
+ */
+const handleCloseReportModal = () => {
+  showReportModal.value = false
+  reportTarget.value = null
+}
+
+/**
+ * 舉報成功處理
+ */
+const handleReported = () => {
+  // 舉報成功後，自動跳過該用戶
+  if (discoveryStore.currentCandidate) {
+    handlePass()
+  }
 }
 
 /**
@@ -543,6 +592,36 @@ onUnmounted(() => {
   font-size: 16px;
   font-weight: 700;
   color: #FF6B6B;
+}
+
+/* 舉報按鈕 */
+.report-btn {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  width: 44px;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.95);
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.report-btn:hover {
+  background: #FFF;
+  transform: scale(1.1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+.report-btn:active {
+  transform: scale(0.95);
 }
 
 /* 卡片資訊 */

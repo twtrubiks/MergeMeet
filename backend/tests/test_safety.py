@@ -233,3 +233,181 @@ async def test_block_cancels_match(client: AsyncClient, test_users_for_safety: d
     updated_match = result.scalar_one()
     assert updated_match.status == "UNMATCHED"
     assert updated_match.unmatched_by == alice.id
+
+
+# ==================== 舉報功能測試 ====================
+
+@pytest.mark.asyncio
+async def test_report_user_success(client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession):
+    """測試：成功舉報用戶"""
+    from sqlalchemy import select
+    result = await test_db.execute(
+        select(User).where(User.email == test_users_for_safety['bob']['email'])
+    )
+    bob = result.scalar_one()
+
+    # Alice 舉報 Bob
+    response = await client.post(
+        "/api/safety/report",
+        headers={"Authorization": f"Bearer {test_users_for_safety['alice']['token']}"},
+        json={
+            "reported_user_id": str(bob.id),
+            "report_type": "HARASSMENT",
+            "reason": "此用戶傳送不當訊息，讓我感到不舒服",
+            "evidence": "多次傳送騷擾訊息"
+        }
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["reported_user_id"] == str(bob.id)
+    assert data["report_type"] == "HARASSMENT"
+    assert data["status"] == "PENDING"
+
+
+@pytest.mark.asyncio
+async def test_cannot_report_self(client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession):
+    """測試：無法舉報自己"""
+    from sqlalchemy import select
+    result = await test_db.execute(
+        select(User).where(User.email == test_users_for_safety['alice']['email'])
+    )
+    alice = result.scalar_one()
+
+    # Alice 嘗試舉報自己
+    response = await client.post(
+        "/api/safety/report",
+        headers={"Authorization": f"Bearer {test_users_for_safety['alice']['token']}"},
+        json={
+            "reported_user_id": str(alice.id),
+            "report_type": "OTHER",
+            "reason": "測試用的舉報原因文字"
+        }
+    )
+
+    assert response.status_code == 400
+    assert "無法舉報自己" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_report_requires_valid_type(client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession):
+    """測試：舉報類型必須有效"""
+    from sqlalchemy import select
+    result = await test_db.execute(
+        select(User).where(User.email == test_users_for_safety['bob']['email'])
+    )
+    bob = result.scalar_one()
+
+    # Alice 使用無效的舉報類型
+    response = await client.post(
+        "/api/safety/report",
+        headers={"Authorization": f"Bearer {test_users_for_safety['alice']['token']}"},
+        json={
+            "reported_user_id": str(bob.id),
+            "report_type": "INVALID_TYPE",
+            "reason": "這是一個測試舉報的原因"
+        }
+    )
+
+    assert response.status_code == 400
+    assert "無效的舉報類型" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_report_nonexistent_user(client: AsyncClient, test_users_for_safety: dict):
+    """測試：舉報不存在的用戶"""
+    import uuid
+
+    # Alice 舉報不存在的用戶
+    fake_user_id = str(uuid.uuid4())
+    response = await client.post(
+        "/api/safety/report",
+        headers={"Authorization": f"Bearer {test_users_for_safety['alice']['token']}"},
+        json={
+            "reported_user_id": fake_user_id,
+            "report_type": "FAKE",
+            "reason": "這是一個測試舉報的原因"
+        }
+    )
+
+    assert response.status_code == 404
+    assert "被舉報用戶不存在" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_get_my_reports(client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession):
+    """測試：取得我的舉報記錄"""
+    from sqlalchemy import select
+
+    # 取得 Bob 和 Charlie 的 user_id
+    result = await test_db.execute(
+        select(User).where(User.email == test_users_for_safety['bob']['email'])
+    )
+    bob = result.scalar_one()
+
+    result = await test_db.execute(
+        select(User).where(User.email == test_users_for_safety['charlie']['email'])
+    )
+    charlie = result.scalar_one()
+
+    # Alice 舉報 Bob
+    await client.post(
+        "/api/safety/report",
+        headers={"Authorization": f"Bearer {test_users_for_safety['alice']['token']}"},
+        json={
+            "reported_user_id": str(bob.id),
+            "report_type": "HARASSMENT",
+            "reason": "騷擾行為讓我感到不適"
+        }
+    )
+
+    # Alice 舉報 Charlie
+    await client.post(
+        "/api/safety/report",
+        headers={"Authorization": f"Bearer {test_users_for_safety['alice']['token']}"},
+        json={
+            "reported_user_id": str(charlie.id),
+            "report_type": "FAKE",
+            "reason": "疑似假帳號，個人資料可疑"
+        }
+    )
+
+    # 取得舉報記錄
+    response = await client.get(
+        "/api/safety/reports",
+        headers={"Authorization": f"Bearer {test_users_for_safety['alice']['token']}"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 2
+    assert any(r["report_type"] == "HARASSMENT" for r in data)
+    assert any(r["report_type"] == "FAKE" for r in data)
+
+
+@pytest.mark.asyncio
+async def test_report_increases_warning_count(client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession):
+    """測試：舉報會增加被舉報用戶的警告次數"""
+    from sqlalchemy import select
+
+    # 取得 Bob 的初始警告次數
+    result = await test_db.execute(
+        select(User).where(User.email == test_users_for_safety['bob']['email'])
+    )
+    bob = result.scalar_one()
+    initial_warning_count = bob.warning_count
+
+    # Alice 舉報 Bob
+    await client.post(
+        "/api/safety/report",
+        headers={"Authorization": f"Bearer {test_users_for_safety['alice']['token']}"},
+        json={
+            "reported_user_id": str(bob.id),
+            "report_type": "INAPPROPRIATE",
+            "reason": "不當行為讓我感到不舒服"
+        }
+    )
+
+    # 刷新並檢查警告次數
+    await test_db.refresh(bob)
+    assert bob.warning_count == initial_warning_count + 1

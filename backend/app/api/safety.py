@@ -10,10 +10,13 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.models.match import BlockedUser, Match
+from app.models.report import Report
 from app.schemas.safety import (
     BlockUserRequest,
     BlockedUserResponse,
     UnblockUserRequest,
+    ReportUserRequest,
+    ReportResponse,
 )
 
 router = APIRouter()
@@ -169,3 +172,96 @@ async def get_blocked_users(
             ))
 
     return response
+
+
+@router.post("/report", status_code=status.HTTP_201_CREATED, response_model=ReportResponse)
+async def report_user(
+    request: ReportUserRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    舉報用戶
+
+    - 可舉報不當行為、騷擾、假帳號、詐騙等
+    - 不能舉報自己
+    - 需提供舉報原因（至少 10 字）
+    """
+    # 驗證不能舉報自己
+    if str(current_user.id) == request.reported_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="無法舉報自己"
+        )
+
+    # 檢查被舉報用戶是否存在
+    result = await db.execute(
+        select(User).where(User.id == request.reported_user_id)
+    )
+    reported_user = result.scalar_one_or_none()
+
+    if not reported_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="被舉報用戶不存在"
+        )
+
+    # 驗證舉報類型
+    valid_types = ["INAPPROPRIATE", "HARASSMENT", "FAKE", "SCAM", "OTHER"]
+    if request.report_type not in valid_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"無效的舉報類型。有效類型：{', '.join(valid_types)}"
+        )
+
+    # 創建舉報記錄
+    new_report = Report(
+        reporter_id=current_user.id,
+        reported_user_id=uuid.UUID(request.reported_user_id),
+        report_type=request.report_type,
+        reason=request.reason,
+        evidence=request.evidence,
+        status="PENDING"
+    )
+    db.add(new_report)
+
+    # 更新被舉報用戶的警告次數
+    reported_user.warning_count += 1
+
+    await db.commit()
+    await db.refresh(new_report)
+
+    return ReportResponse(
+        id=str(new_report.id),
+        reported_user_id=str(new_report.reported_user_id),
+        report_type=new_report.report_type,
+        reason=new_report.reason,
+        status=new_report.status,
+        created_at=new_report.created_at
+    )
+
+
+@router.get("/reports", response_model=List[ReportResponse])
+async def get_my_reports(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """取得我的舉報記錄"""
+    result = await db.execute(
+        select(Report)
+        .where(Report.reporter_id == current_user.id)
+        .order_by(Report.created_at.desc())
+    )
+    reports = result.scalars().all()
+
+    return [
+        ReportResponse(
+            id=str(report.id),
+            reported_user_id=str(report.reported_user_id),
+            report_type=report.report_type,
+            reason=report.reason,
+            status=report.status,
+            created_at=report.created_at
+        )
+        for report in reports
+    ]
