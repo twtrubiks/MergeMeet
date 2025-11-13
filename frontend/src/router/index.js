@@ -6,6 +6,7 @@ import Register from '@/views/Register.vue'
 import Profile from '@/views/Profile.vue'
 import Discovery from '@/views/Discovery.vue'
 import Matches from '@/views/Matches.vue'
+import Blocked from '@/views/Blocked.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -44,6 +45,12 @@ const router = createRouter({
       path: '/matches',
       name: 'matches',
       component: Matches,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/blocked',
+      name: 'blocked',
+      component: Blocked,
       meta: { requiresAuth: true }
     }
   ]
