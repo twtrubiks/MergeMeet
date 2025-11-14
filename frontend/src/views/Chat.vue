@@ -23,6 +23,20 @@
             </div>
           </div>
         </div>
+
+        <!-- 更多選項按鈕 -->
+        <n-dropdown
+          v-if="currentConversation"
+          :options="moreOptions"
+          @select="handleMoreAction"
+          trigger="click"
+        >
+          <n-button text class="more-button">
+            <template #icon>
+              <n-icon size="24"><EllipsisVertical /></n-icon>
+            </template>
+          </n-button>
+        </n-dropdown>
       </div>
 
       <!-- 訊息列表 -->
@@ -82,12 +96,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NButton, NIcon, NAvatar, NInput, NEmpty, NSpin, NAlert, useMessage, useDialog } from 'naive-ui'
-import { ArrowBack, Send } from '@vicons/ionicons5'
+import { NButton, NIcon, NAvatar, NInput, NEmpty, NSpin, NAlert, NDropdown, useMessage, useDialog } from 'naive-ui'
+import { ArrowBack, Send, EllipsisVertical, BanOutline, AlertCircleOutline } from '@vicons/ionicons5'
 import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
+import { useSafetyStore } from '@/stores/safety'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
 
 const route = useRoute()
@@ -96,6 +111,7 @@ const message = useMessage()
 const dialog = useDialog()
 const chatStore = useChatStore()
 const userStore = useUserStore()
+const safetyStore = useSafetyStore()
 
 const matchId = computed(() => route.params.matchId)
 const messageInput = ref('')
@@ -104,6 +120,21 @@ const typingTimer = ref(null)
 const defaultAvatar = 'https://via.placeholder.com/40'
 
 const currentConversation = computed(() => chatStore.currentConversation)
+const otherUserId = computed(() => currentConversation.value?.other_user_id)
+
+// 更多選項下拉選單
+const moreOptions = computed(() => [
+  {
+    label: '封鎖用戶',
+    key: 'block',
+    icon: () => h(NIcon, null, { default: () => h(BanOutline) })
+  },
+  {
+    label: '舉報用戶',
+    key: 'report',
+    icon: () => h(NIcon, null, { default: () => h(AlertCircleOutline) })
+  }
+])
 
 // 返回上一頁
 const goBack = () => {
@@ -126,6 +157,47 @@ const handleDeleteMessage = (messageId) => {
       }
     }
   })
+}
+
+// 處理更多選項動作
+const handleMoreAction = (key) => {
+  if (!otherUserId.value) {
+    message.error('無法獲取用戶資訊')
+    return
+  }
+
+  if (key === 'block') {
+    handleBlockUser()
+  } else if (key === 'report') {
+    handleReportUser()
+  }
+}
+
+// 封鎖用戶
+const handleBlockUser = () => {
+  dialog.warning({
+    title: '封鎖用戶',
+    content: `確定要封鎖 ${currentConversation.value?.other_user_name} 嗎？封鎖後將無法看到對方的個人資料、無法配對，且對方無法向你發送訊息。`,
+    positiveText: '確定封鎖',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        await safetyStore.blockUser(otherUserId.value, '從聊天頁面封鎖')
+        message.success('已成功封鎖該用戶')
+        // 封鎖成功後返回訊息列表
+        router.push('/messages')
+      } catch (error) {
+        message.error(error.message || '封鎖失敗')
+      }
+    }
+  })
+}
+
+// 舉報用戶
+const handleReportUser = () => {
+  // TODO: 實現舉報對話框
+  // 可以考慮使用 ReportModal 組件或創建簡單的對話框
+  message.info('舉報功能開發中，請前往探索頁面使用舉報功能')
 }
 
 // 發送訊息
@@ -266,6 +338,11 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   flex: 1;
+}
+
+.more-button {
+  font-size: 24px;
+  flex-shrink: 0;
 }
 
 .user-details {
