@@ -7,6 +7,8 @@ set -e  # 遇到錯誤立即停止
 
 API_BASE="http://localhost:8000/api"
 FRONTEND_BASE="http://localhost:5173"
+POSTGRES_CONTAINER="mergemeet_postgres"
+VERBOSE="${VERBOSE:-false}"  # 設定 VERBOSE=true 可顯示詳細輸出
 
 echo "=========================================="
 echo "MergeMeet 探索與配對 + 即時聊天測試"
@@ -23,7 +25,7 @@ NC='\033[0m' # No Color
 # 步驟 0: 清理舊的測試用戶
 # ============================================
 echo -e "${BLUE}[步驟 0/10] 清理舊的測試用戶${NC}"
-docker exec mergemeet_postgres psql -U mergemeet -d mergemeet -c "DELETE FROM users WHERE email IN ('alice.test@example.com', 'bob.test@example.com');" > /dev/null 2>&1
+docker exec $POSTGRES_CONTAINER psql -U mergemeet -d mergemeet -c "DELETE FROM users WHERE email IN ('alice.test@example.com', 'bob.test@example.com');" > /dev/null 2>&1
 echo -e "${GREEN}✅ 舊用戶已清理${NC}"
 echo ""
 
@@ -102,13 +104,20 @@ echo -e "${BLUE}[步驟 3/10] 取得興趣標籤並設定${NC}"
 TAGS_RESPONSE=$(curl -s -X GET "$API_BASE/profile/interest-tags/")
 TAG_IDS=$(echo $TAGS_RESPONSE | jq -r '.[0:3] | map(.id) | @json')
 
-curl -s -X PUT "$API_BASE/profile/interests/" \
+INTERESTS_RESPONSE=$(curl -s -X PUT "$API_BASE/profile/interests/" \
   -H "Authorization: Bearer $ALICE_TOKEN" \
   -H "Content-Type: application/json" \
-  -d "{\"interest_ids\": $TAG_IDS}" > /dev/null
+  -d "{\"interest_ids\": $TAG_IDS}")
+
+# 檢查是否有錯誤
+if echo "$INTERESTS_RESPONSE" | jq -e '.detail' > /dev/null 2>&1; then
+  echo "❌ Alice 興趣標籤設定失敗"
+  echo "$INTERESTS_RESPONSE" | jq '.'
+  exit 1
+fi
 
 # 標記檔案為完整（測試用）
-docker exec mergemeet_postgres psql -U mergemeet -d mergemeet -c "UPDATE profiles SET is_complete = true WHERE user_id = (SELECT id FROM users WHERE email = 'alice.test@example.com');" > /dev/null 2>&1
+docker exec $POSTGRES_CONTAINER psql -U mergemeet -d mergemeet -c "UPDATE profiles SET is_complete = true WHERE user_id = (SELECT id FROM users WHERE email = 'alice.test@example.com');" > /dev/null 2>&1
 
 echo -e "${GREEN}✅ Alice 興趣標籤設定成功${NC}"
 echo ""
@@ -185,13 +194,20 @@ echo ""
 # 步驟 6: 設定 Bob 的興趣標籤
 # ============================================
 echo -e "${BLUE}[步驟 6/10] 設定 Bob 的興趣標籤${NC}"
-curl -s -X PUT "$API_BASE/profile/interests/" \
+BOB_INTERESTS_RESPONSE=$(curl -s -X PUT "$API_BASE/profile/interests/" \
   -H "Authorization: Bearer $BOB_TOKEN" \
   -H "Content-Type: application/json" \
-  -d "{\"interest_ids\": $TAG_IDS}" > /dev/null
+  -d "{\"interest_ids\": $TAG_IDS}")
+
+# 檢查是否有錯誤
+if echo "$BOB_INTERESTS_RESPONSE" | jq -e '.detail' > /dev/null 2>&1; then
+  echo "❌ Bob 興趣標籤設定失敗"
+  echo "$BOB_INTERESTS_RESPONSE" | jq '.'
+  exit 1
+fi
 
 # 標記檔案為完整（測試用）
-docker exec mergemeet_postgres psql -U mergemeet -d mergemeet -c "UPDATE profiles SET is_complete = true WHERE user_id = (SELECT id FROM users WHERE email = 'bob.test@example.com');" > /dev/null 2>&1
+docker exec $POSTGRES_CONTAINER psql -U mergemeet -d mergemeet -c "UPDATE profiles SET is_complete = true WHERE user_id = (SELECT id FROM users WHERE email = 'bob.test@example.com');" > /dev/null 2>&1
 
 echo -e "${GREEN}✅ Bob 興趣標籤設定成功${NC}"
 echo ""
@@ -203,10 +219,19 @@ echo -e "${BLUE}[步驟 7/10] Alice 瀏覽候選人${NC}"
 BROWSE_RESPONSE=$(curl -s -X GET "$API_BASE/discovery/browse?limit=10" \
   -H "Authorization: Bearer $ALICE_TOKEN")
 
-# Debug: 顯示返回內容
-echo "   Debug: Browse API 返回:"
-echo "$BROWSE_RESPONSE" | jq '.' 2>/dev/null || echo "$BROWSE_RESPONSE"
-echo ""
+# 檢查是否有錯誤
+if echo "$BROWSE_RESPONSE" | jq -e '.detail' > /dev/null 2>&1; then
+  echo "❌ Alice 瀏覽候選人失敗"
+  echo "$BROWSE_RESPONSE" | jq '.'
+  exit 1
+fi
+
+# Verbose 模式顯示詳細內容
+if [ "$VERBOSE" = "true" ]; then
+  echo "   Browse API 返回:"
+  echo "$BROWSE_RESPONSE" | jq '.'
+  echo ""
+fi
 
 BOB_USER_ID=$(echo $BROWSE_RESPONSE | jq -r '.[0].user_id // empty' 2>/dev/null)
 
@@ -227,6 +252,13 @@ echo -e "${BLUE}[步驟 8/10] Alice 喜歡 Bob${NC}"
 ALICE_LIKE_RESPONSE=$(curl -s -X POST "$API_BASE/discovery/like/$BOB_USER_ID" \
   -H "Authorization: Bearer $ALICE_TOKEN")
 
+# 檢查是否有錯誤
+if echo "$ALICE_LIKE_RESPONSE" | jq -e '.detail' > /dev/null 2>&1; then
+  echo "❌ Alice 喜歡操作失敗"
+  echo "$ALICE_LIKE_RESPONSE" | jq '.'
+  exit 1
+fi
+
 IS_MATCH=$(echo $ALICE_LIKE_RESPONSE | jq -r '.is_match')
 echo -e "${GREEN}✅ Alice 已喜歡 Bob${NC}"
 echo "   是否配對: $IS_MATCH"
@@ -239,6 +271,13 @@ echo -e "${BLUE}[步驟 9/10] Bob 瀏覽候選人並喜歡 Alice${NC}"
 BOB_BROWSE_RESPONSE=$(curl -s -X GET "$API_BASE/discovery/browse?limit=10" \
   -H "Authorization: Bearer $BOB_TOKEN")
 
+# 檢查是否有錯誤
+if echo "$BOB_BROWSE_RESPONSE" | jq -e '.detail' > /dev/null 2>&1; then
+  echo "❌ Bob 瀏覽候選人失敗"
+  echo "$BOB_BROWSE_RESPONSE" | jq '.'
+  exit 1
+fi
+
 ALICE_USER_ID=$(echo $BOB_BROWSE_RESPONSE | jq -r '.[0].user_id // empty')
 
 if [ -z "$ALICE_USER_ID" ]; then
@@ -248,6 +287,13 @@ fi
 
 BOB_LIKE_RESPONSE=$(curl -s -X POST "$API_BASE/discovery/like/$ALICE_USER_ID" \
   -H "Authorization: Bearer $BOB_TOKEN")
+
+# 檢查是否有錯誤
+if echo "$BOB_LIKE_RESPONSE" | jq -e '.detail' > /dev/null 2>&1; then
+  echo "❌ Bob 喜歡操作失敗"
+  echo "$BOB_LIKE_RESPONSE" | jq '.'
+  exit 1
+fi
 
 IS_MATCH=$(echo $BOB_LIKE_RESPONSE | jq -r '.is_match')
 MATCH_ID=$(echo $BOB_LIKE_RESPONSE | jq -r '.match_id')
@@ -265,6 +311,13 @@ echo -e "${BLUE}[步驟 10/10] 測試即時聊天功能${NC}"
 # 取得配對列表
 MATCHES_RESPONSE=$(curl -s -X GET "$API_BASE/discovery/matches" \
   -H "Authorization: Bearer $ALICE_TOKEN")
+
+# 檢查是否有錯誤
+if echo "$MATCHES_RESPONSE" | jq -e '.detail' > /dev/null 2>&1; then
+  echo "❌ 取得配對列表失敗"
+  echo "$MATCHES_RESPONSE" | jq '.'
+  exit 1
+fi
 
 MATCH_COUNT=$(echo $MATCHES_RESPONSE | jq -r 'length')
 echo -e "${GREEN}✅ Alice 有 $MATCH_COUNT 個配對${NC}"
