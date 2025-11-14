@@ -275,17 +275,22 @@ export const useChatStore = defineStore('chat', () => {
     const { match_id, user_id, is_typing } = data
 
     if (is_typing) {
-      typingUsers.value[match_id] = user_id
+      // 使用 spread operator 創建新物件以觸發 Vue 響應式更新
+      typingUsers.value = { ...typingUsers.value, [match_id]: user_id }
       console.log('[Chat] User typing:', { match_id, user_id, typingUsers: typingUsers.value })
       // 3 秒後自動清除
       setTimeout(() => {
         if (typingUsers.value[match_id] === user_id) {
-          delete typingUsers.value[match_id]
+          // 使用解構移除屬性並創建新物件
+          const { [match_id]: _, ...rest } = typingUsers.value
+          typingUsers.value = rest
           console.log('[Chat] Typing timeout cleared:', { match_id, user_id })
         }
       }, 3000)
     } else {
-      delete typingUsers.value[match_id]
+      // 使用解構移除屬性並創建新物件
+      const { [match_id]: _, ...rest } = typingUsers.value
+      typingUsers.value = rest
       console.log('[Chat] Typing stopped:', { match_id, user_id })
     }
   }
