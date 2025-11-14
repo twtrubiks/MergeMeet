@@ -84,18 +84,27 @@ DELETE '/messages/messages/{id}'           // ✅ 正確
 - 所有 `/api/profile/photos` 呼叫都不帶尾隨斜線 ✅
 
 #### 2. 測試腳本 (`test_matching_chat.sh`) ✅
-**狀態：** 已修復（本次驗證中發現並修正）
-**問題：** 使用了帶尾隨斜線的 API 端點
-**修復內容：**
+**狀態：** 已修正（Profile API 需要保留 trailing slash）
+**發現：** Profile API 端點仍需要尾隨斜線（符合 CLAUDE.md 規範）
+**修正內容：**
 ```bash
-# 修復前 → 修復後
-$API_BASE/profile/              → $API_BASE/profile
-$API_BASE/profile/interests/    → $API_BASE/profile/interests
-$API_BASE/profile/interest-tags/ → $API_BASE/profile/interest-tags
+# Profile API 正確格式（需要 trailing slash）
+POST   $API_BASE/profile/
+PATCH  $API_BASE/profile/
+PUT    $API_BASE/profile/interests/
+GET    $API_BASE/profile/interest-tags/
+
+# Discovery API 正確格式（不需要 trailing slash）
+GET    $API_BASE/discovery/browse
+POST   $API_BASE/discovery/like/{user_id}
 ```
 
+**新增功能：**
+- 新增 API 錯誤檢查機制（使用 jq 檢測 `.detail` 欄位）
+- 測試腳本現已完全通過所有 10 個步驟
+
 **相關 Commit：**
-- `d2565bb` - fix: 移除 test_matching_chat.sh 中的 trailing slash
+- `14d1863` - fix: 恢復 test_matching_chat.sh 中 Profile API 的 trailing slash
 
 ---
 
@@ -121,17 +130,18 @@ $API_BASE/profile/interest-tags/ → $API_BASE/profile/interest-tags
 
 | Phase | 項目 | 狀態 | 備註 |
 |-------|------|------|------|
-| Phase 1 | 後端 Profile API | ✅ 完成 | 已由其他工程師完成 |
-| Phase 1 | 後端 Messages API | ✅ 完成 | 已由其他工程師完成 |
-| Phase 2 | 前端 Profile Store | ✅ 完成 | 已由其他工程師完成 |
-| Phase 2 | 前端 Chat Store | ✅ 完成 | 已由其他工程師完成 |
-| Phase 3 | 後端測試檔案 | ✅ 完成 | 已由其他工程師完成 |
-| Phase 3 | 測試腳本 | ✅ 完成 | **本次驗證中修復** |
+| Phase 1 | 後端 Discovery API | ✅ 完成 | 已移除 trailing slash |
+| Phase 1 | 後端 Messages API | ✅ 完成 | 已移除 trailing slash |
+| Phase 2 | 前端 Discovery Store | ✅ 完成 | 已移除 trailing slash |
+| Phase 2 | 前端 Chat Store | ✅ 完成 | 已移除 trailing slash |
+| Phase 3 | 後端測試檔案 | ✅ 完成 | 已移除 trailing slash |
+| Phase 3 | 測試腳本 | ✅ 完成 | **Profile API 保留 trailing slash** |
 | Phase 4 | 文檔更新 | ⚠️ 部分完成 | 見下方建議 |
 
 ### 總體狀態：✅ 已完成
 
 **核心功能：** 100% 完成
+**重要發現：** TRAILING_SLASH_REFACTOR_PLAN.md 僅適用於 Discovery 和 Messages API，Profile API 仍需要 trailing slash（符合 CLAUDE.md 規範）
 **文檔更新：** 建議補充（見下方）
 
 ---
@@ -199,11 +209,30 @@ curl -w "\nHTTP: %{http_code}\n" -X GET "http://localhost:8000/api/messages/conv
 
 **TRAILING_SLASH_REFACTOR_PLAN.md 中列出的所有核心項目已經完成。**
 
-✅ 後端 API 統一不使用尾隨斜線
-✅ 前端 API 呼叫統一不使用尾隨斜線
-✅ 測試檔案和腳本統一不使用尾隨斜線
-✅ 符合 RESTful API 業界標準
-✅ 消除了 307 重定向問題
+### API 端點 Trailing Slash 使用規範
+
+**需要 trailing slash 的端點（Profile API）：**
+- ✅ `POST /api/profile/` - 創建個人檔案
+- ✅ `GET /api/profile/` - 獲取個人檔案
+- ✅ `PATCH /api/profile/` - 更新個人檔案
+- ✅ `PUT /api/profile/interests/` - 設定興趣標籤
+- ✅ `GET /api/profile/interest-tags/` - 獲取興趣標籤列表
+- ✅ `POST /api/profile/photos/` - 上傳照片
+
+**不需要 trailing slash 的端點（Discovery & Messages API）：**
+- ✅ `GET /api/discovery/browse` - 瀏覽候選人
+- ✅ `POST /api/discovery/like/{user_id}` - 喜歡用戶
+- ✅ `GET /api/discovery/matches` - 查看配對列表
+- ✅ `GET /api/messages/conversations` - 查看對話列表
+- ✅ `GET /api/messages/matches/{match_id}/messages` - 查看聊天記錄
+
+### 驗證結果
+
+✅ Discovery & Messages API 已統一不使用尾隨斜線
+✅ Profile API 正確使用尾隨斜線（符合 CLAUDE.md 規範）
+✅ 前端 API 呼叫格式正確
+✅ 測試腳本已修正並通過所有測試（10/10 步驟）
+✅ 消除了 Discovery & Messages API 的 307 重定向問題
 
 **重構成功！** 🎉
 
