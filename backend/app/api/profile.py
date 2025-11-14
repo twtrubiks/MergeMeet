@@ -53,7 +53,7 @@ def check_profile_completeness(profile: Profile) -> bool:
     return has_basic_info and has_photos and has_interests
 
 
-@router.post("/", response_model=ProfileResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ProfileResponse, status_code=status.HTTP_201_CREATED)
 async def create_profile(
     request: ProfileCreateRequest,
     current_user: User = Depends(get_current_user),
@@ -118,7 +118,7 @@ async def create_profile(
     )
 
 
-@router.get("/", response_model=ProfileResponse)
+@router.get("", response_model=ProfileResponse)
 async def get_my_profile(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
@@ -188,7 +188,7 @@ async def get_my_profile(
     )
 
 
-@router.patch("/", response_model=ProfileResponse)
+@router.patch("", response_model=ProfileResponse)
 async def update_profile(
     request: ProfileUpdateRequest,
     current_user: User = Depends(get_current_user),
@@ -283,7 +283,7 @@ async def update_profile(
     )
 
 
-@router.put("/interests/", response_model=ProfileResponse)
+@router.put("/interests", response_model=ProfileResponse)
 async def update_interests(
     request: UpdateInterestsRequest,
     current_user: User = Depends(get_current_user),
@@ -384,7 +384,7 @@ async def update_interests(
     )
 
 
-@router.post("/photos/", response_model=PhotoResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/photos", response_model=PhotoResponse, status_code=status.HTTP_201_CREATED)
 async def upload_photo(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
@@ -462,7 +462,7 @@ async def upload_photo(
     )
 
 
-@router.delete("/photos/{photo_id}/", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/photos/{photo_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_photo(
     photo_id: str,
     current_user: User = Depends(get_current_user),
@@ -523,7 +523,7 @@ async def delete_photo(
         await db.commit()
 
 
-@router.get("/interest-tags/", response_model=List[InterestTagResponse])
+@router.get("/interest-tags", response_model=List[InterestTagResponse])
 async def get_interest_tags(
     category: str = None,
     db: AsyncSession = Depends(get_db)
@@ -548,7 +548,7 @@ async def get_interest_tags(
     ]
 
 
-@router.post("/interest-tags/", response_model=InterestTagResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/interest-tags", response_model=InterestTagResponse, status_code=status.HTTP_201_CREATED)
 async def create_interest_tag(
     request: InterestTagCreateRequest,
     current_user: User = Depends(get_current_user),

@@ -65,7 +65,7 @@ export const useChatStore = defineStore('chat', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.get('/messages/conversations/')
+      const response = await apiClient.get('/messages/conversations')
       conversations.value = response.data
       return response.data
     } catch (err) {
@@ -83,7 +83,7 @@ export const useChatStore = defineStore('chat', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.get(`/messages/matches/${matchId}/messages/`, {
+      const response = await apiClient.get(`/messages/matches/${matchId}/messages`, {
         params: { page, page_size: pageSize }
       })
 
@@ -141,7 +141,7 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     try {
-      await apiClient.post('/messages/messages/read/', {
+      await apiClient.post('/messages/messages/read', {
         message_ids: messageIds
       })
 
@@ -181,7 +181,7 @@ export const useChatStore = defineStore('chat', () => {
    */
   const deleteMessage = async (messageId) => {
     try {
-      await apiClient.delete(`/messages/messages/${messageId}/`)
+      await apiClient.delete(`/messages/messages/${messageId}`)
 
       // 從本地狀態移除
       for (const matchId in messages.value) {

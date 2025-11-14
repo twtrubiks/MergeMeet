@@ -31,7 +31,7 @@ export const useProfileStore = defineStore('profile', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.get('/profile/')
+      const response = await apiClient.get('/profile')
       profile.value = response.data
       return response.data
     } catch (err) {
@@ -59,7 +59,7 @@ export const useProfileStore = defineStore('profile', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.post('/profile/', data)
+      const response = await apiClient.post('/profile', data)
       profile.value = response.data
       return response.data
     } catch (err) {
@@ -78,7 +78,7 @@ export const useProfileStore = defineStore('profile', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.patch('/profile/', data)
+      const response = await apiClient.patch('/profile', data)
       profile.value = response.data
       return response.data
     } catch (err) {
@@ -97,7 +97,7 @@ export const useProfileStore = defineStore('profile', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.put('/profile/interests/', {
+      const response = await apiClient.put('/profile/interests', {
         interest_ids: interestIds
       })
       profile.value = response.data
@@ -121,7 +121,7 @@ export const useProfileStore = defineStore('profile', () => {
       const formData = new FormData()
       formData.append('file', file)
 
-      const response = await apiClient.post('/profile/photos/', formData, {
+      const response = await apiClient.post('/profile/photos', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
@@ -146,7 +146,7 @@ export const useProfileStore = defineStore('profile', () => {
     loading.value = true
     error.value = null
     try {
-      await apiClient.delete(`/profile/photos/${photoId}/`)
+      await apiClient.delete(`/profile/photos/${photoId}`)
       // 重新取得完整檔案以更新照片列表
       await fetchProfile()
     } catch (err) {
@@ -166,7 +166,7 @@ export const useProfileStore = defineStore('profile', () => {
     error.value = null
     try {
       const params = category ? { category } : {}
-      const response = await apiClient.get('/profile/interest-tags/', { params })
+      const response = await apiClient.get('/profile/interest-tags', { params })
       interestTags.value = response.data
       return response.data
     } catch (err) {

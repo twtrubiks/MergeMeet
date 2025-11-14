@@ -54,63 +54,67 @@ pytest tests/
 
 ### FastAPI 尾隨斜線 (Trailing Slash) 規則
 
-**問題**: FastAPI 對於 URL 尾隨斜線的處理**非常嚴格**，錯誤的格式會導致 307 重定向，導致請求失敗。
+**統一標準**: 本專案所有 API 端點**一律不使用**尾隨斜線，符合 RESTful API 業界標準。
 
-### 正確的 URL 格式
+### ✅ 正確的 URL 格式（無尾隨斜線）
 
-#### ✅ **需要** 尾隨斜線的端點:
 ```bash
 # Profile API
-POST   /api/profile/              # 創建個人檔案
-GET    /api/profile/              # 獲取個人檔案
-PATCH  /api/profile/              # 更新個人檔案
-PUT    /api/profile/interests/    # 設定興趣標籤
-```
+POST   /api/profile                    # 創建個人檔案
+GET    /api/profile                    # 獲取個人檔案
+PATCH  /api/profile                    # 更新個人檔案
+PUT    /api/profile/interests          # 設定興趣標籤
+POST   /api/profile/photos             # 上傳照片
+DELETE /api/profile/photos/{photo_id}  # 刪除照片
+GET    /api/profile/interest-tags      # 獲取興趣標籤列表
 
-#### ❌ **不需要** 尾隨斜線的端點:
-```bash
 # Discovery API
-GET    /api/discovery/browse?limit=10         # 瀏覽候選人
-POST   /api/discovery/like/{user_id}          # 喜歡用戶
-POST   /api/discovery/pass/{user_id}          # 跳過用戶
-GET    /api/discovery/matches                 # 查看配對列表
+GET    /api/discovery/browse           # 瀏覽候選人
+POST   /api/discovery/like/{user_id}   # 喜歡用戶
+POST   /api/discovery/pass/{user_id}   # 跳過用戶
+GET    /api/discovery/matches          # 查看配對列表
 
 # Messages API
-GET    /api/messages/conversations            # 查看對話列表
+GET    /api/messages/conversations                # 查看對話列表
 GET    /api/messages/matches/{match_id}/messages  # 查看聊天記錄
+POST   /api/messages/messages/read                # 標記訊息為已讀
+DELETE /api/messages/messages/{message_id}        # 刪除訊息
+
+# Safety API
+POST   /api/safety/block/{user_id}     # 封鎖用戶
+GET    /api/safety/blocked             # 查看封鎖列表
+POST   /api/safety/report              # 舉報用戶
+
+# Auth API
+POST   /api/auth/register              # 用戶註冊
+POST   /api/auth/login                 # 用戶登入
+POST   /api/auth/refresh               # 刷新 Token
 ```
 
-### 錯誤示例與修正
+### ❌ 錯誤示例（加了尾隨斜線會導致 307 重定向）
 
-❌ **錯誤** (導致 307 重定向):
 ```bash
-# Discovery browse 加了斜線
-GET /api/discovery/browse/?limit=10   → 307 Redirect
-
-# Like API 加了斜線
-POST /api/discovery/like/{user_id}/   → 307 Redirect
-
-# Matches API 加了斜線
-GET /api/discovery/matches/           → 307 Redirect
+# 所有端點都不應該有尾隨斜線
+POST /api/profile/                     → 307 Redirect ❌
+GET  /api/discovery/browse/            → 307 Redirect ❌
+POST /api/discovery/like/{user_id}/    → 307 Redirect ❌
+GET  /api/messages/conversations/      → 307 Redirect ❌
 ```
 
-✅ **正確**:
-```bash
-GET  /api/discovery/browse?limit=10
-POST /api/discovery/like/{user_id}
-GET  /api/discovery/matches
-```
+### FastAPI Router 定義規範
 
-### 如何判斷是否需要斜線?
-
-查看 FastAPI router 定義:
+所有 router 定義統一**不使用**尾隨斜線：
 ```python
-# 有斜線 = URL 需要斜線
-@router.post("/profile/", ...)      # ✅ POST /api/profile/
+# ✅ 正確 - 所有端點都不使用尾隨斜線
+@router.post("", ...)                      # POST /api/profile
+@router.get("", ...)                       # GET /api/profile
+@router.put("/interests", ...)             # PUT /api/profile/interests
+@router.get("/browse", ...)                # GET /api/discovery/browse
+@router.post("/like/{user_id}", ...)       # POST /api/discovery/like/{id}
 
-# 無斜線 = URL 不需要斜線
-@router.get("/browse", ...)         # ✅ GET /api/discovery/browse
-@router.post("/like/{user_id}", ...)  # ✅ POST /api/discovery/like/{id}
+# ❌ 錯誤 - 不要使用尾隨斜線
+@router.post("/", ...)                     # 會導致前端 307 錯誤
+@router.put("/interests/", ...)            # 會導致前端 307 錯誤
 ```
 
 ### 測試時注意事項
@@ -119,21 +123,26 @@ GET  /api/discovery/matches
    ```bash
    curl -w "\nHTTP: %{http_code}\n" -X GET "..."
    # HTTP: 200 ✅ 正確
-   # HTTP: 307 ❌ URL 格式錯誤
+   # HTTP: 307 ❌ URL 格式錯誤（有尾隨斜線）
    ```
 
-2. **前端 axios** 請求時，確保 URL 格式正確
+2. **前端 axios** 請求時，確保**所有 URL 都不使用尾隨斜線**
    ```javascript
-   // ✅ 正確
-   await axios.get('/api/discovery/browse?limit=10')
+   // ✅ 正確 - 無尾隨斜線
+   await axios.get('/api/profile')
+   await axios.post('/api/profile', data)
+   await axios.put('/api/profile/interests', data)
+   await axios.get('/api/discovery/browse')
    await axios.post(`/api/discovery/like/${userId}`)
+   await axios.get('/api/messages/conversations')
 
-   // ❌ 錯誤 - 會 307 重定向
-   await axios.get('/api/discovery/browse/?limit=10')
+   // ❌ 錯誤 - 加了尾隨斜線會 307 重定向
+   await axios.get('/api/profile/')
+   await axios.put('/api/profile/interests/', data)
    await axios.post(`/api/discovery/like/${userId}/`)
    ```
 
-3. **測試腳本**中的所有 API 呼叫都需遵守此規則
+3. **測試腳本**中的所有 API 呼叫都必須遵守**無尾隨斜線**規則
 
 ## 目錄結構
 ```

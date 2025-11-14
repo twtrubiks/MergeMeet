@@ -20,7 +20,7 @@ from app.schemas.message import (
 router = APIRouter()
 
 
-@router.get("/matches/{match_id}/messages/", response_model=ChatHistoryResponse)
+@router.get("/matches/{match_id}/messages", response_model=ChatHistoryResponse)
 async def get_chat_history(
     match_id: str,
     page: int = Query(1, ge=1, description="頁碼"),
@@ -94,7 +94,7 @@ async def get_chat_history(
     )
 
 
-@router.get("/conversations/", response_model=List[MatchWithLastMessageResponse])
+@router.get("/conversations", response_model=List[MatchWithLastMessageResponse])
 async def get_conversations(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
@@ -193,7 +193,7 @@ async def get_conversations(
     return conversations
 
 
-@router.post("/messages/read/", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/messages/read", status_code=status.HTTP_204_NO_CONTENT)
 async def mark_messages_as_read(
     request: MarkAsReadRequest,
     current_user: User = Depends(get_current_user),
@@ -251,7 +251,7 @@ async def mark_messages_as_read(
     return None
 
 
-@router.delete("/messages/{message_id}/", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_message(
     message_id: str,
     current_user: User = Depends(get_current_user),
