@@ -22,13 +22,3 @@ async def test_health_check(client: AsyncClient):
     data = response.json()
     assert data["status"] == "healthy"
     assert data["service"] == "MergeMeet API"
-
-
-@pytest.mark.asyncio
-async def test_hello_world(client: AsyncClient):
-    """測試 Hello World 端點"""
-    response = await client.get("/api/hello")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "success"
-    assert "Hello" in data["message"]

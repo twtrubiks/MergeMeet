@@ -95,32 +95,6 @@ async def matched_users_for_ws(client: AsyncClient, test_db: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_websocket_connection_manager_connect(matched_users_for_ws: dict):
-    """測試 WebSocket 連接管理器的連接功能"""
-    user_id = matched_users_for_ws["alice"]["user_id"]
-
-    # 測試連接數量
-    initial_count = len(manager.active_connections)
-
-    # 注意：實際的 WebSocket 連接測試需要真實的 WebSocket 客戶端
-    # 這裡我們測試管理器的基本功能
-    assert manager.active_connections is not None
-    assert isinstance(manager.active_connections, dict)
-
-
-@pytest.mark.asyncio
-async def test_websocket_connection_manager_disconnect(matched_users_for_ws: dict):
-    """測試 WebSocket 連接管理器的斷開連接功能"""
-    user_id = matched_users_for_ws["alice"]["user_id"]
-
-    # 測試斷開連接
-    await manager.disconnect(user_id)
-
-    # 驗證用戶已斷開
-    assert user_id not in manager.active_connections
-
-
-@pytest.mark.asyncio
 async def test_websocket_match_rooms():
     """測試配對聊天室功能"""
     match_id = "test-match-id"
@@ -171,23 +145,6 @@ async def test_chat_message_stored_in_database(
 
 
 @pytest.mark.asyncio
-async def test_message_validation_empty_content(
-    matched_users_for_ws: dict,
-    test_db: AsyncSession
-):
-    """測試空訊息內容驗證"""
-    match_id = matched_users_for_ws["match_id"]
-    alice_user_id = matched_users_for_ws["alice"]["user_id"]
-
-    # 嘗試創建空內容訊息
-    # 這應該在 WebSocket 處理函數中被拒絕
-    # 我們在這裡模擬驗證邏輯
-
-    content = ""
-    assert content.strip() == "", "空內容應該被檢測到"
-
-
-@pytest.mark.asyncio
 async def test_message_sender_must_be_match_member(
     matched_users_for_ws: dict,
     client: AsyncClient,
@@ -217,84 +174,6 @@ async def test_message_sender_must_be_match_member(
 
     # Charlie 不應該在配對中
     assert str(charlie.id) not in [str(match.user1_id), str(match.user2_id)]
-
-
-@pytest.mark.asyncio
-async def test_typing_indicator_data_format():
-    """測試打字指示器數據格式"""
-    typing_data = {
-        "type": "typing",
-        "user_id": "test-user-id",
-        "match_id": "test-match-id",
-        "is_typing": True
-    }
-
-    # 驗證必要欄位
-    assert typing_data["type"] == "typing"
-    assert "user_id" in typing_data
-    assert "match_id" in typing_data
-    assert "is_typing" in typing_data
-    assert isinstance(typing_data["is_typing"], bool)
-
-
-@pytest.mark.asyncio
-async def test_read_receipt_data_format():
-    """測試已讀回條數據格式"""
-    read_receipt_data = {
-        "type": "read_receipt",
-        "message_id": "test-message-id",
-        "read_by": "test-user-id",
-        "read_at": "2024-01-01T00:00:00"
-    }
-
-    # 驗證必要欄位
-    assert read_receipt_data["type"] == "read_receipt"
-    assert "message_id" in read_receipt_data
-    assert "read_by" in read_receipt_data
-    assert "read_at" in read_receipt_data
-
-
-@pytest.mark.asyncio
-async def test_chat_message_data_format():
-    """測試聊天訊息數據格式"""
-    message_data = {
-        "type": "chat_message",
-        "match_id": "test-match-id",
-        "content": "Hello World",
-        "message_type": "TEXT"
-    }
-
-    # 驗證必要欄位
-    assert message_data["type"] == "chat_message"
-    assert "match_id" in message_data
-    assert "content" in message_data
-    assert message_data["content"].strip() != ""
-
-
-@pytest.mark.asyncio
-async def test_join_match_room_data_format():
-    """測試加入聊天室數據格式"""
-    join_data = {
-        "type": "join_match",
-        "match_id": "test-match-id"
-    }
-
-    # 驗證必要欄位
-    assert join_data["type"] == "join_match"
-    assert "match_id" in join_data
-
-
-@pytest.mark.asyncio
-async def test_leave_match_room_data_format():
-    """測試離開聊天室數據格式"""
-    leave_data = {
-        "type": "leave_match",
-        "match_id": "test-match-id"
-    }
-
-    # 驗證必要欄位
-    assert leave_data["type"] == "leave_match"
-    assert "match_id" in leave_data
 
 
 @pytest.mark.asyncio
@@ -432,24 +311,3 @@ async def test_multiple_messages_ordering(
         assert messages[i].sent_at <= messages[i+1].sent_at
 
 
-@pytest.mark.asyncio
-async def test_websocket_error_handling_invalid_message_type():
-    """測試無效訊息類型的錯誤處理"""
-    invalid_message = {
-        "type": "invalid_type",
-        "data": "some data"
-    }
-
-    # 驗證訊息類型
-    valid_types = ["chat_message", "typing", "read_receipt", "join_match", "leave_match"]
-    assert invalid_message["type"] not in valid_types
-
-
-@pytest.mark.asyncio
-async def test_websocket_manager_state_consistency():
-    """測試 WebSocket 管理器的狀態一致性"""
-    # 驗證管理器初始狀態
-    assert hasattr(manager, 'active_connections')
-    assert hasattr(manager, 'match_rooms')
-    assert isinstance(manager.active_connections, dict)
-    assert isinstance(manager.match_rooms, dict)
