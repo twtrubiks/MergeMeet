@@ -6,6 +6,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import apiClient from '@/api/client'
 import { useWebSocket } from '@/composables/useWebSocket'
+import { useUserStore } from './user'
 
 export const useChatStore = defineStore('chat', () => {
   // WebSocket instance
@@ -309,8 +310,7 @@ export const useChatStore = defineStore('chat', () => {
    * 獲取當前用戶 ID (從 user store)
    */
   const currentUserId = () => {
-    // 這裡應該從 user store 獲取
-    const userStore = useAuthStore()
+    const userStore = useUserStore()
     return userStore.user?.id
   }
 
@@ -368,9 +368,3 @@ export const useChatStore = defineStore('chat', () => {
     $reset
   }
 })
-
-// 需要導入 useUserStore (避免循環依賴，在函數內部導入)
-function useAuthStore() {
-  const { useUserStore } = require('./user')
-  return useUserStore()
-}
