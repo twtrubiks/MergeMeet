@@ -50,6 +50,91 @@ cd backend
 pytest tests/
 ```
 
+## ⚠️ API Routing 重要規範
+
+### FastAPI 尾隨斜線 (Trailing Slash) 規則
+
+**問題**: FastAPI 對於 URL 尾隨斜線的處理**非常嚴格**，錯誤的格式會導致 307 重定向，導致請求失敗。
+
+### 正確的 URL 格式
+
+#### ✅ **需要** 尾隨斜線的端點:
+```bash
+# Profile API
+POST   /api/profile/              # 創建個人檔案
+GET    /api/profile/              # 獲取個人檔案
+PATCH  /api/profile/              # 更新個人檔案
+PUT    /api/profile/interests/    # 設定興趣標籤
+```
+
+#### ❌ **不需要** 尾隨斜線的端點:
+```bash
+# Discovery API
+GET    /api/discovery/browse?limit=10         # 瀏覽候選人
+POST   /api/discovery/like/{user_id}          # 喜歡用戶
+POST   /api/discovery/pass/{user_id}          # 跳過用戶
+GET    /api/discovery/matches                 # 查看配對列表
+
+# Messages API
+GET    /api/messages/conversations            # 查看對話列表
+GET    /api/messages/matches/{match_id}/messages  # 查看聊天記錄
+```
+
+### 錯誤示例與修正
+
+❌ **錯誤** (導致 307 重定向):
+```bash
+# Discovery browse 加了斜線
+GET /api/discovery/browse/?limit=10   → 307 Redirect
+
+# Like API 加了斜線
+POST /api/discovery/like/{user_id}/   → 307 Redirect
+
+# Matches API 加了斜線
+GET /api/discovery/matches/           → 307 Redirect
+```
+
+✅ **正確**:
+```bash
+GET  /api/discovery/browse?limit=10
+POST /api/discovery/like/{user_id}
+GET  /api/discovery/matches
+```
+
+### 如何判斷是否需要斜線?
+
+查看 FastAPI router 定義:
+```python
+# 有斜線 = URL 需要斜線
+@router.post("/profile/", ...)      # ✅ POST /api/profile/
+
+# 無斜線 = URL 不需要斜線
+@router.get("/browse", ...)         # ✅ GET /api/discovery/browse
+@router.post("/like/{user_id}", ...)  # ✅ POST /api/discovery/like/{id}
+```
+
+### 測試時注意事項
+
+1. **curl 測試**時務必檢查 HTTP status code
+   ```bash
+   curl -w "\nHTTP: %{http_code}\n" -X GET "..."
+   # HTTP: 200 ✅ 正確
+   # HTTP: 307 ❌ URL 格式錯誤
+   ```
+
+2. **前端 axios** 請求時，確保 URL 格式正確
+   ```javascript
+   // ✅ 正確
+   await axios.get('/api/discovery/browse?limit=10')
+   await axios.post(`/api/discovery/like/${userId}`)
+
+   // ❌ 錯誤 - 會 307 重定向
+   await axios.get('/api/discovery/browse/?limit=10')
+   await axios.post(`/api/discovery/like/${userId}/`)
+   ```
+
+3. **測試腳本**中的所有 API 呼叫都需遵守此規則
+
 ## 目錄結構
 ```
 mergemeet/
