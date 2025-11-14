@@ -27,7 +27,7 @@ async def user_with_profile(client: AsyncClient, authenticated_user: dict):
     """創建擁有個人檔案的用戶"""
     token = authenticated_user["token"]
 
-    response = await client.post("/api/profile/",
+    response = await client.post("/api/profile",
         headers={"Authorization": f"Bearer {token}"},
         json={
             "display_name": "Test User",
@@ -49,7 +49,7 @@ async def test_create_profile_success(client: AsyncClient, authenticated_user: d
     """測試成功創建個人檔案"""
     token = authenticated_user["token"]
 
-    response = await client.post("/api/profile/",
+    response = await client.post("/api/profile",
         headers={"Authorization": f"Bearer {token}"},
         json={
             "display_name": "John Doe",
@@ -78,7 +78,7 @@ async def test_create_profile_duplicate(client: AsyncClient, user_with_profile: 
     """測試無法重複創建個人檔案"""
     token = user_with_profile["token"]
 
-    response = await client.post("/api/profile/",
+    response = await client.post("/api/profile",
         headers={"Authorization": f"Bearer {token}"},
         json={
             "display_name": "Another Name",
@@ -101,7 +101,7 @@ async def test_get_profile_success(client: AsyncClient, user_with_profile: dict)
     """測試成功取得個人檔案"""
     token = user_with_profile["token"]
 
-    response = await client.get("/api/profile/",
+    response = await client.get("/api/profile",
         headers={"Authorization": f"Bearer {token}"}
     )
 
@@ -117,7 +117,7 @@ async def test_get_profile_not_exists(client: AsyncClient, authenticated_user: d
     """測試取得不存在的個人檔案"""
     token = authenticated_user["token"]
 
-    response = await client.get("/api/profile/",
+    response = await client.get("/api/profile",
         headers={"Authorization": f"Bearer {token}"}
     )
 
@@ -129,7 +129,7 @@ async def test_update_profile_success(client: AsyncClient, user_with_profile: di
     """測試成功更新個人檔案"""
     token = user_with_profile["token"]
 
-    response = await client.patch("/api/profile/",
+    response = await client.patch("/api/profile",
         headers={"Authorization": f"Bearer {token}"},
         json={
             "display_name": "Updated Name",
@@ -156,7 +156,7 @@ async def test_update_profile_invalid_age_range(client: AsyncClient, user_with_p
     """測試無效的年齡範圍"""
     token = user_with_profile["token"]
 
-    response = await client.patch("/api/profile/",
+    response = await client.patch("/api/profile",
         headers={"Authorization": f"Bearer {token}"},
         json={
             "min_age_preference": 35,
@@ -181,7 +181,7 @@ async def test_get_interest_tags(client: AsyncClient, authenticated_user: dict, 
     await test_db.commit()
 
     token = authenticated_user["token"]
-    response = await client.get("/api/profile/interest-tags/",
+    response = await client.get("/api/profile/interest-tags",
         headers={"Authorization": f"Bearer {token}"}
     )
 
@@ -196,7 +196,7 @@ async def test_create_interest_tag_admin_only(client: AsyncClient, authenticated
     """測試只有管理員可以創建興趣標籤"""
     token = authenticated_user["token"]
 
-    response = await client.post("/api/profile/interest-tags/",
+    response = await client.post("/api/profile/interest-tags",
         headers={"Authorization": f"Bearer {token}"},
         json={
             "name": "新興趣",
@@ -223,7 +223,7 @@ async def test_update_interests_success(client: AsyncClient, user_with_profile: 
     token = user_with_profile["token"]
     tag_ids = [str(tag.id) for tag in tags[:3]]  # 選擇前 3 個
 
-    response = await client.put("/api/profile/interests/",
+    response = await client.put("/api/profile/interests",
         headers={"Authorization": f"Bearer {token}"},
         json={"interest_ids": tag_ids}
     )
@@ -244,7 +244,7 @@ async def test_update_interests_too_few(client: AsyncClient, user_with_profile: 
 
     token = user_with_profile["token"]
 
-    response = await client.put("/api/profile/interests/",
+    response = await client.put("/api/profile/interests",
         headers={"Authorization": f"Bearer {token}"},
         json={"interest_ids": [str(tag.id)]}  # 只有 1 個，少於 3 個
     )
@@ -274,7 +274,7 @@ async def test_update_interests_too_many(client: AsyncClient, user_with_profile:
     token = user_with_profile["token"]
     tag_ids = [str(tag.id) for tag in tags]  # 全選 15 個
 
-    response = await client.put("/api/profile/interests/",
+    response = await client.put("/api/profile/interests",
         headers={"Authorization": f"Bearer {token}"},
         json={"interest_ids": tag_ids}
     )
@@ -298,7 +298,7 @@ async def test_upload_photo_success(client: AsyncClient, user_with_profile: dict
     fake_image = io.BytesIO(b"fake image content")
     fake_image.name = "test.jpg"
 
-    response = await client.post("/api/profile/photos/",
+    response = await client.post("/api/profile/photos",
         headers={"Authorization": f"Bearer {token}"},
         files={"file": ("test.jpg", fake_image, "image/jpeg")}
     )
@@ -368,7 +368,7 @@ async def test_cannot_delete_other_users_photo(client: AsyncClient, user_with_pr
     other_token = response.json()["access_token"]
 
     # 為另一個用戶創建檔案和照片
-    await client.post("/api/profile/",
+    await client.post("/api/profile",
         headers={"Authorization": f"Bearer {other_token}"},
         json={
             "display_name": "Other User",
@@ -418,7 +418,7 @@ async def test_profile_completeness_check(client: AsyncClient, authenticated_use
     token = authenticated_user["token"]
 
     # 1. 創建基本檔案（不完整）
-    await client.post("/api/profile/",
+    await client.post("/api/profile",
         headers={"Authorization": f"Bearer {token}"},
         json={
             "display_name": "Test",
@@ -433,7 +433,7 @@ async def test_profile_completeness_check(client: AsyncClient, authenticated_use
     )
 
     # 檢查完整度 - 應該是不完整
-    response = await client.get("/api/profile/",
+    response = await client.get("/api/profile",
         headers={"Authorization": f"Bearer {token}"}
     )
     assert response.json()["is_complete"] is False
@@ -448,7 +448,7 @@ async def test_profile_completeness_check(client: AsyncClient, authenticated_use
     await test_db.commit()
 
     tag_ids = [str(tag.id) for tag in tags]
-    await client.put("/api/profile/interests/",
+    await client.put("/api/profile/interests",
         headers={"Authorization": f"Bearer {token}"},
         json={"interest_ids": tag_ids}
     )
@@ -473,7 +473,7 @@ async def test_profile_completeness_check(client: AsyncClient, authenticated_use
     await test_db.commit()
 
     # 重新檢查完整度 - 現在應該是完整
-    response = await client.get("/api/profile/",
+    response = await client.get("/api/profile",
         headers={"Authorization": f"Bearer {token}"}
     )
     # 注意：完整度檢查在 profile.py 中實作，需要照片、興趣和基本資料
