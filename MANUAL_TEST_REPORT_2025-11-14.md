@@ -1,4 +1,23 @@
-# 📋 MergeMeet 手動測試報告
+# ⚠️ 歷史記錄 - MergeMeet 手動測試報告
+
+> **⚠️ 警告：此測試報告記錄的是修復前的狀態**
+>
+> 此報告記錄了 **307 重定向問題修復前**的測試結果（2025-11-14 早上）。
+>
+> **報告中的問題已全部修復**：
+> - ✅ 307 重定向問題已解決
+> - ✅ Profile API 已統一不使用 trailing slash
+> - ✅ 所有功能現已正常運作
+>
+> **最新測試請參考**：
+> - ✅ [TRAILING_SLASH_FIX_REPORT_2025-11-14.md](./TRAILING_SLASH_FIX_REPORT_2025-11-14.md) - 修復後的測試報告
+> - ✅ [MANUAL_TESTING_GUIDE.md](./MANUAL_TESTING_GUIDE.md) - 完整測試指南
+>
+> ---
+>
+> 以下內容為歷史記錄，僅供參考
+
+---
 
 **測試日期**: 2025-11-14
 **測試人員**: Claude Code (AI Assistant)

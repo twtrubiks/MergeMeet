@@ -1,4 +1,21 @@
-# Trailing Slash 重構驗證報告
+# ⚠️ 文檔已過時 - Trailing Slash 重構驗證報告
+
+> **⚠️ 警告：此文檔已過時**
+>
+> 此文檔記錄的是**中間階段**的狀態（2025-11-14 早期版本）。
+>
+> **最終架構已變更**：所有 API（包括 Profile API）已統一**不使用 trailing slash**。
+>
+> **請參考最新文檔**：
+> - ✅ [TRAILING_SLASH_STATUS_FINAL.md](./TRAILING_SLASH_STATUS_FINAL.md) - 最終狀態總結
+> - ✅ [TRAILING_SLASH_BEST_PRACTICES.md](./TRAILING_SLASH_BEST_PRACTICES.md) - 最佳實踐指南
+> - ✅ [TRAILING_SLASH_FIX_SUMMARY.md](./TRAILING_SLASH_FIX_SUMMARY.md) - 修復總結
+>
+> ---
+>
+> 以下內容僅供歷史參考
+
+---
 
 **驗證日期：** 2025-11-14
 **驗證人員：** Claude Code
