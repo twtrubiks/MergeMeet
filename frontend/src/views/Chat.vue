@@ -46,6 +46,15 @@
         </div>
 
         <div v-else class="messages-container">
+          <!-- 載入更多指示器 -->
+          <div v-if="isLoadingMore" class="loading-more">
+            <n-spin size="small" />
+            <span>載入中...</span>
+          </div>
+          <div v-else-if="!hasMore && chatStore.currentMessages.length > 0" class="no-more">
+            <span>沒有更多訊息了</span>
+          </div>
+
           <MessageBubble
             v-for="message in chatStore.currentMessages"
             :key="message.id"
@@ -118,6 +127,11 @@ const messageInput = ref('')
 const messageListRef = ref(null)
 const typingTimer = ref(null)
 const defaultAvatar = 'https://via.placeholder.com/40'
+
+// 分頁載入狀態
+const currentPage = ref(1)
+const hasMore = ref(true)
+const isLoadingMore = ref(false)
 
 const currentConversation = computed(() => chatStore.currentConversation)
 const otherUserId = computed(() => currentConversation.value?.other_user_id)
@@ -257,15 +271,60 @@ const scrollToBottom = (smooth = true) => {
   }
 }
 
+// 載入更多歷史訊息
+const loadMoreMessages = async () => {
+  if (isLoadingMore.value || !hasMore.value) {
+    return
+  }
+
+  isLoadingMore.value = true
+
+  try {
+    // 保存當前滾動高度
+    const scrollHeightBefore = messageListRef.value?.scrollHeight || 0
+    const scrollTopBefore = messageListRef.value?.scrollTop || 0
+
+    // 載入下一頁
+    const nextPage = currentPage.value + 1
+    const result = await chatStore.fetchChatHistory(matchId.value, nextPage)
+
+    // 檢查是否還有更多訊息
+    if (result.messages && result.messages.length > 0) {
+      currentPage.value = nextPage
+
+      // 檢查是否還有下一頁
+      const total = result.total || 0
+      const loadedCount = currentPage.value * 50 // 假設每頁 50 條
+      hasMore.value = loadedCount < total
+
+      // 等待 DOM 更新後恢復滾動位置
+      await nextTick()
+
+      // 恢復滾動位置（加上新載入內容的高度）
+      if (messageListRef.value) {
+        const scrollHeightAfter = messageListRef.value.scrollHeight
+        const heightDiff = scrollHeightAfter - scrollHeightBefore
+        messageListRef.value.scrollTop = scrollTopBefore + heightDiff
+      }
+    } else {
+      hasMore.value = false
+    }
+  } catch (error) {
+    console.error('載入更多訊息失敗:', error)
+    message.error('載入更多訊息失敗')
+  } finally {
+    isLoadingMore.value = false
+  }
+}
+
 // 處理滾動事件（實現滾動載入更多）
 const handleScroll = () => {
   if (messageListRef.value) {
     const { scrollTop } = messageListRef.value
 
     // 如果滾動到頂部，載入更多歷史訊息
-    if (scrollTop < 100) {
-      // TODO: 實作載入更多歷史訊息
-      console.log('Load more messages...')
+    if (scrollTop < 100 && !isLoadingMore.value && hasMore.value) {
+      loadMoreMessages()
     }
   }
 }
@@ -282,6 +341,11 @@ watch(
 )
 
 onMounted(async () => {
+  // 重置分頁狀態
+  currentPage.value = 1
+  hasMore.value = true
+  isLoadingMore.value = false
+
   // 初始化 WebSocket
   if (!chatStore.ws.isConnected) {
     chatStore.initWebSocket()
@@ -380,6 +444,24 @@ onUnmounted(() => {
 .messages-container {
   display: flex;
   flex-direction: column;
+}
+
+.loading-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  color: #666;
+  font-size: 14px;
+}
+
+.no-more {
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+  color: #999;
+  font-size: 12px;
 }
 
 .chat-input-area {
