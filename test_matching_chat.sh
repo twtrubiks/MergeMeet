@@ -53,7 +53,7 @@ echo ""
 # 步驟 2: 創建 Alice 的個人檔案
 # ============================================
 echo -e "${BLUE}[步驟 2/10] 創建 Alice 的個人檔案${NC}"
-curl -s -X POST "$API_BASE/profile" \
+PROFILE_RESPONSE=$(curl -s -X POST "$API_BASE/profile/" \
   -H "Authorization: Bearer $ALICE_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -65,10 +65,17 @@ curl -s -X POST "$API_BASE/profile" \
       "longitude": 121.5654,
       "location_name": "台北市信義區"
     }
-  }' > /dev/null
+  }')
+
+# 檢查是否有錯誤
+if echo "$PROFILE_RESPONSE" | jq -e '.detail' > /dev/null 2>&1; then
+  echo "❌ Alice 檔案創建失敗"
+  echo "$PROFILE_RESPONSE" | jq '.'
+  exit 1
+fi
 
 # 更新偏好設定
-curl -s -X PATCH "$API_BASE/profile" \
+PREF_RESPONSE=$(curl -s -X PATCH "$API_BASE/profile/" \
   -H "Authorization: Bearer $ALICE_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -76,7 +83,15 @@ curl -s -X PATCH "$API_BASE/profile" \
     "max_age_preference": 35,
     "max_distance_km": 50,
     "gender_preference": "male"
-  }' > /dev/null
+  }')
+
+# 檢查是否有錯誤
+if echo "$PREF_RESPONSE" | jq -e '.detail' > /dev/null 2>&1; then
+  echo "❌ Alice 偏好設定失敗"
+  echo "$PREF_RESPONSE" | jq '.'
+  exit 1
+fi
+
 echo -e "${GREEN}✅ Alice 檔案創建成功${NC}"
 echo ""
 
@@ -84,10 +99,10 @@ echo ""
 # 步驟 3: 設定 Alice 的興趣標籤
 # ============================================
 echo -e "${BLUE}[步驟 3/10] 取得興趣標籤並設定${NC}"
-TAGS_RESPONSE=$(curl -s -X GET "$API_BASE/profile/interest-tags")
+TAGS_RESPONSE=$(curl -s -X GET "$API_BASE/profile/interest-tags/")
 TAG_IDS=$(echo $TAGS_RESPONSE | jq -r '.[0:3] | map(.id) | @json')
 
-curl -s -X PUT "$API_BASE/profile/interests" \
+curl -s -X PUT "$API_BASE/profile/interests/" \
   -H "Authorization: Bearer $ALICE_TOKEN" \
   -H "Content-Type: application/json" \
   -d "{\"interest_ids\": $TAG_IDS}" > /dev/null
@@ -124,7 +139,7 @@ echo ""
 # 步驟 5: 創建 Bob 的個人檔案
 # ============================================
 echo -e "${BLUE}[步驟 5/10] 創建 Bob 的個人檔案${NC}"
-curl -s -X POST "$API_BASE/profile" \
+BOB_PROFILE_RESPONSE=$(curl -s -X POST "$API_BASE/profile/" \
   -H "Authorization: Bearer $BOB_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -136,10 +151,17 @@ curl -s -X POST "$API_BASE/profile" \
       "longitude": 121.5500,
       "location_name": "台北市大安區"
     }
-  }' > /dev/null
+  }')
+
+# 檢查是否有錯誤
+if echo "$BOB_PROFILE_RESPONSE" | jq -e '.detail' > /dev/null 2>&1; then
+  echo "❌ Bob 檔案創建失敗"
+  echo "$BOB_PROFILE_RESPONSE" | jq '.'
+  exit 1
+fi
 
 # 更新偏好設定
-curl -s -X PATCH "$API_BASE/profile" \
+BOB_PREF_RESPONSE=$(curl -s -X PATCH "$API_BASE/profile/" \
   -H "Authorization: Bearer $BOB_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -147,7 +169,15 @@ curl -s -X PATCH "$API_BASE/profile" \
     "max_age_preference": 32,
     "max_distance_km": 30,
     "gender_preference": "female"
-  }' > /dev/null
+  }')
+
+# 檢查是否有錯誤
+if echo "$BOB_PREF_RESPONSE" | jq -e '.detail' > /dev/null 2>&1; then
+  echo "❌ Bob 偏好設定失敗"
+  echo "$BOB_PREF_RESPONSE" | jq '.'
+  exit 1
+fi
+
 echo -e "${GREEN}✅ Bob 檔案創建成功${NC}"
 echo ""
 
@@ -155,7 +185,7 @@ echo ""
 # 步驟 6: 設定 Bob 的興趣標籤
 # ============================================
 echo -e "${BLUE}[步驟 6/10] 設定 Bob 的興趣標籤${NC}"
-curl -s -X PUT "$API_BASE/profile/interests" \
+curl -s -X PUT "$API_BASE/profile/interests/" \
   -H "Authorization: Bearer $BOB_TOKEN" \
   -H "Content-Type: application/json" \
   -d "{\"interest_ids\": $TAG_IDS}" > /dev/null
@@ -173,7 +203,12 @@ echo -e "${BLUE}[步驟 7/10] Alice 瀏覽候選人${NC}"
 BROWSE_RESPONSE=$(curl -s -X GET "$API_BASE/discovery/browse?limit=10" \
   -H "Authorization: Bearer $ALICE_TOKEN")
 
-BOB_USER_ID=$(echo $BROWSE_RESPONSE | jq -r '.[0].user_id // empty')
+# Debug: 顯示返回內容
+echo "   Debug: Browse API 返回:"
+echo "$BROWSE_RESPONSE" | jq '.' 2>/dev/null || echo "$BROWSE_RESPONSE"
+echo ""
+
+BOB_USER_ID=$(echo $BROWSE_RESPONSE | jq -r '.[0].user_id // empty' 2>/dev/null)
 
 if [ -z "$BOB_USER_ID" ]; then
   echo "❌ Alice 找不到候選人"
