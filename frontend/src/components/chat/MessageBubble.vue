@@ -17,8 +17,29 @@
 
     <!-- 訊息內容 -->
     <div class="message-content-wrapper">
-      <!-- 訊息氣泡 -->
+      <!-- 訊息氣泡（自己的訊息可以右鍵刪除） -->
+      <n-dropdown
+        v-if="isOwn"
+        trigger="manual"
+        :show="showDropdown"
+        :options="dropdownOptions"
+        @select="handleDropdownSelect"
+        @clickoutside="showDropdown = false"
+      >
+        <div
+          :class="[
+            'message-content',
+            isOwn ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-900'
+          ]"
+          @contextmenu.prevent="handleContextMenu"
+        >
+          {{ message.content }}
+        </div>
+      </n-dropdown>
+
+      <!-- 對方的訊息（不可刪除） -->
       <div
+        v-else
         :class="[
           'message-content',
           isOwn ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-900'
@@ -45,8 +66,9 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { NAvatar } from 'naive-ui'
+import { ref, computed, h } from 'vue'
+import { NAvatar, NDropdown, NIcon } from 'naive-ui'
+import { TrashOutline } from '@vicons/ionicons5'
 
 const props = defineProps({
   message: {
@@ -67,7 +89,33 @@ const props = defineProps({
   }
 })
 
+const emit = defineEmits(['delete'])
+
 const defaultAvatar = 'https://via.placeholder.com/40'
+const showDropdown = ref(false)
+
+// 右鍵選單選項
+const dropdownOptions = [
+  {
+    label: '刪除訊息',
+    key: 'delete',
+    icon: () => h(NIcon, null, { default: () => h(TrashOutline) })
+  }
+]
+
+// 處理右鍵點擊
+const handleContextMenu = (e) => {
+  e.preventDefault()
+  showDropdown.value = true
+}
+
+// 處理選單選擇
+const handleDropdownSelect = (key) => {
+  if (key === 'delete') {
+    emit('delete', props.message.id)
+  }
+  showDropdown.value = false
+}
 
 // 格式化時間
 const formattedTime = computed(() => {
@@ -140,6 +188,8 @@ const formattedTime = computed(() => {
   font-size: 14px;
   line-height: 1.5;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  cursor: context-menu;
+  user-select: text;
 }
 
 .message-own .message-content {

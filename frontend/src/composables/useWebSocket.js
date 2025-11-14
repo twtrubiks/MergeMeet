@@ -160,6 +160,7 @@ export function useWebSocket() {
    * 發送打字指示器
    */
   const sendTypingIndicator = (matchId, isTyping) => {
+    console.log('[WebSocket] Sending typing indicator:', { matchId, isTyping })
     return send({
       type: 'typing',
       match_id: matchId,

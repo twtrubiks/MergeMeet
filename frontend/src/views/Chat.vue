@@ -39,6 +39,7 @@
             :is-own="message.sender_id === userStore.user?.id"
             :show-avatar="message.sender_id !== userStore.user?.id"
             :other-user-avatar="currentConversation?.other_user_avatar"
+            @delete="handleDeleteMessage"
           />
         </div>
       </div>
@@ -83,7 +84,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NButton, NIcon, NAvatar, NInput, NEmpty, NSpin, NAlert, useMessage } from 'naive-ui'
+import { NButton, NIcon, NAvatar, NInput, NEmpty, NSpin, NAlert, useMessage, useDialog } from 'naive-ui'
 import { ArrowBack, Send } from '@vicons/ionicons5'
 import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
@@ -92,6 +93,7 @@ import MessageBubble from '@/components/chat/MessageBubble.vue'
 const route = useRoute()
 const router = useRouter()
 const message = useMessage()
+const dialog = useDialog()
 const chatStore = useChatStore()
 const userStore = useUserStore()
 
@@ -106,6 +108,24 @@ const currentConversation = computed(() => chatStore.currentConversation)
 // 返回上一頁
 const goBack = () => {
   router.push('/messages')
+}
+
+// 刪除訊息
+const handleDeleteMessage = (messageId) => {
+  dialog.warning({
+    title: '刪除訊息',
+    content: '確定要刪除這則訊息嗎？此操作無法復原。',
+    positiveText: '刪除',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        await chatStore.deleteMessage(messageId)
+        message.success('訊息已刪除')
+      } catch (error) {
+        message.error(error.message || '刪除失敗')
+      }
+    }
+  })
 }
 
 // 發送訊息
@@ -138,6 +158,8 @@ const handleSendMessage = async (event) => {
 
 // 處理打字事件
 const handleTyping = () => {
+  console.log('[Chat.vue] User typing, matchId:', matchId.value)
+
   // 發送正在打字的狀態
   chatStore.sendTyping(matchId.value, true)
 
@@ -148,6 +170,7 @@ const handleTyping = () => {
 
   // 3 秒後自動停止打字狀態
   typingTimer.value = setTimeout(() => {
+    console.log('[Chat.vue] Typing timeout, sending stop')
     chatStore.sendTyping(matchId.value, false)
   }, 3000)
 }
@@ -197,8 +220,8 @@ onMounted(async () => {
     await chatStore.fetchConversations()
   }
 
-  // 加入聊天室
-  chatStore.joinMatchRoom(matchId.value)
+  // 加入聊天室（等待訊息載入和已讀標記完成）
+  await chatStore.joinMatchRoom(matchId.value)
 
   // 滾動到底部
   await nextTick()

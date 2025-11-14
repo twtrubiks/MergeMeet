@@ -207,17 +207,17 @@ export const useChatStore = defineStore('chat', () => {
   /**
    * 加入配對聊天室
    */
-  const joinMatchRoom = (matchId) => {
+  const joinMatchRoom = async (matchId) => {
     currentMatchId.value = matchId
     ws.joinMatch(matchId)
 
     // 獲取聊天記錄
     if (!messages.value[matchId]) {
-      fetchChatHistory(matchId)
+      await fetchChatHistory(matchId)
     }
 
-    // 標記已讀
-    markConversationAsRead(matchId)
+    // 標記已讀（確保訊息已載入後再執行）
+    await markConversationAsRead(matchId)
   }
 
   /**
@@ -270,18 +270,22 @@ export const useChatStore = defineStore('chat', () => {
    * 處理打字指示器
    */
   const handleTypingIndicator = (data) => {
+    console.log('[Chat] Received typing indicator:', data)
     const { match_id, user_id, is_typing } = data
 
     if (is_typing) {
       typingUsers.value[match_id] = user_id
+      console.log('[Chat] User typing:', { match_id, user_id, typingUsers: typingUsers.value })
       // 3 秒後自動清除
       setTimeout(() => {
         if (typingUsers.value[match_id] === user_id) {
           delete typingUsers.value[match_id]
+          console.log('[Chat] Typing timeout cleared:', { match_id, user_id })
         }
       }, 3000)
     } else {
       delete typingUsers.value[match_id]
+      console.log('[Chat] Typing stopped:', { match_id, user_id })
     }
   }
 
