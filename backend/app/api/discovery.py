@@ -13,7 +13,7 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.models.profile import Profile
-from app.models.match import Like, Match, BlockedUser
+from app.models.match import Like, Match, BlockedUser, Message
 from app.schemas.discovery import ProfileCard, LikeResponse, MatchSummary, MatchDetail
 from app.services.matching_service import matching_service
 
@@ -416,8 +416,18 @@ async def get_matches(
             photos=photos
         )
 
-        # TODO: 計算未讀訊息數量
-        unread_count = 0
+        # 計算未讀訊息數量（對方發送給我的未讀訊息）
+        unread_result = await db.execute(
+            select(func.count(Message.id)).where(
+                and_(
+                    Message.match_id == match.id,
+                    Message.sender_id == matched_user_id,  # 對方發送的
+                    Message.is_read.is_(None),  # 未讀
+                    Message.deleted_at.is_(None)  # 未刪除
+                )
+            )
+        )
+        unread_count = unread_result.scalar() or 0
 
         match_summary = MatchSummary(
             match_id=match.id,

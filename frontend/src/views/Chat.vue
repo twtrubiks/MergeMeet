@@ -101,6 +101,14 @@
         </n-alert>
       </div>
     </n-spin>
+
+    <!-- 舉報對話框 -->
+    <ReportModal
+      :show="showReportModal"
+      :reported-user="reportedUserData"
+      @close="showReportModal = false"
+      @reported="handleReported"
+    />
   </div>
 </template>
 
@@ -113,6 +121,7 @@ import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
 import { useSafetyStore } from '@/stores/safety'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
+import ReportModal from '@/components/ReportModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -132,6 +141,16 @@ const defaultAvatar = 'https://via.placeholder.com/40'
 const currentPage = ref(1)
 const hasMore = ref(true)
 const isLoadingMore = ref(false)
+
+// 舉報功能
+const showReportModal = ref(false)
+const reportedUserData = computed(() => {
+  if (!currentConversation.value) return null
+  return {
+    user_id: currentConversation.value.other_user_id,
+    display_name: currentConversation.value.other_user_name
+  }
+})
 
 const currentConversation = computed(() => chatStore.currentConversation)
 const otherUserId = computed(() => currentConversation.value?.other_user_id)
@@ -209,9 +228,17 @@ const handleBlockUser = () => {
 
 // 舉報用戶
 const handleReportUser = () => {
-  // TODO: 實現舉報對話框
-  // 可以考慮使用 ReportModal 組件或創建簡單的對話框
-  message.info('舉報功能開發中，請前往探索頁面使用舉報功能')
+  if (!otherUserId.value) {
+    message.error('無法獲取用戶資訊')
+    return
+  }
+  showReportModal.value = true
+}
+
+// 舉報成功處理
+const handleReported = () => {
+  message.success('舉報已送出，感謝您的協助')
+  showReportModal.value = false
 }
 
 // 發送訊息
