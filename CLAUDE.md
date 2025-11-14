@@ -91,15 +91,17 @@ POST   /api/auth/login                 # 用戶登入
 POST   /api/auth/refresh               # 刷新 Token
 ```
 
-### ❌ 錯誤示例（加了尾隨斜線會導致 307 重定向）
+### ❌ 錯誤示例（加了尾隨斜線會導致 404 錯誤）
 
 ```bash
 # 所有端點都不應該有尾隨斜線
-POST /api/profile/                     → 307 Redirect ❌
-GET  /api/discovery/browse/            → 307 Redirect ❌
-POST /api/discovery/like/{user_id}/    → 307 Redirect ❌
-GET  /api/messages/conversations/      → 307 Redirect ❌
+POST /api/profile/                     → 404 Not Found ❌
+GET  /api/discovery/browse/            → 404 Not Found ❌
+POST /api/discovery/like/{user_id}/    → 404 Not Found ❌
+GET  /api/messages/conversations/      → 404 Not Found ❌
 ```
+
+**註**: FastAPI 已配置 `redirect_slashes=False`，因此帶斜線的請求直接返回 404，不會重定向。
 
 ### FastAPI Router 定義規範
 
@@ -113,9 +115,26 @@ GET  /api/messages/conversations/      → 307 Redirect ❌
 @router.post("/like/{user_id}", ...)       # POST /api/discovery/like/{id}
 
 # ❌ 錯誤 - 不要使用尾隨斜線
-@router.post("/", ...)                     # 會導致前端 307 錯誤
-@router.put("/interests/", ...)            # 會導致前端 307 錯誤
+@router.post("/", ...)                     # 會導致前端 404 錯誤
+@router.put("/interests/", ...)            # 會導致前端 404 錯誤
 ```
+
+### FastAPI 配置
+
+在 `backend/app/main.py` 中，已配置 FastAPI 禁用自動重定向：
+
+```python
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    version=settings.VERSION,
+    redirect_slashes=False,  # 禁用自動重定向
+)
+```
+
+這確保了：
+- ✅ 不帶斜線的 URL 正常工作 (HTTP 200)
+- ✅ 帶斜線的 URL 直接返回 404 (不會重定向)
+- ✅ 避免 Authorization Header 在重定向中丟失
 
 ### 測試時注意事項
 
@@ -123,7 +142,7 @@ GET  /api/messages/conversations/      → 307 Redirect ❌
    ```bash
    curl -w "\nHTTP: %{http_code}\n" -X GET "..."
    # HTTP: 200 ✅ 正確
-   # HTTP: 307 ❌ URL 格式錯誤（有尾隨斜線）
+   # HTTP: 404 ❌ URL 格式錯誤（有尾隨斜線）
    ```
 
 2. **前端 axios** 請求時，確保**所有 URL 都不使用尾隨斜線**
@@ -136,7 +155,7 @@ GET  /api/messages/conversations/      → 307 Redirect ❌
    await axios.post(`/api/discovery/like/${userId}`)
    await axios.get('/api/messages/conversations')
 
-   // ❌ 錯誤 - 加了尾隨斜線會 307 重定向
+   // ❌ 錯誤 - 加了尾隨斜線會返回 404
    await axios.get('/api/profile/')
    await axios.put('/api/profile/interests/', data)
    await axios.post(`/api/discovery/like/${userId}/`)

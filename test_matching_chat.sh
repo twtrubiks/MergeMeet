@@ -55,7 +55,7 @@ echo ""
 # 步驟 2: 創建 Alice 的個人檔案
 # ============================================
 echo -e "${BLUE}[步驟 2/10] 創建 Alice 的個人檔案${NC}"
-PROFILE_RESPONSE=$(curl -s -X POST "$API_BASE/profile/" \
+PROFILE_RESPONSE=$(curl -s -X POST "$API_BASE/profile" \
   -H "Authorization: Bearer $ALICE_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -77,7 +77,7 @@ if echo "$PROFILE_RESPONSE" | jq -e '.detail' > /dev/null 2>&1; then
 fi
 
 # 更新偏好設定
-PREF_RESPONSE=$(curl -s -X PATCH "$API_BASE/profile/" \
+PREF_RESPONSE=$(curl -s -X PATCH "$API_BASE/profile" \
   -H "Authorization: Bearer $ALICE_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -101,10 +101,10 @@ echo ""
 # 步驟 3: 設定 Alice 的興趣標籤
 # ============================================
 echo -e "${BLUE}[步驟 3/10] 取得興趣標籤並設定${NC}"
-TAGS_RESPONSE=$(curl -s -X GET "$API_BASE/profile/interest-tags/")
+TAGS_RESPONSE=$(curl -s -X GET "$API_BASE/profile/interest-tags")
 TAG_IDS=$(echo $TAGS_RESPONSE | jq -r '.[0:3] | map(.id) | @json')
 
-INTERESTS_RESPONSE=$(curl -s -X PUT "$API_BASE/profile/interests/" \
+INTERESTS_RESPONSE=$(curl -s -X PUT "$API_BASE/profile/interests" \
   -H "Authorization: Bearer $ALICE_TOKEN" \
   -H "Content-Type: application/json" \
   -d "{\"interest_ids\": $TAG_IDS}")
@@ -148,7 +148,7 @@ echo ""
 # 步驟 5: 創建 Bob 的個人檔案
 # ============================================
 echo -e "${BLUE}[步驟 5/10] 創建 Bob 的個人檔案${NC}"
-BOB_PROFILE_RESPONSE=$(curl -s -X POST "$API_BASE/profile/" \
+BOB_PROFILE_RESPONSE=$(curl -s -X POST "$API_BASE/profile" \
   -H "Authorization: Bearer $BOB_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -170,7 +170,7 @@ if echo "$BOB_PROFILE_RESPONSE" | jq -e '.detail' > /dev/null 2>&1; then
 fi
 
 # 更新偏好設定
-BOB_PREF_RESPONSE=$(curl -s -X PATCH "$API_BASE/profile/" \
+BOB_PREF_RESPONSE=$(curl -s -X PATCH "$API_BASE/profile" \
   -H "Authorization: Bearer $BOB_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -194,7 +194,7 @@ echo ""
 # 步驟 6: 設定 Bob 的興趣標籤
 # ============================================
 echo -e "${BLUE}[步驟 6/10] 設定 Bob 的興趣標籤${NC}"
-BOB_INTERESTS_RESPONSE=$(curl -s -X PUT "$API_BASE/profile/interests/" \
+BOB_INTERESTS_RESPONSE=$(curl -s -X PUT "$API_BASE/profile/interests" \
   -H "Authorization: Bearer $BOB_TOKEN" \
   -H "Content-Type: application/json" \
   -d "{\"interest_ids\": $TAG_IDS}")

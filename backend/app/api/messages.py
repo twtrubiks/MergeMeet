@@ -18,7 +18,7 @@ from app.schemas.message import (
     MarkAsReadRequest
 )
 
-router = APIRouter()
+router = APIRouter(prefix="/api/messages")
 
 
 @router.get("/matches/{match_id}/messages", response_model=ChatHistoryResponse)

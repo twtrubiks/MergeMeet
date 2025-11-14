@@ -23,7 +23,7 @@ from app.schemas.profile import (
     UpdateInterestsRequest,
 )
 
-router = APIRouter()
+router = APIRouter(prefix="/api/profile")
 
 
 def calculate_age(date_of_birth: date) -> int:
