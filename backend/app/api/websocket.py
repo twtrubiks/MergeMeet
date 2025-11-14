@@ -58,10 +58,10 @@ async def websocket_endpoint(
                 await handle_read_receipt(message_data, user_id)
 
             elif message_type == "join_match":
-                handle_join_match(message_data, user_id)
+                await handle_join_match(message_data, user_id)
 
             elif message_type == "leave_match":
-                handle_leave_match(message_data, user_id)
+                await handle_leave_match(message_data, user_id)
 
             else:
                 logger.warning(f"Unknown message type: {message_type}")
@@ -271,7 +271,7 @@ async def handle_read_receipt(data: dict, user_id: str):
             logger.error(f"Error handling read receipt: {e}", exc_info=True)
 
 
-def handle_join_match(data: dict, user_id: str):
+async def handle_join_match(data: dict, user_id: str):
     """處理加入配對聊天室
 
     Args:
@@ -286,7 +286,7 @@ def handle_join_match(data: dict, user_id: str):
     manager.join_match_room(match_id, user_id)
 
     # 通知用戶已加入聊天室
-    manager.send_personal_message(
+    await manager.send_personal_message(
         user_id,
         {
             "type": "joined_match",
@@ -295,7 +295,7 @@ def handle_join_match(data: dict, user_id: str):
     )
 
 
-def handle_leave_match(data: dict, user_id: str):
+async def handle_leave_match(data: dict, user_id: str):
     """處理離開配對聊天室
 
     Args:

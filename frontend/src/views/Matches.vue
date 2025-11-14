@@ -36,25 +36,25 @@
           <!-- 用戶頭像 -->
           <div class="match-avatar">
             <img
-              v-if="match.profile_picture"
-              :src="match.profile_picture"
-              :alt="match.display_name"
+              v-if="match.matched_user.photos && match.matched_user.photos.length > 0"
+              :src="match.matched_user.photos[0]"
+              :alt="match.matched_user.display_name"
             >
             <div v-else class="avatar-placeholder">
-              {{ match.display_name[0] }}
+              {{ match.matched_user.display_name[0] }}
             </div>
-            <div class="online-status" :class="{ online: isOnline(match.last_active) }"></div>
+            <div class="online-status" :class="{ online: isOnline(match.matched_user.last_active) }"></div>
           </div>
 
           <!-- 用戶資訊 -->
           <div class="match-info">
             <div class="match-header">
-              <h3 class="match-name">{{ match.display_name }}</h3>
-              <span class="match-age">{{ match.age }}</span>
+              <h3 class="match-name">{{ match.matched_user.display_name }}</h3>
+              <span class="match-age">{{ match.matched_user.age }}</span>
             </div>
 
-            <p v-if="match.distance_km" class="match-distance">
-              📍 {{ formatDistance(match.distance_km) }}
+            <p v-if="match.matched_user.distance_km" class="match-distance">
+              📍 {{ formatDistance(match.matched_user.distance_km) }}
             </p>
 
             <p class="match-date">
@@ -62,9 +62,9 @@
             </p>
 
             <!-- 共同興趣 -->
-            <div v-if="match.interests && match.interests.length > 0" class="match-interests">
+            <div v-if="match.matched_user.interests && match.matched_user.interests.length > 0" class="match-interests">
               <span
-                v-for="interest in match.interests.slice(0, 3)"
+                v-for="interest in match.matched_user.interests.slice(0, 3)"
                 :key="interest"
                 class="interest-tag"
               >
@@ -75,6 +75,13 @@
 
           <!-- 操作按鈕 -->
           <div class="match-actions">
+            <button
+              @click="openChat(match.match_id)"
+              class="btn-chat"
+              title="開始聊天"
+            >
+              💬
+            </button>
             <button
               @click="showUnmatchConfirm(match)"
               class="btn-unmatch"
@@ -95,7 +102,7 @@
             <div class="modal-icon">⚠️</div>
             <h2 class="modal-title">確定要取消配對？</h2>
             <p class="modal-subtitle">
-              此操作無法復原，您將不再能與 {{ unmatchTarget.display_name }} 聊天。
+              此操作無法復原，您將不再能與 {{ unmatchTarget.matched_user.display_name }} 聊天。
             </p>
             <div class="modal-actions">
               <button @click="cancelUnmatch" class="btn-cancel">
@@ -114,8 +121,10 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useDiscoveryStore } from '@/stores/discovery'
 
+const router = useRouter()
 const discoveryStore = useDiscoveryStore()
 
 const unmatchTarget = ref(null)
@@ -181,6 +190,13 @@ const loadMatches = async () => {
   } catch (error) {
     console.error('載入配對列表失敗:', error)
   }
+}
+
+/**
+ * 開啟聊天室
+ */
+const openChat = (matchId) => {
+  router.push(`/messages/${matchId}`)
 }
 
 /**
@@ -461,8 +477,11 @@ onMounted(() => {
 /* 操作按鈕 */
 .match-actions {
   flex-shrink: 0;
+  display: flex;
+  gap: 8px;
 }
 
+.btn-chat,
 .btn-unmatch {
   width: 40px;
   height: 40px;
@@ -472,6 +491,11 @@ onMounted(() => {
   font-size: 20px;
   cursor: pointer;
   transition: all 0.3s ease;
+}
+
+.btn-chat:hover {
+  background: #E3F2FD;
+  transform: scale(1.1);
 }
 
 .btn-unmatch:hover {

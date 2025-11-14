@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func, desc
+from sqlalchemy.orm import selectinload
 from typing import List
 from datetime import datetime
 
@@ -131,7 +132,9 @@ async def get_conversations(
 
         # 獲取對方的個人資料
         profile_result = await db.execute(
-            select(Profile).where(Profile.user_id == other_user_id)
+            select(Profile)
+            .options(selectinload(Profile.photos))
+            .where(Profile.user_id == other_user_id)
         )
         other_profile = profile_result.scalar_one_or_none()
 
