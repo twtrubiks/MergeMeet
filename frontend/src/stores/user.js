@@ -53,11 +53,8 @@ export const useUserStore = defineStore('user', () => {
       const response = await authAPI.register(registerData)
       saveTokens(response)
 
-      // 儲存基本用戶資訊
-      user.value = {
-        email: registerData.email,
-        email_verified: false,
-      }
+      // 從 Token 初始化用戶資訊（包含 user.id）
+      initializeFromToken()
 
       return true
     } catch (err) {
@@ -82,10 +79,8 @@ export const useUserStore = defineStore('user', () => {
       const response = await authAPI.login(credentials)
       saveTokens(response)
 
-      // 儲存基本用戶資訊
-      user.value = {
-        email: credentials.email,
-      }
+      // 從 Token 初始化用戶資訊（包含 user.id）
+      initializeFromToken()
 
       return true
     } catch (err) {
