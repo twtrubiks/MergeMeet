@@ -498,3 +498,97 @@ async def test_deleted_messages_not_in_history(client: AsyncClient, matched_user
     data = response.json()
     assert len(data["messages"]) == 1  # 只應該看到一條訊息
     assert data["messages"][0]["content"] == "Message 2"
+
+
+@pytest.mark.asyncio
+async def test_delete_message_websocket_broadcast(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+    """測試刪除訊息時 WebSocket 廣播通知"""
+    from unittest.mock import AsyncMock, patch
+
+    match_id = matched_users["match_id"]
+    alice_token = matched_users["alice"]["token"]
+    alice_user_id = matched_users["alice"]["user_id"]
+
+    # Alice 發送訊息
+    message = Message(
+        match_id=match_id,
+        sender_id=alice_user_id,
+        content="Test message to delete",
+        message_type="TEXT"
+    )
+    test_db.add(message)
+    await test_db.commit()
+    await test_db.refresh(message)
+    message_id = str(message.id)
+
+    # Mock WebSocket manager 的 send_to_match 方法
+    with patch('app.websocket.manager.manager.send_to_match', new_callable=AsyncMock) as mock_send:
+        # Alice 刪除訊息
+        response = await client.delete(
+            f"/api/messages/messages/{message_id}",
+            headers={"Authorization": f"Bearer {alice_token}"}
+        )
+
+        assert response.status_code == 204
+
+        # 驗證 WebSocket 廣播被調用
+        mock_send.assert_called_once()
+
+        # 驗證廣播的參數
+        call_args = mock_send.call_args
+        assert call_args[0][0] == match_id  # match_id
+
+        broadcast_data = call_args[0][1]  # 廣播的數據
+        assert broadcast_data["type"] == "message_deleted"
+        assert broadcast_data["message_id"] == message_id
+        assert broadcast_data["match_id"] == match_id
+        assert broadcast_data["deleted_by"] == alice_user_id
+
+        # 驗證排除了刪除者
+        assert call_args[1]["exclude_user"] == alice_user_id
+
+
+@pytest.mark.asyncio
+async def test_delete_message_websocket_event_format(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+    """測試刪除訊息 WebSocket 事件格式正確性"""
+    from unittest.mock import AsyncMock, patch
+
+    match_id = matched_users["match_id"]
+    bob_token = matched_users["bob"]["token"]
+    bob_user_id = matched_users["bob"]["user_id"]
+
+    # Bob 發送訊息
+    message = Message(
+        match_id=match_id,
+        sender_id=bob_user_id,
+        content="Bob's test message",
+        message_type="TEXT"
+    )
+    test_db.add(message)
+    await test_db.commit()
+    await test_db.refresh(message)
+
+    # Mock WebSocket manager
+    with patch('app.websocket.manager.manager.send_to_match', new_callable=AsyncMock) as mock_send:
+        # Bob 刪除訊息
+        await client.delete(
+            f"/api/messages/messages/{message.id}",
+            headers={"Authorization": f"Bearer {bob_token}"}
+        )
+
+        # 獲取廣播的事件數據
+        broadcast_data = mock_send.call_args[0][1]
+
+        # 驗證事件包含所有必要欄位
+        required_fields = ["type", "message_id", "match_id", "deleted_by"]
+        for field in required_fields:
+            assert field in broadcast_data, f"Missing required field: {field}"
+
+        # 驗證事件類型
+        assert broadcast_data["type"] == "message_deleted"
+
+        # 驗證 UUID 格式
+        import uuid
+        assert uuid.UUID(broadcast_data["message_id"])
+        assert uuid.UUID(broadcast_data["match_id"])
+        assert uuid.UUID(broadcast_data["deleted_by"])
