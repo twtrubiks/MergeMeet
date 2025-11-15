@@ -84,12 +84,14 @@ npm run dev
 
 | 帳號 | Email | 密碼 | 狀態 |
 |------|-------|------|------|
-| Alice | alice@example.com | password123 | 完整檔案 |
-| Bob | bob@example.com | password123 | 完整檔案 |
-| Carol | carol@example.com | password123 | 完整檔案 |
-| David | david@example.com | password123 | 完整檔案 |
+| Alice | alice@example.com | Password123 | 完整檔案 |
+| Bob | bob@example.com | Password123 | 完整檔案 |
+| Carol | carol@example.com | Password123 | 完整檔案 |
+| David | david@example.com | Password123 | 完整檔案 |
 
-**註**: 如果帳號不存在，需要先自行註冊。
+**註**:
+- 密碼必須包含至少一個大寫字母（後端驗證要求）
+- 如果帳號不存在，需要先自行註冊
 
 ### 2.2 測試資料範例
 
@@ -151,7 +153,7 @@ npm run dev
 2. 填寫登入表單
    ```
    Email: alice@example.com
-   密碼: password123
+   密碼: Password123
    ```
 
 3. 點擊「登入」按鈕
