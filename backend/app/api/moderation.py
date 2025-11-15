@@ -10,6 +10,7 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_admin_user, get_current_user
 from app.models.user import User
 from app.models.moderation import SensitiveWord, ContentAppeal, ModerationLog
+from app.services.content_moderation import ContentModerationService
 from app.schemas.moderation import (
     SensitiveWordCreate,
     SensitiveWordUpdate,
@@ -109,6 +110,9 @@ async def create_sensitive_word(
     await db.commit()
     await db.refresh(new_word)
 
+    # 清除快取
+    ContentModerationService.clear_cache()
+
     return SensitiveWordResponse.model_validate(new_word)
 
 
@@ -166,6 +170,9 @@ async def update_sensitive_word(
     await db.commit()
     await db.refresh(word)
 
+    # 清除快取
+    ContentModerationService.clear_cache()
+
     return SensitiveWordResponse.model_validate(word)
 
 
@@ -196,6 +203,9 @@ async def delete_sensitive_word(
     word.updated_at = datetime.now()
 
     await db.commit()
+
+    # 清除快取
+    ContentModerationService.clear_cache()
 
 
 # ============ 內容申訴 API ============

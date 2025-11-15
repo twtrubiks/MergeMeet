@@ -167,7 +167,7 @@
                   :options="categoryOptions"
                   style="width: 200px"
                   clearable
-                  @update:value="loadSensitiveWords"
+                  @update:value="() => loadSensitiveWords(true)"
                 />
                 <n-select
                   v-model:value="wordFilters.is_active"
@@ -175,7 +175,7 @@
                   :options="activeOptions"
                   style="width: 150px"
                   clearable
-                  @update:value="loadSensitiveWords"
+                  @update:value="() => loadSensitiveWords(true)"
                 />
               </div>
 
@@ -350,13 +350,14 @@ import { useRouter } from 'vue-router'
 import {
   NButton, NTag, NSpin, NTabs, NTabPane, NDataTable,
   NSelect, NModal, NForm, NFormItem, NInput, NCheckbox,
-  useMessage
+  useMessage, useDialog
 } from 'naive-ui'
 import apiClient from '@/api/client'
 import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
 const message = useMessage()
+const dialog = useDialog()
 const userStore = useUserStore()
 
 const activeTab = ref('dashboard')
@@ -585,7 +586,11 @@ const loadModerationStats = async () => {
 }
 
 // 載入敏感詞列表
-const loadSensitiveWords = async () => {
+const loadSensitiveWords = async (resetPage = false) => {
+  if (resetPage) {
+    wordPagination.value.page = 1
+  }
+
   loadingWords.value = true
   try {
     const params = {
@@ -655,16 +660,24 @@ const handleUpdateWord = async () => {
 }
 
 // 刪除敏感詞（軟刪除）
-const handleDeleteWord = async (wordId) => {
-  try {
-    await apiClient.delete(`/moderation/sensitive-words/${wordId}`)
-    message.success('刪除成功')
-    await loadSensitiveWords()
-    await loadModerationStats()
-  } catch (error) {
-    console.error('刪除敏感詞失敗:', error)
-    message.error('刪除失敗')
-  }
+const handleDeleteWord = (wordId) => {
+  dialog.warning({
+    title: '確認刪除',
+    content: '確定要刪除此敏感詞嗎？此操作為軟刪除，可以稍後重新啟用。',
+    positiveText: '確認',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        await apiClient.delete(`/moderation/sensitive-words/${wordId}`)
+        message.success('刪除成功')
+        await loadSensitiveWords()
+        await loadModerationStats()
+      } catch (error) {
+        console.error('刪除敏感詞失敗:', error)
+        message.error('刪除失敗')
+      }
+    }
+  })
 }
 
 // 分頁改變

@@ -187,7 +187,9 @@ class ContentModerationService:
         )
 
         db.add(log)
-        await db.commit()
+        # 不自動 commit，由調用者決定何時提交
+        # 這樣可以避免在其他事務中調用時產生問題
+        await db.flush()
 
     @classmethod
     async def sanitize_content(cls, content: str, db: AsyncSession) -> str:

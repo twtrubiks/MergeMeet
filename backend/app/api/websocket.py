@@ -94,8 +94,10 @@ async def handle_chat_message(data: dict, sender_id: str):
                 return
 
             # 內容審核：檢查敏感詞
-            is_safe, violations = ContentModerationService.check_message_content(content)
-            if not is_safe:
+            is_approved, violations, action = await ContentModerationService.check_message_content(
+                content, db, sender_id
+            )
+            if not is_approved:
                 logger.warning(f"Unsafe content detected from {sender_id}: {violations}")
                 await manager.send_personal_message(
                     sender_id,
