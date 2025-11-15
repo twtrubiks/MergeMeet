@@ -50,6 +50,7 @@ export const useChatStore = defineStore('chat', () => {
     ws.onMessage('new_message', handleNewMessage)
     ws.onMessage('typing', handleTypingIndicator)
     ws.onMessage('read_receipt', handleReadReceipt)
+    ws.onMessage('message_deleted', handleMessageDeleted)
   }
 
   /**
@@ -307,6 +308,24 @@ export const useChatStore = defineStore('chat', () => {
       if (message) {
         message.is_read = read_at
         break
+      }
+    }
+  }
+
+  /**
+   * 處理訊息刪除事件（來自 WebSocket）
+   */
+  const handleMessageDeleted = (data) => {
+    const { message_id, match_id } = data
+
+    console.log('[Chat] Received message_deleted event:', data)
+
+    // 從本地狀態移除訊息
+    if (messages.value[match_id]) {
+      const index = messages.value[match_id].findIndex(m => m.id === message_id)
+      if (index > -1) {
+        messages.value[match_id].splice(index, 1)
+        console.log('[Chat] Message removed from local state:', message_id)
       }
     }
   }

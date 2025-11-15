@@ -265,7 +265,10 @@ async def delete_message(
 
     - 只有發送者可以刪除自己的訊息
     - 使用軟刪除，不實際從資料庫移除
+    - 通過 WebSocket 即時通知配對中的另一方
     """
+    from app.websocket.manager import manager
+
     # 查詢訊息
     result = await db.execute(
         select(Message).where(Message.id == message_id)
@@ -285,8 +288,23 @@ async def delete_message(
             detail="您只能刪除自己的訊息"
         )
 
+    # 保存 match_id 用於 WebSocket 廣播
+    match_id = str(message.match_id)
+
     # 軟刪除
     message.deleted_at = datetime.utcnow()
     await db.commit()
+
+    # 通過 WebSocket 通知配對中的另一方
+    await manager.send_to_match(
+        match_id,
+        {
+            "type": "message_deleted",
+            "message_id": message_id,
+            "match_id": match_id,
+            "deleted_by": str(current_user.id)
+        },
+        exclude_user=str(current_user.id)  # 排除刪除者本人
+    )
 
     return None
