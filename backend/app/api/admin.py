@@ -191,7 +191,7 @@ async def review_report(
     # 更新舉報狀態
     report.status = request.status
     report.admin_notes = request.admin_notes
-    report.reviewed_at = datetime.utcnow()
+    report.reviewed_at = func.now()
     report.reviewed_by = current_admin.id
 
     # 根據處理結果採取行動
@@ -309,7 +309,8 @@ async def ban_user(
     user.ban_reason = request.reason
 
     if request.duration_days:
-        user.banned_until = datetime.utcnow() + timedelta(days=request.duration_days)
+        from datetime import datetime, timezone
+        user.banned_until = datetime.now(timezone.utc) + timedelta(days=request.duration_days)
     else:
         user.banned_until = None  # 永久封禁
 

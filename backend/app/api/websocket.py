@@ -118,14 +118,18 @@ async def handle_chat_message(data: dict, sender_id: uuid.UUID):
                 )
 
                 # 記錄違規行為（可選：增加警告次數）
-                result = await db.execute(
-                    select(User).where(User.id == sender_id)
-                )
-                user = result.scalar_one_or_none()
-                if user:
-                    user.warning_count += 1
-                    await db.commit()
-                    logger.info(f"User {sender_id} warning count increased to {user.warning_count}")
+                try:
+                    result = await db.execute(
+                        select(User).where(User.id == sender_id)
+                    )
+                    user = result.scalar_one_or_none()
+                    if user:
+                        user.warning_count += 1
+                        await db.commit()
+                        logger.info(f"User {sender_id} warning count increased to {user.warning_count}")
+                except Exception as e:
+                    await db.rollback()
+                    logger.error(f"Failed to update warning count: {e}")
 
                 return
 
@@ -163,35 +167,42 @@ async def handle_chat_message(data: dict, sender_id: uuid.UUID):
                 )
                 return
 
-            # 儲存訊息到資料庫
-            message = Message(
-                match_id=match_id,
-                sender_id=sender_id,
-                content=content,
-                message_type=data.get("message_type", "TEXT")
-            )
-            db.add(message)
-            await db.commit()
-            await db.refresh(message)
+            # 儲存訊息到資料庫（確保事務完整性）
+            try:
+                message = Message(
+                    match_id=match_id,
+                    sender_id=sender_id,
+                    content=content,
+                    message_type=data.get("message_type", "TEXT")
+                )
+                db.add(message)
+                await db.commit()
+                await db.refresh(message)
 
-            # 準備要發送的訊息資料
-            message_payload = {
-                "type": "new_message",
-                "message": {
-                    "id": str(message.id),
-                    "match_id": str(message.match_id),
-                    "sender_id": str(message.sender_id),
-                    "content": message.content,
-                    "message_type": message.message_type,
-                    "sent_at": message.sent_at.isoformat(),
-                    "is_read": message.is_read.isoformat() if message.is_read else None
+                # 準備要發送的訊息資料
+                message_payload = {
+                    "type": "new_message",
+                    "message": {
+                        "id": str(message.id),
+                        "match_id": str(message.match_id),
+                        "sender_id": str(message.sender_id),
+                        "content": message.content,
+                        "message_type": message.message_type,
+                        "sent_at": message.sent_at.isoformat(),
+                        "is_read": message.is_read.isoformat() if message.is_read else None
+                    }
                 }
-            }
 
-            # 發送給配對的所有用戶 (包括發送者自己，用於確認)
-            await manager.send_to_match(match_id, message_payload)
+                # 發送給配對的所有用戶 (包括發送者自己，用於確認)
+                await manager.send_to_match(match_id, message_payload)
 
-            logger.info(f"Message {message.id} sent in match {match_id}")
+                logger.info(f"Message {message.id} sent in match {match_id}")
+
+            except Exception as e:
+                # 事務失敗，回滾並通知用戶
+                await db.rollback()
+                logger.error(f"Database error while saving message: {e}", exc_info=True)
+                raise  # 重新拋出異常，由外層處理
 
         except Exception as e:
             logger.error(f"Error handling chat message: {e}", exc_info=True)
@@ -294,7 +305,7 @@ async def handle_join_match(data: dict, user_id: str):
     if not match_id:
         return
 
-    manager.join_match_room(match_id, user_id)
+    await manager.join_match_room(match_id, user_id)
 
     # 通知用戶已加入聊天室
     await manager.send_personal_message(
@@ -318,6 +329,6 @@ async def handle_leave_match(data: dict, user_id: str):
     if not match_id:
         return
 
-    manager.leave_match_room(match_id, user_id)
+    await manager.leave_match_room(match_id, user_id)
 
     logger.info(f"User {user_id} left match {match_id}")

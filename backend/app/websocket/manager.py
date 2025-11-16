@@ -3,6 +3,7 @@ from fastapi import WebSocket
 from typing import Dict, List, Optional
 import json
 import logging
+import asyncio
 
 from app.core.security import decode_token
 
@@ -13,6 +14,8 @@ class ConnectionManager:
     """WebSocket 連接管理器
 
     管理所有活躍的 WebSocket 連接，並提供訊息發送功能
+
+    使用 asyncio.Lock 保護並發安全
     """
 
     def __init__(self):
@@ -21,6 +24,10 @@ class ConnectionManager:
 
         # 配對ID -> 用戶ID列表 (用於聊天室管理)
         self.match_rooms: Dict[str, List[str]] = {}
+
+        # 並發安全鎖
+        self._connections_lock = asyncio.Lock()
+        self._rooms_lock = asyncio.Lock()
 
     async def connect(self, websocket: WebSocket, user_id: str, token: str) -> bool:
         """建立 WebSocket 連接
@@ -42,7 +49,10 @@ class ConnectionManager:
 
         # 接受連接
         await websocket.accept()
-        self.active_connections[user_id] = websocket
+
+        # 並發安全：使用鎖保護字典操作
+        async with self._connections_lock:
+            self.active_connections[user_id] = websocket
         logger.info(f"User {user_id} connected via WebSocket")
 
         # 發送連接成功訊息
@@ -59,16 +69,19 @@ class ConnectionManager:
         Args:
             user_id: 用戶 ID
         """
-        if user_id in self.active_connections:
-            try:
-                await self.active_connections[user_id].close()
-            except Exception as e:
-                logger.error(f"Error closing connection for user {user_id}: {e}")
+        # 並發安全：使用鎖保護字典操作
+        async with self._connections_lock:
+            if user_id in self.active_connections:
+                try:
+                    await self.active_connections[user_id].close()
+                except Exception as e:
+                    logger.error(f"Error closing connection for user {user_id}: {e}")
 
-            del self.active_connections[user_id]
-            logger.info(f"User {user_id} disconnected")
+                del self.active_connections[user_id]
+                logger.info(f"User {user_id} disconnected")
 
-            # 從所有配對房間移除
+        # 從所有配對房間移除
+        async with self._rooms_lock:
             for match_id in list(self.match_rooms.keys()):
                 if user_id in self.match_rooms[match_id]:
                     self.match_rooms[match_id].remove(user_id)
@@ -107,33 +120,37 @@ class ConnectionManager:
                 if user_id != exclude_user:
                     await self.send_personal_message(user_id, message)
 
-    def join_match_room(self, match_id: str, user_id: str):
+    async def join_match_room(self, match_id: str, user_id: str):
         """加入配對聊天室
 
         Args:
             match_id: 配對 ID
             user_id: 用戶 ID
         """
-        if match_id not in self.match_rooms:
-            self.match_rooms[match_id] = []
-        if user_id not in self.match_rooms[match_id]:
-            self.match_rooms[match_id].append(user_id)
-            logger.info(f"User {user_id} joined match room {match_id}")
+        # 並發安全：使用鎖保護字典操作
+        async with self._rooms_lock:
+            if match_id not in self.match_rooms:
+                self.match_rooms[match_id] = []
+            if user_id not in self.match_rooms[match_id]:
+                self.match_rooms[match_id].append(user_id)
+                logger.info(f"User {user_id} joined match room {match_id}")
 
-    def leave_match_room(self, match_id: str, user_id: str):
+    async def leave_match_room(self, match_id: str, user_id: str):
         """離開配對聊天室
 
         Args:
             match_id: 配對 ID
             user_id: 用戶 ID
         """
-        if match_id in self.match_rooms and user_id in self.match_rooms[match_id]:
-            self.match_rooms[match_id].remove(user_id)
-            if not self.match_rooms[match_id]:
-                del self.match_rooms[match_id]
-            logger.info(f"User {user_id} left match room {match_id}")
+        # 並發安全：使用鎖保護字典操作
+        async with self._rooms_lock:
+            if match_id in self.match_rooms and user_id in self.match_rooms[match_id]:
+                self.match_rooms[match_id].remove(user_id)
+                if not self.match_rooms[match_id]:
+                    del self.match_rooms[match_id]
+                logger.info(f"User {user_id} left match room {match_id}")
 
-    def is_online(self, user_id: str) -> bool:
+    async def is_online(self, user_id: str) -> bool:
         """檢查用戶是否在線
 
         Args:
@@ -142,15 +159,19 @@ class ConnectionManager:
         Returns:
             bool: 是否在線
         """
-        return user_id in self.active_connections
+        # 並發安全：讀取時也使用鎖
+        async with self._connections_lock:
+            return user_id in self.active_connections
 
-    def get_online_users(self) -> List[str]:
+    async def get_online_users(self) -> List[str]:
         """獲取所有在線用戶
 
         Returns:
             List[str]: 在線用戶 ID 列表
         """
-        return list(self.active_connections.keys())
+        # 並發安全：讀取時也使用鎖
+        async with self._connections_lock:
+            return list(self.active_connections.keys())
 
 
 # 全局單例實例

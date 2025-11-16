@@ -65,9 +65,18 @@ async def browse_users(
     max_birth_date = today - relativedelta(years=min_age)
     min_birth_date = today - relativedelta(years=max_age + 1)
 
-    # 建立主查詢（預先加載 relationships）
+    # 建立主查詢（預先加載 relationships 和計算距離）
+    # 計算距離作為標籤，避免 N+1 查詢
+    distance_label = (
+        func.ST_Distance(
+            Profile.location,
+            my_profile.location,
+            True  # use_spheroid=True
+        ) / 1000  # 轉換為公里
+    ).label('distance_km')
+
     query = (
-        select(Profile)
+        select(Profile, distance_label)
         .join(User, Profile.user_id == User.id)
         .options(
             selectinload(Profile.user),
@@ -137,27 +146,18 @@ async def browse_users(
     # 限制數量（先取較多候選人，稍後排序後再限制）
     query = query.limit(limit * 3)
 
-    # 執行查詢
+    # 執行查詢（優化：距離已在查詢中計算，避免 N+1 問題）
     result = await db.execute(query)
-    profiles = result.scalars().all()
+    rows = result.all()
 
     # 轉換為 ProfileCard 格式並計算配對分數
     profile_cards = []
-    for profile in profiles:
+    for row in rows:
+        profile = row[0]  # Profile 對象
+        distance_km = row[1]  # 距離（已在查詢中計算）
+
         # 計算年齡
         age = relativedelta(today, profile.user.date_of_birth).years
-
-        # 計算距離（公里）
-        distance_result = await db.execute(
-            select(
-                func.ST_Distance(
-                    Profile.location,
-                    my_profile.location,
-                    True  # use_spheroid=True
-                ) / 1000  # 轉換為公里
-            ).where(Profile.id == profile.id)
-        )
-        distance_km = distance_result.scalar()
 
         # 取得興趣標籤
         interests = [interest.name for interest in profile.interests]
@@ -360,6 +360,8 @@ async def get_matches(
     取得我的所有配對
 
     返回配對列表，包含對方的基本資訊
+
+    優化：批次載入資料，避免 N+1 查詢問題
     """
     # 查詢所有活躍的配對
     result = await db.execute(
@@ -375,29 +377,61 @@ async def get_matches(
     )
     matches = result.scalars().all()
 
+    if not matches:
+        return []
+
+    # 批次載入：收集所有需要的 ID
+    match_ids = [match.id for match in matches]
+    matched_user_ids = [
+        match.user2_id if match.user1_id == current_user.id else match.user1_id
+        for match in matches
+    ]
+
+    # 批次查詢 1：所有配對用戶的 profiles（1 次查詢取代 N 次）
+    profiles_result = await db.execute(
+        select(Profile)
+        .options(
+            selectinload(Profile.user),
+            selectinload(Profile.photos),
+            selectinload(Profile.interests)
+        )
+        .where(Profile.user_id.in_(matched_user_ids))
+    )
+    profiles_by_user_id = {p.user_id: p for p in profiles_result.scalars().all()}
+
+    # 批次查詢 2：所有未讀訊息數（1 次查詢取代 N 次）
+    unread_counts_result = await db.execute(
+        select(
+            Message.match_id,
+            func.count(Message.id).label('count')
+        )
+        .where(
+            and_(
+                Message.match_id.in_(match_ids),
+                Message.sender_id.in_(matched_user_ids),
+                Message.is_read.is_(None),
+                Message.deleted_at.is_(None)
+            )
+        )
+        .group_by(Message.match_id)
+    )
+    unread_counts_by_match = {row.match_id: row.count for row in unread_counts_result.all()}
+
     # 組裝回應
+    today = datetime.today().date()
     match_summaries = []
+
     for match in matches:
         # 取得配對對象的 user_id
         matched_user_id = match.user2_id if match.user1_id == current_user.id else match.user1_id
 
-        # 取得對方的 profile（預先加載 relationships）
-        result = await db.execute(
-            select(Profile)
-            .options(
-                selectinload(Profile.user),
-                selectinload(Profile.photos),
-                selectinload(Profile.interests)
-            )
-            .where(Profile.user_id == matched_user_id)
-        )
-        matched_profile = result.scalar_one_or_none()
+        # 從批次載入的數據中獲取
+        matched_profile = profiles_by_user_id.get(matched_user_id)
 
         if not matched_profile:
             continue
 
         # 計算年齡
-        today = datetime.today().date()
         age = relativedelta(today, matched_profile.user.date_of_birth).years
 
         # 取得興趣和照片
@@ -416,18 +450,8 @@ async def get_matches(
             photos=photos
         )
 
-        # 計算未讀訊息數量（對方發送給我的未讀訊息）
-        unread_result = await db.execute(
-            select(func.count(Message.id)).where(
-                and_(
-                    Message.match_id == match.id,
-                    Message.sender_id == matched_user_id,  # 對方發送的
-                    Message.is_read.is_(None),  # 未讀
-                    Message.deleted_at.is_(None)  # 未刪除
-                )
-            )
-        )
-        unread_count = unread_result.scalar() or 0
+        # 從批次載入的數據中獲取未讀數
+        unread_count = unread_counts_by_match.get(match.id, 0)
 
         match_summary = MatchSummary(
             match_id=match.id,

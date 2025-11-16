@@ -24,7 +24,7 @@ router = APIRouter()
 
 @router.post("/block/{user_id}", status_code=status.HTTP_201_CREATED)
 async def block_user(
-    user_id: str,
+    user_id: uuid.UUID,
     request: BlockUserRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
@@ -37,7 +37,7 @@ async def block_user(
     - 不能封鎖自己
     """
     # 驗證不能封鎖自己
-    if str(current_user.id) == user_id:
+    if current_user.id == user_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="無法封鎖自己"
@@ -75,7 +75,7 @@ async def block_user(
     # 創建封鎖記錄
     new_block = BlockedUser(
         blocker_id=current_user.id,
-        blocked_id=uuid.UUID(user_id),
+        blocked_id=user_id,
         reason=request.reason
     )
     db.add(new_block)
@@ -110,7 +110,7 @@ async def block_user(
 
 @router.delete("/block/{user_id}")
 async def unblock_user(
-    user_id: str,
+    user_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):

@@ -1,5 +1,5 @@
 """安全相關工具：JWT 認證、密碼加密"""
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 import hashlib
 from jose import JWTError, jwt
@@ -20,7 +20,15 @@ def _pre_hash_password(password: str) -> str:
 
     Returns:
         SHA256 哈希後的十六進制字串
+
+    Raises:
+        ValueError: 密碼長度超過限制
     """
+    # 防止 DoS 攻擊：限制密碼最大長度
+    MAX_PASSWORD_LENGTH = 128
+    if len(password) > MAX_PASSWORD_LENGTH:
+        raise ValueError(f"密碼長度不能超過 {MAX_PASSWORD_LENGTH} 字元")
+
     return hashlib.sha256(password.encode('utf-8')).hexdigest()
 
 
@@ -69,9 +77,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     to_encode = data.copy()
 
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
     to_encode.update({"exp": expire, "type": "access"})
 
@@ -95,7 +103,7 @@ def create_refresh_token(data: dict) -> str:
         JWT Refresh Token 字串
     """
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
     to_encode.update({"exp": expire, "type": "refresh"})
 

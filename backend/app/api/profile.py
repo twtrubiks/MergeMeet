@@ -103,9 +103,12 @@ async def create_profile(
         bio=request.bio,
     )
 
-    # 設置地理位置
+    # 設置地理位置（使用 GeoAlchemy2 函數避免 SQL 注入）
     if request.location:
-        new_profile.location = f"SRID=4326;POINT({request.location.longitude} {request.location.latitude})"
+        new_profile.location = ST_SetSRID(
+            ST_MakePoint(request.location.longitude, request.location.latitude),
+            4326
+        )
         new_profile.location_name = request.location.location_name
 
     db.add(new_profile)
@@ -254,7 +257,11 @@ async def update_profile(
     if request.bio is not None:
         profile.bio = request.bio
     if request.location is not None:
-        profile.location = f"SRID=4326;POINT({request.location.longitude} {request.location.latitude})"
+        # 使用 GeoAlchemy2 函數避免 SQL 注入
+        profile.location = ST_SetSRID(
+            ST_MakePoint(request.location.longitude, request.location.latitude),
+            4326
+        )
         profile.location_name = request.location.location_name
     if request.min_age_preference is not None:
         profile.min_age_preference = request.min_age_preference

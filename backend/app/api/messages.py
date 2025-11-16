@@ -107,6 +107,8 @@ async def get_conversations(
     - 包含最後一條訊息
     - 顯示未讀訊息數量
     - 按最後訊息時間排序
+
+    優化：批次載入資料，避免 N+1 查詢問題
     """
     # 查詢用戶的所有活躍配對
     result = await db.execute(
@@ -124,47 +126,71 @@ async def get_conversations(
     )
     matches = result.scalars().all()
 
+    if not matches:
+        return []
+
+    # 批次載入：收集所有需要的 ID
+    match_ids = [match.id for match in matches]
+    other_user_ids = [
+        match.user2_id if match.user1_id == current_user.id else match.user1_id
+        for match in matches
+    ]
+
+    # 批次查詢 1：所有對方的個人資料（1 次查詢取代 N 次）
+    profiles_result = await db.execute(
+        select(Profile)
+        .options(selectinload(Profile.photos))
+        .where(Profile.user_id.in_(other_user_ids))
+    )
+    profiles_by_user_id = {p.user_id: p for p in profiles_result.scalars().all()}
+
+    # 批次查詢 2：所有訊息（用於找最後一條訊息）
+    messages_result = await db.execute(
+        select(Message)
+        .where(
+            and_(
+                Message.match_id.in_(match_ids),
+                Message.deleted_at.is_(None)
+            )
+        )
+        .order_by(Message.match_id, desc(Message.sent_at))
+    )
+    all_messages = messages_result.scalars().all()
+
+    # 整理每個 match 的最後一條訊息
+    last_messages_by_match = {}
+    for msg in all_messages:
+        if msg.match_id not in last_messages_by_match:
+            last_messages_by_match[msg.match_id] = msg
+
+    # 批次查詢 3：所有未讀訊息數（1 次查詢取代 N 次）
+    unread_counts_result = await db.execute(
+        select(
+            Message.match_id,
+            func.count(Message.id).label('count')
+        )
+        .where(
+            and_(
+                Message.match_id.in_(match_ids),
+                Message.sender_id.in_(other_user_ids),
+                Message.is_read.is_(None),
+                Message.deleted_at.is_(None)
+            )
+        )
+        .group_by(Message.match_id)
+    )
+    unread_counts_by_match = {row.match_id: row.count for row in unread_counts_result.all()}
+
     conversations = []
 
     for match in matches:
         # 確定對方用戶 ID
         other_user_id = match.user2_id if match.user1_id == current_user.id else match.user1_id
 
-        # 獲取對方的個人資料
-        profile_result = await db.execute(
-            select(Profile)
-            .options(selectinload(Profile.photos))
-            .where(Profile.user_id == other_user_id)
-        )
-        other_profile = profile_result.scalar_one_or_none()
-
-        # 獲取最後一條訊息
-        last_msg_result = await db.execute(
-            select(Message)
-            .where(
-                and_(
-                    Message.match_id == match.id,
-                    Message.deleted_at.is_(None)
-                )
-            )
-            .order_by(desc(Message.sent_at))
-            .limit(1)
-        )
-        last_message = last_msg_result.scalar_one_or_none()
-
-        # 計算未讀訊息數
-        unread_result = await db.execute(
-            select(func.count(Message.id))
-            .where(
-                and_(
-                    Message.match_id == match.id,
-                    Message.sender_id == other_user_id,
-                    Message.is_read.is_(None),
-                    Message.deleted_at.is_(None)
-                )
-            )
-        )
-        unread_count = unread_result.scalar()
+        # 從批次載入的數據中獲取
+        other_profile = profiles_by_user_id.get(other_user_id)
+        last_message = last_messages_by_match.get(match.id)
+        unread_count = unread_counts_by_match.get(match.id, 0)
 
         # 獲取對方的頭像
         other_user_avatar = None

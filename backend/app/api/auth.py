@@ -2,10 +2,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta
 import random
 import string
+import asyncio
+import logging
+from typing import Dict, Tuple, Optional
 
 from app.core.database import get_db
 from app.core.security import (
@@ -27,9 +30,74 @@ from app.schemas.auth import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
-# 簡易的驗證碼儲存（生產環境應使用 Redis）
-verification_codes = {}
+
+def _generate_auth_tokens(user_id: str) -> Tuple[str, str]:
+    """生成認證 token (access + refresh)
+
+    Args:
+        user_id: 用戶 ID (字串格式)
+
+    Returns:
+        Tuple[str, str]: (access_token, refresh_token)
+    """
+    access_token = create_access_token(data={"sub": user_id})
+    refresh_token = create_refresh_token(data={"sub": user_id})
+    return access_token, refresh_token
+
+
+class VerificationCodeStore:
+    """帶過期機制的驗證碼存儲（生產環境應使用 Redis）"""
+
+    def __init__(self, ttl_minutes: int = 10):
+        self._store: Dict[str, Tuple[str, datetime]] = {}
+        self._lock = asyncio.Lock()
+        self._ttl = timedelta(minutes=ttl_minutes)
+
+    async def set(self, email: str, code: str) -> None:
+        """設置驗證碼，帶過期時間"""
+        async with self._lock:
+            expires_at = datetime.now(timezone.utc) + self._ttl
+            self._store[email] = (code, expires_at)
+
+    async def get(self, email: str) -> Optional[str]:
+        """獲取驗證碼，自動檢查過期"""
+        async with self._lock:
+            if email not in self._store:
+                return None
+
+            code, expires_at = self._store[email]
+
+            # 檢查是否過期
+            if datetime.now(timezone.utc) > expires_at:
+                del self._store[email]
+                return None
+
+            return code
+
+    async def delete(self, email: str) -> None:
+        """刪除驗證碼"""
+        async with self._lock:
+            self._store.pop(email, None)
+
+    async def cleanup_expired(self) -> int:
+        """清理過期的驗證碼，返回清理數量"""
+        async with self._lock:
+            now = datetime.now(timezone.utc)
+            expired_keys = [
+                email for email, (_, expires_at) in self._store.items()
+                if now > expires_at
+            ]
+
+            for email in expired_keys:
+                del self._store[email]
+
+            return len(expired_keys)
+
+
+# 驗證碼儲存（10 分鐘過期）
+verification_codes = VerificationCodeStore(ttl_minutes=10)
 
 
 def generate_verification_code() -> str:
@@ -68,9 +136,11 @@ async def register(
     existing_user = result.scalar_one_or_none()
 
     if existing_user:
+        # 防止用戶枚舉：不透露 Email 是否已註冊
+        # 但為了 UX，這裡仍然告知（可根據安全需求調整）
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email 已被註冊"
+            detail="註冊失敗，請檢查輸入資料"  # 改為模糊訊息
         )
 
     # 建立用戶
@@ -88,12 +158,11 @@ async def register(
 
     # 生成驗證碼（模擬發送 Email）
     verification_code = generate_verification_code()
-    verification_codes[request.email] = verification_code
-    print(f"📧 [模擬] 發送驗證碼到 {request.email}: {verification_code}")
+    await verification_codes.set(request.email, verification_code)
+    logger.info(f"📧 [模擬] 發送驗證碼到 {request.email}: {verification_code}")
 
     # 生成 JWT Token
-    access_token = create_access_token(data={"sub": str(new_user.id)})
-    refresh_token = create_refresh_token(data={"sub": str(new_user.id)})
+    access_token, refresh_token = _generate_auth_tokens(str(new_user.id))
 
     return TokenResponse(
         access_token=access_token,
@@ -144,8 +213,7 @@ async def login(
         )
 
     # 生成 JWT Token
-    access_token = create_access_token(data={"sub": str(user.id)})
-    refresh_token = create_refresh_token(data={"sub": str(user.id)})
+    access_token, refresh_token = _generate_auth_tokens(str(user.id))
 
     return TokenResponse(
         access_token=access_token,
@@ -203,8 +271,7 @@ async def admin_login(
         )
 
     # 生成 JWT Token
-    access_token = create_access_token(data={"sub": str(user.id)})
-    refresh_token = create_refresh_token(data={"sub": str(user.id)})
+    access_token, refresh_token = _generate_auth_tokens(str(user.id))
 
     return TokenResponse(
         access_token=access_token,
@@ -257,8 +324,7 @@ async def refresh_token(
         )
 
     # 生成新的 Token
-    access_token = create_access_token(data={"sub": str(user.id)})
-    refresh_token = create_refresh_token(data={"sub": str(user.id)})
+    access_token, refresh_token = _generate_auth_tokens(str(user.id))
 
     return TokenResponse(
         access_token=access_token,
@@ -280,12 +346,12 @@ async def verify_email(
     - 更新用戶的 email_verified 狀態
     """
     # 檢查驗證碼
-    stored_code = verification_codes.get(request.email)
+    stored_code = await verification_codes.get(request.email)
 
     if not stored_code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="找不到驗證碼，請重新註冊"
+            detail="驗證碼不存在或已過期（10分鐘有效期），請重新發送"
         )
 
     if stored_code != request.verification_code:
@@ -310,7 +376,7 @@ async def verify_email(
     await db.commit()
 
     # 刪除已使用的驗證碼
-    del verification_codes[request.email]
+    await verification_codes.delete(request.email)
 
     return {
         "message": "Email 驗證成功",
@@ -351,8 +417,8 @@ async def resend_verification(
 
     # 生成新的驗證碼
     verification_code = generate_verification_code()
-    verification_codes[email] = verification_code
-    print(f"📧 [模擬] 重新發送驗證碼到 {email}: {verification_code}")
+    await verification_codes.set(email, verification_code)
+    logger.info(f"📧 [模擬] 重新發送驗證碼到 {email}: {verification_code}")
 
     return {
         "message": "驗證碼已重新發送",
