@@ -8,6 +8,7 @@ from datetime import date
 from dateutil.relativedelta import relativedelta
 from typing import List
 import uuid
+import logging
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
@@ -25,6 +26,7 @@ from app.schemas.profile import (
 from app.services.content_moderation import ContentModerationService
 
 router = APIRouter(prefix="/api/profile")
+logger = logging.getLogger(__name__)
 
 
 def calculate_age(date_of_birth: date) -> int:
@@ -485,14 +487,26 @@ async def upload_photo(
         mime_type=file.content_type,
     )
 
-    db.add(new_photo)
-    await db.commit()
-    await db.refresh(new_photo)
+    # 合併事務：添加照片並更新個人檔案完整度
+    try:
+        db.add(new_photo)
+        # 在 commit 前完成所有資料庫操作
+        await db.flush()  # 確保 new_photo 有 ID
 
-    # 重新載入 profile 的關聯以檢查完整度
-    await db.refresh(profile, ["photos", "interests"])
-    profile.is_complete = check_profile_completeness(profile)
-    await db.commit()
+        # 重新載入 profile 的關聯以檢查完整度
+        await db.refresh(profile, ["photos", "interests"])
+        profile.is_complete = check_profile_completeness(profile)
+
+        # 一次性提交所有更改
+        await db.commit()
+        await db.refresh(new_photo)
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Failed to add photo for user {current_user.id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="照片上傳失敗，請稍後再試"
+        )
 
     return PhotoResponse(
         id=str(new_photo.id),

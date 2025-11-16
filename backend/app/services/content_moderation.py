@@ -1,5 +1,6 @@
 """內容審核服務 - 基於資料庫的動態敏感詞管理"""
 from typing import Tuple, List, Optional, Dict
+from collections import OrderedDict
 import re
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,17 +8,21 @@ from sqlalchemy import select
 import uuid
 import json
 import asyncio
+import logging
 
 from app.models.moderation import SensitiveWord, ModerationLog
+
+logger = logging.getLogger(__name__)
 
 
 class ContentModerationService:
     """內容審核服務 - 負責檢測敏感詞和不當內容"""
 
     # 快取敏感詞（避免每次都查詢資料庫）
-    _cache: Dict[str, List[Dict]] = {}
-    _cache_time: Optional[datetime] = None
+    _cache: OrderedDict = OrderedDict()  # 使用 OrderedDict 支持 LRU 策略
+    _cache_time: Dict[str, datetime] = {}  # 每個快取項的時間戳
     _cache_ttl: int = 300  # 快取 5 分鐘
+    _max_cache_size: int = 100  # 最大快取項數（防止內存無限增長）
     _cache_lock: asyncio.Lock = asyncio.Lock()  # 快取鎖，確保線程安全
 
     # 可疑模式（正則表達式）- 保留靜態模式
@@ -32,7 +37,7 @@ class ContentModerationService:
     @classmethod
     async def _load_sensitive_words(cls, db: AsyncSession) -> List[Dict]:
         """
-        從資料庫載入敏感詞（帶快取機制和線程安全保護）
+        從資料庫載入敏感詞（帶快取機制、LRU 策略和線程安全保護）
 
         Args:
             db: 資料庫 session
@@ -40,21 +45,27 @@ class ContentModerationService:
         Returns:
             敏感詞字典列表（已序列化，可安全緩存）
         """
+        cache_key = "words"
         now = datetime.now()
 
         # 快速檢查（無鎖）- 如果快取有效直接返回
-        if cls._cache_time and (now - cls._cache_time).total_seconds() < cls._cache_ttl:
-            cached_words = cls._cache.get("words")
+        cache_timestamp = cls._cache_time.get(cache_key)
+        if cache_timestamp and (now - cache_timestamp).total_seconds() < cls._cache_ttl:
+            cached_words = cls._cache.get(cache_key)
             if cached_words is not None:
+                # LRU: 移到最後（最近使用）
+                cls._cache.move_to_end(cache_key)
                 return cached_words
 
         # 快取失效，需要重新載入（使用鎖避免重複查詢）
         async with cls._cache_lock:
             # 雙重檢查：可能其他協程已經更新了快取
             now = datetime.now()
-            if cls._cache_time and (now - cls._cache_time).total_seconds() < cls._cache_ttl:
-                cached_words = cls._cache.get("words")
+            cache_timestamp = cls._cache_time.get(cache_key)
+            if cache_timestamp and (now - cache_timestamp).total_seconds() < cls._cache_ttl:
+                cached_words = cls._cache.get(cache_key)
                 if cached_words is not None:
+                    cls._cache.move_to_end(cache_key)
                     return cached_words
 
             # 從資料庫載入啟用的敏感詞
@@ -77,9 +88,18 @@ class ContentModerationService:
                 for w in words
             ]
 
+            # 檢查快取大小，實施 LRU 策略
+            if len(cls._cache) >= cls._max_cache_size:
+                # 移除最舊的項目（FIFO，因為 OrderedDict 保持插入順序）
+                oldest_key = next(iter(cls._cache))
+                cls._cache.pop(oldest_key)
+                cls._cache_time.pop(oldest_key, None)
+                logger.warning(f"Cache evicted due to size limit: {oldest_key} (max: {cls._max_cache_size})")
+
             # 更新快取（緩存字典而不是 ORM 對象）
-            cls._cache = {"words": words_data}
-            cls._cache_time = now
+            cls._cache[cache_key] = words_data
+            cls._cache_time[cache_key] = now
+            logger.info(f"Cache updated: {cache_key} ({len(words_data)} words)")
 
             return words_data
 
@@ -87,8 +107,9 @@ class ContentModerationService:
     async def clear_cache(cls):
         """清除敏感詞快取（線程安全）"""
         async with cls._cache_lock:
-            cls._cache = {}
-            cls._cache_time = None
+            cls._cache.clear()
+            cls._cache_time.clear()
+            logger.info("Cache cleared")
 
     @classmethod
     async def check_content(

@@ -5,6 +5,7 @@ from sqlalchemy import select, and_, or_, func, desc
 from sqlalchemy.orm import selectinload
 from typing import List
 from datetime import datetime
+import logging
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
@@ -19,6 +20,7 @@ from app.schemas.message import (
 )
 
 router = APIRouter(prefix="/api/messages")
+logger = logging.getLogger(__name__)
 
 
 @router.get("/matches/{match_id}/messages", response_model=ChatHistoryResponse)
@@ -316,9 +318,17 @@ async def delete_message(
     # 保存 match_id 用於 WebSocket 廣播
     match_id = str(message.match_id)
 
-    # 軟刪除
-    message.deleted_at = func.now()
-    await db.commit()
+    # 軟刪除 (帶異常處理確保事務完整性)
+    try:
+        message.deleted_at = func.now()
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Failed to delete message {message_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="訊息刪除失敗，請稍後再試"
+        )
 
     # 通過 WebSocket 通知配對中的另一方
     await manager.send_to_match(
