@@ -5,6 +5,7 @@ from sqlalchemy import select, func, and_, or_
 from typing import List
 from datetime import datetime, timedelta
 import uuid
+import re
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_admin_user
@@ -125,20 +126,26 @@ async def get_all_reports(
     result = await db.execute(query)
     reports = result.scalars().all()
 
+    if not reports:
+        return []
+
+    # 批次載入：收集所有相關用戶 ID（修復：避免 N+1 查詢）
+    user_ids = set()
+    for report in reports:
+        user_ids.add(report.reporter_id)
+        user_ids.add(report.reported_user_id)
+
+    # 批次查詢所有用戶（1 次查詢取代 2N 次）
+    users_result = await db.execute(
+        select(User).where(User.id.in_(user_ids))
+    )
+    users_by_id = {u.id: u for u in users_result.scalars().all()}
+
     # 組裝響應
     response = []
     for report in reports:
-        # 取得舉報者資訊
-        reporter_result = await db.execute(
-            select(User).where(User.id == report.reporter_id)
-        )
-        reporter = reporter_result.scalar_one_or_none()
-
-        # 取得被舉報者資訊
-        reported_result = await db.execute(
-            select(User).where(User.id == report.reported_user_id)
-        )
-        reported_user = reported_result.scalar_one_or_none()
+        reporter = users_by_id.get(report.reporter_id)
+        reported_user = users_by_id.get(report.reported_user_id)
 
         if reporter and reported_user:
             response.append(ReportDetailResponse(
@@ -239,9 +246,12 @@ async def get_all_users(
     """
     query = select(User)
 
-    # 搜尋
+    # 搜尋（修復：添加輸入清理防止 SQL 注入）
     if search:
-        query = query.where(User.email.ilike(f"%{search}%"))
+        # 只允許安全字符：字母、數字、@、.、-、_
+        safe_search = re.sub(r'[^\w@.\-]', '', search)
+        if safe_search:  # 確保清理後還有內容
+            query = query.where(User.email.ilike(f"%{safe_search}%"))
 
     # 狀態篩選
     if is_active is not None:

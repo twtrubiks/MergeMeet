@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, not_, func, case
 from sqlalchemy.orm import selectinload
+from sqlalchemy.exc import IntegrityError
 from geoalchemy2.functions import ST_Distance, ST_DWithin
 from typing import Optional, List
 from datetime import datetime, timedelta
@@ -262,12 +263,22 @@ async def like_user(
             detail="用戶不存在或不可見"
         )
 
-    # 建立喜歡記錄
+    # 建立喜歡記錄（修復：使用資料庫唯一約束處理並發點讚）
     like = Like(
         from_user_id=current_user.id,
         to_user_id=user_id
     )
     db.add(like)
+
+    try:
+        await db.flush()  # 先刷新以檢測唯一約束
+    except IntegrityError:
+        # 並發情況下，另一個請求已創建了同樣的喜歡記錄
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="已經喜歡過此用戶"
+        )
 
     # 檢查對方是否也喜歡我
     result = await db.execute(
@@ -315,12 +326,32 @@ async def like_user(
                 status="ACTIVE"
             )
             db.add(match)
-            await db.flush()
-            match_id = match.id
+            try:
+                await db.flush()
+                match_id = match.id
+            except IntegrityError:
+                # 並發情況下，另一個請求已創建了配對
+                await db.rollback()
+                # 重新查詢配對
+                result = await db.execute(
+                    select(Match).where(
+                        and_(
+                            Match.user1_id == user1_id,
+                            Match.user2_id == user2_id
+                        )
+                    )
+                )
+                existing_match = result.scalar_one_or_none()
+                if existing_match:
+                    match_id = existing_match.id
 
         is_match = True
 
-    await db.commit()
+    try:
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise
 
     return LikeResponse(
         liked=True,

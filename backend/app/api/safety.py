@@ -146,7 +146,11 @@ async def get_blocked_users(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """取得封鎖列表"""
+    """
+    取得封鎖列表
+
+    優化：批次載入用戶資訊，避免 N+1 查詢問題
+    """
     result = await db.execute(
         select(BlockedUser)
         .where(BlockedUser.blocker_id == current_user.id)
@@ -154,14 +158,22 @@ async def get_blocked_users(
     )
     blocked_users = result.scalars().all()
 
-    # 取得被封鎖用戶的資訊
+    if not blocked_users:
+        return []
+
+    # 批次載入：收集所有被封鎖用戶 ID
+    blocked_user_ids = [block.blocked_id for block in blocked_users]
+
+    # 批次查詢所有被封鎖的用戶（1 次查詢取代 N 次）
+    users_result = await db.execute(
+        select(User).where(User.id.in_(blocked_user_ids))
+    )
+    users_by_id = {u.id: u for u in users_result.scalars().all()}
+
+    # 組裝回應
     response = []
     for block in blocked_users:
-        user_result = await db.execute(
-            select(User).where(User.id == block.blocked_id)
-        )
-        user = user_result.scalar_one_or_none()
-
+        user = users_by_id.get(block.blocked_id)
         if user:
             response.append(BlockedUserResponse(
                 id=str(block.id),

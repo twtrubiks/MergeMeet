@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from datetime import date, datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta
 import random
@@ -137,13 +138,12 @@ async def register(
 
     if existing_user:
         # 防止用戶枚舉：不透露 Email 是否已註冊
-        # 但為了 UX，這裡仍然告知（可根據安全需求調整）
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="註冊失敗，請檢查輸入資料"  # 改為模糊訊息
+            detail="註冊失敗，請檢查輸入資料"  # 模糊訊息
         )
 
-    # 建立用戶
+    # 建立用戶（修復：使用資料庫唯一約束處理並發註冊）
     new_user = User(
         email=request.email,
         password_hash=get_password_hash(request.password),
@@ -153,8 +153,18 @@ async def register(
     )
 
     db.add(new_user)
-    await db.commit()
-    await db.refresh(new_user)
+
+    try:
+        await db.commit()
+        await db.refresh(new_user)
+    except IntegrityError:
+        # 並發情況下，另一個請求已創建了同樣的用戶
+        await db.rollback()
+        logger.warning(f"Concurrent registration attempt for email: {request.email}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="註冊失敗，請檢查輸入資料"
+        )
 
     # 生成驗證碼（模擬發送 Email）
     verification_code = generate_verification_code()
@@ -205,8 +215,8 @@ async def login(
             detail="帳號已被停用"
         )
 
-    # 檢查是否被封禁
-    if user.banned_until and user.banned_until > date.today():
+    # 檢查是否被封禁（修復：使用 datetime 而非 date）
+    if user.banned_until and user.banned_until > datetime.now(timezone.utc):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"帳號已被封禁至 {user.banned_until}"
@@ -263,8 +273,8 @@ async def admin_login(
             detail="帳號已被停用"
         )
 
-    # 檢查是否被封禁
-    if user.banned_until and user.banned_until > date.today():
+    # 檢查是否被封禁（修復：使用 datetime 而非 date）
+    if user.banned_until and user.banned_until > datetime.now(timezone.utc):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"帳號已被封禁至 {user.banned_until}"
