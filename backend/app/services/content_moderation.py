@@ -116,7 +116,7 @@ class ContentModerationService:
 
         violations = []
         triggered_word_ids = []
-        max_severity = "LOW"
+        max_severity = None
         action_to_take = "APPROVED"
 
         content_lower = content.lower()
@@ -148,7 +148,10 @@ class ContentModerationService:
 
                 # 更新最高嚴重程度和動作
                 severity_order = {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
-                if severity_order.get(word_obj["severity"], 0) > severity_order.get(max_severity, 0):
+                current_severity = severity_order.get(word_obj["severity"], 0)
+                max_severity_value = severity_order.get(max_severity, 0) if max_severity else 0
+
+                if current_severity > max_severity_value:
                     max_severity = word_obj["severity"]
                     action_to_take = word_obj["action"]
 

@@ -232,6 +232,7 @@ async def test_get_conversations_with_messages(client: AsyncClient, matched_user
     )
     test_db.add(message)
     await test_db.commit()
+    await test_db.refresh(message)
 
     # Alice 查看對話列表
     response = await client.get(
