@@ -4,6 +4,7 @@ from typing import Dict, List, Optional
 import json
 import logging
 import asyncio
+from datetime import datetime, timezone
 
 from app.core.security import decode_token
 
@@ -45,6 +46,19 @@ class ConnectionManager:
         if not payload or payload.get("sub") != user_id:
             await websocket.close(code=1008, reason="Invalid token")
             logger.warning(f"Invalid token for user {user_id}")
+            return False
+
+        # 檢查 Token 類型（必須是 access token）
+        if payload.get("type") != "access":
+            await websocket.close(code=1008, reason="Invalid token type")
+            logger.warning(f"WebSocket connection with wrong token type for user {user_id}")
+            return False
+
+        # 明確檢查 Token 過期時間（雙重保險）
+        exp = payload.get("exp")
+        if exp and datetime.fromtimestamp(exp, tz=timezone.utc) < datetime.now(timezone.utc):
+            await websocket.close(code=1008, reason="Token expired")
+            logger.warning(f"WebSocket connection with expired token for user {user_id}")
             return False
 
         # 接受連接

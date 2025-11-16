@@ -13,13 +13,31 @@ class RegisterRequest(BaseModel):
 
     @validator("password")
     def validate_password(cls, v):
-        """驗證密碼強度"""
+        """驗證密碼強度
+
+        要求:
+        - 至少 8 個字元（已在 Field 定義）
+        - 至少包含一個大寫字母
+        - 至少包含一個小寫字母
+        - 至少包含一個數字
+        - 不能是常見弱密碼
+        """
         if not re.search(r"[A-Z]", v):
             raise ValueError("密碼必須包含至少一個大寫字母")
         if not re.search(r"[a-z]", v):
             raise ValueError("密碼必須包含至少一個小寫字母")
         if not re.search(r"\d", v):
             raise ValueError("密碼必須包含至少一個數字")
+
+        # 檢查常見弱密碼（最嚴重的弱密碼）
+        weak_passwords = [
+            '12345678', 'password', 'qwerty123',
+            '11111111', '88888888',
+            'admin123', '1q2w3e4r'
+        ]
+        if v.lower() in weak_passwords:
+            raise ValueError("密碼太常見，請使用更強的密碼")
+
         return v
 
     class Config:
