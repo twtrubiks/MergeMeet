@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
 from typing import List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid
 import re
 
@@ -319,7 +319,6 @@ async def ban_user(
     user.ban_reason = request.reason
 
     if request.duration_days:
-        from datetime import datetime, timezone
         user.banned_until = datetime.now(timezone.utc) + timedelta(days=request.duration_days)
     else:
         user.banned_until = None  # 永久封禁

@@ -331,8 +331,9 @@ async def like_user(
                 match_id = match.id
             except IntegrityError:
                 # 並發情況下，另一個請求已創建了配對
-                await db.rollback()
-                # 重新查詢配對
+                # 重要：不要 rollback！否則會回滾前面的 like 記錄
+                # 直接重新查詢已存在的配對即可
+                db.expunge(match)  # 從 session 移除失敗的 match 對象
                 result = await db.execute(
                     select(Match).where(
                         and_(
@@ -344,6 +345,13 @@ async def like_user(
                 existing_match = result.scalar_one_or_none()
                 if existing_match:
                     match_id = existing_match.id
+                else:
+                    # 如果還是查不到，說明有其他問題
+                    await db.rollback()
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="配對創建失敗"
+                    )
 
         is_match = True
 
