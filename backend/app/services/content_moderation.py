@@ -15,7 +15,7 @@ class ContentModerationService:
     """內容審核服務 - 負責檢測敏感詞和不當內容"""
 
     # 快取敏感詞（避免每次都查詢資料庫）
-    _cache: Dict[str, List[SensitiveWord]] = {}
+    _cache: Dict[str, List[Dict]] = {}
     _cache_time: Optional[datetime] = None
     _cache_ttl: int = 300  # 快取 5 分鐘
     _cache_lock: asyncio.Lock = asyncio.Lock()  # 快取鎖，確保線程安全
@@ -30,7 +30,7 @@ class ContentModerationService:
     ]
 
     @classmethod
-    async def _load_sensitive_words(cls, db: AsyncSession) -> List[SensitiveWord]:
+    async def _load_sensitive_words(cls, db: AsyncSession) -> List[Dict]:
         """
         從資料庫載入敏感詞（帶快取機制和線程安全保護）
 
@@ -38,7 +38,7 @@ class ContentModerationService:
             db: 資料庫 session
 
         Returns:
-            敏感詞列表
+            敏感詞字典列表（已序列化，可安全緩存）
         """
         now = datetime.now()
 
@@ -63,11 +63,25 @@ class ContentModerationService:
             )
             words = result.scalars().all()
 
-            # 更新快取
-            cls._cache = {"words": words}
+            # 序列化為字典（避免 SQLAlchemy DetachedInstanceError）
+            words_data = [
+                {
+                    "id": str(w.id),
+                    "word": w.word,
+                    "category": w.category,
+                    "severity": w.severity,
+                    "action": w.action,
+                    "is_regex": w.is_regex,
+                    "description": w.description
+                }
+                for w in words
+            ]
+
+            # 更新快取（緩存字典而不是 ORM 對象）
+            cls._cache = {"words": words_data}
             cls._cache_time = now
 
-            return words
+            return words_data
 
     @classmethod
     async def clear_cache(cls):
@@ -114,10 +128,10 @@ class ContentModerationService:
         for word_obj in sensitive_words:
             matched = False
 
-            if word_obj.is_regex:
+            if word_obj["is_regex"]:
                 # 正則表達式匹配
                 try:
-                    pattern = re.compile(word_obj.word, re.IGNORECASE)
+                    pattern = re.compile(word_obj["word"], re.IGNORECASE)
                     if pattern.search(content):
                         matched = True
                 except re.error:
@@ -125,18 +139,18 @@ class ContentModerationService:
                     continue
             else:
                 # 簡單字串匹配
-                if word_obj.word in content_lower:
+                if word_obj["word"] in content_lower:
                     matched = True
 
             if matched:
-                violations.append(f"{word_obj.category}: {word_obj.word}")
-                triggered_word_ids.append(word_obj.id)
+                violations.append(f"{word_obj['category']}: {word_obj['word']}")
+                triggered_word_ids.append(uuid.UUID(word_obj["id"]))
 
                 # 更新最高嚴重程度和動作
                 severity_order = {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
-                if severity_order.get(word_obj.severity, 0) > severity_order.get(max_severity, 0):
-                    max_severity = word_obj.severity
-                    action_to_take = word_obj.action
+                if severity_order.get(word_obj["severity"], 0) > severity_order.get(max_severity, 0):
+                    max_severity = word_obj["severity"]
+                    action_to_take = word_obj["action"]
 
         # 檢查可疑模式
         for pattern in cls.SUSPICIOUS_PATTERNS:
@@ -237,14 +251,14 @@ class ContentModerationService:
 
         # 替換敏感詞為 ***
         for word_obj in sensitive_words:
-            if word_obj.is_regex:
+            if word_obj["is_regex"]:
                 try:
-                    pattern = re.compile(word_obj.word, re.IGNORECASE)
+                    pattern = re.compile(word_obj["word"], re.IGNORECASE)
                     sanitized = pattern.sub('***', sanitized)
                 except re.error:
                     continue
             else:
-                pattern = re.compile(re.escape(word_obj.word), re.IGNORECASE)
+                pattern = re.compile(re.escape(word_obj["word"]), re.IGNORECASE)
                 sanitized = pattern.sub('***', sanitized)
 
         # 移除可疑的 URL
