@@ -18,17 +18,22 @@
       </n-badge>
     </div>
 
-    <n-spin :show="chatStore.loading">
-      <div class="chat-list-container">
+      <!-- 載入中 -->
+      <div v-if="chatStore.loading" class="loading">
+        <HeartLoader text="載入對話中..." />
+      </div>
+
+      <div v-else class="chat-list-container">
         <!-- 空狀態 -->
-        <div v-if="!chatStore.loading && chatStore.conversations.length === 0" class="empty-state">
-          <n-empty description="還沒有對話">
-            <template #extra>
-              <n-button type="primary" @click="goToDiscovery">
-                開始探索
-              </n-button>
-            </template>
-          </n-empty>
+        <div v-if="chatStore.conversations.length === 0" class="empty-state">
+          <div class="empty-animation">
+            <span class="empty-chat">💬</span>
+          </div>
+          <h2>還沒有對話</h2>
+          <p>開始探索並配對來開啟對話！</p>
+          <AnimatedButton variant="primary" @click="goToDiscovery">
+            🔍 開始探索
+          </AnimatedButton>
         </div>
 
         <!-- 對話列表 -->
@@ -83,7 +88,6 @@
           </div>
         </div>
       </div>
-    </n-spin>
 
     <!-- WebSocket 連接狀態 -->
     <div v-if="!chatStore.ws.isConnected" class="connection-warning">
@@ -97,10 +101,12 @@
 <script setup>
 import { onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { NBadge, NButton, NIcon, NAvatar, NEmpty, NSpin, NAlert, useMessage } from 'naive-ui'
+import { NBadge, NButton, NIcon, NAvatar, NAlert, useMessage } from 'naive-ui'
 import { Notifications, ChevronForward, Home } from '@vicons/ionicons5'
 import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
+import AnimatedButton from '@/components/ui/AnimatedButton.vue'
+import HeartLoader from '@/components/ui/HeartLoader.vue'
 
 const router = useRouter()
 const message = useMessage()
@@ -184,81 +190,175 @@ onMounted(async () => {
 <style scoped>
 .chat-list-page {
   min-height: 100vh;
-  background-color: #f5f5f5;
+  background: linear-gradient(135deg, #FFF5F5 0%, #FFE5E5 100%);
+}
+
+/* 載入中 */
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 80px);
+  padding: 40px;
 }
 
 /* 返回主選單按鈕 */
 .back-home-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  background: #f5f5f5;
-  color: #18a058;
+  gap: 8px;
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #667eea;
   text-decoration: none;
-  border-radius: 20px;
+  border-radius: 25px;
   font-weight: 600;
-  font-size: 0.9rem;
-  transition: all 0.3s ease;
+  font-size: 0.95rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   flex-shrink: 0;
 }
 
 .back-home-btn:hover {
-  background: #e8f5e9;
-  transform: translateY(-1px);
+  background: white;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
-  background-color: white;
-  border-bottom: 1px solid #e5e5e5;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  padding: 20px;
+  background: white;
+  border-bottom: 2px solid #f0f0f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 .page-title {
-  font-size: 24px;
-  font-weight: 600;
+  font-size: 1.75rem;
+  font-weight: 800;
   margin: 0;
-  color: #333;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   flex: 1;
   text-align: center;
 }
 
 .chat-list-container {
-  min-height: calc(100vh - 72px);
+  min-height: calc(100vh - 80px);
+  padding: 20px;
 }
 
+/* 空狀態 */
 .empty-state {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 400px;
+  min-height: 500px;
+  text-align: center;
+  background: white;
+  border-radius: 20px;
+  padding: 60px 40px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  animation: fadeIn 0.6s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.empty-animation {
+  margin-bottom: 32px;
+}
+
+.empty-chat {
+  display: inline-block;
+  font-size: 6rem;
+  animation: float 3s ease-in-out infinite;
+  filter: drop-shadow(0 8px 16px rgba(102, 126, 234, 0.3));
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+.empty-state h2 {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #333;
+  margin: 0 0 16px;
+}
+
+.empty-state p {
+  font-size: 1.1rem;
+  color: #666;
+  margin: 0 0 32px;
+  font-weight: 500;
 }
 
 .conversation-list {
-  background-color: white;
+  background: white;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
 
 .conversation-item {
   display: flex;
   align-items: center;
-  padding: 16px 20px;
-  gap: 12px;
+  padding: 18px 24px;
+  gap: 16px;
   cursor: pointer;
-  border-bottom: 1px solid #f0f0f0;
-  transition: background-color 0.2s;
+  border-bottom: 2px solid #f0f0f0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.conversation-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  transform: scaleY(0);
+  transition: transform 0.3s ease;
+}
+
+.conversation-item:hover::before {
+  transform: scaleY(1);
 }
 
 .conversation-item:hover {
-  background-color: #f8f8f8;
+  background: linear-gradient(90deg, rgba(102, 126, 234, 0.05), transparent);
+  transform: translateX(4px);
 }
 
 .conversation-item:active {
-  background-color: #f0f0f0;
+  transform: translateX(2px);
+  background: linear-gradient(90deg, rgba(102, 126, 234, 0.08), transparent);
 }
 
 .avatar-badge {
@@ -270,19 +370,19 @@ onMounted(async () => {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .conversation-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
 .user-name {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 1.05rem;
+  font-weight: 700;
   color: #333;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -290,10 +390,11 @@ onMounted(async () => {
 }
 
 .message-time {
-  font-size: 12px;
+  font-size: 0.8rem;
   color: #999;
   white-space: nowrap;
   flex-shrink: 0;
+  font-weight: 600;
 }
 
 .conversation-preview {
@@ -302,36 +403,151 @@ onMounted(async () => {
 }
 
 .last-message {
-  font-size: 14px;
+  font-size: 0.95rem;
   color: #666;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 500;
 }
 
 .last-message.unread {
   color: #333;
-  font-weight: 600;
+  font-weight: 700;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .no-message {
-  font-size: 14px;
+  font-size: 0.95rem;
   color: #999;
   font-style: italic;
+  font-weight: 500;
 }
 
 .arrow-icon {
   flex-shrink: 0;
   color: #ccc;
+  transition: all 0.3s ease;
+}
+
+.conversation-item:hover .arrow-icon {
+  color: #667eea;
+  transform: translateX(4px);
 }
 
 .connection-warning {
   position: fixed;
-  top: 72px;
+  top: 90px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;
   width: 90%;
-  max-width: 400px;
+  max-width: 450px;
+  animation: slideDown 0.4s ease;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateX(-50%) translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+  .page-header {
+    padding: 16px;
+  }
+
+  .page-title {
+    font-size: 1.5rem;
+  }
+
+  .chat-list-container {
+    padding: 16px;
+  }
+
+  .empty-state {
+    padding: 40px 24px;
+    min-height: 400px;
+  }
+
+  .empty-chat {
+    font-size: 5rem;
+  }
+
+  .empty-state h2 {
+    font-size: 1.75rem;
+  }
+
+  .empty-state p {
+    font-size: 1rem;
+  }
+
+  .conversation-item {
+    padding: 16px 18px;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .chat-list-page {
+    background: white;
+  }
+
+  .page-header {
+    padding: 12px;
+    border-radius: 0;
+  }
+
+  .page-title {
+    font-size: 1.3rem;
+  }
+
+  .back-home-btn {
+    padding: 8px 14px;
+    font-size: 0.85rem;
+  }
+
+  .chat-list-container {
+    padding: 12px;
+  }
+
+  .empty-state {
+    padding: 32px 20px;
+    border-radius: 16px;
+  }
+
+  .empty-chat {
+    font-size: 4rem;
+  }
+
+  .empty-state h2 {
+    font-size: 1.5rem;
+  }
+
+  .conversation-list {
+    border-radius: 16px;
+  }
+
+  .conversation-item {
+    padding: 14px 16px;
+  }
+
+  .user-name {
+    font-size: 1rem;
+  }
+
+  .last-message,
+  .no-message {
+    font-size: 0.9rem;
+  }
 }
 </style>

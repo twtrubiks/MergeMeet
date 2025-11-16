@@ -9,16 +9,20 @@
 
       <!-- 載入中 -->
       <div v-if="profileStore.loading && !profileStore.profile" class="loading">
-        <div class="spinner"></div>
-        <p>載入中...</p>
+        <HeartLoader text="載入個人檔案..." />
       </div>
 
       <!-- 尚未建立檔案 -->
       <div v-else-if="!profileStore.hasProfile && !isCreating" class="empty-state">
         <div class="card">
+          <div class="welcome-animation">
+            <span class="welcome-heart">💕</span>
+          </div>
           <h1>👋 歡迎！</h1>
           <p class="subtitle">建立你的個人檔案，開始認識新朋友</p>
-          <button @click="startCreating" class="btn-primary">建立個人檔案</button>
+          <AnimatedButton variant="primary" @click="startCreating">
+            ✨ 建立個人檔案
+          </AnimatedButton>
         </div>
       </div>
 
@@ -93,8 +97,12 @@
             </div>
 
             <div class="button-group">
-              <button @click="cancelEdit" class="btn-secondary">取消</button>
-              <button @click="nextStep" class="btn-primary">下一步</button>
+              <AnimatedButton variant="ghost" @click="cancelEdit">
+                取消
+              </AnimatedButton>
+              <AnimatedButton variant="primary" @click="nextStep">
+                下一步 →
+              </AnimatedButton>
             </div>
           </div>
 
@@ -103,8 +111,12 @@
             <PhotoUploader @photos-changed="fetchProfileData" />
 
             <div class="button-group">
-              <button @click="currentStep = 1" class="btn-secondary">上一步</button>
-              <button @click="nextStep" class="btn-primary">下一步</button>
+              <AnimatedButton variant="ghost" @click="currentStep = 1">
+                ← 上一步
+              </AnimatedButton>
+              <AnimatedButton variant="primary" @click="nextStep">
+                下一步 →
+              </AnimatedButton>
             </div>
           </div>
 
@@ -113,14 +125,17 @@
             <InterestSelector v-model="selectedInterests" />
 
             <div class="button-group">
-              <button @click="currentStep = 2" class="btn-secondary">上一步</button>
-              <button
+              <AnimatedButton variant="ghost" @click="currentStep = 2">
+                ← 上一步
+              </AnimatedButton>
+              <AnimatedButton
+                variant="success"
                 @click="submitProfile"
-                class="btn-primary"
                 :disabled="profileStore.loading"
+                :loading="profileStore.loading"
               >
-                {{ profileStore.loading ? '儲存中...' : '完成' }}
-              </button>
+                <span v-if="!profileStore.loading">✨ 完成</span>
+              </AnimatedButton>
             </div>
           </div>
 
@@ -155,7 +170,9 @@
                 📍 {{ profileStore.profile.location_name }}
               </p>
             </div>
-            <button @click="startEditing" class="btn-edit">編輯</button>
+            <AnimatedButton variant="primary" @click="startEditing">
+              ✏️ 編輯
+            </AnimatedButton>
           </div>
 
           <!-- 個人簡介 -->
@@ -238,6 +255,8 @@ import { useProfileStore } from '@/stores/profile'
 import { useUserStore } from '@/stores/user'
 import PhotoUploader from '@/components/PhotoUploader.vue'
 import InterestSelector from '@/components/InterestSelector.vue'
+import AnimatedButton from '@/components/ui/AnimatedButton.vue'
+import HeartLoader from '@/components/ui/HeartLoader.vue'
 
 const router = useRouter()
 const profileStore = useProfileStore()
@@ -534,40 +553,67 @@ onMounted(async () => {
 
 /* 載入中 */
 .loading {
-  text-align: center;
-  color: white;
-  padding: 4rem 0;
-}
-
-.spinner {
-  width: 50px;
-  height: 50px;
-  border: 4px solid rgba(255, 255, 255, 0.3);
-  border-top-color: white;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 1rem;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 100px 20px;
 }
 
 /* 空狀態 */
 .empty-state {
   text-align: center;
+  animation: fadeIn 0.6s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.welcome-animation {
+  margin-bottom: 24px;
+}
+
+.welcome-heart {
+  display: inline-block;
+  font-size: 5rem;
+  animation: heartBeat 1.5s infinite;
+  filter: drop-shadow(0 8px 16px rgba(255, 107, 107, 0.4));
+}
+
+@keyframes heartBeat {
+  0%, 100% {
+    transform: scale(1);
+  }
+  10%, 30% {
+    transform: scale(1.15);
+  }
+  20%, 40% {
+    transform: scale(0.95);
+  }
 }
 
 .empty-state h1 {
   font-size: 2.5rem;
   margin-bottom: 1rem;
-  color: #333;
+  font-weight: 800;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .subtitle {
   color: #666;
   font-size: 1.2rem;
   margin-bottom: 2rem;
+  font-weight: 500;
 }
 
 /* 步驟指示器 */
@@ -577,6 +623,18 @@ onMounted(async () => {
   margin-bottom: 2rem;
   padding-bottom: 2rem;
   border-bottom: 2px solid #f0f0f0;
+  position: relative;
+}
+
+.steps::before {
+  content: '';
+  position: absolute;
+  top: 20px;
+  left: 20%;
+  right: 20%;
+  height: 2px;
+  background: #e0e0e0;
+  z-index: 0;
 }
 
 .step {
@@ -584,57 +642,72 @@ onMounted(async () => {
   flex-direction: column;
   align-items: center;
   flex: 1;
-  opacity: 0.5;
-  transition: opacity 0.3s;
+  opacity: 0.4;
+  transition: all 0.4s ease;
+  position: relative;
+  z-index: 1;
 }
 
 .step.active {
   opacity: 1;
+  transform: scale(1.05);
 }
 
 .step-number {
-  width: 40px;
-  height: 40px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
   background: #e0e0e0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin-bottom: 0.75rem;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .step.active .step-number {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  transform: scale(1.1);
 }
 
 .step-label {
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   color: #666;
+  font-weight: 600;
+}
+
+.step.active .step-label {
+  color: #667eea;
 }
 
 /* 表單 */
 .form-group {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.75rem;
 }
 
 .form-group label {
   display: block;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
   color: #333;
+  font-size: 0.95rem;
 }
 
 .form-group input,
 .form-group select,
 .form-group textarea {
   width: 100%;
-  padding: 12px;
+  padding: 14px 16px;
   border: 2px solid #e0e0e0;
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 1rem;
-  transition: border-color 0.3s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: white;
 }
 
 .form-group input:focus,
@@ -642,6 +715,18 @@ onMounted(async () => {
 .form-group textarea:focus {
   outline: none;
   border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  transform: translateY(-2px);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 120px;
+  font-family: inherit;
+}
+
+.form-group select {
+  cursor: pointer;
 }
 
 .form-group small {
@@ -649,11 +734,13 @@ onMounted(async () => {
   margin-top: 0.5rem;
   color: #999;
   font-size: 0.85rem;
+  font-weight: 500;
 }
 
 .form-group .hint {
   color: #999;
   font-style: italic;
+  font-weight: 400;
 }
 
 /* 按鈕 */
@@ -664,79 +751,47 @@ onMounted(async () => {
   margin-top: 2rem;
 }
 
-.btn-primary,
-.btn-secondary,
-.btn-edit {
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-  font-size: 1rem;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
-}
-
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: #6c757d;
-  color: white;
-}
-
-.btn-secondary:hover {
-  background: #5a6268;
-  transform: translateY(-2px);
-}
-
-.btn-edit {
-  background: #667eea;
-  color: white;
-  padding: 8px 16px;
-  font-size: 0.9rem;
-}
-
 .error-message {
-  margin-top: 1rem;
-  padding: 12px;
-  background: #fee;
-  border: 1px solid #fcc;
-  border-radius: 8px;
+  margin-top: 1.5rem;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(244, 67, 54, 0.1), rgba(233, 30, 99, 0.1));
+  border: 2px solid rgba(244, 67, 54, 0.3);
+  border-radius: 12px;
   color: #c33;
+  font-weight: 600;
+  animation: shake 0.5s ease;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-10px); }
+  75% { transform: translateX(10px); }
 }
 
 /* 檔案顯示 */
 .profile-header {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 2rem;
   margin-bottom: 2rem;
   padding-bottom: 2rem;
   border-bottom: 2px solid #f0f0f0;
+  position: relative;
 }
 
 .profile-avatar {
   flex-shrink: 0;
+  position: relative;
 }
 
 .profile-avatar img,
 .avatar-placeholder {
-  width: 100px;
-  height: 100px;
+  width: 120px;
+  height: 120px;
   border-radius: 50%;
   object-fit: cover;
+  border: 4px solid white;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 
 .avatar-placeholder {
@@ -745,8 +800,8 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2.5rem;
-  font-weight: 600;
+  font-size: 3rem;
+  font-weight: 800;
 }
 
 .profile-info {
@@ -754,138 +809,231 @@ onMounted(async () => {
 }
 
 .profile-info h1 {
-  margin: 0 0 0.5rem 0;
-  color: #333;
+  margin: 0 0 0.75rem 0;
+  font-size: 2rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .profile-age,
 .profile-location {
-  margin: 0.25rem 0;
+  margin: 0.5rem 0;
   color: #666;
+  font-size: 1.05rem;
+  font-weight: 500;
 }
 
 .profile-section {
-  margin-bottom: 2rem;
+  margin-bottom: 2.5rem;
+  animation: slideUp 0.5s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .profile-section h3 {
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
+  font-size: 1.3rem;
+  font-weight: 800;
   color: #333;
 }
 
 .bio {
   color: #666;
-  line-height: 1.6;
+  line-height: 1.8;
+  font-size: 1.05rem;
+  font-weight: 400;
 }
 
 /* 照片網格 */
 .photo-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1.25rem;
 }
 
 .photo-item {
   position: relative;
   aspect-ratio: 1;
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.photo-item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
 }
 
 .photo-item img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.photo-item:hover img {
+  transform: scale(1.05);
 }
 
 .photo-badge {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  background: rgba(102, 126, 234, 0.9);
+  top: 10px;
+  right: 10px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
   color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 6px 12px;
+  border-radius: 8px;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
 }
 
 /* 興趣標籤 */
 .interests-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.75rem;
 }
 
 .interest-tag {
-  padding: 8px 16px;
-  background: #f0f0f0;
+  padding: 10px 18px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+  border: 1px solid rgba(102, 126, 234, 0.3);
   border-radius: 20px;
-  font-size: 0.9rem;
-  color: #333;
+  font-size: 0.95rem;
+  color: #667eea;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.interest-tag:hover {
+  transform: scale(1.05);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.15));
 }
 
 /* 偏好設定 */
 .preferences {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1rem;
 }
 
 .pref-item {
   display: flex;
   justify-content: space-between;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
+  border-radius: 12px;
+  border: 1px solid rgba(102, 126, 234, 0.15);
+  transition: all 0.2s ease;
+}
+
+.pref-item:hover {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.08));
+  transform: translateX(4px);
 }
 
 .pref-label {
-  font-weight: 600;
+  font-weight: 700;
   color: #666;
+  font-size: 0.95rem;
 }
 
 .pref-value {
   color: #333;
+  font-weight: 600;
+  font-size: 0.95rem;
 }
 
 /* 狀態標籤 */
 .status-badges {
   display: flex;
   gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .badge {
-  padding: 8px 16px;
+  padding: 10px 18px;
   border-radius: 20px;
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 0.9rem;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.badge:hover {
+  transform: scale(1.05);
 }
 
 .badge-success {
-  background: #d4edda;
-  color: #155724;
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.15), rgba(102, 187, 106, 0.15));
+  color: #2e7d32;
+  border: 2px solid rgba(76, 175, 80, 0.3);
 }
 
 .badge-warning {
-  background: #fff3cd;
-  color: #856404;
+  background: linear-gradient(135deg, rgba(255, 152, 0, 0.15), rgba(255, 193, 7, 0.15));
+  color: #e65100;
+  border: 2px solid rgba(255, 152, 0, 0.3);
 }
 
 .badge-inactive {
-  background: #f0f0f0;
+  background: rgba(0, 0, 0, 0.05);
   color: #666;
+  border: 2px solid rgba(0, 0, 0, 0.1);
 }
 
 /* 響應式 */
 @media (max-width: 768px) {
+  .card {
+    padding: 1.5rem;
+  }
+
   .profile-header {
     flex-direction: column;
     text-align: center;
+    gap: 1.5rem;
+  }
+
+  .profile-avatar img,
+  .avatar-placeholder {
+    width: 100px;
+    height: 100px;
+  }
+
+  .avatar-placeholder {
+    font-size: 2.5rem;
+  }
+
+  .profile-info h1 {
+    font-size: 1.75rem;
   }
 
   .steps {
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.5rem;
+  }
+
+  .steps::before {
+    display: none;
+  }
+
+  .step-number {
+    width: 45px;
+    height: 45px;
+    font-size: 1rem;
   }
 
   .button-group {
@@ -894,6 +1042,42 @@ onMounted(async () => {
 
   .photo-grid {
     grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+
+  .status-badges {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .profile-page {
+    padding: 16px;
+  }
+
+  .card {
+    padding: 1.25rem;
+    border-radius: 12px;
+  }
+
+  .empty-state h1 {
+    font-size: 2rem;
+  }
+
+  .subtitle {
+    font-size: 1rem;
+  }
+
+  .welcome-heart {
+    font-size: 4rem;
+  }
+
+  .profile-section h3 {
+    font-size: 1.1rem;
+  }
+
+  .photo-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

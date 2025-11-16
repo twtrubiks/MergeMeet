@@ -7,49 +7,66 @@
         <span class="btn-text">返回主選單</span>
       </router-link>
 
-      <h1 class="page-title">我的配對</h1>
+      <h1 class="page-title">💕 我的配對</h1>
 
       <!-- 載入中 -->
       <div v-if="discoveryStore.loading && discoveryStore.matches.length === 0" class="loading">
-        <div class="spinner"></div>
-        <p>載入中...</p>
+        <HeartLoader text="載入配對列表..." />
       </div>
 
       <!-- 錯誤訊息 -->
       <div v-else-if="discoveryStore.error" class="error-message">
         <p>❌ {{ discoveryStore.error }}</p>
-        <button @click="loadMatches" class="btn-retry">重試</button>
+        <AnimatedButton variant="danger" @click="loadMatches">
+          🔄 重試
+        </AnimatedButton>
       </div>
 
       <!-- 空狀態 -->
       <div v-else-if="!discoveryStore.hasMatches" class="empty-state">
-        <div class="empty-icon">💔</div>
+        <div class="empty-animation">
+          <div class="broken-heart">💔</div>
+        </div>
         <h2>還沒有配對</h2>
         <p>開始探索並喜歡其他用戶來建立配對！</p>
-        <router-link to="/discovery" class="btn-discover">
-          <span class="btn-icon">🔍</span>
-          <span>開始探索</span>
-        </router-link>
+        <AnimatedButton variant="primary" @click="$router.push('/discovery')">
+          🔍 開始探索
+        </AnimatedButton>
       </div>
 
       <!-- 配對列表 -->
-      <div v-else class="matches-grid">
+      <div v-else>
+        <div class="matches-stats">
+          <Badge variant="success" size="large">
+            {{ discoveryStore.matches.length }} 個配對
+          </Badge>
+        </div>
+
+        <div class="matches-grid">
         <div
-          v-for="match in discoveryStore.matches"
+          v-for="(match, index) in discoveryStore.matches"
           :key="match.match_id"
           class="match-card"
+          :style="{ animationDelay: `${index * 0.1}s` }"
         >
+          <!-- 新配對標籤 -->
+          <div v-if="isNewMatch(match.matched_at)" class="new-match-badge">
+            ✨ NEW
+          </div>
+
           <!-- 用戶頭像 -->
           <div class="match-avatar">
-            <img
-              v-if="match.matched_user.photos && match.matched_user.photos.length > 0"
-              :src="match.matched_user.photos[0]"
-              :alt="match.matched_user.display_name"
-            >
-            <div v-else class="avatar-placeholder">
-              {{ match.matched_user.display_name[0] }}
+            <div class="avatar-ring" :class="{ online: isOnline(match.matched_user.last_active) }">
+              <img
+                v-if="match.matched_user.photos && match.matched_user.photos.length > 0"
+                :src="match.matched_user.photos[0]"
+                :alt="match.matched_user.display_name"
+              >
+              <div v-else class="avatar-placeholder">
+                {{ match.matched_user.display_name[0] }}
+              </div>
             </div>
-            <div class="online-status" :class="{ online: isOnline(match.matched_user.last_active) }"></div>
+            <div class="online-pulse" v-if="isOnline(match.matched_user.last_active)"></div>
           </div>
 
           <!-- 用戶資訊 -->
@@ -63,9 +80,14 @@
               📍 {{ formatDistance(match.matched_user.distance_km) }}
             </p>
 
-            <p class="match-date">
-              配對於 {{ formatDate(match.matched_at) }}
-            </p>
+            <div class="match-meta">
+              <Badge variant="info" size="small">
+                {{ formatDate(match.matched_at) }}
+              </Badge>
+              <Badge v-if="isOnline(match.matched_user.last_active)" variant="success" size="small">
+                ● 在線
+              </Badge>
+            </div>
 
             <!-- 共同興趣 -->
             <div v-if="match.matched_user.interests && match.matched_user.interests.length > 0" class="match-interests">
@@ -75,6 +97,9 @@
                 class="interest-tag"
               >
                 {{ interest }}
+              </span>
+              <span v-if="match.matched_user.interests.length > 3" class="interest-more">
+                +{{ match.matched_user.interests.length - 3 }}
               </span>
             </div>
           </div>
@@ -98,6 +123,7 @@
           </div>
         </div>
       </div>
+      </div>
     </div>
 
     <!-- 取消配對確認彈窗 -->
@@ -111,12 +137,12 @@
               此操作無法復原，您將不再能與 {{ unmatchTarget.matched_user.display_name }} 聊天。
             </p>
             <div class="modal-actions">
-              <button @click="cancelUnmatch" class="btn-cancel">
+              <AnimatedButton variant="ghost" @click="cancelUnmatch">
                 取消
-              </button>
-              <button @click="confirmUnmatch" class="btn-confirm" :disabled="isUnmatching">
-                {{ isUnmatching ? '處理中...' : '確定取消' }}
-              </button>
+              </AnimatedButton>
+              <AnimatedButton variant="danger" :loading="isUnmatching" @click="confirmUnmatch">
+                <span v-if="!isUnmatching">確定取消</span>
+              </AnimatedButton>
             </div>
           </div>
         </div>
@@ -129,6 +155,9 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDiscoveryStore } from '@/stores/discovery'
+import AnimatedButton from '@/components/ui/AnimatedButton.vue'
+import HeartLoader from '@/components/ui/HeartLoader.vue'
+import Badge from '@/components/ui/Badge.vue'
 
 const router = useRouter()
 const discoveryStore = useDiscoveryStore()
@@ -174,6 +203,16 @@ const formatDate = (dateString) => {
       day: 'numeric'
     })
   }
+}
+
+/**
+ * 判斷是否為新配對（24小時內）
+ */
+const isNewMatch = (matchedAt) => {
+  const matchDate = new Date(matchedAt)
+  const now = new Date()
+  const diffInHours = (now - matchDate) / (1000 * 60 * 60)
+  return diffInHours < 24
 }
 
 /**
@@ -287,131 +326,175 @@ onMounted(() => {
 
 .page-title {
   text-align: center;
-  font-size: 32px;
-  font-weight: 700;
+  font-size: 2.5rem;
+  font-weight: 800;
   color: #333;
   margin-bottom: 30px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 /* 載入中 */
 .loading {
-  text-align: center;
-  padding: 60px 20px;
-}
-
-.spinner {
-  width: 50px;
-  height: 50px;
-  margin: 0 auto 20px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #FF6B6B;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 100px 20px;
 }
 
 /* 錯誤訊息 */
 .error-message {
   text-align: center;
-  padding: 40px 20px;
+  padding: 60px 20px;
 }
 
 .error-message p {
   color: #e74c3c;
-  font-size: 16px;
-  margin-bottom: 20px;
-}
-
-.btn-retry {
-  padding: 12px 30px;
-  background: #FF6B6B;
-  color: white;
-  border: none;
-  border-radius: 25px;
-  font-size: 16px;
+  font-size: 1.1rem;
+  margin-bottom: 24px;
   font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.btn-retry:hover {
-  background: #FF5252;
-  transform: translateY(-2px);
 }
 
 /* 空狀態 */
 .empty-state {
   text-align: center;
-  padding: 60px 20px;
+  padding: 80px 20px;
+  animation: fadeIn 0.6s ease;
 }
 
-.empty-icon {
-  font-size: 80px;
-  margin-bottom: 20px;
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.empty-animation {
+  margin-bottom: 32px;
+}
+
+.broken-heart {
+  font-size: 120px;
+  display: inline-block;
+  animation: heartbreak 2s ease-in-out infinite;
+}
+
+@keyframes heartbreak {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+  }
+  25% {
+    transform: rotate(-10deg) scale(1.1);
+  }
+  75% {
+    transform: rotate(10deg) scale(1.1);
+  }
 }
 
 .empty-state h2 {
-  font-size: 24px;
+  font-size: 2rem;
   color: #333;
-  margin-bottom: 10px;
+  margin-bottom: 16px;
+  font-weight: 700;
 }
 
 .empty-state p {
-  font-size: 16px;
+  font-size: 1.1rem;
   color: #666;
-  margin-bottom: 30px;
+  margin-bottom: 32px;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
-.btn-discover {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 14px 30px;
-  background: linear-gradient(135deg, #FF6B6B, #FF8E53);
-  color: white;
-  text-decoration: none;
-  border-radius: 25px;
-  font-size: 16px;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
-}
-
-.btn-discover:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
-}
-
-.btn-icon {
-  font-size: 20px;
+/* 配對統計 */
+.matches-stats {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 32px;
 }
 
 /* 配對網格 */
 .matches-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
   gap: 24px;
 }
 
 /* 配對卡片 */
 .match-card {
+  position: relative;
   background: white;
-  border-radius: 16px;
+  border-radius: 20px;
   padding: 24px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
-  gap: 16px;
+  gap: 20px;
   align-items: flex-start;
+  border: 2px solid transparent;
+  animation: slideIn 0.5s ease-out both;
+  overflow: hidden;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.match-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 107, 107, 0.1), transparent);
+  transition: left 0.5s;
+}
+
+.match-card:hover::before {
+  left: 100%;
 }
 
 .match-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  transform: translateY(-6px);
+  box-shadow: 0 12px 30px rgba(255, 107, 107, 0.15);
+  border-color: rgba(255, 107, 107, 0.3);
+}
+
+/* 新配對標籤 */
+.new-match-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: linear-gradient(135deg, #FFD700, #FFA500);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
+  animation: glow 2s ease-in-out infinite;
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
+  }
+  50% {
+    box-shadow: 0 4px 16px rgba(255, 215, 0, 0.6);
+  }
 }
 
 /* 用戶頭像 */
@@ -420,12 +503,25 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-.match-avatar img,
+.avatar-ring {
+  position: relative;
+  padding: 4px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f5f5f5, #e0e0e0);
+  transition: all 0.3s ease;
+}
+
+.avatar-ring.online {
+  background: linear-gradient(135deg, #4CAF50, #66BB6A);
+}
+
+.avatar-ring img,
 .avatar-placeholder {
-  width: 80px;
-  height: 80px;
+  width: 90px;
+  height: 90px;
   border-radius: 50%;
   object-fit: cover;
+  border: 3px solid white;
 }
 
 .avatar-placeholder {
@@ -434,24 +530,33 @@ onMounted(() => {
   justify-content: center;
   background: linear-gradient(135deg, #FF6B6B, #FF8E53);
   color: white;
-  font-size: 32px;
-  font-weight: bold;
+  font-size: 36px;
+  font-weight: 800;
 }
 
-.online-status {
+.online-pulse {
   position: absolute;
-  bottom: 4px;
-  right: 4px;
-  width: 16px;
-  height: 16px;
+  bottom: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  background: #4CAF50;
   border-radius: 50%;
-  background: #ccc;
   border: 3px solid white;
+  box-shadow: 0 0 0 rgba(76, 175, 80, 0.7);
+  animation: pulse 2s ease-in-out infinite;
 }
 
-.online-status.online {
-  background: #4CAF50;
-  box-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(76, 175, 80, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+  }
 }
 
 /* 用戶資訊 */
@@ -468,76 +573,138 @@ onMounted(() => {
 }
 
 .match-name {
-  font-size: 20px;
-  font-weight: 700;
-  color: #333;
+  font-size: 1.4rem;
+  font-weight: 800;
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .match-age {
-  font-size: 18px;
-  color: #666;
+  font-size: 1.2rem;
+  color: #999;
+  font-weight: 600;
   flex-shrink: 0;
 }
 
 .match-distance {
-  font-size: 13px;
-  color: #999;
-  margin: 0 0 6px;
+  font-size: 0.9rem;
+  color: #666;
+  margin: 0 0 8px;
+  font-weight: 500;
 }
 
-.match-date {
-  font-size: 12px;
-  color: #999;
-  margin: 0 0 12px;
+.match-meta {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+  flex-wrap: wrap;
 }
 
 .match-interests {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
+  margin-top: 12px;
 }
 
 .interest-tag {
-  display: inline-block;
-  padding: 4px 10px;
-  background: #FFF0F0;
-  color: #FF6B6B;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+  color: #667eea;
+  border: 1px solid rgba(102, 126, 234, 0.3);
+  border-radius: 16px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.interest-tag:hover {
+  transform: scale(1.05);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.15));
+}
+
+.interest-more {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  background: rgba(0, 0, 0, 0.05);
+  color: #999;
+  border-radius: 16px;
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
 /* 操作按鈕 */
 .match-actions {
   flex-shrink: 0;
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .btn-chat,
 .btn-unmatch {
-  width: 40px;
-  height: 40px;
+  position: relative;
+  width: 50px;
+  height: 50px;
   border: none;
   border-radius: 50%;
-  background: #f5f5f5;
-  font-size: 20px;
+  font-size: 1.3rem;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.btn-chat {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+}
+
+.btn-unmatch {
+  background: linear-gradient(135deg, #f093fb, #f5576c);
+}
+
+.btn-chat::before,
+.btn-unmatch::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.4s, height 0.4s;
+}
+
+.btn-chat:hover::before,
+.btn-unmatch:hover::before {
+  width: 100%;
+  height: 100%;
 }
 
 .btn-chat:hover {
-  background: #E3F2FD;
-  transform: scale(1.1);
+  transform: scale(1.15) translateY(-3px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
 }
 
 .btn-unmatch:hover {
-  background: #FFE5E5;
-  transform: scale(1.1);
+  transform: scale(1.15) translateY(-3px);
+  box-shadow: 0 8px 20px rgba(245, 87, 108, 0.4);
+}
+
+.btn-chat:active,
+.btn-unmatch:active {
+  transform: scale(1.05);
 }
 
 /* Modal 覆蓋層 */
@@ -547,7 +714,8 @@ onMounted(() => {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -558,86 +726,67 @@ onMounted(() => {
 /* Modal 容器 */
 .modal-container {
   background: white;
-  border-radius: 20px;
-  max-width: 450px;
+  border-radius: 24px;
+  max-width: 480px;
   width: 100%;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-  animation: slideUp 0.3s ease-out;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: modalSlideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 2px solid rgba(255, 255, 255, 0.8);
 }
 
-@keyframes slideUp {
+@keyframes modalSlideUp {
   from {
-    transform: translateY(50px);
+    transform: translateY(60px) scale(0.95);
     opacity: 0;
   }
   to {
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
     opacity: 1;
   }
 }
 
 /* Modal 內容 */
 .modal-content {
-  padding: 40px 30px 30px;
+  padding: 48px 32px 32px;
   text-align: center;
 }
 
 .modal-icon {
-  font-size: 64px;
-  margin-bottom: 20px;
+  font-size: 5rem;
+  margin-bottom: 24px;
+  animation: iconBounce 0.6s ease-out;
+}
+
+@keyframes iconBounce {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
 }
 
 .modal-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: #333;
-  margin: 0 0 12px;
+  font-size: 1.8rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #333, #666);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0 0 16px;
 }
 
 .modal-subtitle {
-  font-size: 15px;
+  font-size: 1.05rem;
   color: #666;
-  line-height: 1.5;
-  margin: 0 0 30px;
+  line-height: 1.6;
+  margin: 0 0 32px;
+  font-weight: 500;
 }
 
 .modal-actions {
   display: flex;
-  gap: 12px;
-}
-
-.modal-actions button {
-  flex: 1;
-  padding: 14px 20px;
-  border: none;
-  border-radius: 12px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.btn-cancel {
-  background: #f5f5f5;
-  color: #666;
-}
-
-.btn-cancel:hover {
-  background: #e0e0e0;
-}
-
-.btn-confirm {
-  background: #e74c3c;
-  color: white;
-}
-
-.btn-confirm:hover:not(:disabled) {
-  background: #c0392b;
-}
-
-.btn-confirm:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  gap: 16px;
 }
 
 /* Modal 過渡效果 */
@@ -651,27 +800,105 @@ onMounted(() => {
 
 /* 響應式設計 */
 @media (max-width: 768px) {
+  .page-title {
+    font-size: 2rem;
+  }
+
   .matches-grid {
     grid-template-columns: 1fr;
     gap: 16px;
   }
 
   .match-card {
-    padding: 16px;
+    padding: 20px;
+    gap: 16px;
   }
 
-  .match-avatar img,
+  .avatar-ring img,
   .avatar-placeholder {
-    width: 60px;
-    height: 60px;
+    width: 70px;
+    height: 70px;
   }
 
   .avatar-placeholder {
-    font-size: 24px;
+    font-size: 28px;
   }
 
   .match-name {
-    font-size: 18px;
+    font-size: 1.2rem;
+  }
+
+  .match-age {
+    font-size: 1rem;
+  }
+
+  .btn-chat,
+  .btn-unmatch {
+    width: 45px;
+    height: 45px;
+    font-size: 1.1rem;
+  }
+
+  .modal-container {
+    margin: 0 16px;
+  }
+
+  .modal-content {
+    padding: 36px 24px 24px;
+  }
+
+  .modal-icon {
+    font-size: 4rem;
+  }
+
+  .modal-title {
+    font-size: 1.5rem;
+  }
+
+  .modal-subtitle {
+    font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-title {
+    font-size: 1.75rem;
+  }
+
+  .match-card {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .match-avatar {
+    margin-bottom: 12px;
+  }
+
+  .match-info {
+    width: 100%;
+  }
+
+  .match-header {
+    justify-content: center;
+  }
+
+  .match-actions {
+    flex-direction: row;
+    width: 100%;
+    justify-content: center;
+    margin-top: 16px;
+  }
+
+  .match-interests {
+    justify-content: center;
+  }
+
+  .new-match-badge {
+    top: 8px;
+    right: 8px;
+    font-size: 0.65rem;
+    padding: 4px 10px;
   }
 }
 </style>
