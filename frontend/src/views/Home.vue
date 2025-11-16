@@ -1,111 +1,176 @@
 <template>
   <div class="home">
     <div class="container">
-      <h1>🎉 歡迎使用 MergeMeet</h1>
-      <p class="subtitle">現代化交友平台 - 完整功能版本</p>
+      <!-- 頂部標題 -->
+      <div class="hero-section">
+        <div class="logo-animation">
+          <span class="logo-heart">💕</span>
+        </div>
+        <h1>歡迎使用 MergeMeet</h1>
+        <p class="subtitle">現代化交友平台 - 完整功能版本</p>
+      </div>
 
       <!-- 認證狀態卡片 -->
-      <div class="card auth-card">
-        <h2>認證狀態</h2>
-        <div v-if="userStore.isAuthenticated" class="auth-info">
-          <p class="success">✅ 已登入</p>
-          <p class="user-email">{{ userStore.userEmail }}</p>
-          <div class="button-group">
-            <router-link to="/discovery" class="btn-primary">🔍 開始探索</router-link>
-            <router-link to="/matches" class="btn-primary">💕 我的配對</router-link>
+      <GlassCard :hoverable="true" variant="primary">
+        <template #icon>
+          <span v-if="userStore.isAuthenticated">✅</span>
+          <span v-else>🔐</span>
+        </template>
+        <div class="auth-section">
+          <h2>{{ userStore.isAuthenticated ? '已登入' : '認證狀態' }}</h2>
+          <div v-if="userStore.isAuthenticated" class="auth-info">
+            <p class="user-email">{{ userStore.userEmail }}</p>
+            <div class="button-grid">
+              <AnimatedButton
+                variant="primary"
+                @click="$router.push('/discovery')"
+              >
+                🔍 開始探索
+              </AnimatedButton>
+              <AnimatedButton
+                variant="secondary"
+                @click="$router.push('/matches')"
+              >
+                💕 我的配對
+              </AnimatedButton>
+              <AnimatedButton
+                variant="ghost"
+                @click="$router.push('/profile')"
+              >
+                👤 個人檔案
+              </AnimatedButton>
+              <AnimatedButton
+                variant="danger"
+                @click="handleLogout"
+              >
+                🚪 登出
+              </AnimatedButton>
+            </div>
           </div>
-          <div class="button-group" style="margin-top: 12px;">
-            <router-link to="/profile" class="btn-secondary">個人檔案</router-link>
-            <button @click="handleLogout" class="btn-outline">登出</button>
+          <div v-else class="auth-actions">
+            <p class="info-text">請登入或註冊以使用完整功能</p>
+            <div class="button-group">
+              <AnimatedButton
+                variant="primary"
+                @click="$router.push('/login')"
+              >
+                ✨ 登入
+              </AnimatedButton>
+              <AnimatedButton
+                variant="secondary"
+                @click="$router.push('/register')"
+              >
+                🎉 註冊
+              </AnimatedButton>
+            </div>
           </div>
         </div>
-        <div v-else class="auth-actions">
-          <p class="info-text">請登入或註冊以使用完整功能</p>
-          <div class="button-group">
-            <router-link to="/login" class="btn-primary">登入</router-link>
-            <router-link to="/register" class="btn-outline">註冊</router-link>
-          </div>
-        </div>
-      </div>
+      </GlassCard>
 
       <!-- API 狀態卡片 -->
-      <div class="card">
-        <h2>後端 API 狀態</h2>
-        <div v-if="loading">載入中...</div>
-        <div v-else-if="apiStatus">
-          <p class="success">✅ {{ apiStatus.message }}</p>
-          <p>版本: {{ apiStatus.version }}</p>
+      <GlassCard
+        :hoverable="true"
+        :variant="apiStatus ? 'success' : loading ? 'default' : 'danger'"
+      >
+        <template #icon>
+          <span v-if="loading">⏳</span>
+          <span v-else-if="apiStatus">🚀</span>
+          <span v-else>⚠️</span>
+        </template>
+        <div class="api-section">
+          <h2>後端 API 狀態</h2>
+          <div v-if="loading" class="status-loading">
+            <HeartLoader text="連接中..." />
+          </div>
+          <div v-else-if="apiStatus" class="status-success">
+            <p class="status-message">{{ apiStatus.message }}</p>
+            <p class="status-version">版本: <strong>{{ apiStatus.version }}</strong></p>
+          </div>
+          <div v-else class="status-error">
+            <p>無法連接到後端 API</p>
+            <small>請確認後端服務已啟動</small>
+          </div>
         </div>
-        <div v-else class="error">
-          ❌ 無法連接到後端 API
-        </div>
-      </div>
+      </GlassCard>
 
-      <!-- 開發資訊 -->
-      <div class="info">
+      <!-- 功能展示區 -->
+      <div class="features-section">
         <h3>已完成功能</h3>
         <div class="features-grid">
-          <div class="feature-section">
-            <h4>Week 1: 認證系統</h4>
-            <ul>
-              <li>✅ 用戶註冊 API</li>
-              <li>✅ 用戶登入 API</li>
-              <li>✅ JWT 認證機制</li>
-              <li>✅ Token 刷新功能</li>
-              <li>✅ Email 驗證</li>
-              <li>✅ 密碼強度驗證</li>
-              <li>✅ 年齡驗證（18+）</li>
-            </ul>
-          </div>
-          <div class="feature-section">
-            <h4>Week 2: 個人檔案</h4>
-            <ul>
-              <li>✅ 個人檔案建立與編輯</li>
-              <li>✅ 照片上傳管理（最多 6 張）</li>
-              <li>✅ 興趣標籤選擇（47 種標籤）</li>
-              <li>✅ 地理位置（PostGIS）</li>
-              <li>✅ 配對偏好設定</li>
-              <li>✅ 檔案完整度檢查</li>
-            </ul>
-          </div>
-          <div class="feature-section">
-            <h4>Week 3: 探索與配對</h4>
-            <ul>
-              <li>✅ 智能配對演算法（多因素評分）</li>
-              <li>✅ 卡片滑動介面</li>
-              <li>✅ 喜歡/跳過操作</li>
-              <li>✅ 互相喜歡自動配對</li>
-              <li>✅ 配對列表管理</li>
-              <li>✅ 配對成功彈窗</li>
-              <li>✅ 取消配對功能</li>
-            </ul>
-          </div>
-          <div class="feature-section">
-            <h4>Week 4: 訊息系統</h4>
-            <ul>
-              <li>✅ 聊天室功能</li>
-              <li>✅ 訊息發送與接收</li>
-              <li>✅ WebSocket 即時通訊</li>
-              <li>✅ 訊息已讀狀態</li>
-              <li>✅ 對話列表</li>
-              <li>✅ 訊息分頁載入</li>
-              <li>✅ 訊息刪除功能</li>
-            </ul>
-          </div>
-          <div class="feature-section">
-            <h4>Week 5: 安全功能</h4>
-            <ul>
-              <li>✅ 用戶封鎖系統</li>
-              <li>✅ 用戶舉報功能</li>
-              <li>✅ 內容審核（敏感詞過濾）</li>
-              <li>✅ 管理員後台</li>
-              <li>✅ 舉報審核處理</li>
-              <li>✅ 用戶封禁管理</li>
-              <li>✅ 敏感詞管理</li>
-            </ul>
-          </div>
+          <FeatureCard
+            title="Week 1: 認證系統"
+            badge="Core"
+            :items="[
+              '用戶註冊 API',
+              '用戶登入 API',
+              'JWT 認證機制',
+              'Token 刷新功能',
+              'Email 驗證',
+              '密碼強度驗證',
+              '年齡驗證（18+）'
+            ]"
+          />
+          <FeatureCard
+            title="Week 2: 個人檔案"
+            badge="Profile"
+            :items="[
+              '個人檔案建立與編輯',
+              '照片上傳管理（最多 6 張）',
+              '興趣標籤選擇（47 種標籤）',
+              '地理位置（PostGIS）',
+              '配對偏好設定',
+              '檔案完整度檢查'
+            ]"
+          />
+          <FeatureCard
+            title="Week 3: 探索與配對"
+            badge="Matching"
+            :items="[
+              '智能配對演算法（多因素評分）',
+              '卡片滑動介面',
+              '喜歡/跳過操作',
+              '互相喜歡自動配對',
+              '配對列表管理',
+              '配對成功彈窗',
+              '取消配對功能'
+            ]"
+          />
+          <FeatureCard
+            title="Week 4: 訊息系統"
+            badge="Chat"
+            :items="[
+              '聊天室功能',
+              '訊息發送與接收',
+              'WebSocket 即時通訊',
+              '訊息已讀狀態',
+              '對話列表',
+              '訊息分頁載入',
+              '訊息刪除功能'
+            ]"
+          />
+          <FeatureCard
+            title="Week 5: 安全功能"
+            badge="Safety"
+            :items="[
+              '用戶封鎖系統',
+              '用戶舉報功能',
+              '內容審核（敏感詞過濾）',
+              '管理員後台',
+              '舉報審核處理',
+              '用戶封禁管理',
+              '敏感詞管理'
+            ]"
+          />
         </div>
       </div>
+    </div>
+
+    <!-- 裝飾性背景元素 -->
+    <div class="bg-decoration">
+      <div class="circle circle-1"></div>
+      <div class="circle circle-2"></div>
+      <div class="circle circle-3"></div>
+      <div class="circle circle-4"></div>
     </div>
   </div>
 </template>
@@ -115,6 +180,10 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import { useUserStore } from '@/stores/user'
+import AnimatedButton from '@/components/ui/AnimatedButton.vue'
+import GlassCard from '@/components/ui/GlassCard.vue'
+import FeatureCard from '@/components/ui/FeatureCard.vue'
+import HeartLoader from '@/components/ui/HeartLoader.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -144,169 +213,334 @@ const handleLogout = () => {
 
 <style scoped>
 .home {
+  position: relative;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 20px;
+  padding: 40px 20px;
+  overflow: hidden;
+}
+
+/* 裝飾性背景動畫 */
+.bg-decoration {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.circle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  animation: float 25s infinite ease-in-out;
+}
+
+.circle-1 {
+  width: 400px;
+  height: 400px;
+  top: -150px;
+  left: -150px;
+  animation-delay: 0s;
+}
+
+.circle-2 {
+  width: 300px;
+  height: 300px;
+  bottom: -100px;
+  right: -100px;
+  animation-delay: 5s;
+}
+
+.circle-3 {
+  width: 200px;
+  height: 200px;
+  top: 40%;
+  right: 5%;
+  animation-delay: 10s;
+}
+
+.circle-4 {
+  width: 250px;
+  height: 250px;
+  bottom: 30%;
+  left: 5%;
+  animation-delay: 15s;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(30px, -30px) scale(1.05);
+  }
+  50% {
+    transform: translate(-20px, 20px) scale(0.95);
+  }
+  75% {
+    transform: translate(25px, 15px) scale(1.02);
+  }
 }
 
 .container {
-  max-width: 600px;
+  position: relative;
+  z-index: 1;
+  max-width: 1200px;
   width: 100%;
+}
+
+/* Hero Section */
+.hero-section {
+  text-align: center;
+  margin-bottom: 48px;
+  animation: fadeIn 0.8s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.logo-animation {
+  margin-bottom: 24px;
+}
+
+.logo-heart {
+  display: inline-block;
+  font-size: 5rem;
+  animation: heartBeat 1.5s infinite, pulse 2s infinite;
+  filter: drop-shadow(0 8px 16px rgba(255, 107, 107, 0.4));
+}
+
+@keyframes heartBeat {
+  0%, 100% {
+    transform: scale(1);
+  }
+  10%, 30% {
+    transform: scale(1.15);
+  }
+  20%, 40% {
+    transform: scale(0.95);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    filter: drop-shadow(0 8px 16px rgba(255, 107, 107, 0.4));
+  }
+  50% {
+    filter: drop-shadow(0 12px 24px rgba(255, 107, 107, 0.6));
+  }
 }
 
 h1 {
   color: white;
-  font-size: 3rem;
-  margin-bottom: 1rem;
-  text-align: center;
+  font-size: 3.5rem;
+  font-weight: 800;
+  margin-bottom: 16px;
+  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  letter-spacing: -1px;
 }
 
 .subtitle {
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 1.2rem;
-  text-align: center;
-  margin-bottom: 2rem;
-}
-
-.card {
-  background: white;
-  border-radius: 12px;
-  padding: 2rem;
-  margin-bottom: 1.5rem;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-}
-
-.card h2 {
-  color: #333;
-  margin-bottom: 1rem;
-}
-
-.success {
-  color: #10b981;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-}
-
-.error {
-  color: #ef4444;
-  font-weight: 600;
-}
-
-.info {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border-radius: 12px;
-  padding: 1.5rem;
-  color: white;
-}
-
-.info h3 {
-  margin-bottom: 1rem;
-}
-
-.info ul {
-  list-style: none;
-}
-
-.info li {
-  padding: 0.5rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.info li:last-child {
-  border-bottom: none;
-}
-
-.features-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1.5rem;
-}
-
-.feature-section h4 {
-  margin-bottom: 0.75rem;
   color: rgba(255, 255, 255, 0.95);
-  font-size: 1.1rem;
+  font-size: 1.3rem;
+  font-weight: 300;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.auth-card {
+/* Auth Section */
+.auth-section h2 {
+  color: #333;
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 24px;
   text-align: center;
 }
 
 .auth-info {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 24px;
   align-items: center;
 }
 
 .user-email {
   color: #667eea;
   font-weight: 600;
+  font-size: 1.1rem;
+  padding: 12px 24px;
+  background: rgba(102, 126, 234, 0.1);
+  border-radius: 12px;
 }
 
-.info-text {
-  color: #666;
-  margin-bottom: 1rem;
+.button-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  width: 100%;
+  max-width: 500px;
 }
 
 .auth-actions {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 20px;
+  align-items: center;
+}
+
+.info-text {
+  color: #666;
+  font-size: 1.05rem;
+  text-align: center;
 }
 
 .button-group {
   display: flex;
-  gap: 1rem;
+  gap: 16px;
   justify-content: center;
+  flex-wrap: wrap;
 }
 
-.btn-primary,
-.btn-outline,
-.btn-secondary {
-  padding: 12px 24px;
-  border-radius: 8px;
+/* API Section */
+.api-section h2 {
+  color: #333;
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.status-loading {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0;
+}
+
+.status-success {
+  text-align: center;
+}
+
+.status-message {
+  color: #10b981;
   font-weight: 600;
-  text-decoration: none;
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-  border: none;
+  font-size: 1.2rem;
+  margin-bottom: 12px;
+}
+
+.status-version {
+  color: #666;
   font-size: 1rem;
 }
 
-.btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+.status-version strong {
+  color: #333;
+}
+
+.status-error {
+  text-align: center;
+  color: #ef4444;
+}
+
+.status-error p {
+  font-weight: 600;
+  font-size: 1.1rem;
+  margin-bottom: 8px;
+}
+
+.status-error small {
+  color: #999;
+  font-size: 0.9rem;
+}
+
+/* Features Section */
+.features-section {
+  margin-top: 48px;
+  animation: slideUp 0.8s ease-out 0.3s both;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.features-section h3 {
   color: white;
+  font-size: 2rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 32px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
 }
 
-.btn-outline {
-  background: transparent;
-  color: #667eea;
-  border: 2px solid #667eea;
+/* 響應式設計 */
+@media (max-width: 768px) {
+  h1 {
+    font-size: 2.5rem;
+  }
+
+  .subtitle {
+    font-size: 1.1rem;
+  }
+
+  .logo-heart {
+    font-size: 4rem;
+  }
+
+  .button-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .features-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
-.btn-outline:hover {
-  background: #667eea;
-  color: white;
-  transform: translateY(-2px);
-}
+@media (max-width: 480px) {
+  .home {
+    padding: 20px 16px;
+  }
 
-.btn-secondary {
-  background: #6c757d;
-  color: white;
-}
+  h1 {
+    font-size: 2rem;
+  }
 
-.btn-secondary:hover {
-  background: #5a6268;
-  transform: translateY(-2px);
+  .subtitle {
+    font-size: 1rem;
+  }
+
+  .logo-heart {
+    font-size: 3.5rem;
+  }
+
+  .auth-section h2,
+  .api-section h2 {
+    font-size: 1.5rem;
+  }
 }
 </style>
