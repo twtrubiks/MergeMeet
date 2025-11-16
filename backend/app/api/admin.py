@@ -25,6 +25,37 @@ from app.schemas.admin import (
 router = APIRouter()
 
 
+def mask_email(email: str) -> str:
+    """
+    Email 脫敏處理,保護用戶隱私
+
+    示例:
+    - user@example.com -> us***@example.com
+    - a@test.com -> a***@test.com
+    - longname@domain.com -> lo***e@domain.com
+
+    Args:
+        email: 原始 email 地址
+
+    Returns:
+        脫敏後的 email 地址
+    """
+    if not email or '@' not in email:
+        return '***@***'
+
+    local, domain = email.split('@', 1)
+
+    if len(local) <= 1:
+        masked_local = local[0] + '***'
+    elif len(local) <= 3:
+        masked_local = local[0] + '***'
+    else:
+        # 保留前兩個和最後一個字符,中間替換為 ***
+        masked_local = local[:2] + '***' + local[-1]
+
+    return f"{masked_local}@{domain}"
+
+
 @router.get("/stats", response_model=DashboardStatsResponse)
 async def get_dashboard_stats(
     current_admin: User = Depends(get_current_admin_user),
@@ -151,9 +182,9 @@ async def get_all_reports(
             response.append(ReportDetailResponse(
                 id=str(report.id),
                 reporter_id=str(report.reporter_id),
-                reporter_email=reporter.email,
+                reporter_email=mask_email(reporter.email),  # 脫敏處理保護隱私
                 reported_user_id=str(report.reported_user_id),
-                reported_user_email=reported_user.email,
+                reported_user_email=mask_email(reported_user.email),  # 脫敏處理保護隱私
                 report_type=report.report_type,
                 reason=report.reason,
                 evidence=report.evidence,

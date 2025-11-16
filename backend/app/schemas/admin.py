@@ -1,5 +1,5 @@
 """管理後台相關 Schemas"""
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import List, Optional
 
@@ -43,7 +43,7 @@ class ReportDetailResponse(BaseModel):
 class ReviewReportRequest(BaseModel):
     """處理舉報請求"""
     status: str  # APPROVED, REJECTED, UNDER_REVIEW
-    admin_notes: Optional[str] = None
+    admin_notes: Optional[str] = Field(None, max_length=1000, description="管理員備註（最多 1000 字）")
     action: Optional[str] = None  # BAN_USER, WARNING, NO_ACTION
 
 
@@ -67,7 +67,7 @@ class UserManagementResponse(BaseModel):
 class BanUserRequest(BaseModel):
     """封禁用戶請求"""
     user_id: str
-    reason: str
+    reason: str = Field(..., min_length=10, max_length=500, description="封禁原因（10-500 字）")
     duration_days: Optional[int] = None  # None = 永久封禁
 
 
