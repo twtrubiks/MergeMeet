@@ -22,6 +22,7 @@ from app.schemas.profile import (
     InterestTagCreateRequest,
     UpdateInterestsRequest,
 )
+from app.services.content_moderation import ContentModerationService
 
 router = APIRouter(prefix="/api/profile")
 
@@ -76,6 +77,23 @@ async def create_profile(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="個人檔案已存在"
         )
+
+    # 內容審核：檢查個人簡介
+    if request.bio:
+        is_approved, violations, action = await ContentModerationService.check_profile_content(
+            db=db,
+            user_id=current_user.id,
+            bio=request.bio
+        )
+        if not is_approved:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "message": "個人簡介包含不當內容",
+                    "violations": violations,
+                    "action": action
+                }
+            )
 
     # 建立檔案
     new_profile = Profile(
@@ -210,6 +228,23 @@ async def update_profile(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="個人檔案不存在，請先建立"
         )
+
+    # 內容審核：檢查個人簡介
+    if request.bio is not None:
+        is_approved, violations, action = await ContentModerationService.check_profile_content(
+            db=db,
+            user_id=current_user.id,
+            bio=request.bio
+        )
+        if not is_approved:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "message": "個人簡介包含不當內容",
+                    "violations": violations,
+                    "action": action
+                }
+            )
 
     # 更新欄位
     if request.display_name is not None:

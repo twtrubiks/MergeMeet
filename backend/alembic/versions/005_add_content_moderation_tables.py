@@ -17,6 +17,9 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # 確保 pgcrypto 擴展已安裝（用於 gen_random_uuid()）
+    op.execute('CREATE EXTENSION IF NOT EXISTS "pgcrypto"')
+
     # 建立 sensitive_words 表
     op.create_table(
         'sensitive_words',
@@ -112,6 +115,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # 刪除審核相關表
     op.drop_index(op.f('ix_moderation_logs_created_at'), table_name='moderation_logs')
     op.drop_index(op.f('ix_moderation_logs_user_id'), table_name='moderation_logs')
     op.drop_table('moderation_logs')
@@ -123,3 +127,6 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_sensitive_words_is_active'), table_name='sensitive_words')
     op.drop_index(op.f('ix_sensitive_words_word'), table_name='sensitive_words')
     op.drop_table('sensitive_words')
+
+    # 注意：不刪除 pgcrypto 擴展，因為其他表可能也在使用
+    # 如需清理，請手動執行: DROP EXTENSION IF EXISTS "pgcrypto" CASCADE;

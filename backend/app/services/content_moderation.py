@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import uuid
 import json
+import asyncio
 
 from app.models.moderation import SensitiveWord, ModerationLog
 
@@ -17,6 +18,7 @@ class ContentModerationService:
     _cache: Dict[str, List[SensitiveWord]] = {}
     _cache_time: Optional[datetime] = None
     _cache_ttl: int = 300  # 快取 5 分鐘
+    _cache_lock: asyncio.Lock = asyncio.Lock()  # 快取鎖，確保線程安全
 
     # 可疑模式（正則表達式）- 保留靜態模式
     SUSPICIOUS_PATTERNS = [
@@ -30,7 +32,7 @@ class ContentModerationService:
     @classmethod
     async def _load_sensitive_words(cls, db: AsyncSession) -> List[SensitiveWord]:
         """
-        從資料庫載入敏感詞（帶快取機制）
+        從資料庫載入敏感詞（帶快取機制和線程安全保護）
 
         Args:
             db: 資料庫 session
@@ -40,27 +42,39 @@ class ContentModerationService:
         """
         now = datetime.now()
 
-        # 檢查快取是否有效
+        # 快速檢查（無鎖）- 如果快取有效直接返回
         if cls._cache_time and (now - cls._cache_time).total_seconds() < cls._cache_ttl:
-            return cls._cache.get("words", [])
+            cached_words = cls._cache.get("words")
+            if cached_words is not None:
+                return cached_words
 
-        # 從資料庫載入啟用的敏感詞
-        result = await db.execute(
-            select(SensitiveWord).where(SensitiveWord.is_active == True)
-        )
-        words = result.scalars().all()
+        # 快取失效，需要重新載入（使用鎖避免重複查詢）
+        async with cls._cache_lock:
+            # 雙重檢查：可能其他協程已經更新了快取
+            now = datetime.now()
+            if cls._cache_time and (now - cls._cache_time).total_seconds() < cls._cache_ttl:
+                cached_words = cls._cache.get("words")
+                if cached_words is not None:
+                    return cached_words
 
-        # 更新快取
-        cls._cache = {"words": words}
-        cls._cache_time = now
+            # 從資料庫載入啟用的敏感詞
+            result = await db.execute(
+                select(SensitiveWord).where(SensitiveWord.is_active == True)
+            )
+            words = result.scalars().all()
 
-        return words
+            # 更新快取
+            cls._cache = {"words": words}
+            cls._cache_time = now
+
+            return words
 
     @classmethod
-    def clear_cache(cls):
-        """清除敏感詞快取"""
-        cls._cache = {}
-        cls._cache_time = None
+    async def clear_cache(cls):
+        """清除敏感詞快取（線程安全）"""
+        async with cls._cache_lock:
+            cls._cache = {}
+            cls._cache_time = None
 
     @classmethod
     async def check_content(
@@ -164,7 +178,7 @@ class ContentModerationService:
         action_taken: str
     ):
         """
-        記錄審核日誌
+        記錄審核日誌（獨立事務，確保日誌永久保存）
 
         Args:
             db: 資料庫 session
@@ -176,20 +190,30 @@ class ContentModerationService:
             triggered_word_ids: 觸發的敏感詞 ID
             action_taken: 採取的動作
         """
-        log = ModerationLog(
-            user_id=user_id,
-            content_type=content_type,
-            original_content=content,
-            is_approved=is_approved,
-            violations=json.dumps(violations, ensure_ascii=False) if violations else None,
-            triggered_word_ids=json.dumps([str(wid) for wid in triggered_word_ids]) if triggered_word_ids else None,
-            action_taken=action_taken
-        )
+        from app.core.database import AsyncSessionLocal
 
-        db.add(log)
-        # 不自動 commit，由調用者決定何時提交
-        # 這樣可以避免在其他事務中調用時產生問題
-        await db.flush()
+        # 使用獨立的資料庫 session 確保審核日誌永久保存
+        # 即使主事務回滾，審核記錄也會保留（審計需求）
+        async with AsyncSessionLocal() as log_db:
+            try:
+                log = ModerationLog(
+                    user_id=user_id,
+                    content_type=content_type,
+                    original_content=content,
+                    is_approved=is_approved,
+                    violations=json.dumps(violations, ensure_ascii=False) if violations else None,
+                    triggered_word_ids=json.dumps([str(wid) for wid in triggered_word_ids]) if triggered_word_ids else None,
+                    action_taken=action_taken
+                )
+
+                log_db.add(log)
+                await log_db.commit()
+            except Exception as e:
+                # 日誌記錄失敗不應影響主流程
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to log moderation: {e}", exc_info=True)
+                await log_db.rollback()
 
     @classmethod
     async def sanitize_content(cls, content: str, db: AsyncSession) -> str:

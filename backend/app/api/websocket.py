@@ -1,10 +1,11 @@
 """WebSocket API 端點"""
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from datetime import datetime
 import json
 import logging
+import uuid
 
 from app.core.database import get_db
 from app.websocket.manager import manager
@@ -34,6 +35,14 @@ async def websocket_endpoint(
         - token: JWT access token
         - user_id: 當前用戶的 ID
     """
+    # 轉換 user_id 為 UUID 類型
+    try:
+        user_uuid = uuid.UUID(user_id)
+    except ValueError:
+        logger.error(f"Invalid user_id format: {user_id}")
+        await websocket.close(code=1008, reason="Invalid user_id format")
+        return
+
     # 建立連接
     connected = await manager.connect(websocket, user_id, token)
     if not connected:
@@ -49,7 +58,7 @@ async def websocket_endpoint(
             message_type = message_data.get("type")
 
             if message_type == "chat_message":
-                await handle_chat_message(message_data, user_id)
+                await handle_chat_message(message_data, user_uuid)
 
             elif message_type == "typing":
                 await handle_typing_indicator(message_data, user_id)
@@ -74,12 +83,12 @@ async def websocket_endpoint(
         await manager.disconnect(user_id)
 
 
-async def handle_chat_message(data: dict, sender_id: str):
+async def handle_chat_message(data: dict, sender_id: uuid.UUID):
     """處理聊天訊息
 
     Args:
         data: 訊息資料，包含 match_id 和 content
-        sender_id: 發送者 ID
+        sender_id: 發送者 ID (UUID 類型)
     """
     from app.core.database import AsyncSessionLocal
     from app.services.content_moderation import ContentModerationService
@@ -100,7 +109,7 @@ async def handle_chat_message(data: dict, sender_id: str):
             if not is_approved:
                 logger.warning(f"Unsafe content detected from {sender_id}: {violations}")
                 await manager.send_personal_message(
-                    sender_id,
+                    str(sender_id),
                     {
                         "type": "error",
                         "message": "訊息包含不當內容，已被系統拒絕",
@@ -134,7 +143,7 @@ async def handle_chat_message(data: dict, sender_id: str):
             if not match:
                 logger.warning(f"Match {match_id} not found or inactive")
                 await manager.send_personal_message(
-                    sender_id,
+                    str(sender_id),
                     {
                         "type": "error",
                         "message": "配對不存在或已取消"
@@ -143,10 +152,10 @@ async def handle_chat_message(data: dict, sender_id: str):
                 return
 
             # 驗證發送者是否為配對的成員
-            if sender_id not in [str(match.user1_id), str(match.user2_id)]:
+            if sender_id not in [match.user1_id, match.user2_id]:
                 logger.warning(f"User {sender_id} not in match {match_id}")
                 await manager.send_personal_message(
-                    sender_id,
+                    str(sender_id),
                     {
                         "type": "error",
                         "message": "您不是這個配對的成員"
@@ -187,7 +196,7 @@ async def handle_chat_message(data: dict, sender_id: str):
         except Exception as e:
             logger.error(f"Error handling chat message: {e}", exc_info=True)
             await manager.send_personal_message(
-                sender_id,
+                str(sender_id),
                 {
                     "type": "error",
                     "message": "訊息發送失敗"
@@ -253,7 +262,7 @@ async def handle_read_receipt(data: dict, user_id: str):
 
             # 更新訊息狀態
             if not message.is_read:
-                message.is_read = datetime.utcnow()
+                message.is_read = func.now()
                 await db.commit()
 
                 # 通知發送者

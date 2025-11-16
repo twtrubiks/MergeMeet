@@ -303,7 +303,7 @@ async def like_user(
             # 如果配對曾經取消，重新啟用
             if existing_match.status == "UNMATCHED":
                 existing_match.status = "ACTIVE"
-                existing_match.matched_at = datetime.now()
+                existing_match.matched_at = func.now()
                 existing_match.unmatched_at = None
                 existing_match.unmatched_by = None
                 match_id = existing_match.id
@@ -476,7 +476,7 @@ async def unmatch(
 
     # 更新配對狀態
     match.status = "UNMATCHED"
-    match.unmatched_at = datetime.now()
+    match.unmatched_at = func.now()
     match.unmatched_by = current_user.id
 
     await db.commit()

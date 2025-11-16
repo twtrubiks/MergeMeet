@@ -111,7 +111,7 @@ async def create_sensitive_word(
     await db.refresh(new_word)
 
     # 清除快取
-    ContentModerationService.clear_cache()
+    await ContentModerationService.clear_cache()
 
     return SensitiveWordResponse.model_validate(new_word)
 
@@ -165,13 +165,13 @@ async def update_sensitive_word(
     for field, value in update_data.items():
         setattr(word, field, value)
 
-    word.updated_at = datetime.now()
+    word.updated_at = func.now()
 
     await db.commit()
     await db.refresh(word)
 
     # 清除快取
-    ContentModerationService.clear_cache()
+    await ContentModerationService.clear_cache()
 
     return SensitiveWordResponse.model_validate(word)
 
@@ -200,12 +200,12 @@ async def delete_sensitive_word(
 
     # 軟刪除
     word.is_active = False
-    word.updated_at = datetime.now()
+    word.updated_at = func.now()
 
     await db.commit()
 
     # 清除快取
-    ContentModerationService.clear_cache()
+    await ContentModerationService.clear_cache()
 
 
 # ============ 內容申訴 API ============
@@ -337,8 +337,8 @@ async def review_appeal(
     appeal.status = review_data.status
     appeal.admin_response = review_data.admin_response
     appeal.reviewed_by = current_admin.id
-    appeal.reviewed_at = datetime.now()
-    appeal.updated_at = datetime.now()
+    appeal.reviewed_at = func.now()
+    appeal.updated_at = func.now()
 
     await db.commit()
     await db.refresh(appeal)

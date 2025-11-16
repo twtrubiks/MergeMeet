@@ -239,13 +239,12 @@ async def mark_messages_as_read(
 
     # 更新訊息狀態
     updated_count = 0
-    now = datetime.utcnow()
 
     for message in messages:
         # 驗證：訊息必須屬於用戶的配對，且不是自己發送的
         if message.match_id in user_matches and message.sender_id != current_user.id:
             if not message.is_read:
-                message.is_read = now
+                message.is_read = func.now()
                 updated_count += 1
 
     if updated_count > 0:
@@ -292,7 +291,7 @@ async def delete_message(
     match_id = str(message.match_id)
 
     # 軟刪除
-    message.deleted_at = datetime.utcnow()
+    message.deleted_at = func.now()
     await db.commit()
 
     # 通過 WebSocket 通知配對中的另一方

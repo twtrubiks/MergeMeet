@@ -1,7 +1,7 @@
 """安全功能 API - 封鎖與舉報"""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_, or_, func
 from typing import List
 from datetime import datetime
 import uuid
@@ -96,7 +96,7 @@ async def block_user(
 
     if match:
         match.status = "UNMATCHED"
-        match.unmatched_at = datetime.utcnow()
+        match.unmatched_at = func.now()
         match.unmatched_by = current_user.id
 
     await db.commit()
