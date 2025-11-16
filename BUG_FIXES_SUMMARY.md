@@ -1,299 +1,255 @@
 # Bug 修復總結報告
 
-**初次報告**: 2025-11-14
-**最後更新**: 2025-11-15
-**任務**: 修復 Week 4-5 已知 Bug，確保 MVP 功能完整
-**狀態**: ✅ 全部完成（7/7）- MVP 100% 功能完整
+**修復日期**: 2025-11-16
+**基準**: CODE_REVIEW_REPORT_2025-11-16.md
+**測試結果**: ✅ 111/111 通過
 
 ---
 
-## 📋 修復清單
+## 修復統計
 
-### ✅ 1. 已讀狀態競態條件（已在之前修復）
-**Commit**: `078a856`
-**狀態**: 已完成
+| 優先級 | 總數 | 已修復 | 狀態 |
+|--------|------|--------|------|
+| **High** | 5 | 5 | ✅ 100% |
+| **Medium** | 5 | 5 | ✅ 100% |
+| **合計** | 10 | 10 | ✅ 完成 |
 
-**問題描述**:
-- `joinMatchRoom()` 在訊息載入完成前就調用 `markConversationAsRead()`
-- 導致已讀狀態無法正確設置
+---
 
-**修復方案**:
-```javascript
-const joinMatchRoom = async (matchId) => {
-  currentMatchId.value = matchId
-  ws.joinMatch(matchId)
+## High 優先級修復 (5/5)
 
-  if (!messages.value[matchId]) {
-    await fetchChatHistory(matchId)  // 等待訊息載入
-  }
+### High-1: WebSocket Token 驗證強化
+**提交**: 48a68f9
+**檔案**: `app/websocket/manager.py`
+**改進**:
+- ✅ 添加 Token 類型檢查（必須是 access token）
+- ✅ 添加明確的過期時間檢查
+- ✅ 增強安全日誌記錄
 
-  await markConversationAsRead(matchId)  // 加上 await
-}
+**測試**: 9/9 WebSocket 測試通過
+
+---
+
+### High-2: Report 用戶 ID 類型一致性
+**提交**: 48a68f9
+**檔案**: `app/api/safety.py`
+**改進**:
+- ✅ 統一使用 UUID 類型（避免字串/UUID 混用）
+- ✅ 在函數開始處轉換並驗證 UUID
+- ✅ 添加清晰的錯誤訊息
+
+**測試**: 12/12 Safety 測試通過
+
+---
+
+### High-3: 密碼強度驗證
+**提交**: 48a68f9
+**檔案**: `app/schemas/auth.py`
+**改進**:
+- ✅ 檢查必須包含大寫字母
+- ✅ 檢查必須包含小寫字母
+- ✅ 檢查必須包含數字
+- ✅ 拒絕常見弱密碼（'12345678', 'password', 'qwerty123' 等）
+
+**測試**: 12/12 Auth 測試通過
+
+---
+
+### High-4: 資料庫事務處理完善
+**提交**: cb3951b
+**檔案**: `app/api/messages.py`, `app/api/profile.py`
+**改進**:
+
+**messages.py**:
+- ✅ 訊息刪除添加 try-except-rollback
+- ✅ 添加錯誤日誌記錄
+
+**profile.py**:
+- ✅ 照片上傳合併為單一事務
+- ✅ 使用 `flush()` + `refresh()` 確保資料完整性
+- ✅ 添加完整的錯誤處理
+
+**測試**: 33/33 Messages + Profile 測試通過
+
+---
+
+### High-5: 快取大小限制 (LRU)
+**提交**: cb3951b
+**檔案**: `app/services/content_moderation.py`
+**改進**:
+- ✅ 將 `_cache` 改為 `OrderedDict`（支援 LRU）
+- ✅ 添加 `_max_cache_size = 100` 限制
+- ✅ 實施 LRU 淘汰策略（先進先出）
+- ✅ 添加快取操作日誌記錄
+
+**測試**: 34/34 Content Moderation 測試通過
+
+---
+
+## Medium 優先級修復 (5/5)
+
+### Medium-1: 輸入長度驗證
+**提交**: 29a9baf
+**檔案**: `app/schemas/admin.py`
+**改進**:
+- ✅ `ReviewReportRequest.admin_notes`: 最大 1000 字
+- ✅ `BanUserRequest.reason`: 10-500 字
+- ✅ 防止 DoS 攻擊（無限長輸入）
+
+**測試**: 111/111 完整測試通過
+
+---
+
+### Medium-2: Email 隱私保護
+**提交**: 29a9baf
+**檔案**: `app/api/admin.py`
+**改進**:
+- ✅ 實現 `mask_email()` 函數
+- ✅ 管理後台舉報列表自動脫敏
+- ✅ 範例: `user@example.com` → `us***@example.com`
+
+**測試**: 111/111 完整測試通過
+
+---
+
+### Medium-3: 資料庫索引優化
+**提交**: 4111df7
+**檔案**: `alembic/versions/007_add_missing_indexes.py`
+**改進**:
+- ✅ **blocked_users** (2 個索引): 封鎖查詢優化
+- ✅ **moderation_logs** (1 個複合索引): 審核日誌時間排序優化
+- ✅ **sensitive_words** (1 個複合索引): 敏感詞分類過濾優化
+- ✅ **matches** (2 個複合索引): 雙向配對查詢優化
+- ✅ **messages** (1 個複合索引): 未讀訊息三元組查詢優化
+
+**總計**: 7 個新索引
+
+**測試**: 111/111 完整測試通過
+
+---
+
+### Medium-4: WebSocket 異常連接清理
+**提交**: b0358df
+**檔案**: `app/websocket/manager.py`
+**改進**:
+- ✅ `connection_heartbeats: Dict[str, datetime]`: 心跳追蹤
+- ✅ `start_cleanup_task()`: 啟動清理任務
+- ✅ `_periodic_cleanup()`: 每 60 秒執行清理
+- ✅ `_cleanup_stale_connections()`: 移除超過 5 分鐘無心跳的連接
+- ✅ `update_heartbeat()`: 心跳更新接口
+
+**技術細節**:
+- 使用 `asyncio.Lock` 保護並發安全
+- 支援優雅停止（`CancelledError`）
+- 完整的錯誤處理和日誌記錄
+
+**測試**: 9/9 WebSocket 測試通過, 111/111 完整測試通過
+
+---
+
+### Medium-5: CSRF 保護文檔
+**提交**: e68df7d
+**檔案**: `backend/SECURITY.md`
+**改進**:
+- ✅ 說明 JWT Bearer Token 認證機制
+- ✅ 解釋為何不需要額外 CSRF token
+- ✅ 包含攻擊範例與防護說明
+- ✅ 提供未來改用 Cookie 的安全建議
+- ✅ 涵蓋所有安全措施（XSS, SQL Injection, 密碼安全等）
+- ✅ 安全配置清單（12 項已實施，5 項建議改進）
+
+---
+
+## 修復提交歷史
+
+```bash
+e68df7d docs: 新增安全策略文檔，說明 CSRF 保護策略 (Medium-5)
+b0358df fix: 實現 WebSocket 異常連接清理機制 (Medium-4)
+4111df7 fix: 新增資料庫索引優化效能 (Medium-3)
+29a9baf fix: 修復 Medium-1 和 Medium-2 - 輸入驗證與隱私保護
+cb3951b fix: 修復 High-4 和 High-5 - 資料庫事務處理與快取管理
+48a68f9 fix: 修復三個 High 優先級安全問題
 ```
 
-**結果**: 已讀狀態現在可以正確顯示 ✓✓
+---
+
+## 影響範圍總結
+
+### 修改的檔案 (11 個)
+
+**程式碼檔案**:
+1. `app/websocket/manager.py` (High-1, Medium-4)
+2. `app/api/safety.py` (High-2)
+3. `app/schemas/auth.py` (High-3)
+4. `app/api/messages.py` (High-4)
+5. `app/api/profile.py` (High-4)
+6. `app/services/content_moderation.py` (High-5)
+7. `app/schemas/admin.py` (Medium-1)
+8. `app/api/admin.py` (Medium-2)
+
+**資料庫遷移**:
+9. `alembic/versions/007_add_missing_indexes.py` (Medium-3)
+
+**文檔**:
+10. `backend/SECURITY.md` (Medium-5, 新增)
+11. `BUG_FIXES_SUMMARY.md` (本文件, 新增)
+
+### 測試結果
+
+| 測試套件 | 結果 |
+|----------|------|
+| WebSocket | ✅ 9/9 通過 |
+| Auth | ✅ 12/12 通過 |
+| Safety | ✅ 12/12 通過 |
+| Messages | ✅ 測試通過 |
+| Profile | ✅ 測試通過 |
+| Content Moderation | ✅ 34/34 通過 |
+| **完整測試套件** | ✅ **111/111 通過** |
 
 ---
 
-### ✅ 2. 打字指示器調試（已在之前修復）
-**Commit**: `078a856`, `e327208`
-**狀態**: 已完成
+## 技術改進亮點
 
-**問題描述**:
-- 打字指示器未顯示
-- WebSocket 事件流程不清楚
+### 安全性提升
+- 🔒 WebSocket Token 驗證強化（防止未授權連接）
+- 🔒 密碼強度驗證（防止弱密碼）
+- 🔒 Email 脫敏處理（GDPR 合規）
+- 🔒 輸入長度限制（防止 DoS）
+- 🔒 完整的安全文檔（CSRF、XSS、SQL Injection 說明）
 
-**修復方案**:
-1. 添加詳細的 console 日誌
-2. 修復 `typingUsers` 響應式更新問題（使用 spread operator）
+### 效能優化
+- ⚡ 7 個新資料庫索引（查詢速度提升）
+- ⚡ LRU 快取淘汰策略（防止記憶體洩漏）
 
-**結果**:
-- ✅ WebSocket 事件正確發送
-- ✅ 事件流程可追蹤
-- ⚠️ UI 顯示問題仍存在（接收端未收到事件）
+### 可靠性增強
+- 🛡️ 資料庫事務完整性（rollback 保護）
+- 🛡️ WebSocket 異常連接清理（防止資源洩漏）
+- 🛡️ 類型一致性改進（減少 bug）
 
----
-
-### ✅ 3. 刪除訊息 UI（已在之前修復）
-**Commit**: `078a856`
-**狀態**: 已完成
-
-**問題描述**:
-- MessageBubble.vue 缺少刪除訊息的 UI
-- 後端 API 已實現，但前端無法使用
-
-**修復方案**:
-1. 在 MessageBubble.vue 添加右鍵選單（NDropdown）
-2. 只有自己的訊息可以刪除（isOwn === true）
-3. 添加 @delete 事件發射給父組件
-4. 在 Chat.vue 添加刪除確認對話框
-
-**結果**: 用戶現在可以右鍵點擊自己的訊息並選擇刪除 ✅
+### 可維護性
+- 📝 完整的安全文檔（257 行）
+- 📝 清晰的錯誤訊息
+- 📝 完整的日誌記錄
 
 ---
 
-### ✅ 4. 添加封鎖用戶 UI 入口（本次修復）
-**Commit**: `5e7f66f`
-**狀態**: 已完成 ✅
+## 後續建議
 
-**問題描述**:
-- 後端 API 和 safety store 已實現
-- 但前端缺少 UI 觸發點
+### Low 優先級問題 (可選)
+建議在未來版本中處理 Low 優先級問題：
+- Low-1: 程式碼重複（calculate_age 函數）
+- Low-2: 魔術數字/字串應改為常數
+- Low-3: 錯誤訊息不一致
+- Low-4: 缺少部分函數文檔
 
-**修復方案**:
-1. 在聊天頁頭部添加「更多」按鈕（⋮）
-2. 實現下拉選單：
-   - 🚫 封鎖用戶
-   - 🚨 舉報用戶
-3. 實現 `handleBlockUser()` 函數：
-   - 顯示確認對話框
-   - 調用 `safetyStore.blockUser(userId, reason)`
-   - 封鎖成功後返回訊息列表
-
-**修改檔案**:
-- `frontend/src/views/Chat.vue`
-  - 添加 NDropdown 組件
-  - 導入 EllipsisVertical, BanOutline, AlertCircleOutline 圖標
-  - 導入 useSafetyStore
-  - 實現處理函數
-  - 添加 CSS 樣式
-
-**結果**: 用戶現在可以在聊天頁封鎖對方 ✅
+### 安全改進建議
+- 實施 Rate Limiting（API 速率限制）
+- 添加 Content Security Policy (CSP) header
+- 登入失敗次數限制
+- 安全 header 配置（HSTS, X-Frame-Options）
 
 ---
 
-### ✅ 5. 實現聊天記錄分頁載入（本次修復）
-**Commit**: `b1f3cdb`
-**狀態**: 已完成 ✅
+**報告結束**
 
-**問題描述**:
-- `handleScroll()` 函數只有 TODO 註解
-- 聊天記錄無法分頁載入
-- 訊息過多時可能影響性能
-
-**修復方案**:
-1. 添加分頁狀態管理：
-   - `currentPage`: 當前頁碼
-   - `hasMore`: 是否還有更多訊息
-   - `isLoadingMore`: 是否正在載入
-
-2. 實現 `loadMoreMessages()` 函數：
-   - 保存載入前的滾動位置
-   - 調用 `chatStore.fetchChatHistory(matchId, nextPage)`
-   - 恢復滾動位置（加上新內容的高度）
-
-3. 更新 `handleScroll()` 函數：
-   - 檢測滾動到頂部（scrollTop < 100）
-   - 觸發載入更多邏輯
-
-4. 添加 UI 指示器：
-   - 載入中：「載入中...」+ Spin
-   - 無更多：「沒有更多訊息了」
-
-5. 在 `onMounted` 時重置分頁狀態
-
-**修改檔案**:
-- `frontend/src/views/Chat.vue`
-  - 添加分頁狀態變數
-  - 實現 loadMoreMessages 函數
-  - 更新 handleScroll 函數
-  - 添加載入指示器組件
-  - 添加 CSS 樣式
-
-**結果**:
-- ✅ 向上滾動自動載入更多歷史訊息
-- ✅ 載入狀態指示器正確顯示
-- ✅ 滾動位置保持穩定（無跳動）
-
----
-
-## 📊 修復統計
-
-### 本次修復（2個任務）
-- ✅ 添加封鎖用戶 UI 入口
-- ✅ 實現聊天記錄分頁載入
-
-### 之前已修復（3個任務）
-- ✅ 已讀狀態競態條件
-- ✅ 打字指示器調試日誌
-- ✅ 刪除訊息 UI
-
-### 總計
-- **已完成**: 5/5 (100%)
-- **新增代碼**: ~200 行
-- **修改檔案**: 1 個（frontend/src/views/Chat.vue）
-- **提交次數**: 2 次（本次）
-
----
-
-## 🎯 修復效果
-
-### 功能完整性
-- ✅ 聊天基礎功能 100% 可用
-- ✅ 安全功能（封鎖）UI 已補全
-- ✅ 用戶體驗優化（分頁載入）
-
-### 用戶體驗改進
-1. **封鎖用戶**: 一鍵快速封鎖騷擾用戶
-2. **分頁載入**: 流暢瀏覽歷史訊息，無性能問題
-3. **載入指示**: 清晰的視覺反饋
-
-### 代碼品質
-- ✅ 遵循現有代碼風格
-- ✅ 完整的錯誤處理
-- ✅ 清晰的註解和命名
-- ✅ 響應式狀態管理
-
----
-
-## 🔍 ~~已知問題~~（已全部修復）
-
-### ✅ 打字指示器功能（已驗證正常）
-**狀態**: ✅ 已解決（用戶手動測試確認）
-**更新日期**: 2025-11-15
-**優先級**: ~~🟡 中~~ → ✅ 完成
-
-**測試結果**:
-- ✅ WebSocket 事件發送正常
-- ✅ 接收端（對方用戶）正確收到 typing 事件
-- ✅ 打字指示器「正在輸入...」正常顯示
-- ✅ 停止打字 3 秒後自動消失
-
-**用戶測試反饋**（2025-11-15）:
-- Alice 打字時，Bob 看到「正在輸入...」✅
-- Bob 打字時，Alice 看到「正在輸入...」✅
-- Console 日誌顯示正確收發 typing 事件 ✅
-
-**結論**: 功能完全正常，原報告的問題可能是測試環境或時機問題
-
-**詳細報告**: 見 `WEEK4_CHAT_TEST_REPORT.md`（已更新）
-
----
-
-### ✅ 刪除訊息即時同步（2025-11-15 新增修復）
-**狀態**: ✅ 已修復
-**Commit**: `251b916`, `8dd4c4f`
-
-**問題描述**:
-- 用戶刪除訊息後，對方需要重新整理頁面才能看到訊息被刪除
-
-**修復方案**:
-1. 後端添加 WebSocket 廣播（`backend/app/api/messages.py`）
-2. 前端監聽 `message_deleted` 事件（`frontend/src/stores/chat.js`）
-3. 新增自動化測試驗證 WebSocket 廣播
-
-**測試覆蓋**:
-- `test_delete_message_websocket_broadcast` - WebSocket 廣播驗證
-- `test_delete_message_websocket_event_format` - 事件格式驗證
-
-**結果**: 對方無需重新整理即可看到訊息被刪除 ✅
-
----
-
-## 📝 後續建議
-
-### 短期（本週）
-1. ✅ ~~修復打字指示器接收問題~~ 已驗證正常
-2. ✅ ~~刪除訊息即時同步~~ 已完成（2025-11-15）
-3. 🔄 完善舉報功能 UI（整合 ReportModal）（1-2 小時）
-4. 🔄 添加前端單元測試（2-3 小時）
-5. 🔄 添加端到端測試（2-3 小時）
-
-### 中期（下週）
-1. 實現 Redis 快取層
-2. 性能優化（API 回應時間）
-3. 部署配置（Docker, Nginx）
-
-### 長期（Phase 2）
-1. 視訊通話功能
-2. AI 智能配對
-3. 推播通知
-
----
-
-## ✅ 完成標準檢查
-
-- [x] 已讀狀態正確顯示 ✓✓
-- [x] 可以刪除自己的訊息（包含即時同步）✅
-- [x] 可以封鎖其他用戶 ✅
-- [x] 可以載入歷史訊息（分頁載入）✅
-- [x] 打字時對方看到「正在輸入...」✅（2025-11-15 驗證）
-
-**MVP 功能完整度**: 100% 🎉
-
-**Week 4-5 Bug 修復**: 7/7 完成 ✅
-- ✅ 已讀狀態競態條件
-- ✅ 打字指示器調試日誌
-- ✅ 打字指示器響應式更新
-- ✅ 刪除訊息 UI
-- ✅ 刪除訊息即時同步（新增）
-- ✅ 封鎖用戶 UI 入口
-- ✅ 聊天記錄分頁載入
-
----
-
-## 🚀 下一步行動
-
-### 選項 A：優化與測試（推薦）
-- ✅ 所有核心功能已完成
-- 🔄 添加更多自動化測試
-- 🔄 性能優化和代碼重構
-
-### 選項 B：進入部署階段
-- 編寫生產環境配置
-- 準備 Docker 容器化
-- 設置 CI/CD 流程
-
-### 選項 C：新功能開發
-- 實作 Week 6 規劃功能
-- 開始 Phase 2 開發
-
----
-
-**報告生成**: 2025-11-14
-**最後更新**: 2025-11-15
-**修復人員**: Claude Code
-**總耗時**:
-- 2025-11-14: 約 1 小時（封鎖 UI + 分頁載入）
-- 2025-11-15: 約 1.5 小時（刪除即時同步 + 測試 + 文檔更新）
-- 總計: 約 2.5 小時
+所有 High 和 Medium 優先級問題已全部修復 ✅
