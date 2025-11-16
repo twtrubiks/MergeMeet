@@ -1,9 +1,15 @@
 <template>
   <div class="chat-list-page">
+    <!-- 返回主選單按鈕 -->
+    <router-link to="/" class="back-home-btn">
+      <n-icon size="20"><Home /></n-icon>
+      <span>返回主選單</span>
+    </router-link>
+
     <div class="page-header">
       <h1 class="page-title">訊息</h1>
       <n-badge :value="chatStore.unreadCount" :max="99" :show="chatStore.unreadCount > 0">
-        <n-button text>
+        <n-button text @click="handleNotificationClick">
           <template #icon>
             <n-icon size="24"><Notifications /></n-icon>
           </template>
@@ -91,7 +97,7 @@
 import { onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { NBadge, NButton, NIcon, NAvatar, NEmpty, NSpin, NAlert, useMessage } from 'naive-ui'
-import { Notifications, ChevronForward } from '@vicons/ionicons5'
+import { Notifications, ChevronForward, Home } from '@vicons/ionicons5'
 import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
 
@@ -105,6 +111,12 @@ const defaultAvatar = 'https://via.placeholder.com/50'
 // 前往探索頁面
 const goToDiscovery = () => {
   router.push('/discovery')
+}
+
+// 處理通知點擊
+const handleNotificationClick = () => {
+  // 可以在這裡實現通知面板或標記所有訊息為已讀等功能
+  message.info('目前沒有新通知')
 }
 
 // 開啟聊天視窗
@@ -172,6 +184,32 @@ onMounted(async () => {
 .chat-list-page {
   min-height: 100vh;
   background-color: #f5f5f5;
+}
+
+/* 返回主選單按鈕 */
+.back-home-btn {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 100;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #18a058;
+  text-decoration: none;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.back-home-btn:hover {
+  background: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(24, 160, 88, 0.2);
 }
 
 .page-header {
