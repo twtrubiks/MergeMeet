@@ -22,11 +22,15 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.3",
+    "@vitest/coverage-v8": "^4.0.9",
+    "@vitest/ui": "^4.0.9",
     "@vue/test-utils": "^2.4.3",
     "autoprefixer": "^10.4.17",
+    "happy-dom": "^20.0.10",
+    "jsdom": "^27.2.0",
     "postcss": "^8.4.33",
     "tailwindcss": "^3.4.1",
     "vite": "^5.0.12",
-    "vitest": "^1.2.0"
+    "vitest": "^4.0.9"
   }
 }
