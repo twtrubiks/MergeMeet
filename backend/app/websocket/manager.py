@@ -4,7 +4,7 @@ from typing import Dict, List, Optional
 import json
 import logging
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from app.core.security import decode_token
 
@@ -26,9 +26,15 @@ class ConnectionManager:
         # 配對ID -> 用戶ID列表 (用於聊天室管理)
         self.match_rooms: Dict[str, List[str]] = {}
 
+        # 用戶ID -> 最後心跳時間 (用於檢測異常斷線)
+        self.connection_heartbeats: Dict[str, datetime] = {}
+
         # 並發安全鎖
         self._connections_lock = asyncio.Lock()
         self._rooms_lock = asyncio.Lock()
+
+        # 定期清理任務
+        self._cleanup_task: Optional[asyncio.Task] = None
 
     async def connect(self, websocket: WebSocket, user_id: str, token: str) -> bool:
         """建立 WebSocket 連接
@@ -67,6 +73,8 @@ class ConnectionManager:
         # 並發安全：使用鎖保護字典操作
         async with self._connections_lock:
             self.active_connections[user_id] = websocket
+            # 初始化心跳時間（防止異常斷線）
+            self.connection_heartbeats[user_id] = datetime.now(timezone.utc)
         logger.info(f"User {user_id} connected via WebSocket")
 
         # 發送連接成功訊息
@@ -92,6 +100,8 @@ class ConnectionManager:
                     logger.error(f"Error closing connection for user {user_id}: {e}")
 
                 del self.active_connections[user_id]
+                # 清除心跳時間
+                self.connection_heartbeats.pop(user_id, None)
                 logger.info(f"User {user_id} disconnected")
 
         # 從所有配對房間移除
@@ -186,6 +196,55 @@ class ConnectionManager:
         # 並發安全：讀取時也使用鎖
         async with self._connections_lock:
             return list(self.active_connections.keys())
+
+    async def start_cleanup_task(self):
+        """啟動定期清理任務（清理異常斷線的連接）"""
+        if self._cleanup_task is None:
+            self._cleanup_task = asyncio.create_task(self._periodic_cleanup())
+            logger.info("Started WebSocket cleanup task")
+
+    async def _periodic_cleanup(self):
+        """定期清理超時連接（每分鐘執行一次）"""
+        while True:
+            try:
+                await asyncio.sleep(60)  # 每分鐘檢查一次
+                await self._cleanup_stale_connections()
+            except asyncio.CancelledError:
+                logger.info("Periodic cleanup task cancelled")
+                break
+            except Exception as e:
+                logger.error(f"Error in periodic cleanup: {e}", exc_info=True)
+
+    async def _cleanup_stale_connections(self):
+        """清理超過 5 分鐘無心跳的連接
+
+        檢測並移除異常斷線的 WebSocket 連接，防止資源洩漏
+        """
+        now = datetime.now(timezone.utc)
+        stale_users = []
+
+        # 找出所有過期的連接（使用鎖保護）
+        async with self._connections_lock:
+            for user_id, last_heartbeat in self.connection_heartbeats.items():
+                if now - last_heartbeat > timedelta(minutes=5):
+                    stale_users.append(user_id)
+
+        # 斷開過期連接
+        for user_id in stale_users:
+            logger.warning(f"Cleaning up stale connection for user {user_id}")
+            await self.disconnect(user_id)
+
+        if stale_users:
+            logger.info(f"Cleaned up {len(stale_users)} stale connections")
+
+    async def update_heartbeat(self, user_id: str):
+        """更新心跳時間（由 WebSocket 端點定期調用）
+
+        Args:
+            user_id: 用戶 ID
+        """
+        if user_id in self.connection_heartbeats:
+            self.connection_heartbeats[user_id] = datetime.now(timezone.utc)
 
 
 # 全局單例實例
