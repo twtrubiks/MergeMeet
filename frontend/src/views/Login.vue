@@ -2,61 +2,62 @@
   <div class="auth-container">
     <div class="auth-card">
       <div class="auth-header">
-        <h1>👋 歡迎回來</h1>
-        <p>登入 MergeMeet</p>
+        <div class="logo-animation">
+          <span class="logo-heart">💕</span>
+        </div>
+        <h1>歡迎回來</h1>
+        <p>登入 MergeMeet 開始配對</p>
       </div>
 
       <form @submit.prevent="handleLogin" class="auth-form">
         <!-- Email -->
-        <div class="form-group">
-          <label for="email">Email</label>
-          <input
-            id="email"
-            v-model="formData.email"
-            type="email"
-            placeholder="your@example.com"
-            required
-            :disabled="isLoading"
-            autocomplete="email"
-          />
-        </div>
+        <FloatingInput
+          id="email"
+          v-model="formData.email"
+          label="Email"
+          type="email"
+          autocomplete="email"
+          :disabled="isLoading"
+          :required="true"
+        />
 
         <!-- 密碼 -->
-        <div class="form-group">
-          <label for="password">密碼</label>
-          <input
-            id="password"
-            v-model="formData.password"
-            type="password"
-            placeholder="輸入密碼"
-            required
-            :disabled="isLoading"
-            autocomplete="current-password"
-          />
-        </div>
-
-        <!-- 錯誤訊息 -->
-        <div v-if="error" class="error-message">
-          {{ error }}
-        </div>
+        <FloatingInput
+          id="password"
+          v-model="formData.password"
+          label="密碼"
+          type="password"
+          autocomplete="current-password"
+          :disabled="isLoading"
+          :required="true"
+          :error="error"
+        />
 
         <!-- 送出按鈕 -->
-        <button
+        <AnimatedButton
           type="submit"
-          class="btn-primary"
-          :disabled="isLoading || !isFormValid"
+          variant="primary"
+          :disabled="!isFormValid"
+          :loading="isLoading"
         >
-          {{ isLoading ? '登入中...' : '登入' }}
-        </button>
+          <span v-if="!isLoading">✨ 登入</span>
+        </AnimatedButton>
       </form>
 
       <!-- 前往註冊 -->
       <div class="auth-footer">
         <p>
           還沒有帳號？
-          <router-link to="/register">立即註冊</router-link>
+          <router-link to="/register" class="register-link">立即註冊 →</router-link>
         </p>
       </div>
+    </div>
+
+    <!-- 裝飾性背景元素 -->
+    <div class="bg-decoration">
+      <div class="circle circle-1"></div>
+      <div class="circle circle-2"></div>
+      <div class="circle circle-3"></div>
     </div>
   </div>
 </template>
@@ -65,6 +66,8 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import AnimatedButton from '@/components/ui/AnimatedButton.vue'
+import FloatingInput from '@/components/ui/FloatingInput.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -110,31 +113,131 @@ const handleLogin = async () => {
 
 <style scoped>
 .auth-container {
+  position: relative;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 20px;
+  overflow: hidden;
+}
+
+/* 裝飾性背景動畫 */
+.bg-decoration {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.circle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  animation: float 20s infinite ease-in-out;
+}
+
+.circle-1 {
+  width: 300px;
+  height: 300px;
+  top: -100px;
+  left: -100px;
+  animation-delay: 0s;
+}
+
+.circle-2 {
+  width: 200px;
+  height: 200px;
+  bottom: -50px;
+  right: -50px;
+  animation-delay: 5s;
+}
+
+.circle-3 {
+  width: 150px;
+  height: 150px;
+  top: 50%;
+  right: 10%;
+  animation-delay: 10s;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(30px, -30px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
 }
 
 .auth-card {
-  background: white;
-  border-radius: 16px;
-  padding: 40px;
+  position: relative;
+  z-index: 1;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 24px;
+  padding: 48px;
   max-width: 450px;
   width: 100%;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3),
+              0 0 0 1px rgba(255, 255, 255, 0.2);
+  animation: slideUp 0.5s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .auth-header {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 40px;
+}
+
+.logo-animation {
+  margin-bottom: 20px;
+}
+
+.logo-heart {
+  display: inline-block;
+  font-size: 4rem;
+  animation: heartBeat 1.5s infinite;
+  filter: drop-shadow(0 4px 8px rgba(255, 107, 107, 0.3));
+}
+
+@keyframes heartBeat {
+  0%, 100% {
+    transform: scale(1);
+  }
+  10%, 30% {
+    transform: scale(1.1);
+  }
+  20%, 40% {
+    transform: scale(0.9);
+  }
 }
 
 .auth-header h1 {
-  font-size: 2rem;
-  color: #333;
+  font-size: 2.2rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin-bottom: 8px;
 }
 
@@ -146,87 +249,48 @@ const handleLogin = async () => {
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
   gap: 8px;
 }
 
-.form-group label {
-  font-weight: 600;
-  color: #333;
-  font-size: 0.9rem;
-}
-
-.form-group input {
-  padding: 12px 16px;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  font-size: 1rem;
-  transition: border-color 0.3s;
-}
-
-.form-group input:focus {
-  outline: none;
-  border-color: #667eea;
-}
-
-.form-group input:disabled {
-  background-color: #f5f5f5;
-  cursor: not-allowed;
-}
-
-.error-message {
-  background-color: #fee;
-  color: #c33;
-  padding: 12px;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  text-align: center;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 14px;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
 .auth-footer {
-  margin-top: 24px;
+  margin-top: 32px;
   text-align: center;
+  padding-top: 24px;
+  border-top: 1px solid #e0e0e0;
 }
 
 .auth-footer p {
   color: #666;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
 }
 
-.auth-footer a {
+.register-link {
   color: #667eea;
   text-decoration: none;
   font-weight: 600;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.auth-footer a:hover {
-  text-decoration: underline;
+.register-link:hover {
+  color: #764ba2;
+  gap: 8px;
+}
+
+/* 響應式設計 */
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 32px 24px;
+  }
+
+  .auth-header h1 {
+    font-size: 1.8rem;
+  }
+
+  .logo-heart {
+    font-size: 3rem;
+  }
 }
 </style>

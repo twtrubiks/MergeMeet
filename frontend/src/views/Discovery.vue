@@ -11,8 +11,7 @@
 
       <!-- 載入中 -->
       <div v-if="discoveryStore.loading && !discoveryStore.currentCandidate" class="loading">
-        <div class="spinner"></div>
-        <p>載入中...</p>
+        <HeartLoader text="尋找你的真命天子..." />
       </div>
 
       <!-- 錯誤訊息 -->
@@ -123,6 +122,7 @@
         >
           <span class="btn-icon">✖️</span>
           <span class="btn-text">跳過</span>
+          <div class="btn-ripple"></div>
         </button>
 
         <button
@@ -132,6 +132,7 @@
         >
           <span class="btn-icon">💚</span>
           <span class="btn-text">喜歡</span>
+          <div class="btn-ripple"></div>
         </button>
       </div>
     </div>
@@ -158,6 +159,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useDiscoveryStore } from '@/stores/discovery'
 import MatchModal from '@/components/MatchModal.vue'
 import ReportModal from '@/components/ReportModal.vue'
+import HeartLoader from '@/components/ui/HeartLoader.vue'
 
 const discoveryStore = useDiscoveryStore()
 
@@ -454,21 +456,9 @@ onUnmounted(() => {
 .loading {
   text-align: center;
   padding: 60px 20px;
-}
-
-.spinner {
-  width: 50px;
-  height: 50px;
-  margin: 0 auto 20px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #FF6B6B;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 /* 錯誤訊息 */
@@ -555,9 +545,10 @@ onUnmounted(() => {
   height: 100%;
   background: white;
   border-radius: 20px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
   overflow: hidden;
-  transition: transform 0.3s ease, opacity 0.3s ease;
+  transition: transform 0.3s ease, opacity 0.3s ease, box-shadow 0.3s ease;
+  border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
 .candidate-card:nth-child(2) {
@@ -575,6 +566,10 @@ onUnmounted(() => {
 .top-card {
   z-index: 10;
   cursor: grab;
+}
+
+.top-card:hover {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
 }
 
 .top-card:active {
@@ -765,13 +760,14 @@ onUnmounted(() => {
 .action-buttons {
   display: flex;
   justify-content: center;
-  gap: 30px;
+  gap: 40px;
   padding: 20px 0;
 }
 
 .action-btn {
-  width: 70px;
-  height: 70px;
+  position: relative;
+  width: 75px;
+  height: 75px;
   border: none;
   border-radius: 50%;
   display: flex;
@@ -779,12 +775,36 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.action-btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.action-btn:active::before {
+  width: 300px;
+  height: 300px;
+  transition: width 0s, height 0s;
 }
 
 .action-btn:hover:not(:disabled) {
-  transform: scale(1.1);
+  transform: scale(1.15) translateY(-3px);
+}
+
+.action-btn:active:not(:disabled) {
+  transform: scale(1.05);
 }
 
 .action-btn:disabled {
@@ -795,29 +815,54 @@ onUnmounted(() => {
 .pass-btn {
   background: white;
   color: #F44336;
+  border: 3px solid #F44336;
 }
 
 .pass-btn:hover:not(:disabled) {
-  box-shadow: 0 6px 20px rgba(244, 67, 54, 0.3);
+  background: #F44336;
+  color: white;
+  box-shadow: 0 8px 25px rgba(244, 67, 54, 0.4);
 }
 
 .like-btn {
   background: linear-gradient(135deg, #4CAF50, #66BB6A);
   color: white;
+  border: 3px solid transparent;
 }
 
 .like-btn:hover:not(:disabled) {
-  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+  background: linear-gradient(135deg, #66BB6A, #4CAF50);
+  box-shadow: 0 8px 25px rgba(76, 175, 80, 0.5);
 }
 
 .btn-icon {
-  font-size: 32px;
+  font-size: 34px;
+  position: relative;
+  z-index: 1;
+  transition: transform 0.3s ease;
+}
+
+.action-btn:hover:not(:disabled) .btn-icon {
+  transform: scale(1.1);
 }
 
 .btn-text {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   margin-top: 4px;
+  position: relative;
+  z-index: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-ripple {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
 }
 
 /* 響應式設計 */

@@ -2,58 +2,59 @@
   <div class="auth-container">
     <div class="auth-card">
       <div class="auth-header">
-        <h1>🎉 加入 MergeMeet</h1>
+        <div class="logo-animation">
+          <span class="logo-heart">💕</span>
+        </div>
+        <h1>加入 MergeMeet</h1>
         <p>開始你的交友之旅</p>
       </div>
 
       <form @submit.prevent="handleRegister" class="auth-form">
         <!-- Email -->
-        <div class="form-group">
-          <label for="email">Email</label>
-          <input
-            id="email"
-            v-model="formData.email"
-            type="email"
-            placeholder="your@example.com"
-            required
-            :disabled="isLoading"
-          />
-        </div>
+        <FloatingInput
+          id="email"
+          v-model="formData.email"
+          label="Email"
+          type="email"
+          :disabled="isLoading"
+          :required="true"
+        />
 
         <!-- 密碼 -->
-        <div class="form-group">
-          <label for="password">密碼</label>
-          <input
+        <div class="password-group">
+          <FloatingInput
             id="password"
             v-model="formData.password"
+            label="密碼"
             type="password"
-            placeholder="至少 8 個字元"
-            required
             :disabled="isLoading"
+            :required="true"
           />
-          <small class="hint">必須包含大小寫字母和數字</small>
+          <div class="password-strength">
+            <div class="strength-bar" :class="passwordStrengthClass"></div>
+          </div>
+          <small class="hint">必須包含大小寫字母和數字，至少 8 個字元</small>
         </div>
 
         <!-- 確認密碼 -->
-        <div class="form-group">
-          <label for="confirmPassword">確認密碼</label>
-          <input
-            id="confirmPassword"
-            v-model="formData.confirmPassword"
-            type="password"
-            placeholder="再次輸入密碼"
-            required
-            :disabled="isLoading"
-          />
-        </div>
+        <FloatingInput
+          id="confirmPassword"
+          v-model="formData.confirmPassword"
+          label="確認密碼"
+          type="password"
+          :disabled="isLoading"
+          :required="true"
+          :error="passwordMismatchError"
+        />
 
         <!-- 出生日期 -->
-        <div class="form-group">
-          <label for="dateOfBirth">出生日期</label>
+        <div class="date-group">
+          <label for="dateOfBirth" class="date-label">出生日期</label>
           <input
             id="dateOfBirth"
             v-model="formData.date_of_birth"
             type="date"
+            class="date-input"
             required
             :disabled="isLoading"
             :max="maxDate"
@@ -63,26 +64,35 @@
 
         <!-- 錯誤訊息 -->
         <div v-if="error" class="error-message">
-          {{ error }}
+          <span class="error-icon">⚠️</span>
+          <span>{{ error }}</span>
         </div>
 
         <!-- 送出按鈕 -->
-        <button
+        <AnimatedButton
           type="submit"
-          class="btn-primary"
-          :disabled="isLoading || !isFormValid"
+          variant="secondary"
+          :disabled="!isFormValid"
+          :loading="isLoading"
         >
-          {{ isLoading ? '註冊中...' : '註冊' }}
-        </button>
+          <span v-if="!isLoading">🎉 註冊</span>
+        </AnimatedButton>
       </form>
 
       <!-- 前往登入 -->
       <div class="auth-footer">
         <p>
           已有帳號？
-          <router-link to="/login">立即登入</router-link>
+          <router-link to="/login" class="login-link">立即登入 →</router-link>
         </p>
       </div>
+    </div>
+
+    <!-- 裝飾性背景元素 -->
+    <div class="bg-decoration">
+      <div class="circle circle-1"></div>
+      <div class="circle circle-2"></div>
+      <div class="circle circle-3"></div>
     </div>
   </div>
 </template>
@@ -91,6 +101,8 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import AnimatedButton from '@/components/ui/AnimatedButton.vue'
+import FloatingInput from '@/components/ui/FloatingInput.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -116,13 +128,45 @@ const maxDate = computed(() => {
   return date.toISOString().split('T')[0]
 })
 
+// 密碼強度計算
+const passwordStrength = computed(() => {
+  const password = formData.value.password
+  if (!password) return 0
+
+  let strength = 0
+  if (password.length >= 8) strength++
+  if (/[A-Z]/.test(password)) strength++
+  if (/[a-z]/.test(password)) strength++
+  if (/\d/.test(password)) strength++
+  if (/[^A-Za-z0-9]/.test(password)) strength++
+
+  return strength
+})
+
+const passwordStrengthClass = computed(() => {
+  const strength = passwordStrength.value
+  if (strength <= 1) return 'weak'
+  if (strength <= 3) return 'medium'
+  return 'strong'
+})
+
+// 密碼不匹配錯誤
+const passwordMismatchError = computed(() => {
+  if (!formData.value.confirmPassword) return ''
+  if (formData.value.password !== formData.value.confirmPassword) {
+    return '密碼不一致'
+  }
+  return ''
+})
+
 // 表單驗證
 const isFormValid = computed(() => {
   return (
     formData.value.email &&
     formData.value.password.length >= 8 &&
     formData.value.password === formData.value.confirmPassword &&
-    formData.value.date_of_birth
+    formData.value.date_of_birth &&
+    passwordStrength.value >= 3
   )
 })
 
@@ -172,114 +216,252 @@ const handleRegister = async () => {
 
 <style scoped>
 .auth-container {
+  position: relative;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
   padding: 20px;
+  overflow: hidden;
+}
+
+/* 裝飾性背景動畫 */
+.bg-decoration {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.circle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  animation: float 20s infinite ease-in-out;
+}
+
+.circle-1 {
+  width: 300px;
+  height: 300px;
+  top: -100px;
+  right: -100px;
+  animation-delay: 0s;
+}
+
+.circle-2 {
+  width: 200px;
+  height: 200px;
+  bottom: -50px;
+  left: -50px;
+  animation-delay: 5s;
+}
+
+.circle-3 {
+  width: 150px;
+  height: 150px;
+  top: 50%;
+  left: 10%;
+  animation-delay: 10s;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(30px, -30px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
 }
 
 .auth-card {
-  background: white;
-  border-radius: 16px;
+  position: relative;
+  z-index: 1;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 24px;
   padding: 40px;
-  max-width: 450px;
+  max-width: 480px;
   width: 100%;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3),
+              0 0 0 1px rgba(255, 255, 255, 0.2);
+  animation: slideUp 0.5s ease-out;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .auth-header {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 32px;
+}
+
+.logo-animation {
+  margin-bottom: 16px;
+}
+
+.logo-heart {
+  display: inline-block;
+  font-size: 3.5rem;
+  animation: heartBeat 1.5s infinite;
+  filter: drop-shadow(0 4px 8px rgba(245, 87, 108, 0.3));
+}
+
+@keyframes heartBeat {
+  0%, 100% {
+    transform: scale(1);
+  }
+  10%, 30% {
+    transform: scale(1.1);
+  }
+  20%, 40% {
+    transform: scale(0.9);
+  }
 }
 
 .auth-header h1 {
   font-size: 2rem;
-  color: #333;
+  font-weight: 700;
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin-bottom: 8px;
 }
 
 .auth-header p {
   color: #666;
-  font-size: 1rem;
+  font-size: 0.95rem;
 }
 
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
   gap: 8px;
 }
 
-.form-group label {
-  font-weight: 600;
-  color: #333;
-  font-size: 0.9rem;
+.password-group {
+  margin-bottom: 16px;
 }
 
-.form-group input {
-  padding: 12px 16px;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  font-size: 1rem;
-  transition: border-color 0.3s;
+.password-strength {
+  width: 100%;
+  height: 4px;
+  background: #e0e0e0;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: -16px;
+  margin-bottom: 4px;
 }
 
-.form-group input:focus {
-  outline: none;
-  border-color: #667eea;
+.strength-bar {
+  height: 100%;
+  transition: all 0.3s ease;
+  border-radius: 2px;
 }
 
-.form-group input:disabled {
-  background-color: #f5f5f5;
-  cursor: not-allowed;
+.strength-bar.weak {
+  width: 33%;
+  background: linear-gradient(90deg, #f44336, #e91e63);
+}
+
+.strength-bar.medium {
+  width: 66%;
+  background: linear-gradient(90deg, #ff9800, #ffc107);
+}
+
+.strength-bar.strong {
+  width: 100%;
+  background: linear-gradient(90deg, #4caf50, #66bb6a);
 }
 
 .hint {
   color: #999;
+  font-size: 0.75rem;
+  margin-top: -8px;
+  display: block;
+}
+
+.date-group {
+  margin-bottom: 16px;
+}
+
+.date-label {
+  display: block;
+  font-weight: 600;
+  color: #333;
   font-size: 0.85rem;
+  margin-bottom: 8px;
+}
+
+.date-input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  font-size: 1rem;
+  background: white;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+  font-family: inherit;
+}
+
+.date-input:focus {
+  border-color: #f5576c;
+  box-shadow: 0 0 0 4px rgba(245, 87, 108, 0.1);
+}
+
+.date-input:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .error-message {
-  background-color: #fee;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #fff5f5, #ffe5e5);
   color: #c33;
-  padding: 12px;
-  border-radius: 8px;
+  padding: 12px 16px;
+  border-radius: 12px;
   font-size: 0.9rem;
-  text-align: center;
+  border: 1px solid #ffcccc;
+  animation: shake 0.5s ease;
 }
 
-.btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 14px;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-10px); }
+  75% { transform: translateX(10px); }
 }
 
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.error-icon {
+  font-size: 1.2rem;
 }
 
 .auth-footer {
   margin-top: 24px;
   text-align: center;
+  padding-top: 20px;
+  border-top: 1px solid #e0e0e0;
 }
 
 .auth-footer p {
@@ -287,13 +469,47 @@ const handleRegister = async () => {
   font-size: 0.9rem;
 }
 
-.auth-footer a {
-  color: #667eea;
+.login-link {
+  color: #f5576c;
   text-decoration: none;
   font-weight: 600;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.auth-footer a:hover {
-  text-decoration: underline;
+.login-link:hover {
+  color: #f093fb;
+  gap: 8px;
+}
+
+/* 自定義滾動條 */
+.auth-card::-webkit-scrollbar {
+  width: 6px;
+}
+
+.auth-card::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.auth-card::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #f093fb, #f5576c);
+  border-radius: 3px;
+}
+
+/* 響應式設計 */
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 32px 24px;
+  }
+
+  .auth-header h1 {
+    font-size: 1.75rem;
+  }
+
+  .logo-heart {
+    font-size: 3rem;
+  }
 }
 </style>
