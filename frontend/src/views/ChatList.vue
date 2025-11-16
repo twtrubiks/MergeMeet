@@ -1,13 +1,14 @@
 <template>
   <div class="chat-list-page">
-    <!-- 返回主選單按鈕 -->
-    <router-link to="/" class="back-home-btn">
-      <n-icon size="20"><Home /></n-icon>
-      <span>返回主選單</span>
-    </router-link>
-
     <div class="page-header">
+      <!-- 返回主選單按鈕 -->
+      <router-link to="/" class="back-home-btn">
+        <n-icon size="20"><Home /></n-icon>
+        <span>返回主選單</span>
+      </router-link>
+
       <h1 class="page-title">訊息</h1>
+
       <n-badge :value="chatStore.unreadCount" :max="99" :show="chatStore.unreadCount > 0">
         <n-button text @click="handleNotificationClick">
           <template #icon>
@@ -188,28 +189,23 @@ onMounted(async () => {
 
 /* 返回主選單按鈕 */
 .back-home-btn {
-  position: fixed;
-  top: 20px;
-  left: 20px;
-  z-index: 100;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  background: rgba(255, 255, 255, 0.95);
+  background: #f5f5f5;
   color: #18a058;
   text-decoration: none;
   border-radius: 20px;
   font-weight: 600;
   font-size: 0.9rem;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
+  flex-shrink: 0;
 }
 
 .back-home-btn:hover {
-  background: white;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(24, 160, 88, 0.2);
+  background: #e8f5e9;
+  transform: translateY(-1px);
 }
 
 .page-header {
@@ -220,6 +216,7 @@ onMounted(async () => {
   background-color: white;
   border-bottom: 1px solid #e5e5e5;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  gap: 16px;
 }
 
 .page-title {
@@ -227,6 +224,8 @@ onMounted(async () => {
   font-weight: 600;
   margin: 0;
   color: #333;
+  flex: 1;
+  text-align: center;
 }
 
 .chat-list-container {
