@@ -101,12 +101,12 @@ async def test_websocket_match_rooms():
     user_id = "test-user-id"
 
     # 測試加入聊天室
-    manager.join_match_room(match_id, user_id)
+    await manager.join_match_room(match_id, user_id)
     assert match_id in manager.match_rooms
     assert user_id in manager.match_rooms[match_id]
 
     # 測試離開聊天室
-    manager.leave_match_room(match_id, user_id)
+    await manager.leave_match_room(match_id, user_id)
     if match_id in manager.match_rooms:
         assert user_id not in manager.match_rooms[match_id]
 
@@ -183,16 +183,38 @@ async def test_message_content_moderation(
 ):
     """測試訊息內容審核"""
     from app.services.content_moderation import ContentModerationService
+    from app.models.moderation import SensitiveWord
+    import uuid
+
+    alice_user_id = matched_users_for_ws["alice"]["user_id"]
+
+    # 創建敏感詞數據
+    sensitive_word = SensitiveWord(
+        id=uuid.uuid4(),
+        word="色情",
+        category="SEXUAL",
+        severity="HIGH",
+        action="REJECT",
+        is_regex=False,
+        is_active=True
+    )
+    test_db.add(sensitive_word)
+    await test_db.commit()
+    await ContentModerationService.clear_cache()
 
     # 測試安全內容
     safe_content = "Hello, how are you?"
-    is_safe, violations = ContentModerationService.check_message_content(safe_content)
+    is_safe, violations, action = await ContentModerationService.check_message_content(
+        safe_content, test_db, alice_user_id
+    )
     assert is_safe is True
     assert len(violations) == 0
 
     # 測試不安全內容
     unsafe_content = "想要看色情影片嗎？"
-    is_safe, violations = ContentModerationService.check_message_content(unsafe_content)
+    is_safe, violations, action = await ContentModerationService.check_message_content(
+        unsafe_content, test_db, alice_user_id
+    )
     assert is_safe is False
     assert len(violations) > 0
 
@@ -204,13 +226,31 @@ async def test_message_with_unsafe_content_rejected(
 ):
     """測試包含不當內容的訊息應被拒絕"""
     from app.services.content_moderation import ContentModerationService
+    from app.models.moderation import SensitiveWord
+    import uuid
 
     match_id = matched_users_for_ws["match_id"]
     alice_user_id = matched_users_for_ws["alice"]["user_id"]
 
+    # 創建敏感詞數據
+    sensitive_word = SensitiveWord(
+        id=uuid.uuid4(),
+        word="投資",
+        category="SCAM",
+        severity="MEDIUM",
+        action="REJECT",
+        is_regex=False,
+        is_active=True
+    )
+    test_db.add(sensitive_word)
+    await test_db.commit()
+    await ContentModerationService.clear_cache()
+
     # 嘗試發送不當內容
     unsafe_content = "加入我們的投資計劃，快速賺錢"
-    is_safe, violations = ContentModerationService.check_message_content(unsafe_content)
+    is_safe, violations, action = await ContentModerationService.check_message_content(
+        unsafe_content, test_db, alice_user_id
+    )
 
     # 驗證內容被標記為不安全
     assert is_safe is False
@@ -274,7 +314,7 @@ async def test_websocket_connection_cleanup_on_disconnect():
     match_id = "test-cleanup-match"
 
     # 模擬加入聊天室
-    manager.join_match_room(match_id, user_id)
+    await manager.join_match_room(match_id, user_id)
 
     # 斷開連接應該清理聊天室
     await manager.disconnect(user_id)
