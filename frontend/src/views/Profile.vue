@@ -1,6 +1,12 @@
 <template>
   <div class="profile-page">
     <div class="container">
+      <!-- 返回主選單按鈕 -->
+      <router-link to="/" class="back-home-btn">
+        <span class="btn-icon">🏠</span>
+        <span class="btn-text">返回主選單</span>
+      </router-link>
+
       <!-- 載入中 -->
       <div v-if="profileStore.loading && !profileStore.profile" class="loading">
         <div class="spinner"></div>
@@ -486,6 +492,37 @@ onMounted(async () => {
 .container {
   max-width: 800px;
   margin: 0 auto;
+}
+
+/* 返回主選單按鈕 */
+.back-home-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #667eea;
+  text-decoration: none;
+  border-radius: 25px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  margin-bottom: 20px;
+}
+
+.back-home-btn:hover {
+  background: white;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+}
+
+.back-home-btn .btn-icon {
+  font-size: 1.2rem;
+}
+
+.back-home-btn .btn-text {
+  font-size: 0.95rem;
 }
 
 .card {

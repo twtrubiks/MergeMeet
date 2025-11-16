@@ -2,7 +2,7 @@
   <div class="home">
     <div class="container">
       <h1>🎉 歡迎使用 MergeMeet</h1>
-      <p class="subtitle">現代化交友平台 - Week 3 探索與配對</p>
+      <p class="subtitle">現代化交友平台 - 完整功能版本</p>
 
       <!-- 認證狀態卡片 -->
       <div class="card auth-card">
@@ -78,6 +78,30 @@
               <li>✅ 配對列表管理</li>
               <li>✅ 配對成功彈窗</li>
               <li>✅ 取消配對功能</li>
+            </ul>
+          </div>
+          <div class="feature-section">
+            <h4>Week 4: 訊息系統</h4>
+            <ul>
+              <li>✅ 聊天室功能</li>
+              <li>✅ 訊息發送與接收</li>
+              <li>✅ WebSocket 即時通訊</li>
+              <li>✅ 訊息已讀狀態</li>
+              <li>✅ 對話列表</li>
+              <li>✅ 訊息分頁載入</li>
+              <li>✅ 訊息刪除功能</li>
+            </ul>
+          </div>
+          <div class="feature-section">
+            <h4>Week 5: 安全功能</h4>
+            <ul>
+              <li>✅ 用戶封鎖系統</li>
+              <li>✅ 用戶舉報功能</li>
+              <li>✅ 內容審核（敏感詞過濾）</li>
+              <li>✅ 管理員後台</li>
+              <li>✅ 舉報審核處理</li>
+              <li>✅ 用戶封禁管理</li>
+              <li>✅ 敏感詞管理</li>
             </ul>
           </div>
         </div>
