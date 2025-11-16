@@ -39,7 +39,7 @@ async def test_register_underage(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_register_duplicate_email(client: AsyncClient):
-    """測試重複 Email 無法註冊"""
+    """測試重複 Email 無法註冊（使用模糊訊息防止用戶枚舉）"""
     # 第一次註冊
     await client.post("/api/auth/register", json={
         "email": "duplicate@example.com",
@@ -55,7 +55,8 @@ async def test_register_duplicate_email(client: AsyncClient):
     })
 
     assert response.status_code == 400
-    assert "已被註冊" in response.json()["detail"]
+    # 安全考量：不透露 Email 是否已註冊（防止用戶枚舉）
+    assert "註冊失敗" in response.json()["detail"]
 
 
 @pytest.mark.asyncio
@@ -185,7 +186,7 @@ async def test_verify_email_success(client: AsyncClient):
 
     # 從 auth.py 的 verification_codes 字典中取得驗證碼
     from app.api.auth import verification_codes
-    code = verification_codes.get("verify@example.com")
+    code = await verification_codes.get("verify@example.com")  # ✅ 添加 await
 
     # 驗證 Email
     response = await client.post("/api/auth/verify-email", json={

@@ -249,6 +249,8 @@ async def test_get_conversations_with_messages(client: AsyncClient, matched_user
     assert "other_user_id" in conversation
     assert "other_user_name" in conversation
     assert "last_message" in conversation
+    # ✅ 檢查 last_message 是否為 None 再訪問
+    assert conversation["last_message"] is not None, "last_message 應該不為 None"
     assert conversation["last_message"]["content"] == "Hello Alice!"
     assert "unread_count" in conversation
 
