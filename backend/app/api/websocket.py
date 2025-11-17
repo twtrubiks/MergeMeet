@@ -102,6 +102,19 @@ async def handle_chat_message(data: dict, sender_id: uuid.UUID):
                 logger.warning(f"Invalid message data from {sender_id}: {data}")
                 return
 
+            # 驗證訊息長度（防止 DoS 攻擊）
+            MAX_MESSAGE_LENGTH = 5000
+            if len(content) > MAX_MESSAGE_LENGTH:
+                await manager.send_personal_message(
+                    str(sender_id),
+                    {
+                        "type": "error",
+                        "message": f"訊息過長，最多 {MAX_MESSAGE_LENGTH} 字符"
+                    }
+                )
+                logger.warning(f"Message too long from {sender_id}: {len(content)} chars")
+                return
+
             # 內容審核：檢查敏感詞
             is_approved, violations, action = await ContentModerationService.check_message_content(
                 content, db, sender_id

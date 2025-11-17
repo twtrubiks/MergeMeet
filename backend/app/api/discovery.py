@@ -280,14 +280,14 @@ async def like_user(
             detail="已經喜歡過此用戶"
         )
 
-    # 檢查對方是否也喜歡我
+    # 檢查對方是否也喜歡我（使用 SELECT FOR UPDATE 鎖定，避免競態條件）
     result = await db.execute(
         select(Like).where(
             and_(
                 Like.from_user_id == user_id,
                 Like.to_user_id == current_user.id
             )
-        )
+        ).with_for_update()
     )
     mutual_like = result.scalar_one_or_none()
 

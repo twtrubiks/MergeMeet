@@ -110,15 +110,21 @@
               @click="openChat(match.match_id)"
               class="btn-chat"
               title="開始聊天"
+              aria-label="與該用戶開始聊天對話"
+              :aria-describedby="`chat-desc-${match.match_id}`"
             >
-              💬
+              <span aria-hidden="true">💬</span>
+              <span :id="`chat-desc-${match.match_id}`" class="sr-only">點擊後將開啟與 {{ match.matched_user.display_name }} 的聊天視窗</span>
             </button>
             <button
               @click="showUnmatchConfirm(match)"
               class="btn-unmatch"
               title="取消配對"
+              aria-label="取消與該用戶的配對關係"
+              :aria-describedby="`unmatch-desc-${match.match_id}`"
             >
-              💔
+              <span aria-hidden="true">💔</span>
+              <span :id="`unmatch-desc-${match.match_id}`" class="sr-only">點擊後將取消與 {{ match.matched_user.display_name }} 的配對</span>
             </button>
           </div>
         </div>
@@ -128,19 +134,37 @@
 
     <!-- 取消配對確認彈窗 -->
     <Transition name="modal">
-      <div v-if="unmatchTarget" class="modal-overlay" @click="cancelUnmatch">
+      <div
+        v-if="unmatchTarget"
+        class="modal-overlay"
+        @click="cancelUnmatch"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="unmatch-dialog-title"
+        aria-describedby="unmatch-dialog-desc"
+      >
         <div class="modal-container" @click.stop>
           <div class="modal-content">
-            <div class="modal-icon">⚠️</div>
-            <h2 class="modal-title">確定要取消配對？</h2>
-            <p class="modal-subtitle">
+            <div class="modal-icon" aria-hidden="true">⚠️</div>
+            <h2 id="unmatch-dialog-title" class="modal-title">確定要取消配對？</h2>
+            <p id="unmatch-dialog-desc" class="modal-subtitle">
               此操作無法復原，您將不再能與 {{ unmatchTarget.matched_user.display_name }} 聊天。
             </p>
             <div class="modal-actions">
-              <AnimatedButton variant="ghost" @click="cancelUnmatch">
+              <AnimatedButton
+                variant="ghost"
+                @click="cancelUnmatch"
+                aria-label="取消此操作，返回配對列表"
+              >
                 取消
               </AnimatedButton>
-              <AnimatedButton variant="danger" :loading="isUnmatching" @click="confirmUnmatch">
+              <AnimatedButton
+                variant="danger"
+                :loading="isUnmatching"
+                @click="confirmUnmatch"
+                aria-label="確認取消配對"
+                :aria-busy="isUnmatching"
+              >
                 <span v-if="!isUnmatching">確定取消</span>
               </AnimatedButton>
             </div>
@@ -152,7 +176,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDiscoveryStore } from '@/stores/discovery'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
@@ -276,12 +300,41 @@ const confirmUnmatch = async () => {
   }
 }
 
+/**
+ * ESC 鍵關閉 Modal (鍵盤導航支持)
+ */
+const handleEscKey = (event) => {
+  if (event.key === 'Escape' && unmatchTarget.value) {
+    cancelUnmatch()
+  }
+}
+
 onMounted(() => {
   loadMatches()
+  // 添加鍵盤事件監聽器
+  window.addEventListener('keydown', handleEscKey)
+})
+
+onUnmounted(() => {
+  // 清理鍵盤事件監聽器
+  window.removeEventListener('keydown', handleEscKey)
 })
 </script>
 
 <style scoped>
+/* Screen Reader Only - 僅對螢幕閱讀器可見 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
 .matches {
   min-height: 100vh;
   background: linear-gradient(135deg, #FFF5F5 0%, #FFE5E5 100%);

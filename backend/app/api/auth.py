@@ -100,6 +100,58 @@ class VerificationCodeStore:
 # 驗證碼儲存（10 分鐘過期）
 verification_codes = VerificationCodeStore(ttl_minutes=10)
 
+# Email 發送速率限制（防止濫用）
+# 格式: {email: (last_sent_time, send_count_today)}
+email_rate_limit: Dict[str, Tuple[datetime, int]] = {}
+email_rate_limit_lock = asyncio.Lock()
+
+
+async def check_email_rate_limit(email: str) -> bool:
+    """
+    檢查 Email 發送速率限制
+
+    規則:
+    - 60 秒內只能發送 1 次
+    - 每天最多發送 5 次
+
+    Returns:
+        True 如果允許發送，False 如果超過限制
+
+    Raises:
+        HTTPException 如果超過限制
+    """
+    async with email_rate_limit_lock:
+        now = datetime.now(timezone.utc)
+
+        if email in email_rate_limit:
+            last_sent, count_today = email_rate_limit[email]
+
+            # 檢查是否在 60 秒冷卻期內
+            time_since_last = (now - last_sent).total_seconds()
+            if time_since_last < 60:
+                remaining = 60 - int(time_since_last)
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=f"發送過於頻繁，請等待 {remaining} 秒後再試"
+                )
+
+            # 檢查是否是新的一天（重置計數）
+            if last_sent.date() < now.date():
+                email_rate_limit[email] = (now, 1)
+            else:
+                # 同一天，檢查次數限制
+                if count_today >= 5:
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail="今日發送次數已達上限（5 次），請明天再試"
+                    )
+                email_rate_limit[email] = (now, count_today + 1)
+        else:
+            # 第一次發送
+            email_rate_limit[email] = (now, 1)
+
+        return True
+
 
 def generate_verification_code() -> str:
     """生成 6 位數驗證碼"""
@@ -403,10 +455,14 @@ async def resend_verification(
     """
     重新發送驗證碼
 
+    - 檢查速率限制（60 秒冷卻 + 每日 5 次限制）
     - 檢查用戶是否存在
     - 生成新的驗證碼
     - 模擬發送 Email
     """
+    # 檢查速率限制（會自動拋出 HTTPException 如果超過限制）
+    await check_email_rate_limit(email)
+
     # 檢查用戶
     result = await db.execute(
         select(User).where(User.email == email)

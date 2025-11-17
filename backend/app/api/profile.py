@@ -472,6 +472,28 @@ async def upload_photo(
             detail="只能上傳圖片檔案"
         )
 
+    # 驗證檔案大小（限制 5MB）
+    MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+
+    # 讀取檔案內容以檢查大小
+    file_content = await file.read()
+    file_size = len(file_content)
+
+    if file_size > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"檔案過大，最大允許 {MAX_FILE_SIZE / 1024 / 1024:.0f}MB"
+        )
+
+    if file_size == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="檔案不能為空"
+        )
+
+    # 重置檔案指標（以便後續處理）
+    await file.seek(0)
+
     # 生成模擬 URL（實際應用應上傳到儲存服務）
     photo_id = uuid.uuid4()
     mock_url = f"/uploads/photos/{current_user.id}/{photo_id}.jpg"

@@ -1,11 +1,19 @@
 <template>
-  <div class="heart-loader-container">
-    <div class="heart-loader">
+  <div
+    class="heart-loader-container"
+    role="status"
+    aria-live="polite"
+    aria-busy="true"
+    :aria-label="text || '載入中，請稍候'"
+  >
+    <div class="heart-loader" aria-hidden="true">
       <div class="heart"></div>
       <div class="heart"></div>
       <div class="heart"></div>
     </div>
-    <p v-if="text" class="loader-text">{{ text }}</p>
+    <p v-if="text" class="loader-text" aria-hidden="true">{{ text }}</p>
+    <!-- 為螢幕閱讀器提供的隱藏文字 -->
+    <span class="sr-only">{{ text || '載入中，請稍候' }}</span>
   </div>
 </template>
 
@@ -19,6 +27,19 @@ defineProps({
 </script>
 
 <style scoped>
+/* Screen Reader Only - 僅對螢幕閱讀器可見 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
 .heart-loader-container {
   display: flex;
   flex-direction: column;

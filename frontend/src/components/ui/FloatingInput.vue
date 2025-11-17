@@ -8,6 +8,8 @@
       :required="required"
       :disabled="disabled"
       :autocomplete="autocomplete"
+      :aria-invalid="!!error"
+      :aria-describedby="error ? `${id}-error` : undefined"
       @input="$emit('update:modelValue', $event.target.value)"
       @focus="isFocused = true"
       @blur="isFocused = false"
@@ -17,7 +19,15 @@
       {{ label }}
     </label>
     <div class="input-border"></div>
-    <div v-if="error" class="error-message">{{ error }}</div>
+    <div
+      v-if="error"
+      :id="`${id}-error`"
+      class="error-message"
+      role="alert"
+      aria-live="assertive"
+    >
+      {{ error }}
+    </div>
   </div>
 </template>
 

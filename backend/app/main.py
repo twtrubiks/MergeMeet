@@ -29,13 +29,13 @@ app = FastAPI(
     redirect_slashes=False,  # 禁用自動重定向，統一不使用 trailing slash
 )
 
-# CORS 中間件
+# CORS 中間件（安全配置）
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origins=settings.BACKEND_CORS_ORIGINS,  # 僅允許指定來源
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],  # 明確指定允許的 HTTP 方法
+    allow_headers=["Authorization", "Content-Type", "Accept"],  # 僅允許必要的 headers
 )
 
 # 靜態檔案（照片上傳）

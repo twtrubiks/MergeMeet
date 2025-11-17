@@ -3,13 +3,18 @@
     :type="type"
     :disabled="disabled || loading"
     :class="['animated-btn', variant, { 'is-loading': loading }]"
+    :aria-busy="loading"
+    :aria-label="loading ? loadingText : undefined"
     @click="$emit('click', $event)"
   >
-    <span v-if="loading" class="loader"></span>
+    <span v-if="loading" class="loader-wrapper" role="status" aria-live="polite">
+      <span class="loader" aria-hidden="true"></span>
+      <span class="sr-only">{{ loadingText }}</span>
+    </span>
     <span v-else class="btn-content">
       <slot></slot>
     </span>
-    <span class="shine"></span>
+    <span class="shine" aria-hidden="true"></span>
   </button>
 </template>
 
@@ -31,6 +36,10 @@ defineProps({
   loading: {
     type: Boolean,
     default: false
+  },
+  loadingText: {
+    type: String,
+    default: '處理中，請稍候'
   }
 })
 
@@ -38,6 +47,19 @@ defineEmits(['click'])
 </script>
 
 <style scoped>
+/* Screen Reader Only - 僅對螢幕閱讀器可見 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
 .animated-btn {
   position: relative;
   padding: 14px 32px;
@@ -158,6 +180,12 @@ defineEmits(['click'])
 /* Loading state */
 .animated-btn.is-loading {
   cursor: wait;
+}
+
+.loader-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .loader {
