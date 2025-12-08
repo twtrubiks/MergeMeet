@@ -98,6 +98,8 @@ class VerificationCodeStore:
 
 
 # 驗證碼儲存（10 分鐘過期）
+# 注意：目前 Email 發送服務尚未整合，驗證碼會記錄在後端 log 中
+# 開發測試時請查看 uvicorn 終端輸出，搜尋 "📧 [模擬] 發送驗證碼" 取得驗證碼
 verification_codes = VerificationCodeStore(ttl_minutes=10)
 
 # Email 發送速率限制（防止濫用）
@@ -218,7 +220,9 @@ async def register(
             detail="註冊失敗，請檢查輸入資料"
         )
 
-    # 生成驗證碼（模擬發送 Email）
+    # 生成驗證碼
+    # TODO: 整合 Email 發送服務（如 SendGrid、AWS SES）後移除模擬邏輯
+    # 目前驗證碼會輸出到 log，開發測試時請查看終端輸出
     verification_code = generate_verification_code()
     await verification_codes.set(request.email, verification_code)
     logger.info(f"📧 [模擬] 發送驗證碼到 {request.email}: {verification_code}")
@@ -482,6 +486,8 @@ async def resend_verification(
         )
 
     # 生成新的驗證碼
+    # TODO: 整合 Email 發送服務後移除模擬邏輯
+    # 目前驗證碼會輸出到 log，開發測試時請查看終端輸出
     verification_code = generate_verification_code()
     await verification_codes.set(email, verification_code)
     logger.info(f"📧 [模擬] 重新發送驗證碼到 {email}: {verification_code}")
