@@ -351,3 +351,144 @@ async def test_multiple_messages_ordering(
         assert messages[i].sent_at <= messages[i+1].sent_at
 
 
+# ==================== 心跳機制測試 ====================
+
+class TestWebSocketHeartbeat:
+    """WebSocket 心跳機制測試"""
+
+    @pytest.mark.asyncio
+    async def test_heartbeat_config(self):
+        """測試心跳配置"""
+        assert manager.HEARTBEAT_INTERVAL == 30  # 發送 ping 的間隔（秒）
+        assert manager.HEARTBEAT_TIMEOUT == 90   # 無回應超時時間（秒）
+
+    @pytest.mark.asyncio
+    async def test_update_heartbeat(self):
+        """測試更新心跳時間"""
+        from datetime import datetime, timezone, timedelta
+
+        user_id = "test-heartbeat-user"
+
+        # 設置初始心跳（舊時間）
+        old_time = datetime.now(timezone.utc) - timedelta(minutes=5)
+        manager.connection_heartbeats[user_id] = old_time
+
+        # 更新心跳
+        await manager.update_heartbeat(user_id)
+
+        # 驗證心跳已更新（新時間應該比舊時間晚）
+        new_time = manager.connection_heartbeats[user_id]
+        assert new_time > old_time
+
+        # 清理
+        del manager.connection_heartbeats[user_id]
+
+    @pytest.mark.asyncio
+    async def test_update_heartbeat_nonexistent_user(self):
+        """測試更新不存在用戶的心跳時間（應該安全跳過）"""
+        user_id = "nonexistent-user-heartbeat"
+
+        # 確保用戶不存在
+        assert user_id not in manager.connection_heartbeats
+
+        # 更新心跳應該不拋出異常
+        await manager.update_heartbeat(user_id)
+
+        # 仍然不存在（不會自動創建）
+        assert user_id not in manager.connection_heartbeats
+
+    @pytest.mark.asyncio
+    async def test_stale_connection_detection(self):
+        """測試過期連接檢測"""
+        from datetime import datetime, timezone, timedelta
+
+        user_id = "test-stale-user"
+
+        # 設置一個過期的心跳時間（超過 90 秒）
+        stale_time = datetime.now(timezone.utc) - timedelta(seconds=100)
+        manager.connection_heartbeats[user_id] = stale_time
+
+        # 計算是否過期
+        now = datetime.now(timezone.utc)
+        is_stale = now - stale_time > timedelta(seconds=manager.HEARTBEAT_TIMEOUT)
+
+        assert is_stale is True
+
+        # 清理
+        del manager.connection_heartbeats[user_id]
+
+    @pytest.mark.asyncio
+    async def test_active_connection_detection(self):
+        """測試活躍連接檢測"""
+        from datetime import datetime, timezone, timedelta
+
+        user_id = "test-active-user"
+
+        # 設置一個最近的心跳時間（10 秒前）
+        recent_time = datetime.now(timezone.utc) - timedelta(seconds=10)
+        manager.connection_heartbeats[user_id] = recent_time
+
+        # 計算是否過期
+        now = datetime.now(timezone.utc)
+        is_stale = now - recent_time > timedelta(seconds=manager.HEARTBEAT_TIMEOUT)
+
+        assert is_stale is False
+
+        # 清理
+        del manager.connection_heartbeats[user_id]
+
+    @pytest.mark.asyncio
+    async def test_heartbeat_cleared_on_disconnect(self):
+        """測試斷開連接時清除心跳"""
+        from datetime import datetime, timezone
+
+        user_id = "test-disconnect-heartbeat"
+
+        # 模擬連接（直接添加心跳，因為沒有真正的 WebSocket）
+        manager.connection_heartbeats[user_id] = datetime.now(timezone.utc)
+
+        # 確保心跳存在
+        assert user_id in manager.connection_heartbeats
+
+        # 斷開連接
+        await manager.disconnect(user_id)
+
+        # 驗證心跳已清除
+        assert user_id not in manager.connection_heartbeats
+
+    @pytest.mark.asyncio
+    async def test_cleanup_stale_connections(self):
+        """測試清理過期連接"""
+        from datetime import datetime, timezone, timedelta
+
+        # 創建過期和活躍的心跳
+        stale_user = "test-stale-cleanup"
+        active_user = "test-active-cleanup"
+
+        manager.connection_heartbeats[stale_user] = datetime.now(timezone.utc) - timedelta(seconds=100)
+        manager.connection_heartbeats[active_user] = datetime.now(timezone.utc) - timedelta(seconds=10)
+
+        # 執行清理
+        await manager._cleanup_stale_connections()
+
+        # 過期連接應該被清理
+        assert stale_user not in manager.connection_heartbeats
+
+        # 活躍連接應該保留
+        assert active_user in manager.connection_heartbeats
+
+        # 清理測試數據
+        if active_user in manager.connection_heartbeats:
+            del manager.connection_heartbeats[active_user]
+
+    @pytest.mark.asyncio
+    async def test_background_tasks_initialization(self):
+        """測試背景任務初始化"""
+        # 確保任務已啟動（在 main.py 的 lifespan 中）
+        # 這裡只驗證任務存在
+        await manager.start_background_tasks()
+
+        assert manager._heartbeat_task is not None
+        assert manager._cleanup_task is not None
+
+

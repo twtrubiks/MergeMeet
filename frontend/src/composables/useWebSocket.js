@@ -218,6 +218,16 @@ export function useWebSocket() {
   }
 
   /**
+   * 發送心跳回應 (pong)
+   * 用於回應伺服器的 ping 訊息，維持連接狀態
+   */
+  const sendPong = () => {
+    return send({
+      type: 'pong'
+    })
+  }
+
+  /**
    * 處理收到的訊息
    */
   const handleMessage = (data) => {
@@ -237,6 +247,11 @@ export function useWebSocket() {
     switch (type) {
       case 'connection':
         console.log('Connection status:', data.status)
+        break
+      case 'ping':
+        // 收到伺服器的心跳 ping，立即回應 pong
+        sendPong()
+        console.debug('Received ping, sent pong')
         break
       case 'error':
         console.error('WebSocket error message:', data.message)

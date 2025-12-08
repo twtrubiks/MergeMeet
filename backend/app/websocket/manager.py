@@ -18,7 +18,16 @@ class ConnectionManager:
     管理所有活躍的 WebSocket 連接，並提供訊息發送功能
 
     使用 asyncio.Lock 保護並發安全
+
+    心跳機制：
+    - 伺服器每 30 秒發送 ping 給所有連接
+    - 客戶端收到 ping 後應回應 pong
+    - 超過 90 秒無回應的連接將被清理
     """
+
+    # 心跳配置
+    HEARTBEAT_INTERVAL = 30  # 發送 ping 的間隔（秒）
+    HEARTBEAT_TIMEOUT = 90   # 無回應超時時間（秒）
 
     def __init__(self):
         # 用戶ID -> WebSocket 連接
@@ -34,8 +43,9 @@ class ConnectionManager:
         self._connections_lock = asyncio.Lock()
         self._rooms_lock = asyncio.Lock()
 
-        # 定期清理任務
+        # 定期任務
         self._cleanup_task: Optional[asyncio.Task] = None
+        self._heartbeat_task: Optional[asyncio.Task] = None
 
     async def connect(self, websocket: WebSocket, user_id: str, token: str) -> bool:
         """建立 WebSocket 連接
@@ -107,9 +117,10 @@ class ConnectionManager:
                     logger.error(f"Error closing connection for user {user_id}: {e}")
 
                 del self.active_connections[user_id]
-                # 清除心跳時間
-                self.connection_heartbeats.pop(user_id, None)
                 logger.info(f"User {user_id} disconnected")
+
+            # 清除心跳時間（無論連接是否存在都要清除）
+            self.connection_heartbeats.pop(user_id, None)
 
         # 從所有配對房間移除
         async with self._rooms_lock:
@@ -204,11 +215,55 @@ class ConnectionManager:
         async with self._connections_lock:
             return list(self.active_connections.keys())
 
-    async def start_cleanup_task(self):
-        """啟動定期清理任務（清理異常斷線的連接）"""
+    async def start_background_tasks(self):
+        """啟動背景任務（心跳和清理）"""
+        if self._heartbeat_task is None:
+            self._heartbeat_task = asyncio.create_task(self._periodic_heartbeat())
+            logger.info("Started WebSocket heartbeat task")
+
         if self._cleanup_task is None:
             self._cleanup_task = asyncio.create_task(self._periodic_cleanup())
             logger.info("Started WebSocket cleanup task")
+
+    async def start_cleanup_task(self):
+        """啟動定期清理任務（清理異常斷線的連接）
+
+        注意：建議使用 start_background_tasks() 同時啟動心跳和清理任務
+        """
+        await self.start_background_tasks()
+
+    async def _periodic_heartbeat(self):
+        """定期發送心跳 ping 給所有連接"""
+        while True:
+            try:
+                await asyncio.sleep(self.HEARTBEAT_INTERVAL)
+                await self._send_heartbeat_to_all()
+            except asyncio.CancelledError:
+                logger.info("Periodic heartbeat task cancelled")
+                break
+            except Exception as e:
+                logger.error(f"Error in periodic heartbeat: {e}", exc_info=True)
+
+    async def _send_heartbeat_to_all(self):
+        """向所有活躍連接發送心跳 ping"""
+        async with self._connections_lock:
+            user_ids = list(self.active_connections.keys())
+
+        if not user_ids:
+            return
+
+        ping_message = {
+            "type": "ping",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+
+        for user_id in user_ids:
+            try:
+                await self.send_personal_message(user_id, ping_message)
+            except Exception as e:
+                logger.error(f"Error sending heartbeat to {user_id}: {e}")
+
+        logger.debug(f"Sent heartbeat ping to {len(user_ids)} connections")
 
     async def _periodic_cleanup(self):
         """定期清理超時連接（每分鐘執行一次）"""
@@ -223,7 +278,7 @@ class ConnectionManager:
                 logger.error(f"Error in periodic cleanup: {e}", exc_info=True)
 
     async def _cleanup_stale_connections(self):
-        """清理超過 5 分鐘無心跳的連接
+        """清理超過 HEARTBEAT_TIMEOUT 秒無心跳的連接
 
         檢測並移除異常斷線的 WebSocket 連接，防止資源洩漏
         """
@@ -233,12 +288,12 @@ class ConnectionManager:
         # 找出所有過期的連接（使用鎖保護）
         async with self._connections_lock:
             for user_id, last_heartbeat in self.connection_heartbeats.items():
-                if now - last_heartbeat > timedelta(minutes=5):
+                if now - last_heartbeat > timedelta(seconds=self.HEARTBEAT_TIMEOUT):
                     stale_users.append(user_id)
 
         # 斷開過期連接
         for user_id in stale_users:
-            logger.warning(f"Cleaning up stale connection for user {user_id}")
+            logger.warning(f"Cleaning up stale connection for user {user_id} (no heartbeat response)")
             await self.disconnect(user_id)
 
         if stale_users:

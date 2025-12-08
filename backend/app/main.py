@@ -7,6 +7,7 @@ from pathlib import Path
 
 from app.core.config import settings
 from app.core.database import init_db, close_db
+from app.websocket.manager import manager
 
 
 @asynccontextmanager
@@ -15,6 +16,10 @@ async def lifespan(app: FastAPI):
     # 啟動時執行
     print("🚀 MergeMeet 啟動中...")
     # await init_db()  # 暫時註解，等資料庫啟動後再開啟
+
+    # 啟動 WebSocket 心跳和清理任務
+    await manager.start_background_tasks()
+
     yield
     # 關閉時執行
     print("👋 MergeMeet 關閉中...")

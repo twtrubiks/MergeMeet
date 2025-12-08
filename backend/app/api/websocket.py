@@ -72,6 +72,11 @@ async def websocket_endpoint(
             elif message_type == "leave_match":
                 await handle_leave_match(message_data, user_id)
 
+            elif message_type == "pong":
+                # 心跳回應：更新用戶的心跳時間
+                await manager.update_heartbeat(user_id)
+                logger.debug(f"Received pong from user {user_id}")
+
             else:
                 logger.warning(f"Unknown message type: {message_type}")
 
