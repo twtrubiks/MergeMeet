@@ -22,6 +22,11 @@ class User(Base):
     date_of_birth = Column(Date, nullable=False)
 
     # 信任機制
+    # TODO: 信任分數系統尚未實現完整邏輯
+    # 預計功能：
+    # - 提高分數：完成驗證、正常互動、被喜歡
+    # - 降低分數：被舉報、發送違規內容、被封鎖
+    # - 影響：低分用戶在探索中排序靠後，極低分自動限制功能
     trust_score = Column(Integer, default=50)
     warning_count = Column(Integer, default=0)
 
