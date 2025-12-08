@@ -1,5 +1,6 @@
 """認證相關 API"""
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -20,6 +21,7 @@ from app.core.security import (
     decode_token,
 )
 from app.core.config import settings
+from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.schemas.auth import (
     RegisterRequest,
@@ -29,6 +31,7 @@ from app.schemas.auth import (
     UserResponse,
     EmailVerificationRequest,
 )
+from app.services.token_blacklist import token_blacklist
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -398,6 +401,39 @@ async def refresh_token(
         token_type="bearer",
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
+
+
+@router.post("/logout", response_model=dict)
+async def logout(
+    current_user: User = Depends(get_current_user),
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())
+):
+    """
+    用戶登出
+
+    - 將當前 Token 加入黑名單
+    - Token 在過期前都無法再使用
+    - 同時使 WebSocket 連接失效
+    """
+    token = credentials.credentials
+
+    # 解碼 Token 取得過期時間
+    payload = decode_token(token)
+    if payload and payload.get("exp"):
+        expires_at = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+    else:
+        # 如果無法取得過期時間，使用預設的 access token 過期時間
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+
+    # 將 Token 加入黑名單
+    await token_blacklist.add(token, expires_at)
+
+    logger.info(f"User {current_user.id} logged out, token blacklisted")
+
+    return {
+        "message": "登出成功",
+        "user_id": str(current_user.id)
+    }
 
 
 @router.post("/verify-email", response_model=dict)

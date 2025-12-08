@@ -7,6 +7,7 @@ from sqlalchemy import select
 from app.core.database import get_db
 from app.core.security import decode_token
 from app.models.user import User
+from app.services.token_blacklist import token_blacklist
 
 security = HTTPBearer()
 
@@ -21,9 +22,17 @@ async def get_current_user(
     從 JWT Token 中解析用戶 ID，並從資料庫中查詢用戶
 
     Raises:
-        HTTPException: 如果 Token 無效或用戶不存在
+        HTTPException: 如果 Token 無效、已被登出或用戶不存在
     """
     token = credentials.credentials
+
+    # 檢查 Token 是否在黑名單中（已登出）
+    if await token_blacklist.is_blacklisted(token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token 已失效，請重新登入",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     # 解碼 Token
     payload = decode_token(token)

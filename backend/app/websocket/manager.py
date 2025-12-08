@@ -7,6 +7,7 @@ import asyncio
 from datetime import datetime, timezone, timedelta
 
 from app.core.security import decode_token
+from app.services.token_blacklist import token_blacklist
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,12 @@ class ConnectionManager:
         Returns:
             bool: 連接是否成功
         """
+        # 檢查 Token 是否在黑名單中（已登出）
+        if await token_blacklist.is_blacklisted(token):
+            await websocket.close(code=1008, reason="Token revoked")
+            logger.warning(f"WebSocket connection with blacklisted token for user {user_id}")
+            return False
+
         # 驗證 Token
         payload = decode_token(token)
         if not payload or payload.get("sub") != user_id:
