@@ -1,4 +1,12 @@
-"""認證相關 API"""
+"""認證相關 API
+
+提供用戶註冊、登入、登出、Token 刷新、Email 驗證等功能。
+
+TODO: 密碼重置功能尚未實現（暫時不重要）
+- POST /forgot-password: 發送密碼重置郵件
+- POST /reset-password: 使用重置令牌設定新密碼
+未來需要時再實現，需整合 Email 發送服務。
+"""
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
