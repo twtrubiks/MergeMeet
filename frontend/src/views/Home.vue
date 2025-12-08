@@ -184,6 +184,7 @@ import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 import GlassCard from '@/components/ui/GlassCard.vue'
 import FeatureCard from '@/components/ui/FeatureCard.vue'
 import HeartLoader from '@/components/ui/HeartLoader.vue'
+import { logger } from '@/utils/logger'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -196,7 +197,7 @@ onMounted(async () => {
     const response = await axios.get('/api/hello')
     apiStatus.value = response.data
   } catch (error) {
-    console.error('API 連接失敗:', error)
+    logger.error('API 連接失敗:', error)
   } finally {
     loading.value = false
   }

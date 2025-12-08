@@ -99,7 +99,7 @@
 </template>
 
 <script setup>
-import { onMounted, computed } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { NBadge, NButton, NIcon, NAvatar, NAlert, useMessage } from 'naive-ui'
 import { Notifications, ChevronForward, Home } from '@vicons/ionicons5'
@@ -107,6 +107,8 @@ import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 import HeartLoader from '@/components/ui/HeartLoader.vue'
+import { safeFormatDate } from '@/utils/dateFormat'
+import { logger } from '@/utils/logger'
 
 const router = useRouter()
 const message = useMessage()
@@ -132,26 +134,8 @@ const openChat = (matchId) => {
 }
 
 // 格式化時間
-const formatTime = (timestamp) => {
-  if (!timestamp) return ''
-
-  const date = new Date(timestamp)
-  const now = new Date()
-  const diffMs = now - date
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffMins < 1) return '剛剛'
-  if (diffMins < 60) return `${diffMins} 分鐘前`
-  if (diffHours < 24) return `${diffHours} 小時前`
-  if (diffDays < 7) return `${diffDays} 天前`
-
-  return date.toLocaleDateString('zh-TW', {
-    month: 'short',
-    day: 'numeric'
-  })
-}
+// 使用共享的工具函數
+const formatTime = safeFormatDate
 
 // 獲取訊息預覽
 const getMessagePreview = (message) => {
@@ -182,8 +166,14 @@ onMounted(async () => {
     await chatStore.fetchConversations()
   } catch (error) {
     message.error('載入對話列表失敗')
-    console.error(error)
+    logger.error('載入對話列表失敗:', error)
   }
+})
+
+onUnmounted(() => {
+  // 組件卸載時清理 WebSocket (但不完全斷開，因為可能還有其他組件需要使用)
+  // 如果需要完全斷開，可以調用 chatStore.closeWebSocket()
+  // 這裡我們保持連接，只是清理本地狀態
 })
 </script>
 

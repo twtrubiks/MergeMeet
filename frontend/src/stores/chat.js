@@ -7,6 +7,7 @@ import { ref, computed } from 'vue'
 import apiClient from '@/api/client'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useUserStore } from './user'
+import { logger } from '@/utils/logger'
 
 export const useChatStore = defineStore('chat', () => {
   // WebSocket instance
@@ -153,7 +154,7 @@ export const useChatStore = defineStore('chat', () => {
         ws.sendReadReceipt(msgId)
       })
     } catch (err) {
-      console.error('標記訊息為已讀失敗:', err)
+      logger.error('標記訊息為已讀失敗:', err)
     }
   }
 
@@ -272,27 +273,27 @@ export const useChatStore = defineStore('chat', () => {
    * 處理打字指示器
    */
   const handleTypingIndicator = (data) => {
-    console.log('[Chat] Received typing indicator:', data)
+    logger.debug('[Chat] Received typing indicator:', data)
     const { match_id, user_id, is_typing } = data
 
     if (is_typing) {
       // 使用 spread operator 創建新物件以觸發 Vue 響應式更新
       typingUsers.value = { ...typingUsers.value, [match_id]: user_id }
-      console.log('[Chat] User typing:', { match_id, user_id, typingUsers: typingUsers.value })
+      logger.debug('[Chat] User typing:', { match_id, user_id, typingUsers: typingUsers.value })
       // 3 秒後自動清除
       setTimeout(() => {
         if (typingUsers.value[match_id] === user_id) {
           // 使用解構移除屬性並創建新物件
           const { [match_id]: _, ...rest } = typingUsers.value
           typingUsers.value = rest
-          console.log('[Chat] Typing timeout cleared:', { match_id, user_id })
+          logger.debug('[Chat] Typing timeout cleared:', { match_id, user_id })
         }
       }, 3000)
     } else {
       // 使用解構移除屬性並創建新物件
       const { [match_id]: _, ...rest } = typingUsers.value
       typingUsers.value = rest
-      console.log('[Chat] Typing stopped:', { match_id, user_id })
+      logger.debug('[Chat] Typing stopped:', { match_id, user_id })
     }
   }
 
@@ -318,14 +319,14 @@ export const useChatStore = defineStore('chat', () => {
   const handleMessageDeleted = (data) => {
     const { message_id, match_id } = data
 
-    console.log('[Chat] Received message_deleted event:', data)
+    logger.debug('[Chat] Received message_deleted event:', data)
 
     // 從本地狀態移除訊息
     if (messages.value[match_id]) {
       const index = messages.value[match_id].findIndex(m => m.id === message_id)
       if (index > -1) {
         messages.value[match_id].splice(index, 1)
-        console.log('[Chat] Message removed from local state:', message_id)
+        logger.debug('[Chat] Message removed from local state:', message_id)
       }
     }
   }

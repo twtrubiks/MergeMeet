@@ -117,7 +117,7 @@ const loadBlockedUsers = async () => {
   try {
     await safetyStore.fetchBlockedUsers()
   } catch (error) {
-    console.error('載入封鎖列表失敗:', error)
+    logger.error('載入封鎖列表失敗:', error)
   }
 }
 
@@ -147,7 +147,7 @@ const confirmUnblock = async () => {
     await safetyStore.unblockUser(unblockTarget.value.blocked_user_id)
     unblockTarget.value = null
   } catch (error) {
-    console.error('解除封鎖失敗:', error)
+    logger.error('解除封鎖失敗:', error)
   } finally {
     isUnblocking.value = null
   }

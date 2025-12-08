@@ -122,6 +122,7 @@ import { useUserStore } from '@/stores/user'
 import { useSafetyStore } from '@/stores/safety'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
 import ReportModal from '@/components/ReportModal.vue'
+import { logger } from '@/utils/logger'
 
 const route = useRoute()
 const router = useRouter()
@@ -271,7 +272,7 @@ const handleSendMessage = async (event) => {
 
 // 處理打字事件
 const handleTyping = () => {
-  console.log('[Chat.vue] User typing, matchId:', matchId.value)
+  logger.debug('[Chat.vue] User typing, matchId:', matchId.value)
 
   // 發送正在打字的狀態
   chatStore.sendTyping(matchId.value, true)
@@ -283,7 +284,7 @@ const handleTyping = () => {
 
   // 3 秒後自動停止打字狀態
   typingTimer.value = setTimeout(() => {
-    console.log('[Chat.vue] Typing timeout, sending stop')
+    logger.debug('[Chat.vue] Typing timeout, sending stop')
     chatStore.sendTyping(matchId.value, false)
   }, 3000)
 }
@@ -337,7 +338,7 @@ const loadMoreMessages = async () => {
       hasMore.value = false
     }
   } catch (error) {
-    console.error('載入更多訊息失敗:', error)
+    logger.error('載入更多訊息失敗:', error)
     message.error('載入更多訊息失敗')
   } finally {
     isLoadingMore.value = false

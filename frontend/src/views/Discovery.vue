@@ -44,6 +44,7 @@
               v-if="candidate.profile_picture"
               :src="candidate.profile_picture"
               :alt="candidate.display_name"
+              @error="(e) => e.target.src = defaultAvatar"
             >
             <div v-else class="image-placeholder">
               <span>{{ candidate.display_name[0] }}</span>
@@ -160,8 +161,13 @@ import { useDiscoveryStore } from '@/stores/discovery'
 import MatchModal from '@/components/MatchModal.vue'
 import ReportModal from '@/components/ReportModal.vue'
 import HeartLoader from '@/components/ui/HeartLoader.vue'
+import { throttle } from '@/utils/helpers'
+import { logger } from '@/utils/logger'
 
 const discoveryStore = useDiscoveryStore()
+
+// 預設頭像（圖片加載失敗時使用）
+const defaultAvatar = '/default-avatar.png'
 
 // 卡片拖拽狀態
 const dragStartX = ref(0)
@@ -231,14 +237,14 @@ const loadCandidates = async () => {
   try {
     await discoveryStore.browseCandidates(20)
   } catch (error) {
-    console.error('載入候選人失敗:', error)
+    logger.error('載入候選人失敗:', error)
   }
 }
 
 /**
- * 處理喜歡
+ * 處理喜歡（內部實現）
  */
-const handleLike = async () => {
+const _handleLike = async () => {
   if (!discoveryStore.currentCandidate || isAnimating.value) return
 
   isAnimating.value = true
@@ -261,7 +267,7 @@ const handleLike = async () => {
         await loadCandidates()
       }
     } catch (error) {
-      console.error('喜歡操作失敗:', error)
+      logger.error('喜歡操作失敗:', error)
     } finally {
       isAnimating.value = false
     }
@@ -269,9 +275,9 @@ const handleLike = async () => {
 }
 
 /**
- * 處理跳過
+ * 處理跳過（內部實現）
  */
-const handlePass = async () => {
+const _handlePass = async () => {
   if (!discoveryStore.currentCandidate || isAnimating.value) return
 
   isAnimating.value = true
@@ -289,12 +295,16 @@ const handlePass = async () => {
         await loadCandidates()
       }
     } catch (error) {
-      console.error('跳過操作失敗:', error)
+      logger.error('跳過操作失敗:', error)
     } finally {
       isAnimating.value = false
     }
   }, 300)
 }
+
+// 節流處理：防止快速重複點擊（500ms 間隔）
+const handleLike = throttle(_handleLike, 500)
+const handlePass = throttle(_handlePass, 500)
 
 /**
  * 卡片退出動畫

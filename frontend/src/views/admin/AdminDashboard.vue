@@ -354,6 +354,7 @@ import {
 } from 'naive-ui'
 import apiClient from '@/api/client'
 import { useUserStore } from '@/stores/user'
+import { logger } from '@/utils/logger'
 
 const router = useRouter()
 const message = useMessage()
@@ -567,7 +568,7 @@ const loadStats = async () => {
     const response = await apiClient.get('/admin/stats')
     stats.value = response.data
   } catch (error) {
-    console.error('載入統計數據失敗:', error)
+    logger.error('載入統計數據失敗:', error)
     message.error('載入統計數據失敗')
   }
 }
@@ -580,7 +581,7 @@ const loadModerationStats = async () => {
     const response = await apiClient.get('/moderation/stats')
     moderationStats.value = response.data
   } catch (error) {
-    console.error('載入審核統計失敗:', error)
+    logger.error('載入審核統計失敗:', error)
     message.error('載入審核統計失敗')
   }
 }
@@ -608,7 +609,7 @@ const loadSensitiveWords = async (resetPage = false) => {
     sensitiveWords.value = response.data.words
     wordPagination.value.itemCount = response.data.total
   } catch (error) {
-    console.error('載入敏感詞失敗:', error)
+    logger.error('載入敏感詞失敗:', error)
     message.error('載入敏感詞失敗')
   } finally {
     loadingWords.value = false
@@ -633,7 +634,7 @@ const handleAddWord = async () => {
     await loadSensitiveWords()
     await loadModerationStats()
   } catch (error) {
-    console.error('新增敏感詞失敗:', error)
+    logger.error('新增敏感詞失敗:', error)
     message.error(error.response?.data?.detail || '新增失敗')
   }
 }
@@ -654,7 +655,7 @@ const handleUpdateWord = async () => {
     await loadSensitiveWords()
     await loadModerationStats()
   } catch (error) {
-    console.error('更新敏感詞失敗:', error)
+    logger.error('更新敏感詞失敗:', error)
     message.error(error.response?.data?.detail || '更新失敗')
   }
 }
@@ -673,7 +674,7 @@ const handleDeleteWord = (wordId) => {
         await loadSensitiveWords()
         await loadModerationStats()
       } catch (error) {
-        console.error('刪除敏感詞失敗:', error)
+        logger.error('刪除敏感詞失敗:', error)
         message.error('刪除失敗')
       }
     }
@@ -695,7 +696,7 @@ const loadAppeals = async () => {
     })
     appeals.value = response.data.appeals
   } catch (error) {
-    console.error('載入申訴失敗:', error)
+    logger.error('載入申訴失敗:', error)
     message.error('載入申訴失敗')
   } finally {
     loadingAppeals.value = false
@@ -720,7 +721,7 @@ const reviewAppeal = async (appealId, status) => {
     await loadAppeals()
     await loadModerationStats()
   } catch (error) {
-    console.error('處理申訴失敗:', error)
+    logger.error('處理申訴失敗:', error)
     message.error(error.response?.data?.detail || '處理失敗')
   }
 }
@@ -734,7 +735,7 @@ const loadReports = async () => {
     })
     reports.value = response.data
   } catch (error) {
-    console.error('載入舉報列表失敗:', error)
+    logger.error('載入舉報列表失敗:', error)
     message.error('載入舉報列表失敗')
   } finally {
     loading.value = false
@@ -754,7 +755,7 @@ const reviewReport = async (reportId, status, action) => {
     await loadReports()
     await loadStats()
   } catch (error) {
-    console.error('處理舉報失敗:', error)
+    logger.error('處理舉報失敗:', error)
     message.error('處理失敗')
   }
 }

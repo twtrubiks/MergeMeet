@@ -58,6 +58,7 @@ import { useRouter } from 'vue-router'
 import { NForm, NFormItem, NInput, NButton, useMessage } from 'naive-ui'
 import apiClient from '@/api/client'
 import { useUserStore } from '@/stores/user'
+import { logger } from '@/utils/logger'
 
 const router = useRouter()
 const message = useMessage()
@@ -111,7 +112,7 @@ const handleLogin = async () => {
     message.success('登入成功')
     router.push('/admin')
   } catch (error) {
-    console.error('登入失敗:', error)
+    logger.error('登入失敗:', error)
     message.error(error.response?.data?.detail || '登入失敗')
   } finally {
     loading.value = false

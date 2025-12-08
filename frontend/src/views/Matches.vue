@@ -63,7 +63,7 @@
                 :alt="match.matched_user.display_name"
               >
               <div v-else class="avatar-placeholder">
-                {{ match.matched_user.display_name[0] }}
+                {{ (match.matched_user.display_name || 'U')[0] }}
               </div>
             </div>
             <div class="online-pulse" v-if="isOnline(match.matched_user.last_active)"></div>
@@ -182,9 +182,13 @@ import { useDiscoveryStore } from '@/stores/discovery'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 import HeartLoader from '@/components/ui/HeartLoader.vue'
 import Badge from '@/components/ui/Badge.vue'
+import { formatMatchDate } from '@/utils/dateFormat'
+import { useMessage } from 'naive-ui'
+import { logger } from '@/utils/logger'
 
 const router = useRouter()
 const discoveryStore = useDiscoveryStore()
+const message = useMessage()
 
 const unmatchTarget = ref(null)
 const isUnmatching = ref(false)
@@ -204,30 +208,9 @@ const formatDistance = (km) => {
 
 /**
  * 格式化日期顯示
+ * 使用共享的工具函數
  */
-const formatDate = (dateString) => {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffInMs = now - date
-  const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24))
-
-  if (diffInDays === 0) {
-    return '今天'
-  } else if (diffInDays === 1) {
-    return '昨天'
-  } else if (diffInDays < 7) {
-    return `${diffInDays} 天前`
-  } else if (diffInDays < 30) {
-    const weeks = Math.floor(diffInDays / 7)
-    return `${weeks} 週前`
-  } else {
-    return date.toLocaleDateString('zh-TW', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
-  }
-}
+const formatDate = formatMatchDate
 
 /**
  * 判斷是否為新配對（24小時內）
@@ -257,7 +240,7 @@ const loadMatches = async () => {
   try {
     await discoveryStore.fetchMatches()
   } catch (error) {
-    console.error('載入配對列表失敗:', error)
+    logger.error('載入配對列表失敗:', error)
   }
 }
 
@@ -292,9 +275,14 @@ const confirmUnmatch = async () => {
 
   try {
     await discoveryStore.unmatch(unmatchTarget.value.match_id)
+    // 成功後才關閉彈窗和清空目標
     unmatchTarget.value = null
+    message.success('已取消配對')
   } catch (error) {
-    console.error('取消配對失敗:', error)
+    logger.error('取消配對失敗:', error)
+    // 顯示用戶友好的錯誤訊息
+    message.error('取消配對失敗,請稍後再試')
+    // 保持彈窗打開,讓用戶可以重試
   } finally {
     isUnmatching.value = false
   }

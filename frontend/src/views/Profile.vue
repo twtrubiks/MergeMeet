@@ -158,7 +158,7 @@
                 :alt="profileStore.profile.display_name"
               />
               <div v-else class="avatar-placeholder">
-                {{ profileStore.profile.display_name?.[0]?.toUpperCase() }}
+                {{ (profileStore.profile.display_name || 'U')[0].toUpperCase() }}
               </div>
             </div>
             <div class="profile-info">
@@ -257,10 +257,14 @@ import PhotoUploader from '@/components/PhotoUploader.vue'
 import InterestSelector from '@/components/InterestSelector.vue'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 import HeartLoader from '@/components/ui/HeartLoader.vue'
+import { useMessage, useDialog } from 'naive-ui'
+import { logger } from '@/utils/logger'
 
 const router = useRouter()
 const profileStore = useProfileStore()
 const userStore = useUserStore()
+const message = useMessage()
+const dialog = useDialog()
 
 // 表單狀態
 const isCreating = ref(false)
@@ -333,7 +337,7 @@ const nextStep = async () => {
   // 驗證步驟 1
   if (currentStep.value === 1) {
     if (!formData.value.display_name || !formData.value.gender || !formData.value.bio) {
-      alert('請填寫所有必填欄位')
+      message.warning('請填寫所有必填欄位')
       return
     }
     // 如果是建立模式，先儲存基本資料
@@ -352,31 +356,64 @@ const nextStep = async () => {
   // 驗證步驟 2（可選提示）
   if (currentStep.value === 2) {
     if (profileStore.profilePhotos.length === 0) {
-      const confirmed = confirm('建議至少上傳 1 張照片以提高配對成功率，確定要跳過嗎？')
-      if (!confirmed) {
-        return
-      }
+      // 使用 Promise 包裝 dialog 調用
+      return new Promise((resolve) => {
+        dialog.warning({
+          title: '提醒',
+          content: '建議至少上傳 1 張照片以提高配對成功率，確定要跳過嗎？',
+          positiveText: '繼續',
+          negativeText: '返回',
+          onPositiveClick: () => {
+            currentStep.value++
+            resolve()
+          }
+        })
+      })
     }
   }
 
   // 驗證步驟 3
   if (currentStep.value === 3) {
     if (selectedInterests.value.length < 3 || selectedInterests.value.length > 10) {
-      alert('請選擇 3-10 個興趣標籤')
+      message.warning('請選擇 3-10 個興趣標籤')
       return
     }
   }
 
-  currentStep.value++
+  // 只有在步驟 2 沒有返回 Promise 時才前進到下一步
+  if (currentStep.value !== 2 || profileStore.profilePhotos.length > 0) {
+    currentStep.value++
+  }
 }
 
 /**
  * 將地點名稱轉換為經緯度（簡易版）
  */
 const geocodeLocation = (locationName) => {
+  // 輸入驗證
+  if (!locationName || typeof locationName !== 'string') {
+    logger.warn('地點名稱無效')
+    return null
+  }
+
+  // 長度限制
+  if (locationName.length > 50) {
+    logger.warn('地點名稱過長')
+    return null
+  }
+
+  // 只允許中文、英文、數字和常見符號
+  const validPattern = /^[\u4e00-\u9fa5a-zA-Z0-9\s-]+$/
+  if (!validPattern.test(locationName)) {
+    logger.warn('地點名稱包含無效字符')
+    return null
+  }
+
   // 常見台灣城市的經緯度（僅供測試使用）
   const cityCoordinates = {
     '台北市': { latitude: 25.0330, longitude: 121.5654 },
+    '台北市信義區': { latitude: 25.033, longitude: 121.5654 },
+    '台北市大安區': { latitude: 25.0263, longitude: 121.5436 },
     '新北市': { latitude: 25.0120, longitude: 121.4659 },
     '桃園市': { latitude: 24.9936, longitude: 121.3010 },
     '台中市': { latitude: 24.1477, longitude: 120.6736 },
@@ -386,15 +423,15 @@ const geocodeLocation = (locationName) => {
     '基隆市': { latitude: 25.1276, longitude: 121.7392 },
   }
 
-  // 查找匹配的城市
-  for (const [city, coords] of Object.entries(cityCoordinates)) {
-    if (locationName.includes(city)) {
-      return coords
-    }
+  // 直接匹配完整地點名稱
+  const coords = cityCoordinates[locationName]
+
+  if (!coords) {
+    logger.warn(`未找到城市座標: ${locationName}`)
+    return null
   }
 
-  // 如果找不到，返回台北市座標作為預設
-  return { latitude: 25.0330, longitude: 121.5654 }
+  return coords
 }
 
 /**
@@ -406,6 +443,10 @@ const saveBasicInfo = async () => {
     const profileData = { ...formData.value }
     if (profileData.location_name) {
       const coords = geocodeLocation(profileData.location_name)
+      if (!coords) {
+        message.error('無法識別該地點,請選擇有效的城市')
+        return
+      }
       profileData.location = {
         latitude: coords.latitude,
         longitude: coords.longitude,
@@ -415,10 +456,14 @@ const saveBasicInfo = async () => {
     }
 
     await profileStore.createProfile(profileData)
+    // 只有成功後才切換狀態
     isCreating.value = false
-    isEditing.value = true // 切換到編輯模式
+    isEditing.value = true
+    message.success('個人檔案創建成功')
   } catch (error) {
-    console.error('建立檔案失敗:', error)
+    logger.error('建立個人檔案失敗:', error)
+    message.error('創建失敗,請檢查網絡連接')
+    // 不改變狀態,讓用戶可以重試
   }
 }
 
@@ -433,6 +478,10 @@ const submitProfile = async () => {
       const profileData = { ...formData.value }
       if (profileData.location_name) {
         const coords = geocodeLocation(profileData.location_name)
+        if (!coords) {
+          message.error('無法識別該地點,請選擇有效的城市')
+          return
+        }
         profileData.location = {
           latitude: coords.latitude,
           longitude: coords.longitude,
@@ -457,7 +506,7 @@ const submitProfile = async () => {
     // 重新載入檔案
     await fetchProfileData()
   } catch (error) {
-    console.error('儲存檔案失敗:', error)
+    logger.error('儲存檔案失敗:', error)
   }
 }
 
@@ -468,7 +517,7 @@ const fetchProfileData = async () => {
   try {
     await profileStore.fetchProfile()
   } catch (error) {
-    console.error('取得檔案失敗:', error)
+    logger.error('取得檔案失敗:', error)
   }
 }
 

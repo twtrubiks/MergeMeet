@@ -4,6 +4,7 @@
  */
 import { ref, onUnmounted, computed } from 'vue'
 import { useUserStore } from '@/stores/user'
+import { logger } from '@/utils/logger'
 
 // WebSocket 連接狀態
 const ConnectionState = {
@@ -36,12 +37,12 @@ export function useWebSocket() {
    */
   const connect = () => {
     if (socket.value?.readyState === WebSocket.OPEN) {
-      console.log('WebSocket already connected')
+      logger.log('WebSocket already connected')
       return
     }
 
     if (!userStore.isAuthenticated || !userStore.user?.id) {
-      console.error('Cannot connect: User not authenticated')
+      logger.error('Cannot connect: User not authenticated')
       return
     }
 
@@ -62,7 +63,7 @@ export function useWebSocket() {
 
       // 連接成功
       socket.value.onopen = () => {
-        console.log('✅ WebSocket connected')
+        logger.log('WebSocket connected')
         connectionState.value = ConnectionState.CONNECTED
         reconnectAttempts.value = 0
       }
@@ -73,13 +74,13 @@ export function useWebSocket() {
           const data = JSON.parse(event.data)
           handleMessage(data)
         } catch (error) {
-          console.error('Error parsing WebSocket message:', error)
+          logger.error('Error parsing WebSocket message:', error)
         }
       }
 
       // 連接關閉
       socket.value.onclose = (event) => {
-        console.log('WebSocket closed:', event.code, event.reason)
+        logger.log('WebSocket closed:', event.code, event.reason)
         connectionState.value = ConnectionState.DISCONNECTED
         socket.value = null
 
@@ -91,11 +92,11 @@ export function useWebSocket() {
 
       // 連接錯誤
       socket.value.onerror = (error) => {
-        console.error('WebSocket error:', error)
+        logger.error('WebSocket error:', error)
       }
 
     } catch (error) {
-      console.error('Error creating WebSocket:', error)
+      logger.error('Error creating WebSocket:', error)
       connectionState.value = ConnectionState.DISCONNECTED
     }
   }
@@ -105,7 +106,7 @@ export function useWebSocket() {
    */
   const scheduleReconnect = () => {
     reconnectAttempts.value++
-    console.log(`Reconnecting... (${reconnectAttempts.value}/${maxReconnectAttempts})`)
+    logger.log(`Reconnecting... (${reconnectAttempts.value}/${maxReconnectAttempts})`)
 
     setTimeout(() => {
       if (userStore.isAuthenticated) {
@@ -131,7 +132,7 @@ export function useWebSocket() {
    */
   const send = (data) => {
     if (!socket.value || socket.value.readyState !== WebSocket.OPEN) {
-      console.error('WebSocket not connected')
+      logger.error('WebSocket not connected')
       return false
     }
 
@@ -139,7 +140,7 @@ export function useWebSocket() {
       socket.value.send(JSON.stringify(data))
       return true
     } catch (error) {
-      console.error('Error sending message:', error)
+      logger.error('Error sending message:', error)
       return false
     }
   }
@@ -160,7 +161,7 @@ export function useWebSocket() {
    * 發送打字指示器
    */
   const sendTypingIndicator = (matchId, isTyping) => {
-    console.log('[WebSocket] Sending typing indicator:', { matchId, isTyping })
+    logger.debug('[WebSocket] Sending typing indicator:', { matchId, isTyping })
     return send({
       type: 'typing',
       match_id: matchId,
@@ -239,22 +240,22 @@ export function useWebSocket() {
       try {
         handler(data)
       } catch (error) {
-        console.error(`Error in message handler for ${type}:`, error)
+        logger.error(`Error in message handler for ${type}:`, error)
       }
     })
 
     // 預設處理
     switch (type) {
       case 'connection':
-        console.log('Connection status:', data.status)
+        logger.log('Connection status:', data.status)
         break
       case 'ping':
         // 收到伺服器的心跳 ping，立即回應 pong
         sendPong()
-        console.debug('Received ping, sent pong')
+        logger.debug('Received ping, sent pong')
         break
       case 'error':
-        console.error('WebSocket error message:', data.message)
+        logger.error('WebSocket error message:', data.message)
         break
       default:
         // 由具體的處理器處理

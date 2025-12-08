@@ -4,6 +4,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authAPI } from '@/api/auth'
+import { logger } from '@/utils/logger'
 
 export const useUserStore = defineStore('user', () => {
   // 狀態
@@ -59,7 +60,7 @@ export const useUserStore = defineStore('user', () => {
       return true
     } catch (err) {
       error.value = err.response?.data?.detail || '註冊失敗'
-      console.error('註冊錯誤:', err)
+      logger.error('註冊錯誤:', err)
       return false
     } finally {
       isLoading.value = false
@@ -85,7 +86,7 @@ export const useUserStore = defineStore('user', () => {
       return true
     } catch (err) {
       error.value = err.response?.data?.detail || '登入失敗'
-      console.error('登入錯誤:', err)
+      logger.error('登入錯誤:', err)
       return false
     } finally {
       isLoading.value = false
@@ -127,7 +128,7 @@ export const useUserStore = defineStore('user', () => {
       return true
     } catch (err) {
       error.value = err.response?.data?.detail || '驗證失敗'
-      console.error('驗證錯誤:', err)
+      logger.error('驗證錯誤:', err)
       return false
     } finally {
       isLoading.value = false
@@ -152,7 +153,7 @@ export const useUserStore = defineStore('user', () => {
       return true
     } catch (err) {
       error.value = err.response?.data?.detail || '重新發送失敗'
-      console.error('重新發送錯誤:', err)
+      logger.error('重新發送錯誤:', err)
       return false
     } finally {
       isLoading.value = false
@@ -188,7 +189,7 @@ export const useUserStore = defineStore('user', () => {
         }
       }
     } catch (err) {
-      console.error('Failed to decode token:', err)
+      logger.error('Failed to decode token:', err)
       // Token 無效，清除
       clearTokens()
     }
