@@ -24,6 +24,7 @@ from app.schemas.profile import (
     UpdateInterestsRequest,
 )
 from app.services.content_moderation import ContentModerationService
+from app.services.file_storage import file_storage
 
 router = APIRouter(prefix="/api/profile")
 logger = logging.getLogger(__name__)
@@ -465,45 +466,38 @@ async def upload_photo(
             detail="最多只能上傳 6 張照片"
         )
 
-    # 驗證檔案類型
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="只能上傳圖片檔案"
-        )
-
-    # 驗證檔案大小（限制 5MB）
-    MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
-
-    # 讀取檔案內容以檢查大小
+    # 讀取檔案內容
     file_content = await file.read()
     file_size = len(file_content)
 
-    if file_size > MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"檔案過大，最大允許 {MAX_FILE_SIZE / 1024 / 1024:.0f}MB"
-        )
-
-    if file_size == 0:
+    # 驗證圖片
+    validation_error = file_storage.validate_image(file.content_type, file_size)
+    if validation_error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="檔案不能為空"
+            detail=validation_error
         )
 
-    # 重置檔案指標（以便後續處理）
-    await file.seek(0)
-
-    # 生成模擬 URL（實際應用應上傳到儲存服務）
-    photo_id = uuid.uuid4()
-    mock_url = f"/uploads/photos/{current_user.id}/{photo_id}.jpg"
-    mock_thumbnail = f"/uploads/photos/{current_user.id}/{photo_id}_thumb.jpg"
+    # 儲存照片到本地
+    try:
+        photo_id, photo_url, thumbnail_url = await file_storage.save_photo(
+            user_id=str(current_user.id),
+            file_content=file_content,
+            filename=file.filename or "photo.jpg",
+            content_type=file.content_type,
+        )
+    except Exception as e:
+        logger.error(f"Failed to save photo for user {current_user.id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="照片儲存失敗，請稍後再試"
+        )
 
     # 建立照片記錄
     new_photo = Photo(
         profile_id=profile.id,
-        url=mock_url,
-        thumbnail_url=mock_thumbnail,
+        url=photo_url,
+        thumbnail_url=thumbnail_url,
         display_order=len(existing_photos),
         is_profile_picture=(len(existing_photos) == 0),  # 第一張設為頭像
         mime_type=file.content_type,
@@ -567,9 +561,16 @@ async def delete_photo(
     # 取得 profile 以便檢查完整度和重新排序
     profile_id = photo.profile_id
     deleted_order = photo.display_order
+    photo_url = photo.url
+    thumbnail_url = photo.thumbnail_url
 
     await db.delete(photo)
     await db.commit()
+
+    # 刪除實際檔案
+    await file_storage.delete_photo(photo_url)
+    if thumbnail_url:
+        await file_storage.delete_photo(thumbnail_url)
 
     # 重新載入 profile 及其照片
     result = await db.execute(

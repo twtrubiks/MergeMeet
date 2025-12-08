@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from app.core.config import settings
 from app.core.database import init_db, close_db
@@ -39,7 +40,9 @@ app.add_middleware(
 )
 
 # 靜態檔案（照片上傳）
-# app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+uploads_dir = Path(settings.UPLOAD_DIR)
+uploads_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 
 
 # ==================== 路由 ====================

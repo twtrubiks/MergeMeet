@@ -1,12 +1,36 @@
 """個人檔案完整功能測試"""
 import pytest
 import io
+import tempfile
+import shutil
+from pathlib import Path
+from unittest.mock import patch
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from PIL import Image
 
 from app.models.user import User
 from app.models.profile import Profile, Photo, InterestTag
+from app.core.config import settings
+
+
+@pytest.fixture
+def temp_upload_dir():
+    """建立臨時上傳目錄用於測試"""
+    temp_dir = tempfile.mkdtemp()
+    yield temp_dir
+    shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+@pytest.fixture
+def sample_image_bytes():
+    """產生測試用 JPEG 圖片"""
+    img = Image.new('RGB', (800, 600), color='red')
+    buffer = io.BytesIO()
+    img.save(buffer, format='JPEG')
+    buffer.seek(0)
+    return buffer.read()
 
 
 @pytest.fixture
@@ -290,29 +314,67 @@ async def test_update_interests_too_many(client: AsyncClient, user_with_profile:
 
 
 @pytest.mark.asyncio
-async def test_upload_photo_success(client: AsyncClient, user_with_profile: dict, test_db: AsyncSession):
+async def test_upload_photo_success(client: AsyncClient, user_with_profile: dict, test_db: AsyncSession, sample_image_bytes, temp_upload_dir):
     """測試成功上傳照片"""
     token = user_with_profile["token"]
 
-    # 創建假的圖片文件
-    fake_image = io.BytesIO(b"fake image content")
-    fake_image.name = "test.jpg"
+    # 使用臨時目錄
+    with patch.object(settings, 'UPLOAD_DIR', temp_upload_dir):
+        # 重新初始化 file_storage 以使用新目錄
+        from app.services.file_storage import FileStorageService
+        with patch('app.api.profile.file_storage', FileStorageService()):
+            response = await client.post("/api/profile/photos",
+                headers={"Authorization": f"Bearer {token}"},
+                files={"file": ("test.jpg", io.BytesIO(sample_image_bytes), "image/jpeg")}
+            )
 
-    response = await client.post("/api/profile/photos",
-        headers={"Authorization": f"Bearer {token}"},
-        files={"file": ("test.jpg", fake_image, "image/jpeg")}
-    )
-
-    # 由於實際文件處理可能失敗，我們接受 201 或 400
-    assert response.status_code in [201, 400, 500]
+            assert response.status_code == 201
+            data = response.json()
+            assert "id" in data
+            assert "url" in data
+            assert "thumbnail_url" in data
+            assert data["is_profile_picture"] is True  # 第一張照片應該是主頭像
 
 
 @pytest.mark.asyncio
-async def test_delete_photo_success(client: AsyncClient, user_with_profile: dict, test_db: AsyncSession):
-    """測試成功刪除照片"""
+async def test_upload_photo_invalid_type(client: AsyncClient, user_with_profile: dict):
+    """測試上傳非圖片檔案"""
     token = user_with_profile["token"]
 
-    # 獲取用戶
+    # 上傳文字檔案
+    fake_file = io.BytesIO(b"This is not an image")
+
+    response = await client.post("/api/profile/photos",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("test.txt", fake_file, "text/plain")}
+    )
+
+    assert response.status_code == 400
+    assert "不支援" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_upload_photo_empty_file(client: AsyncClient, user_with_profile: dict):
+    """測試上傳空檔案"""
+    token = user_with_profile["token"]
+
+    empty_file = io.BytesIO(b"")
+
+    response = await client.post("/api/profile/photos",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("empty.jpg", empty_file, "image/jpeg")}
+    )
+
+    assert response.status_code == 400
+    assert "空" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_upload_photo_max_limit(client: AsyncClient, user_with_profile: dict, test_db: AsyncSession, sample_image_bytes, temp_upload_dir):
+    """測試照片數量上限（最多 6 張）"""
+    token = user_with_profile["token"]
+
+    # 獲取 profile
     result = await test_db.execute(
         select(User).where(User.email == user_with_profile["email"])
     )
@@ -323,23 +385,66 @@ async def test_delete_photo_success(client: AsyncClient, user_with_profile: dict
     )
     profile = result.scalar_one()
 
-    # 直接在資料庫創建照片記錄
-    photo = Photo(
-        profile_id=profile.id,
-        url="/uploads/test.jpg",
-        is_profile_picture=False
-    )
-    test_db.add(photo)
+    # 先在資料庫中創建 6 張照片
+    for i in range(6):
+        photo = Photo(
+            profile_id=profile.id,
+            url=f"/uploads/test{i}.jpg",
+            is_profile_picture=(i == 0)
+        )
+        test_db.add(photo)
     await test_db.commit()
-    await test_db.refresh(photo)
 
-    # 刪除照片
-    response = await client.delete(
-        f"/api/profile/photos/{photo.id}",
-        headers={"Authorization": f"Bearer {token}"}
-    )
+    # 嘗試上傳第 7 張
+    with patch.object(settings, 'UPLOAD_DIR', temp_upload_dir):
+        from app.services.file_storage import FileStorageService
+        with patch('app.api.profile.file_storage', FileStorageService()):
+            response = await client.post("/api/profile/photos",
+                headers={"Authorization": f"Bearer {token}"},
+                files={"file": ("test7.jpg", io.BytesIO(sample_image_bytes), "image/jpeg")}
+            )
 
-    assert response.status_code == 204
+            assert response.status_code == 400
+            assert "最多" in response.json()["detail"] or "6" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_delete_photo_success(client: AsyncClient, user_with_profile: dict, test_db: AsyncSession, sample_image_bytes, temp_upload_dir):
+    """測試成功刪除照片"""
+    token = user_with_profile["token"]
+
+    # 使用臨時目錄
+    with patch.object(settings, 'UPLOAD_DIR', temp_upload_dir):
+        from app.services.file_storage import FileStorageService
+        storage = FileStorageService()
+
+        with patch('app.api.profile.file_storage', storage):
+            # 先上傳一張照片
+            response = await client.post("/api/profile/photos",
+                headers={"Authorization": f"Bearer {token}"},
+                files={"file": ("test.jpg", io.BytesIO(sample_image_bytes), "image/jpeg")}
+            )
+            assert response.status_code == 201
+            photo_id = response.json()["id"]
+            photo_url = response.json()["url"]
+
+            # 確認檔案存在
+            # photo_url 格式: /uploads/photos/{user_id}/{filename}
+            # 移除 /uploads/ 前綴得到相對於 upload_dir 的路徑
+            relative_path = photo_url.replace("/uploads/", "")
+            photo_path = Path(temp_upload_dir) / relative_path
+            assert photo_path.exists(), f"Photo should exist at {photo_path}"
+
+            # 刪除照片
+            response = await client.delete(
+                f"/api/profile/photos/{photo_id}",
+                headers={"Authorization": f"Bearer {token}"}
+            )
+
+            assert response.status_code == 204
+
+            # 確認檔案已刪除
+            assert not photo_path.exists(), f"Photo should be deleted at {photo_path}"
 
 
 @pytest.mark.asyncio
