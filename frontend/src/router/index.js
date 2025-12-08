@@ -84,19 +84,37 @@ const router = createRouter({
   ]
 })
 
-// 路由守衛：檢查認證狀態
+// 路由守衛：檢查認證狀態和管理員權限
 router.beforeEach((to, from, next) => {
   const userStore = useUserStore()
 
+  // 檢查是否需要認證
   if (to.meta.requiresAuth && !userStore.isAuthenticated) {
     // 需要認證但未登入，導向登入頁
     next('/login')
-  } else if ((to.path === '/login' || to.path === '/register') && userStore.isAuthenticated) {
-    // 已登入但訪問登入/註冊頁，導向首頁
-    next('/')
-  } else {
-    next()
+    return
   }
+
+  // 檢查是否需要管理員權限
+  if (to.meta.requiresAdmin && !userStore.isAdmin) {
+    // 需要管理員權限但不是管理員，導向管理員登入頁
+    next('/admin/login')
+    return
+  }
+
+  // 已登入但訪問登入/註冊頁，導向首頁
+  if ((to.path === '/login' || to.path === '/register') && userStore.isAuthenticated) {
+    next('/')
+    return
+  }
+
+  // 已是管理員但訪問管理員登入頁，導向管理後台
+  if (to.path === '/admin/login' && userStore.isAdmin) {
+    next('/admin')
+    return
+  }
+
+  next()
 })
 
 export default router

@@ -1,5 +1,11 @@
 /**
  * 用戶狀態管理 (Pinia Store)
+ *
+ * TODO(Security): Token 目前儲存在 localStorage，存在 XSS 攻擊風險。
+ * 建議改用 HttpOnly Cookie 存儲 Token：
+ * - 後端設置 Set-Cookie: access_token=xxx; HttpOnly; Secure; SameSite=Strict
+ * - 前端發送請求時使用 withCredentials: true
+ * - 參考: https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
@@ -17,6 +23,7 @@ export const useUserStore = defineStore('user', () => {
   // 計算屬性
   const isAuthenticated = computed(() => !!accessToken.value)
   const userEmail = computed(() => user.value?.email || null)
+  const isAdmin = computed(() => user.value?.is_admin === true)
 
   /**
    * 儲存 Token 到 localStorage 和狀態
@@ -205,6 +212,7 @@ export const useUserStore = defineStore('user', () => {
     // 計算屬性
     isAuthenticated,
     userEmail,
+    isAdmin,
     // 方法
     register,
     login,

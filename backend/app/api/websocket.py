@@ -1,4 +1,10 @@
-"""WebSocket API 端點"""
+"""WebSocket API 端點
+
+TODO(Security): WebSocket Token 目前透過 Query Parameter 傳遞，存在以下風險：
+- Token 會出現在伺服器日誌和瀏覽器歷史記錄中
+- 建議改用 Sec-WebSocket-Protocol header 或首次訊息認證
+- 參考: https://devcenter.heroku.com/articles/websocket-security
+"""
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
@@ -14,6 +20,25 @@ from app.models.user import User
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def validate_uuid(value: str, field_name: str = "ID") -> uuid.UUID | None:
+    """驗證字串是否為有效的 UUID 格式
+
+    Args:
+        value: 要驗證的字串
+        field_name: 欄位名稱（用於日誌記錄）
+
+    Returns:
+        有效的 UUID 對象，或 None（如果無效）
+    """
+    if not value:
+        return None
+    try:
+        return uuid.UUID(value)
+    except (ValueError, TypeError):
+        logger.warning(f"Invalid {field_name} format: {value}")
+        return None
 
 
 @router.websocket("/ws")
@@ -100,11 +125,20 @@ async def handle_chat_message(data: dict, sender_id: uuid.UUID):
 
     async with AsyncSessionLocal() as db:
         try:
-            match_id = data.get("match_id")
+            match_id_str = data.get("match_id")
             content = data.get("content", "").strip()
 
+            # 驗證 match_id 格式
+            match_id = validate_uuid(match_id_str, "match_id")
             if not match_id or not content:
                 logger.warning(f"Invalid message data from {sender_id}: {data}")
+                await manager.send_personal_message(
+                    str(sender_id),
+                    {
+                        "type": "error",
+                        "message": "無效的配對 ID 或訊息內容"
+                    }
+                )
                 return
 
             # 驗證訊息長度（防止 DoS 攻擊）
@@ -240,20 +274,22 @@ async def handle_typing_indicator(data: dict, user_id: str):
         data: 包含 match_id 和 is_typing 的資料
         user_id: 正在打字的用戶 ID
     """
-    match_id = data.get("match_id")
+    match_id_str = data.get("match_id")
     is_typing = data.get("is_typing", False)
 
+    # 驗證 match_id 格式
+    match_id = validate_uuid(match_id_str, "match_id")
     if not match_id:
         return
 
     # 發送打字狀態給配對中的其他用戶
     await manager.send_to_match(
-        match_id,
+        str(match_id),
         {
             "type": "typing",
             "user_id": user_id,
             "is_typing": is_typing,
-            "match_id": match_id
+            "match_id": str(match_id)
         },
         exclude_user=user_id
     )
@@ -270,8 +306,10 @@ async def handle_read_receipt(data: dict, user_id: str):
 
     async with AsyncSessionLocal() as db:
         try:
-            message_id = data.get("message_id")
+            message_id_str = data.get("message_id")
 
+            # 驗證 message_id 格式
+            message_id = validate_uuid(message_id_str, "message_id")
             if not message_id:
                 return
 
@@ -318,19 +356,21 @@ async def handle_join_match(data: dict, user_id: str):
         data: 包含 match_id 的資料
         user_id: 要加入的用戶 ID
     """
-    match_id = data.get("match_id")
+    match_id_str = data.get("match_id")
 
+    # 驗證 match_id 格式
+    match_id = validate_uuid(match_id_str, "match_id")
     if not match_id:
         return
 
-    await manager.join_match_room(match_id, user_id)
+    await manager.join_match_room(str(match_id), user_id)
 
     # 通知用戶已加入聊天室
     await manager.send_personal_message(
         user_id,
         {
             "type": "joined_match",
-            "match_id": match_id
+            "match_id": str(match_id)
         }
     )
 
@@ -342,11 +382,13 @@ async def handle_leave_match(data: dict, user_id: str):
         data: 包含 match_id 的資料
         user_id: 要離開的用戶 ID
     """
-    match_id = data.get("match_id")
+    match_id_str = data.get("match_id")
 
+    # 驗證 match_id 格式
+    match_id = validate_uuid(match_id_str, "match_id")
     if not match_id:
         return
 
-    await manager.leave_match_room(match_id, user_id)
+    await manager.leave_match_room(str(match_id), user_id)
 
     logger.info(f"User {user_id} left match {match_id}")
