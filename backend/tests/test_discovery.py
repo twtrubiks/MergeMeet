@@ -135,22 +135,31 @@ async def completed_profiles(client: AsyncClient, test_users: dict, test_db: Asy
     )
     assert response.status_code == 200, f"Failed to set Bob interests: status={response.status_code}, body={response.text}"
 
-    # 上傳假照片
+    # 上傳測試照片
     from io import BytesIO
+    from PIL import Image
+
+    def create_test_image():
+        """創建一個有效的測試圖片"""
+        img = Image.new('RGB', (100, 100), color='red')
+        buffer = BytesIO()
+        img.save(buffer, format='JPEG')
+        buffer.seek(0)
+        return buffer
 
     # Alice 上傳照片
-    fake_image = BytesIO(b"fake image content")
+    test_image = create_test_image()
     response = await client.post("/api/profile/photos",
         headers={"Authorization": f"Bearer {test_users['alice']['token']}"},
-        files={"file": ("photo.jpg", fake_image, "image/jpeg")}
+        files={"file": ("photo.jpg", test_image, "image/jpeg")}
     )
     assert response.status_code == 201, f"Failed to upload Alice photo: status={response.status_code}, body={response.text}"
 
     # Bob 上傳照片
-    fake_image = BytesIO(b"fake image content")
+    test_image = create_test_image()
     response = await client.post("/api/profile/photos",
         headers={"Authorization": f"Bearer {test_users['bob']['token']}"},
-        files={"file": ("photo.jpg", fake_image, "image/jpeg")}
+        files={"file": ("photo.jpg", test_image, "image/jpeg")}
     )
     assert response.status_code == 201, f"Failed to upload Bob photo: status={response.status_code}, body={response.text}"
 
