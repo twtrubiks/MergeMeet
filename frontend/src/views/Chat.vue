@@ -18,8 +18,13 @@
           />
           <div class="user-details">
             <div class="user-name">{{ currentConversation.other_user_name }}</div>
+            <!-- 打字指示器 -->
             <div v-if="chatStore.isTyping" class="typing-indicator">
               正在輸入...
+            </div>
+            <!-- 調試：顯示 isTyping 狀態 -->
+            <div style="font-size: 10px; color: red;">
+              [DEBUG] isTyping: {{ chatStore.isTyping }}
             </div>
           </div>
         </div>

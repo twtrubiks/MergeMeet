@@ -36,8 +36,17 @@ export const useChatStore = defineStore('chat', () => {
   })
 
   const isTyping = computed(() => {
-    if (!currentMatchId.value) return false
-    return !!typingUsers.value[currentMatchId.value]
+    if (!currentMatchId.value) {
+      console.log('🔥 [DEBUG] isTyping: false (no currentMatchId)')
+      return false
+    }
+    const result = !!typingUsers.value[currentMatchId.value]
+    console.log('🔥 [DEBUG] isTyping computed:', {
+      currentMatchId: currentMatchId.value,
+      typingUsers: typingUsers.value,
+      result: result
+    })
+    return result
   })
 
   /**
