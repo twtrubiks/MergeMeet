@@ -395,37 +395,38 @@ async def pass_user(
             detail="不能跳過自己"
         )
 
-    # 創建或更新跳過記錄
-    try:
-        new_pass = Pass(
-            from_user_id=current_user.id,
-            to_user_id=user_id
-        )
-        db.add(new_pass)
-        await db.commit()
-    except IntegrityError:
-        # 已經跳過過，更新時間（使用 ON CONFLICT）
-        await db.rollback()
-        await db.execute(
-            select(Pass)
-            .where(
+    # 創建或更新跳過記錄（先查詢再決定）
+    from sqlalchemy import delete
+
+    # 檢查是否已經跳過過
+    result = await db.execute(
+        select(Pass).where(
+            and_(
                 Pass.from_user_id == current_user.id,
                 Pass.to_user_id == user_id
             )
-            .with_for_update()
         )
-        # 刪除舊記錄，創建新記錄（更新時間）
+    )
+    existing_pass = result.scalar_one_or_none()
+
+    if existing_pass:
+        # 已經跳過過，刪除舊記錄
         await db.execute(
-            Pass.__table__.delete().where(
+            delete(Pass).where(
                 and_(
                     Pass.from_user_id == current_user.id,
                     Pass.to_user_id == user_id
                 )
             )
         )
-        new_pass = Pass(from_user_id=current_user.id, to_user_id=user_id)
-        db.add(new_pass)
-        await db.commit()
+
+    # 創建新記錄（時間會是當前時間）
+    new_pass = Pass(
+        from_user_id=current_user.id,
+        to_user_id=user_id
+    )
+    db.add(new_pass)
+    await db.commit()
 
     return {"passed": True, "message": "已跳過此用戶"}
 

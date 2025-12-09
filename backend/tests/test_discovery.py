@@ -328,6 +328,174 @@ async def test_pass_user(client: AsyncClient, completed_profiles: dict):
 
 
 @pytest.mark.asyncio
+async def test_passed_user_not_shown_in_browse(client: AsyncClient, completed_profiles: dict):
+    """測試：24 小時內跳過的用戶不會出現在瀏覽列表"""
+    # Alice 瀏覽候選人
+    response = await client.get("/api/discovery/browse?limit=10",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"}
+    )
+    candidates_before = response.json()
+
+    if len(candidates_before) == 0:
+        pytest.skip("沒有可配對的候選人")
+
+    bob_user_id = candidates_before[0]["user_id"]
+    bob_name = candidates_before[0]["display_name"]
+
+    # Alice 跳過 Bob
+    response = await client.post(f"/api/discovery/pass/{bob_user_id}",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"}
+    )
+    assert response.status_code == 200
+
+    # 重新瀏覽候選人
+    response = await client.get("/api/discovery/browse?limit=10",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"}
+    )
+    candidates_after = response.json()
+
+    # Bob 不應該出現在列表中（24 小時內）
+    bob_in_list = any(c["user_id"] == bob_user_id for c in candidates_after)
+    assert not bob_in_list, f"{bob_name} 應該被排除但仍出現在候選人列表"
+
+
+@pytest.mark.asyncio
+async def test_passed_user_reappears_after_24_hours(client: AsyncClient, completed_profiles: dict, test_db: AsyncSession):
+    """測試：24 小時後跳過的用戶會重新出現"""
+    from app.models.match import Pass
+    from app.models.user import User
+    from datetime import datetime, timedelta, timezone
+
+    # 獲取 Alice 的 user_id
+    result = await test_db.execute(
+        select(User.id).where(User.email == completed_profiles['alice']['email'])
+    )
+    alice_user_id = result.scalar_one()
+
+    # Alice 瀏覽候選人
+    response = await client.get("/api/discovery/browse?limit=10",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"}
+    )
+    candidates = response.json()
+
+    if len(candidates) == 0:
+        pytest.skip("沒有可配對的候選人")
+
+    bob_user_id = candidates[0]["user_id"]
+
+    # Alice 跳過 Bob
+    response = await client.post(f"/api/discovery/pass/{bob_user_id}",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"}
+    )
+    assert response.status_code == 200
+
+    # 手動修改跳過時間為 25 小時前（模擬時間過去）
+    old_time = datetime.now(timezone.utc) - timedelta(hours=25)
+    await test_db.execute(
+        Pass.__table__.update()
+        .where(
+            Pass.from_user_id == alice_user_id,
+            Pass.to_user_id == bob_user_id
+        )
+        .values(passed_at=old_time)
+    )
+    await test_db.commit()
+
+    # 重新瀏覽候選人
+    response = await client.get("/api/discovery/browse?limit=10",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"}
+    )
+    candidates_after = response.json()
+
+    # Bob 應該重新出現（超過 24 小時）
+    bob_in_list = any(c["user_id"] == bob_user_id for c in candidates_after)
+    assert bob_in_list, "Bob 應該在 24 小時後重新出現"
+
+
+@pytest.mark.asyncio
+async def test_cannot_pass_self(client: AsyncClient, completed_profiles: dict, test_db: AsyncSession):
+    """測試：不能跳過自己"""
+    from app.models.user import User
+
+    # 獲取 Alice 的 user_id
+    result = await test_db.execute(
+        select(User.id).where(User.email == completed_profiles['alice']['email'])
+    )
+    alice_user_id = result.scalar_one()
+
+    response = await client.post(f"/api/discovery/pass/{alice_user_id}",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"}
+    )
+
+    assert response.status_code == 400
+    assert "不能跳過自己" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_duplicate_pass_updates_time(client: AsyncClient, completed_profiles: dict, test_db: AsyncSession):
+    """測試：重複跳過同一用戶會更新時間"""
+    from app.models.match import Pass
+    from app.models.user import User
+    from sqlalchemy import select
+    from datetime import datetime, timezone
+
+    # 獲取 Alice 的 user_id
+    result = await test_db.execute(
+        select(User.id).where(User.email == completed_profiles['alice']['email'])
+    )
+    alice_user_id = result.scalar_one()
+
+    # Alice 瀏覽候選人
+    response = await client.get("/api/discovery/browse?limit=1",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"}
+    )
+    candidates = response.json()
+
+    if len(candidates) == 0:
+        pytest.skip("沒有可配對的候選人")
+
+    bob_user_id = candidates[0]["user_id"]
+
+    # 第一次跳過
+    response = await client.post(f"/api/discovery/pass/{bob_user_id}",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"}
+    )
+    assert response.status_code == 200
+
+    # 查詢第一次跳過的時間
+    result = await test_db.execute(
+        select(Pass.passed_at).where(
+            Pass.from_user_id == alice_user_id,
+            Pass.to_user_id == bob_user_id
+        )
+    )
+    first_pass_time = result.scalar_one()
+
+    # 等待 1 秒
+    import asyncio
+    await asyncio.sleep(1)
+
+    # 第二次跳過（應該更新時間）
+    response = await client.post(f"/api/discovery/pass/{bob_user_id}",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"}
+    )
+    assert response.status_code == 200
+
+    # 查詢第二次跳過的時間
+    await test_db.rollback()  # 重新載入資料
+    result = await test_db.execute(
+        select(Pass.passed_at).where(
+            Pass.from_user_id == alice_user_id,
+            Pass.to_user_id == bob_user_id
+        )
+    )
+    second_pass_time = result.scalar_one()
+
+    # 第二次的時間應該更新
+    assert second_pass_time > first_pass_time, "重複跳過應該更新時間"
+
+
+@pytest.mark.asyncio
 async def test_get_matches_empty(client: AsyncClient, completed_profiles: dict):
     """測試：沒有配對時返回空列表"""
     response = await client.get("/api/discovery/matches",
