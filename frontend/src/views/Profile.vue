@@ -86,14 +86,67 @@
             </div>
 
             <div class="form-group">
-              <label for="location_name">地點</label>
-              <input
+              <label for="location_name">地點 *</label>
+
+              <!-- 自動定位按鈕 -->
+              <div class="location-actions">
+                <button
+                  type="button"
+                  class="btn-auto-location"
+                  @click="getAutoLocation"
+                  :disabled="gettingLocation"
+                >
+                  <span v-if="!gettingLocation">📍 自動獲取我的位置</span>
+                  <span v-else>🔄 定位中...</span>
+                </button>
+                <small class="hint">或手動選擇城市</small>
+              </div>
+
+              <!-- 城市選擇下拉選單 -->
+              <select
                 id="location_name"
                 v-model="formData.location_name"
-                type="text"
-                placeholder="例如：台北市"
-              />
-              <small class="hint">暫不支援自動定位，請手動輸入</small>
+                class="location-select"
+              >
+                <option value="">請選擇城市</option>
+                <optgroup label="北部">
+                  <option value="台北市">台北市</option>
+                  <option value="新北市">新北市</option>
+                  <option value="基隆市">基隆市</option>
+                  <option value="桃園市">桃園市</option>
+                  <option value="新竹市">新竹市</option>
+                  <option value="新竹縣">新竹縣</option>
+                </optgroup>
+                <optgroup label="中部">
+                  <option value="苗栗縣">苗栗縣</option>
+                  <option value="台中市">台中市</option>
+                  <option value="彰化縣">彰化縣</option>
+                  <option value="南投縣">南投縣</option>
+                  <option value="雲林縣">雲林縣</option>
+                </optgroup>
+                <optgroup label="南部">
+                  <option value="嘉義市">嘉義市</option>
+                  <option value="嘉義縣">嘉義縣</option>
+                  <option value="台南市">台南市</option>
+                  <option value="高雄市">高雄市</option>
+                  <option value="屏東縣">屏東縣</option>
+                </optgroup>
+                <optgroup label="東部">
+                  <option value="宜蘭縣">宜蘭縣</option>
+                  <option value="花蓮縣">花蓮縣</option>
+                  <option value="台東縣">台東縣</option>
+                </optgroup>
+                <optgroup label="離島">
+                  <option value="澎湖縣">澎湖縣</option>
+                  <option value="金門縣">金門縣</option>
+                  <option value="連江縣">連江縣（馬祖）</option>
+                </optgroup>
+              </select>
+
+              <!-- 顯示座標信息（GPS 定位成功時） -->
+              <small v-if="formData.gps_location" class="success-hint">
+                ✅ GPS 定位成功（已模糊化保護隱私）
+              </small>
             </div>
 
             <div class="button-group">
@@ -270,13 +323,15 @@ const dialog = useDialog()
 const isCreating = ref(false)
 const isEditing = ref(false)
 const currentStep = ref(1)
+const gettingLocation = ref(false)
 
 // 表單資料
 const formData = ref({
   display_name: '',
   gender: '',
   bio: '',
-  location_name: ''
+  location_name: '',
+  gps_location: null  // 存儲 GPS 定位結果 { latitude, longitude }
 })
 
 // 選擇的興趣標籤
@@ -387,7 +442,109 @@ const nextStep = async () => {
 }
 
 /**
- * 將地點名稱轉換為經緯度（簡易版）
+ * 位置模糊化（保護隱私）
+ * 添加 500m-1km 隨機偏移，避免洩漏精確位置
+ */
+const fuzzyLocation = (latitude, longitude) => {
+  // 添加 0.005 度隨機偏移（約 500m-1km）
+  const offset = 0.005
+  const randomLat = latitude + (Math.random() - 0.5) * offset
+  const randomLng = longitude + (Math.random() - 0.5) * offset
+
+  // 保留 4 位小數（約 10m 精度）
+  return {
+    latitude: Math.round(randomLat * 10000) / 10000,
+    longitude: Math.round(randomLng * 10000) / 10000
+  }
+}
+
+/**
+ * 自動獲取用戶位置（使用瀏覽器 Geolocation API）
+ */
+const getAutoLocation = async () => {
+  if (!navigator.geolocation) {
+    message.warning('您的瀏覽器不支援定位功能，請手動選擇城市')
+    return
+  }
+
+  gettingLocation.value = true
+
+  try {
+    const position = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        resolve,
+        reject,
+        {
+          enableHighAccuracy: true,  // 高精度定位
+          timeout: 10000,            // 10 秒超時
+          maximumAge: 0              // 不使用快取位置
+        }
+      )
+    })
+
+    const { latitude, longitude } = position.coords
+
+    // 位置模糊化保護隱私
+    const fuzzyCoords = fuzzyLocation(latitude, longitude)
+
+    // 存儲 GPS 座標
+    formData.value.gps_location = fuzzyCoords
+
+    // 反向地理編碼（簡化版：根據座標判斷大概城市）
+    const cityName = getCityFromCoords(latitude, longitude)
+    if (cityName) {
+      formData.value.location_name = cityName
+    }
+
+    message.success('✅ 定位成功！已自動獲取您的位置')
+    logger.log('GPS location obtained:', fuzzyCoords)
+
+  } catch (error) {
+    logger.error('定位失敗:', error)
+
+    // 根據錯誤類型顯示不同訊息
+    if (error.code === 1) {
+      message.warning('您拒絕了定位權限，請手動選擇城市')
+    } else if (error.code === 2) {
+      message.error('無法獲取位置，請檢查 GPS 或網路連接')
+    } else if (error.code === 3) {
+      message.warning('定位超時，請手動選擇城市')
+    } else {
+      message.warning('定位失敗，請手動選擇城市')
+    }
+  } finally {
+    gettingLocation.value = false
+  }
+}
+
+/**
+ * 根據座標判斷城市（簡化版反向地理編碼）
+ */
+const getCityFromCoords = (lat, lng) => {
+  // 台灣主要城市的大概範圍（簡化判斷）
+  const cityRanges = [
+    { name: '台北市', lat: [24.95, 25.25], lng: [121.45, 121.65] },
+    { name: '新北市', lat: [24.80, 25.30], lng: [121.30, 122.00] },
+    { name: '基隆市', lat: [25.08, 25.18], lng: [121.68, 121.80] },
+    { name: '桃園市', lat: [24.80, 25.10], lng: [120.90, 121.50] },
+    { name: '新竹市', lat: [24.75, 24.85], lng: [120.90, 121.00] },
+    { name: '台中市', lat: [24.00, 24.30], lng: [120.50, 120.90] },
+    { name: '台南市', lat: [22.90, 23.10], lng: [120.10, 120.35] },
+    { name: '高雄市', lat: [22.50, 22.80], lng: [120.20, 120.45] },
+  ]
+
+  for (const city of cityRanges) {
+    if (lat >= city.lat[0] && lat <= city.lat[1] &&
+        lng >= city.lng[0] && lng <= city.lng[1]) {
+      return city.name
+    }
+  }
+
+  return '台灣'  // 預設值
+}
+
+/**
+ * 將地點名稱轉換為經緯度（擴展版）
  */
 const geocodeLocation = (locationName) => {
   // 輸入驗證
@@ -409,18 +566,35 @@ const geocodeLocation = (locationName) => {
     return null
   }
 
-  // 常見台灣城市的經緯度（僅供測試使用）
+  // 台灣所有縣市的經緯度（城市中心點座標）
   const cityCoordinates = {
+    // 北部
     '台北市': { latitude: 25.0330, longitude: 121.5654 },
-    '台北市信義區': { latitude: 25.033, longitude: 121.5654 },
-    '台北市大安區': { latitude: 25.0263, longitude: 121.5436 },
     '新北市': { latitude: 25.0120, longitude: 121.4659 },
+    '基隆市': { latitude: 25.1276, longitude: 121.7392 },
     '桃園市': { latitude: 24.9936, longitude: 121.3010 },
+    '新竹市': { latitude: 24.8138, longitude: 120.9675 },
+    '新竹縣': { latitude: 24.8387, longitude: 121.0177 },
+    // 中部
+    '苗栗縣': { latitude: 24.5602, longitude: 120.8214 },
     '台中市': { latitude: 24.1477, longitude: 120.6736 },
+    '彰化縣': { latitude: 24.0518, longitude: 120.5161 },
+    '南投縣': { latitude: 23.9609, longitude: 120.9719 },
+    '雲林縣': { latitude: 23.7092, longitude: 120.4313 },
+    // 南部
+    '嘉義市': { latitude: 23.4800, longitude: 120.4491 },
+    '嘉義縣': { latitude: 23.4518, longitude: 120.2554 },
     '台南市': { latitude: 22.9997, longitude: 120.2270 },
     '高雄市': { latitude: 22.6273, longitude: 120.3014 },
-    '新竹市': { latitude: 24.8138, longitude: 120.9675 },
-    '基隆市': { latitude: 25.1276, longitude: 121.7392 },
+    '屏東縣': { latitude: 22.5519, longitude: 120.5487 },
+    // 東部
+    '宜蘭縣': { latitude: 24.7021, longitude: 121.7378 },
+    '花蓮縣': { latitude: 23.9871, longitude: 121.6015 },
+    '台東縣': { latitude: 22.7583, longitude: 121.1444 },
+    // 離島
+    '澎湖縣': { latitude: 23.5712, longitude: 119.5793 },
+    '金門縣': { latitude: 24.4324, longitude: 118.3170 },
+    '連江縣': { latitude: 26.1605, longitude: 119.9515 }  // 馬祖
   }
 
   // 直接匹配完整地點名稱
@@ -439,12 +613,23 @@ const geocodeLocation = (locationName) => {
  */
 const saveBasicInfo = async () => {
   try {
-    // 如果有填寫地點，轉換為經緯度
     const profileData = { ...formData.value }
-    if (profileData.location_name) {
+
+    // 優先使用 GPS 定位座標（更精確）
+    if (profileData.gps_location) {
+      profileData.location = {
+        latitude: profileData.gps_location.latitude,
+        longitude: profileData.gps_location.longitude,
+        location_name: profileData.location_name || '台灣'
+      }
+      delete profileData.gps_location
+      delete profileData.location_name
+    }
+    // 降級：使用城市中心座標
+    else if (profileData.location_name) {
       const coords = geocodeLocation(profileData.location_name)
       if (!coords) {
-        message.error('無法識別該地點,請選擇有效的城市')
+        message.error('無法識別該地點，請選擇有效的城市')
         return
       }
       profileData.location = {
@@ -452,7 +637,7 @@ const saveBasicInfo = async () => {
         longitude: coords.longitude,
         location_name: profileData.location_name
       }
-      delete profileData.location_name // 移除純文字欄位
+      delete profileData.location_name
     }
 
     await profileStore.createProfile(profileData)
@@ -462,8 +647,8 @@ const saveBasicInfo = async () => {
     message.success('個人檔案創建成功')
   } catch (error) {
     logger.error('建立個人檔案失敗:', error)
-    message.error('創建失敗,請檢查網絡連接')
-    // 不改變狀態,讓用戶可以重試
+    message.error('創建失敗，請檢查網絡連接')
+    // 不改變狀態，讓用戶可以重試
   }
 }
 
@@ -474,12 +659,23 @@ const submitProfile = async () => {
   try {
     // 更新基本資料（如果有修改）
     if (isEditing.value) {
-      // 如果有填寫地點，轉換為經緯度
       const profileData = { ...formData.value }
-      if (profileData.location_name) {
+
+      // 優先使用 GPS 定位座標（更精確）
+      if (profileData.gps_location) {
+        profileData.location = {
+          latitude: profileData.gps_location.latitude,
+          longitude: profileData.gps_location.longitude,
+          location_name: profileData.location_name || '台灣'
+        }
+        delete profileData.gps_location
+        delete profileData.location_name
+      }
+      // 降級：使用城市中心座標
+      else if (profileData.location_name) {
         const coords = geocodeLocation(profileData.location_name)
         if (!coords) {
-          message.error('無法識別該地點,請選擇有效的城市')
+          message.error('無法識別該地點，請選擇有效的城市')
           return
         }
         profileData.location = {
@@ -487,7 +683,7 @@ const submitProfile = async () => {
           longitude: coords.longitude,
           location_name: profileData.location_name
         }
-        delete profileData.location_name // 移除純文字欄位
+        delete profileData.location_name
       }
 
       await profileStore.updateProfile(profileData)
@@ -790,6 +986,74 @@ onMounted(async () => {
   color: #999;
   font-style: italic;
   font-weight: 400;
+}
+
+.form-group .success-hint {
+  color: #4CAF50;
+  font-weight: 500;
+  margin-top: 8px;
+  display: block;
+}
+
+/* 位置相關樣式 */
+.location-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.btn-auto-location {
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.btn-auto-location:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.btn-auto-location:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-auto-location:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.location-select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  font-size: 15px;
+  transition: all 0.3s ease;
+  background: white;
+  cursor: pointer;
+}
+
+.location-select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.location-select option {
+  padding: 8px;
+}
+
+.location-select optgroup {
+  font-weight: 600;
+  color: #667eea;
 }
 
 /* 按鈕 */
