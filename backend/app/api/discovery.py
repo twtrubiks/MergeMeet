@@ -1,7 +1,7 @@
 """探索與配對 API"""
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, not_, func, case
+from sqlalchemy import select, and_, or_, not_, func, case, delete
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
 from geoalchemy2.functions import ST_Distance, ST_DWithin
@@ -396,8 +396,6 @@ async def pass_user(
         )
 
     # 創建或更新跳過記錄（先查詢再決定）
-    from sqlalchemy import delete
-
     # 檢查是否已經跳過過
     result = await db.execute(
         select(Pass).where(

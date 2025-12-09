@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import select
 
 from app.core.config import settings
 from app.models.profile import InterestTag
@@ -99,7 +100,6 @@ async def init_tags():
 
     async with AsyncSessionLocal() as session:
         # 檢查是否已有標籤
-        from sqlalchemy import select
         result = await session.execute(select(InterestTag))
         existing_tags = result.scalars().all()
 

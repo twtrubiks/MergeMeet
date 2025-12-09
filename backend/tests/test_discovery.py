@@ -1,15 +1,16 @@
 """探索與配對功能測試"""
 import pytest
+import asyncio
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from io import BytesIO
 from PIL import Image
 
 from app.models.user import User
 from app.models.profile import Profile, InterestTag
-from app.models.match import Like, Match
+from app.models.match import Like, Match, Pass
 
 
 @pytest.fixture
@@ -362,9 +363,6 @@ async def test_passed_user_not_shown_in_browse(client: AsyncClient, completed_pr
 @pytest.mark.asyncio
 async def test_passed_user_reappears_after_24_hours(client: AsyncClient, completed_profiles: dict, test_db: AsyncSession):
     """測試：24 小時後跳過的用戶會重新出現"""
-    from app.models.match import Pass
-    from app.models.user import User
-    from datetime import datetime, timedelta, timezone
 
     # 獲取 Alice 的 user_id
     result = await test_db.execute(
@@ -415,7 +413,6 @@ async def test_passed_user_reappears_after_24_hours(client: AsyncClient, complet
 @pytest.mark.asyncio
 async def test_cannot_pass_self(client: AsyncClient, completed_profiles: dict, test_db: AsyncSession):
     """測試：不能跳過自己"""
-    from app.models.user import User
 
     # 獲取 Alice 的 user_id
     result = await test_db.execute(
@@ -434,10 +431,6 @@ async def test_cannot_pass_self(client: AsyncClient, completed_profiles: dict, t
 @pytest.mark.asyncio
 async def test_duplicate_pass_updates_time(client: AsyncClient, completed_profiles: dict, test_db: AsyncSession):
     """測試：重複跳過同一用戶會更新時間"""
-    from app.models.match import Pass
-    from app.models.user import User
-    from sqlalchemy import select
-    from datetime import datetime, timezone
 
     # 獲取 Alice 的 user_id
     result = await test_db.execute(
@@ -472,7 +465,6 @@ async def test_duplicate_pass_updates_time(client: AsyncClient, completed_profil
     first_pass_time = result.scalar_one()
 
     # 等待 1 秒
-    import asyncio
     await asyncio.sleep(1)
 
     # 第二次跳過（應該更新時間）
