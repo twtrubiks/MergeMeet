@@ -100,14 +100,6 @@ export const useChatStore = defineStore('chat', () => {
       // API 已經返回正序（舊的在前），直接使用
       messages.value[matchId] = response.data.messages
 
-      console.log('🔥 [DEBUG] Fetched messages count:', response.data.messages.length)
-      console.log('🔥 [DEBUG] Last 3 messages:', response.data.messages.slice(-3).map(m => ({
-        id: m.id.substring(0, 8),
-        content: m.content,
-        is_read: m.is_read,
-        sent_at: m.sent_at
-      })))
-
       return response.data
     } catch (err) {
       error.value = err.response?.data?.detail || '無法取得聊天記錄'
@@ -219,10 +211,9 @@ export const useChatStore = defineStore('chat', () => {
     currentMatchId.value = matchId
     ws.joinMatch(matchId)
 
-    // 獲取聊天記錄
-    if (!messages.value[matchId]) {
-      await fetchChatHistory(matchId)
-    }
+    // 每次進入聊天室都重新載入最新訊息
+    // 這確保用戶能看到離開期間的新訊息
+    await fetchChatHistory(matchId)
 
     // 標記已讀（確保訊息已載入後再執行）
     await markConversationAsRead(matchId)

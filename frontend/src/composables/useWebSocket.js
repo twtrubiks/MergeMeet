@@ -32,6 +32,9 @@ export function useWebSocket() {
     connectionState.value === ConnectionState.RECONNECTING
   )
 
+  // 儲存正在進行的連接 Promise（避免重複連接）
+  let connectingPromise = null
+
   /**
    * 建立 WebSocket 連接（使用首次訊息認證）
    *
@@ -40,9 +43,17 @@ export function useWebSocket() {
    * @returns {Promise<void>} 當連接成功並認證完成時 resolve
    */
   const connect = () => {
+    // 已連接，直接返回
     if (socket.value?.readyState === WebSocket.OPEN) {
       logger.log('WebSocket already connected')
       return Promise.resolve()
+    }
+
+    // 正在連接中，返回現有的 Promise（避免重複連接）
+    if (connectingPromise && (connectionState.value === ConnectionState.CONNECTING ||
+        connectionState.value === ConnectionState.RECONNECTING)) {
+      logger.log('WebSocket connection in progress, waiting...')
+      return connectingPromise
     }
 
     if (!userStore.isAuthenticated || !userStore.user?.id) {
@@ -54,7 +65,7 @@ export function useWebSocket() {
       ? ConnectionState.RECONNECTING
       : ConnectionState.CONNECTING
 
-    return new Promise((resolve, reject) => {
+    connectingPromise = new Promise((resolve, reject) => {
       try {
         // 建立 WebSocket 連接（URL 中不包含 Token，避免洩漏）
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -70,6 +81,14 @@ export function useWebSocket() {
         socket.value.onopen = () => {
           logger.log('WebSocket connected, sending auth...')
 
+          // 檢查 socket 是否仍然有效（防止競爭條件）
+          if (!socket.value) {
+            logger.error('WebSocket closed before auth could be sent')
+            connectingPromise = null
+            reject(new Error('WebSocket closed unexpectedly'))
+            return
+          }
+
           // 發送認證訊息（Token 安全地通過 WebSocket 訊息傳遞）
           socket.value.send(JSON.stringify({
             type: 'auth',
@@ -80,6 +99,7 @@ export function useWebSocket() {
           // 等待認證成功回應
           const authTimeout = setTimeout(() => {
             logger.error('WebSocket authentication timeout')
+            connectingPromise = null
             socket.value.close()
             reject(new Error('Authentication timeout'))
           }, 5000) // 5 秒超時
@@ -94,6 +114,7 @@ export function useWebSocket() {
                 logger.log('WebSocket authenticated successfully')
                 connectionState.value = ConnectionState.CONNECTED
                 reconnectAttempts.value = 0
+                connectingPromise = null
 
                 // 移除臨時處理器，啟用正常訊息處理
                 socket.value.onmessage = normalMessageHandler
@@ -101,6 +122,7 @@ export function useWebSocket() {
               } else if (data.type === 'error' && data.message?.includes('auth')) {
                 clearTimeout(authTimeout)
                 logger.error('WebSocket authentication failed:', data.message)
+                connectingPromise = null
                 socket.value.close()
                 reject(new Error('Authentication failed'))
               }
@@ -137,15 +159,19 @@ export function useWebSocket() {
         // 連接錯誤
         socket.value.onerror = (error) => {
           logger.error('WebSocket error:', error)
+          connectingPromise = null
           reject(error)
         }
 
       } catch (error) {
         logger.error('Error creating WebSocket:', error)
         connectionState.value = ConnectionState.DISCONNECTED
+        connectingPromise = null
         reject(error)
       }
     })
+
+    return connectingPromise
   }
 
   /**

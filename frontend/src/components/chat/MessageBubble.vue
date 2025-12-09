@@ -57,10 +57,6 @@
         <span v-else-if="isOwn" class="message-status">
           ✓ 已送達
         </span>
-        <!-- 調試：顯示狀態 -->
-        <span style="font-size: 9px; color: red;" v-if="isOwn">
-          [DEBUG: {{ message.is_read ? 'HAS_READ' : 'NO_READ' }}]
-        </span>
       </div>
     </div>
 
