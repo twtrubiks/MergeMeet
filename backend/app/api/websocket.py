@@ -11,7 +11,7 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import logging
 import uuid
@@ -374,7 +374,9 @@ async def handle_read_receipt(data: dict, user_id: str):
 
             # 更新訊息狀態
             if not message.is_read:
-                message.is_read = func.now()
+                # 使用 Python datetime 而不是 SQL func.now()
+                read_time = datetime.now(timezone.utc)
+                message.is_read = read_time
                 await db.commit()
 
                 # 通知發送者
@@ -384,7 +386,7 @@ async def handle_read_receipt(data: dict, user_id: str):
                         "type": "read_receipt",
                         "message_id": str(message.id),
                         "read_by": user_id,
-                        "read_at": message.is_read.isoformat()
+                        "read_at": read_time.isoformat()
                     }
                 )
 
