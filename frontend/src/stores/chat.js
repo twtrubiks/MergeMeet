@@ -237,7 +237,7 @@ export const useChatStore = defineStore('chat', () => {
   /**
    * 處理新訊息事件
    */
-  const handleNewMessage = (data) => {
+  const handleNewMessage = async (data) => {
     const message = data.message
     const matchId = message.match_id
 
