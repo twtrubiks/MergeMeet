@@ -39,6 +39,8 @@ class ContentModerationService:
         """
         從資料庫載入敏感詞（帶快取機制、LRU 策略和線程安全保護）
 
+        修復競態條件：所有快取操作都在鎖內進行，避免無鎖檢查導致的數據不一致。
+
         Args:
             db: 資料庫 session
 
@@ -46,29 +48,21 @@ class ContentModerationService:
             敏感詞字典列表（已序列化，可安全緩存）
         """
         cache_key = "words"
-        now = datetime.now()
 
-        # 快速檢查（無鎖）- 如果快取有效直接返回
-        cache_timestamp = cls._cache_time.get(cache_key)
-        if cache_timestamp and (now - cache_timestamp).total_seconds() < cls._cache_ttl:
-            cached_words = cls._cache.get(cache_key)
-            if cached_words is not None:
-                # LRU: 移到最後（最近使用）
-                cls._cache.move_to_end(cache_key)
-                return cached_words
-
-        # 快取失效，需要重新載入（使用鎖避免重複查詢）
+        # 所有快取操作都在鎖內進行，確保線程安全
         async with cls._cache_lock:
-            # 雙重檢查：可能其他協程已經更新了快取
             now = datetime.now()
             cache_timestamp = cls._cache_time.get(cache_key)
+
+            # 檢查快取是否有效
             if cache_timestamp and (now - cache_timestamp).total_seconds() < cls._cache_ttl:
                 cached_words = cls._cache.get(cache_key)
                 if cached_words is not None:
+                    # LRU: 移到最後（最近使用）
                     cls._cache.move_to_end(cache_key)
                     return cached_words
 
-            # 從資料庫載入啟用的敏感詞
+            # 快取失效，從資料庫載入啟用的敏感詞
             result = await db.execute(
                 select(SensitiveWord).where(SensitiveWord.is_active == True)
             )

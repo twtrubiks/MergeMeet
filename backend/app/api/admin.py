@@ -258,9 +258,31 @@ async def review_report(
     }
 
 
+def escape_like_pattern(pattern: str) -> str:
+    """
+    轉義 SQL LIKE 模式中的特殊字符
+
+    LIKE 特殊字符：
+    - % : 匹配任意數量字符
+    - _ : 匹配單個字符
+    - \\ : 轉義字符本身
+
+    Args:
+        pattern: 原始搜尋字串
+
+    Returns:
+        轉義後的安全字串
+    """
+    # 先轉義反斜線，再轉義 % 和 _
+    pattern = pattern.replace("\\", "\\\\")
+    pattern = pattern.replace("%", "\\%")
+    pattern = pattern.replace("_", "\\_")
+    return pattern
+
+
 @router.get("/users", response_model=List[UserManagementResponse])
 async def get_all_users(
-    search: str = Query(None, description="搜尋 email"),
+    search: str = Query(None, description="搜尋 email", max_length=100),
     is_active: bool = Query(None, description="篩選啟用狀態"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -271,18 +293,21 @@ async def get_all_users(
     取得所有用戶列表
 
     支援：
-    - Email 搜尋
+    - Email 搜尋（安全過濾）
     - 狀態篩選
     - 分頁
     """
     query = select(User)
 
-    # 搜尋（修復：添加輸入清理防止 SQL 注入）
+    # 搜尋（修復：多層安全防護）
     if search:
-        # 只允許安全字符：字母、數字、@、.、-、_
+        # 1. 只允許安全字符：字母、數字、@、.、-（移除 _ 因為它是 LIKE 特殊字符）
         safe_search = re.sub(r'[^\w@.\-]', '', search)
-        if safe_search:  # 確保清理後還有內容
-            query = query.where(User.email.ilike(f"%{safe_search}%"))
+        if safe_search:
+            # 2. 轉義 LIKE 特殊字符（防止 LIKE 注入）
+            escaped_search = escape_like_pattern(safe_search)
+            # 3. 使用參數化查詢（SQLAlchemy ORM 自動處理）
+            query = query.where(User.email.ilike(f"%{escaped_search}%"))
 
     # 狀態篩選
     if is_active is not None:

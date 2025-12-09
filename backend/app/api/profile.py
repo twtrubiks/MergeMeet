@@ -436,10 +436,69 @@ async def upload_photo(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    上傳照片（簡化版）
+    上傳照片
 
-    注意：此版本暫不實際處理圖片，僅模擬上傳流程
+    安全措施：
+    - 檔案大小限制（5MB）
+    - MIME 類型驗證
+    - 實際圖片格式驗證（使用 PIL）
     """
+    from app.core.config import settings
+    from PIL import Image
+    import io
+
+    # 安全檢查 1：預先驗證 Content-Type
+    if file.content_type not in {"image/jpeg", "image/png", "image/gif", "image/webp"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="不支援的圖片格式，僅支援: jpg, jpeg, png, gif, webp"
+        )
+
+    # 安全檢查 2：流式讀取並限制大小（防止 DoS）
+    max_size = settings.MAX_UPLOAD_SIZE  # 5MB
+    chunks = []
+    total_size = 0
+    chunk_size = 64 * 1024  # 64KB chunks
+
+    while True:
+        chunk = await file.read(chunk_size)
+        if not chunk:
+            break
+        total_size += len(chunk)
+        if total_size > max_size:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"檔案過大，最大允許 {max_size / 1024 / 1024:.0f}MB"
+            )
+        chunks.append(chunk)
+
+    file_content = b"".join(chunks)
+    file_size = len(file_content)
+
+    if file_size == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="檔案不能為空"
+        )
+
+    # 安全檢查 3：驗證實際圖片格式（防止偽造 Content-Type）
+    try:
+        img = Image.open(io.BytesIO(file_content))
+        img.verify()  # 驗證圖片完整性
+        # 確認是支援的格式
+        if img.format not in {"JPEG", "PNG", "GIF", "WEBP"}:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="無效的圖片格式"
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="無效的圖片檔案，請上傳有效的圖片"
+        )
+
     # 取得檔案（一次性載入照片和興趣以便後續檢查完整度）
     result = await db.execute(
         select(Profile)
@@ -464,18 +523,6 @@ async def upload_photo(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="最多只能上傳 6 張照片"
-        )
-
-    # 讀取檔案內容
-    file_content = await file.read()
-    file_size = len(file_content)
-
-    # 驗證圖片
-    validation_error = file_storage.validate_image(file.content_type, file_size)
-    if validation_error:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=validation_error
         )
 
     # 儲存照片到本地
