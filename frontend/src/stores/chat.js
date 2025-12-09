@@ -97,12 +97,15 @@ export const useChatStore = defineStore('chat', () => {
       })
 
       // 簡單：直接覆蓋（API 是權威來源）
+      // API 已經返回正序（舊的在前），直接使用
       messages.value[matchId] = response.data.messages
 
-      console.log('🔥 [DEBUG] Fetched messages:', response.data.messages.map(m => ({
+      console.log('🔥 [DEBUG] Fetched messages count:', response.data.messages.length)
+      console.log('🔥 [DEBUG] Last 3 messages:', response.data.messages.slice(-3).map(m => ({
         id: m.id.substring(0, 8),
         content: m.content,
-        is_read: m.is_read
+        is_read: m.is_read,
+        sent_at: m.sent_at
       })))
 
       return response.data

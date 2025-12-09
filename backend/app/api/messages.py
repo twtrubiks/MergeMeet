@@ -71,8 +71,8 @@ async def get_chat_history(
     )
     total = count_result.scalar()
 
-    # 分頁查詢訊息
-    offset = (page - 1) * page_size
+    # 查詢訊息（倒序取最新 N 條，聊天室應該顯示最新訊息）
+    # 不使用 offset，直接取最新的 page_size 條
     result = await db.execute(
         select(Message)
         .where(
@@ -81,11 +81,13 @@ async def get_chat_history(
                 Message.deleted_at.is_(None)
             )
         )
-        .order_by(Message.sent_at)  # 正序：舊的在前，新的在後
-        .offset(offset)
-        .limit(page_size)
+        .order_by(desc(Message.sent_at))  # 倒序：最新的在前
+        .limit(page_size)  # 只取最新 N 條
     )
     messages = result.scalars().all()
+
+    # 反轉為正序（前端期望舊的在前）
+    messages = list(reversed(messages))
 
     has_more = total > (page * page_size)
 
