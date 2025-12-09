@@ -142,7 +142,8 @@ async def handle_chat_message(data: dict, sender_id: uuid.UUID):
                 return
 
             # 驗證訊息長度（防止 DoS 攻擊）
-            MAX_MESSAGE_LENGTH = 5000
+            # 即時聊天訊息建議限制在 2000 字符以內
+            MAX_MESSAGE_LENGTH = 2000
             if len(content) > MAX_MESSAGE_LENGTH:
                 await manager.send_personal_message(
                     str(sender_id),

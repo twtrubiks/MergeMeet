@@ -42,9 +42,13 @@ class MatchWithLastMessageResponse(BaseModel):
 
 
 class SendMessageRequest(BaseModel):
-    """發送訊息請求"""
+    """發送訊息請求
+
+    訊息長度限制：1-2000 字符
+    即時聊天訊息不宜過長，防止濫用和 DoS 攻擊
+    """
     match_id: UUID4
-    content: str = Field(..., min_length=1, max_length=5000)
+    content: str = Field(..., min_length=1, max_length=2000)
     message_type: str = Field(default="TEXT", pattern="^(TEXT|IMAGE|GIF)$")
 
 

@@ -611,13 +611,21 @@ async def delete_photo(
     photo_url = photo.url
     thumbnail_url = photo.thumbnail_url
 
+    # 先刪除實際檔案（避免資料庫提交後檔案刪除失敗導致不一致）
+    try:
+        await file_storage.delete_photo(photo_url)
+        if thumbnail_url:
+            await file_storage.delete_photo(thumbnail_url)
+    except Exception as e:
+        logger.error(f"Failed to delete photo files: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="照片檔案刪除失敗"
+        )
+
+    # 檔案刪除成功後，再刪除資料庫記錄
     await db.delete(photo)
     await db.commit()
-
-    # 刪除實際檔案
-    await file_storage.delete_photo(photo_url)
-    if thumbnail_url:
-        await file_storage.delete_photo(thumbnail_url)
 
     # 重新載入 profile 及其照片
     result = await db.execute(
