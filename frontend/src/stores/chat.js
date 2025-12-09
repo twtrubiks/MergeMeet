@@ -91,16 +91,33 @@ export const useChatStore = defineStore('chat', () => {
         params: { page, page_size: pageSize }
       })
 
-      // 合併訊息 (避免重複)
+      // 合併訊息並更新狀態（避免重複，同時更新已存在訊息的 is_read）
       if (!messages.value[matchId]) {
         messages.value[matchId] = []
       }
 
-      const existingIds = new Set(messages.value[matchId].map(m => m.id))
-      const newMessages = response.data.messages.filter(m => !existingIds.has(m.id))
+      const existingMap = new Map(messages.value[matchId].map(m => [m.id, m]))
+      const apiMessages = response.data.messages
 
-      // 按時間排序 (舊的在前)
-      messages.value[matchId] = [...messages.value[matchId], ...newMessages].sort(
+      // 合併邏輯：
+      // 1. 如果訊息已存在，用 API 返回的狀態更新（is_read 可能已變更）
+      // 2. 如果訊息不存在，添加新訊息
+      const mergedMessages = apiMessages.map(apiMsg => {
+        if (existingMap.has(apiMsg.id)) {
+          // 已存在：更新狀態（特別是 is_read）
+          return { ...existingMap.get(apiMsg.id), is_read: apiMsg.is_read }
+        } else {
+          // 新訊息：直接使用
+          return apiMsg
+        }
+      })
+
+      // 補充：添加只在本地有但 API 沒返回的訊息（可能是分頁之外的新訊息）
+      const apiIds = new Set(apiMessages.map(m => m.id))
+      const localOnlyMessages = messages.value[matchId].filter(m => !apiIds.has(m.id))
+
+      // 按時間排序（舊的在前）
+      messages.value[matchId] = [...mergedMessages, ...localOnlyMessages].sort(
         (a, b) => new Date(a.sent_at) - new Date(b.sent_at)
       )
 
