@@ -2,10 +2,26 @@
 
 提供用戶註冊、登入、登出、Token 刷新、Email 驗證等功能。
 
-TODO: 密碼重置功能尚未實現（暫時不重要）
-- POST /forgot-password: 發送密碼重置郵件
-- POST /reset-password: 使用重置令牌設定新密碼
-未來需要時再實現，需整合 Email 發送服務。
+TODO: 未實現功能（上線前建議完成）
+
+1. 密碼重置功能（高優先級）
+   - POST /forgot-password: 發送密碼重置郵件
+   - POST /reset-password: 使用重置令牌設定新密碼
+   - 需整合 Email 發送服務
+   - 重置 Token 建議 1 小時過期
+   - 風險：用戶忘記密碼無法恢復帳號
+
+2. 登入失敗次數限制（高優先級）
+   - 目前登入端點無失敗次數限制
+   - 建議：5 次失敗後鎖定帳戶 15 分鐘
+   - 可使用 Redis 或內存字典實現
+   - 風險：密碼暴力破解攻擊
+   - 影響端點：/login, /admin-login
+
+3. 密碼修改功能（中優先級）
+   - POST /change-password: 修改密碼（需舊密碼驗證）
+   - 建議：禁止使用最近 3 次的密碼（密碼歷史檢查）
+   - 風險：用戶無法主動修改密碼
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials

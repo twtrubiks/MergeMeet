@@ -1,4 +1,12 @@
-"""MergeMeet FastAPI 主應用"""
+"""MergeMeet FastAPI 主應用
+
+TODO: 全局速率限制（上線前建議完成）
+- 目前無全局 API 速率限制，存在 DoS 攻擊風險
+- 建議：整合 slowapi 或 fastapi-limiter
+- 配置：每 IP 每分鐘最多 60 請求
+- 特殊端點（登入、註冊）可設置更嚴格限制
+- 參考：https://github.com/laurentS/slowapi
+"""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
