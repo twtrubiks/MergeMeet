@@ -266,9 +266,16 @@ export const useChatStore = defineStore('chat', () => {
     if (conv) {
       conv.last_message = message
 
-      // 如果不是當前用戶發送的，增加未讀計數
-      if (message.sender_id !== currentUserId() && matchId !== currentMatchId.value) {
-        conv.unread_count = (conv.unread_count || 0) + 1
+      // 處理未讀計數和已讀標記
+      if (message.sender_id !== currentUserId()) {
+        // 如果在當前聊天室，立即標記為已讀
+        if (matchId === currentMatchId.value) {
+          // 立即標記這條訊息為已讀
+          await markAsRead([message.id])
+        } else {
+          // 不在當前聊天室，增加未讀計數
+          conv.unread_count = (conv.unread_count || 0) + 1
+        }
       }
 
       // 將對話移到列表頂部
