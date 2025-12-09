@@ -18,14 +18,6 @@
           />
           <div class="user-details">
             <div class="user-name">{{ currentConversation.other_user_name }}</div>
-            <!-- 打字指示器 -->
-            <div v-if="chatStore.isTyping" class="typing-indicator">
-              正在輸入...
-            </div>
-            <!-- 調試：顯示 isTyping 狀態 -->
-            <div style="font-size: 10px; color: red;">
-              [DEBUG] isTyping: {{ chatStore.isTyping }}
-            </div>
           </div>
         </div>
 
@@ -70,6 +62,16 @@
             @delete="handleDeleteMessage"
           />
         </div>
+      </div>
+
+      <!-- 打字指示器（固定在輸入框上方） -->
+      <div v-if="chatStore.isTyping" class="typing-indicator-fixed">
+        <div class="typing-dots">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+        <span class="typing-text">{{ currentConversation?.other_user_name }} 正在輸入...</span>
       </div>
 
       <!-- 輸入區域 -->
@@ -460,10 +462,64 @@ onUnmounted(() => {
   color: #333;
 }
 
-.typing-indicator {
-  font-size: 12px;
+/* 打字指示器（固定在輸入框上方） */
+.typing-indicator-fixed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(24, 144, 255, 0.1);
+  border-left: 3px solid #1890ff;
+  font-size: 13px;
   color: #1890ff;
-  font-style: italic;
+  animation: slideDown 0.3s ease;
+}
+
+.typing-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.typing-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #1890ff;
+  animation: typing 1.4s infinite;
+}
+
+.typing-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+.typing-text {
+  font-weight: 500;
+}
+
+@keyframes typing {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.7;
+  }
+  30% {
+    transform: translateY(-6px);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .message-list {

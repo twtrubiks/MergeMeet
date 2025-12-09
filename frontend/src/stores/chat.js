@@ -36,17 +36,8 @@ export const useChatStore = defineStore('chat', () => {
   })
 
   const isTyping = computed(() => {
-    if (!currentMatchId.value) {
-      console.log('🔥 [DEBUG] isTyping: false (no currentMatchId)')
-      return false
-    }
-    const result = !!typingUsers.value[currentMatchId.value]
-    console.log('🔥 [DEBUG] isTyping computed:', {
-      currentMatchId: currentMatchId.value,
-      typingUsers: typingUsers.value,
-      result: result
-    })
-    return result
+    if (!currentMatchId.value) return false
+    return !!typingUsers.value[currentMatchId.value]
   })
 
   /**
@@ -221,11 +212,8 @@ export const useChatStore = defineStore('chat', () => {
    * 加入配對聊天室
    */
   const joinMatchRoom = async (matchId) => {
-    console.log('🔥 [DEBUG] Joining match room:', matchId)
     currentMatchId.value = matchId
-    console.log('🔥 [DEBUG] currentMatchId set to:', currentMatchId.value)
-    const joinResult = ws.joinMatch(matchId)
-    console.log('🔥 [DEBUG] Join match result:', joinResult)
+    ws.joinMatch(matchId)
 
     // 獲取聊天記錄
     if (!messages.value[matchId]) {
@@ -295,34 +283,27 @@ export const useChatStore = defineStore('chat', () => {
    * 處理打字指示器
    */
   const handleTypingIndicator = (data) => {
-    console.log('🔥 [DEBUG] Typing indicator received:', data)
     logger.debug('[Chat] Received typing indicator:', data)
     const { match_id, user_id, is_typing } = data
-
-    console.log('🔥 [DEBUG] Current matchId:', currentMatchId.value)
-    console.log('🔥 [DEBUG] Typing users before:', typingUsers.value)
 
     if (is_typing) {
       // 使用 spread operator 創建新物件以觸發 Vue 響應式更新
       typingUsers.value = { ...typingUsers.value, [match_id]: user_id }
-      console.log('🔥 [DEBUG] Typing users after (typing):', typingUsers.value)
-      logger.debug('[Chat] User typing:', { match_id, user_id, typingUsers: typingUsers.value })
+      logger.debug('[Chat] User typing:', { match_id, user_id })
       // 3 秒後自動清除
       setTimeout(() => {
         if (typingUsers.value[match_id] === user_id) {
           // 使用解構移除屬性並創建新物件
           const { [match_id]: _, ...rest } = typingUsers.value
           typingUsers.value = rest
-          console.log('🔥 [DEBUG] Typing timeout cleared')
-          logger.debug('[Chat] Typing timeout cleared:', { match_id, user_id })
+          logger.debug('[Chat] Typing timeout cleared')
         }
       }, 3000)
     } else {
       // 使用解構移除屬性並創建新物件
       const { [match_id]: _, ...rest } = typingUsers.value
       typingUsers.value = rest
-      console.log('🔥 [DEBUG] Typing stopped')
-      logger.debug('[Chat] Typing stopped:', { match_id, user_id })
+      logger.debug('[Chat] Typing stopped')
     }
   }
 
@@ -330,19 +311,18 @@ export const useChatStore = defineStore('chat', () => {
    * 處理已讀回條
    */
   const handleReadReceipt = (data) => {
-    console.log('🔥 [DEBUG] Read receipt received:', data)
+    logger.debug('[Chat] Received read receipt:', data)
     const { message_id, read_at } = data
 
     // 更新訊息狀態（使用 map 創建新陣列觸發 Vue 響應式）
     for (const matchId in messages.value) {
       const messageIndex = messages.value[matchId].findIndex(m => m.id === message_id)
       if (messageIndex > -1) {
-        console.log('🔥 [DEBUG] Updating message is_read:', message_id)
         // 創建新陣列以觸發 Vue 響應式更新
         messages.value[matchId] = messages.value[matchId].map((m, index) =>
           index === messageIndex ? { ...m, is_read: read_at } : m
         )
-        console.log('🔥 [DEBUG] Message updated, new is_read:', messages.value[matchId][messageIndex].is_read)
+        logger.debug('[Chat] Message marked as read:', message_id)
         break
       }
     }
