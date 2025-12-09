@@ -42,16 +42,17 @@ export const useChatStore = defineStore('chat', () => {
 
   /**
    * 初始化 WebSocket 連接和訊息處理器
+   * @returns {Promise<void>} 當 WebSocket 連接成功時 resolve
    */
   const initWebSocket = () => {
-    // 連接 WebSocket
-    ws.connect()
-
-    // 註冊訊息處理器
+    // 註冊訊息處理器（在連接前註冊）
     ws.onMessage('new_message', handleNewMessage)
     ws.onMessage('typing', handleTypingIndicator)
     ws.onMessage('read_receipt', handleReadReceipt)
     ws.onMessage('message_deleted', handleMessageDeleted)
+
+    // 連接 WebSocket
+    return ws.connect()
   }
 
   /**
@@ -240,15 +241,24 @@ export const useChatStore = defineStore('chat', () => {
     const message = data.message
     const matchId = message.match_id
 
-    // 確保該配對的訊息陣列存在
+    logger.debug('[Chat] Received new message:', { matchId, messageId: message.id })
+
+    // 確保該配對的訊息陣列存在，使用解構賦值確保響應式
     if (!messages.value[matchId]) {
-      messages.value[matchId] = []
+      messages.value = {
+        ...messages.value,
+        [matchId]: []
+      }
     }
 
     // 檢查是否已存在 (避免重複)
     const exists = messages.value[matchId].some(m => m.id === message.id)
     if (!exists) {
-      messages.value[matchId].push(message)
+      // 使用解構賦值更新陣列，確保響應式更新
+      messages.value[matchId] = [...messages.value[matchId], message]
+      logger.debug('[Chat] Message added to store:', { matchId, totalMessages: messages.value[matchId].length })
+    } else {
+      logger.debug('[Chat] Message already exists, skipping')
     }
 
     // 更新對話列表中的最後一條訊息

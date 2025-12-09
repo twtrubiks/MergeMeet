@@ -34,71 +34,77 @@ export function useWebSocket() {
 
   /**
    * 建立 WebSocket 連接
+   * @returns {Promise<void>} 當連接成功時 resolve
    */
   const connect = () => {
     if (socket.value?.readyState === WebSocket.OPEN) {
       logger.log('WebSocket already connected')
-      return
+      return Promise.resolve()
     }
 
     if (!userStore.isAuthenticated || !userStore.user?.id) {
       logger.error('Cannot connect: User not authenticated')
-      return
+      return Promise.reject(new Error('User not authenticated'))
     }
 
     connectionState.value = reconnectAttempts.value > 0
       ? ConnectionState.RECONNECTING
       : ConnectionState.CONNECTING
 
-    try {
-      // 建立 WebSocket 連接
-      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      const wsHost = import.meta.env.VITE_WS_URL || 'localhost:8000'
-      const token = userStore.accessToken
-      const userId = userStore.user.id
+    return new Promise((resolve, reject) => {
+      try {
+        // 建立 WebSocket 連接
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+        const wsHost = import.meta.env.VITE_WS_URL || 'localhost:8000'
+        const token = userStore.accessToken
+        const userId = userStore.user.id
 
-      const wsUrl = `${wsProtocol}//${wsHost}/ws?token=${token}&user_id=${userId}`
+        const wsUrl = `${wsProtocol}//${wsHost}/ws?token=${token}&user_id=${userId}`
 
-      socket.value = new WebSocket(wsUrl)
+        socket.value = new WebSocket(wsUrl)
 
-      // 連接成功
-      socket.value.onopen = () => {
-        logger.log('WebSocket connected')
-        connectionState.value = ConnectionState.CONNECTED
-        reconnectAttempts.value = 0
-      }
-
-      // 接收訊息
-      socket.value.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data)
-          handleMessage(data)
-        } catch (error) {
-          logger.error('Error parsing WebSocket message:', error)
+        // 連接成功
+        socket.value.onopen = () => {
+          logger.log('WebSocket connected')
+          connectionState.value = ConnectionState.CONNECTED
+          reconnectAttempts.value = 0
+          resolve()
         }
-      }
 
-      // 連接關閉
-      socket.value.onclose = (event) => {
-        logger.log('WebSocket closed:', event.code, event.reason)
+        // 接收訊息
+        socket.value.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data)
+            handleMessage(data)
+          } catch (error) {
+            logger.error('Error parsing WebSocket message:', error)
+          }
+        }
+
+        // 連接關閉
+        socket.value.onclose = (event) => {
+          logger.log('WebSocket closed:', event.code, event.reason)
+          connectionState.value = ConnectionState.DISCONNECTED
+          socket.value = null
+
+          // 嘗試重新連接 (除非是正常關閉)
+          if (event.code !== 1000 && reconnectAttempts.value < maxReconnectAttempts) {
+            scheduleReconnect()
+          }
+        }
+
+        // 連接錯誤
+        socket.value.onerror = (error) => {
+          logger.error('WebSocket error:', error)
+          reject(error)
+        }
+
+      } catch (error) {
+        logger.error('Error creating WebSocket:', error)
         connectionState.value = ConnectionState.DISCONNECTED
-        socket.value = null
-
-        // 嘗試重新連接 (除非是正常關閉)
-        if (event.code !== 1000 && reconnectAttempts.value < maxReconnectAttempts) {
-          scheduleReconnect()
-        }
+        reject(error)
       }
-
-      // 連接錯誤
-      socket.value.onerror = (error) => {
-        logger.error('WebSocket error:', error)
-      }
-
-    } catch (error) {
-      logger.error('Error creating WebSocket:', error)
-      connectionState.value = ConnectionState.DISCONNECTED
-    }
+    })
   }
 
   /**
@@ -132,11 +138,12 @@ export function useWebSocket() {
    */
   const send = (data) => {
     if (!socket.value || socket.value.readyState !== WebSocket.OPEN) {
-      logger.error('WebSocket not connected')
+      logger.error('WebSocket not connected, readyState:', socket.value?.readyState)
       return false
     }
 
     try {
+      logger.debug('[WebSocket] Sending message:', data.type)
       socket.value.send(JSON.stringify(data))
       return true
     } catch (error) {
@@ -183,10 +190,13 @@ export function useWebSocket() {
    * 加入配對聊天室
    */
   const joinMatch = (matchId) => {
-    return send({
+    logger.debug('[WebSocket] Joining match room:', matchId)
+    const result = send({
       type: 'join_match',
       match_id: matchId
     })
+    logger.debug('[WebSocket] Join match result:', result)
+    return result
   }
 
   /**

@@ -374,9 +374,15 @@ onMounted(async () => {
   hasMore.value = true
   isLoadingMore.value = false
 
-  // 初始化 WebSocket
+  // 初始化 WebSocket 並等待連接成功
   if (!chatStore.ws.isConnected) {
-    chatStore.initWebSocket()
+    try {
+      await chatStore.initWebSocket()
+      logger.debug('[Chat.vue] WebSocket connected successfully')
+    } catch (error) {
+      logger.error('[Chat.vue] Failed to connect WebSocket:', error)
+      message.error('WebSocket 連接失敗')
+    }
   }
 
   // 載入對話列表（如果還沒載入）

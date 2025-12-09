@@ -176,6 +176,7 @@ export const useUserStore = defineStore('user', () => {
 
   /**
    * 從 JWT Token 解析用戶資料並初始化
+   * 注意：會保留現有的 is_admin 屬性，避免管理員登入後狀態被覆蓋
    */
   const initializeFromToken = () => {
     if (!accessToken.value) {
@@ -187,12 +188,15 @@ export const useUserStore = defineStore('user', () => {
       const payload = accessToken.value.split('.')[1]
       const decodedPayload = JSON.parse(atob(payload))
 
-      // 從 token 提取用戶資訊
+      // 從 token 提取用戶資訊，保留現有的 is_admin 和 email 屬性
       if (decodedPayload.sub) {
+        const currentIsAdmin = user.value?.is_admin || false
+        const currentEmail = user.value?.email || null
         user.value = {
           id: decodedPayload.sub,
-          email: decodedPayload.email || null,
-          email_verified: decodedPayload.email_verified || false
+          email: decodedPayload.email || currentEmail,
+          email_verified: decodedPayload.email_verified || false,
+          is_admin: currentIsAdmin
         }
       }
     } catch (err) {

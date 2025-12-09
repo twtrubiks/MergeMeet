@@ -245,8 +245,12 @@ async def handle_chat_message(data: dict, sender_id: uuid.UUID):
                     }
                 }
 
+                logger.info(f"Preparing to send message {message.id} to match {match_id}")
+                logger.debug(f"Message payload: {message_payload}")
+
                 # 發送給配對的所有用戶 (包括發送者自己，用於確認)
-                await manager.send_to_match(match_id, message_payload)
+                # 注意：match_rooms 的 key 是字符串，需要轉換
+                await manager.send_to_match(str(match_id), message_payload)
 
                 logger.info(f"Message {message.id} sent in match {match_id}")
 
