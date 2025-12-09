@@ -318,6 +318,7 @@ export const useChatStore = defineStore('chat', () => {
    * 處理已讀回條
    */
   const handleReadReceipt = (data) => {
+    console.log('🔥 [DEBUG] Read receipt received:', data)
     logger.debug('[Chat] Received read receipt:', data)
     const { message_id, read_at } = data
 
@@ -325,14 +326,20 @@ export const useChatStore = defineStore('chat', () => {
     for (const matchId in messages.value) {
       const messageIndex = messages.value[matchId].findIndex(m => m.id === message_id)
       if (messageIndex > -1) {
+        console.log('🔥 [DEBUG] Found message at index:', messageIndex, 'in match:', matchId)
+        console.log('🔥 [DEBUG] Message before update:', messages.value[matchId][messageIndex])
+
         // 創建新陣列以觸發 Vue 響應式更新
         messages.value[matchId] = messages.value[matchId].map((m, index) =>
           index === messageIndex ? { ...m, is_read: read_at } : m
         )
+
+        console.log('🔥 [DEBUG] Message after update:', messages.value[matchId][messageIndex])
         logger.debug('[Chat] Message marked as read:', message_id)
         break
       }
     }
+    console.log('🔥 [DEBUG] All messages in current match:', messages.value[currentMatchId.value])
   }
 
   /**
