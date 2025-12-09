@@ -81,7 +81,7 @@ async def get_chat_history(
                 Message.deleted_at.is_(None)
             )
         )
-        .order_by(desc(Message.sent_at))
+        .order_by(Message.sent_at)  # 正序：舊的在前，新的在後
         .offset(offset)
         .limit(page_size)
     )

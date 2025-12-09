@@ -99,6 +99,12 @@ export const useChatStore = defineStore('chat', () => {
       // 簡單：直接覆蓋（API 是權威來源）
       messages.value[matchId] = response.data.messages
 
+      console.log('🔥 [DEBUG] Fetched messages:', response.data.messages.map(m => ({
+        id: m.id.substring(0, 8),
+        content: m.content,
+        is_read: m.is_read
+      })))
+
       return response.data
     } catch (err) {
       error.value = err.response?.data?.detail || '無法取得聊天記錄'
