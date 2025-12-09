@@ -60,7 +60,13 @@ def _generate_auth_tokens(user_id: str) -> Tuple[str, str]:
 
 
 class VerificationCodeStore:
-    """帶過期機制的驗證碼存儲（生產環境應使用 Redis）"""
+    """帶過期機制的驗證碼存儲
+
+    Redis 整合備註（暫未使用）：
+    - 生產環境建議使用 Redis: redis.setex(f"verify:{email}", 600, code)
+    - 支援多實例部署時的驗證碼共享
+    - 天然支援 TTL 自動過期
+    """
 
     def __init__(self, ttl_minutes: int = 10):
         self._store: Dict[str, Tuple[str, datetime]] = {}

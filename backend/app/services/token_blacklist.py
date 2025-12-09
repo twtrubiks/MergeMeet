@@ -3,7 +3,11 @@
 用於在登出時將 Token 加入黑名單，防止已登出的 Token 被繼續使用。
 
 注意：目前使用內存存儲，伺服器重啟後黑名單會清空。
-TODO: 生產環境應整合 Redis 實現持久化和分散式支援。
+
+Redis 整合備註（暫未使用）：
+- 生產環境建議整合 Redis 實現持久化和分散式支援
+- 可使用 redis.setex(f"blacklist:{token}", ttl, "1") 自動過期
+- 支援多實例部署時的黑名單共享
 """
 import asyncio
 from datetime import datetime, timezone

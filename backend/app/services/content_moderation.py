@@ -1,4 +1,10 @@
-"""內容審核服務 - 基於資料庫的動態敏感詞管理"""
+"""內容審核服務 - 基於資料庫的動態敏感詞管理
+
+Redis 整合備註（暫未使用）：
+- 目前使用類變數快取敏感詞，僅支援單實例
+- 生產環境可整合 Redis 共享快取：redis.setex("sensitive_words", 300, data)
+- 多實例部署時可減少重複的資料庫查詢
+"""
 from typing import Tuple, List, Optional, Dict
 from collections import OrderedDict
 import re

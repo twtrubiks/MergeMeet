@@ -1,4 +1,12 @@
-"""WebSocket 連接管理器"""
+"""WebSocket 連接管理器
+
+Redis 整合備註（暫未使用）：
+- 目前使用內存管理連接，僅支援單實例部署
+- 生產環境如需水平擴展，可整合 Redis Pub/Sub：
+  - 發送訊息: redis.publish(f"match:{match_id}", message)
+  - 訂閱頻道: redis.subscribe(f"match:{match_id}")
+- 可實現跨實例的即時訊息廣播
+"""
 from fastapi import WebSocket
 from typing import Dict, List, Optional
 import json
