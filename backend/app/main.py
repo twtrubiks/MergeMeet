@@ -12,17 +12,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from pathlib import Path
+import logging
 
 from app.core.config import settings
 from app.core.database import init_db, close_db
 from app.websocket.manager import manager
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """應用程式生命週期管理"""
     # 啟動時執行
-    print("🚀 MergeMeet 啟動中...")
+    logger.info("🚀 MergeMeet 啟動中...")
     # await init_db()  # 暫時註解，等資料庫啟動後再開啟
 
     # 啟動 WebSocket 心跳和清理任務
@@ -30,7 +33,7 @@ async def lifespan(app: FastAPI):
 
     yield
     # 關閉時執行
-    print("👋 MergeMeet 關閉中...")
+    logger.info("👋 MergeMeet 關閉中...")
     await close_db()
 
 

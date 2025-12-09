@@ -14,6 +14,7 @@ import logging
 import uuid
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.websocket.manager import manager
 from app.models.match import Message, Match
 from app.models.user import User
@@ -143,13 +144,12 @@ async def handle_chat_message(data: dict, sender_id: uuid.UUID):
 
             # 驗證訊息長度（防止 DoS 攻擊）
             # 即時聊天訊息建議限制在 2000 字符以內
-            MAX_MESSAGE_LENGTH = 2000
-            if len(content) > MAX_MESSAGE_LENGTH:
+            if len(content) > settings.MAX_MESSAGE_LENGTH:
                 await manager.send_personal_message(
                     str(sender_id),
                     {
                         "type": "error",
-                        "message": f"訊息過長，最多 {MAX_MESSAGE_LENGTH} 字符"
+                        "message": f"訊息過長，最多 {settings.MAX_MESSAGE_LENGTH} 字符"
                     }
                 )
                 logger.warning(f"Message too long from {sender_id}: {len(content)} chars")

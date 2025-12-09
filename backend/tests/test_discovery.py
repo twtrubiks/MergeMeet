@@ -168,14 +168,12 @@ async def completed_profiles(client: AsyncClient, test_users: dict, test_db: Asy
         headers={"Authorization": f"Bearer {test_users['alice']['token']}"}
     )
     alice_profile = response.json()
-    print(f"Alice profile is_complete: {alice_profile.get('is_complete')}")
     assert alice_profile.get('is_complete') == True, f"Alice profile not complete: {alice_profile}"
 
     response = await client.get("/api/profile",
         headers={"Authorization": f"Bearer {test_users['bob']['token']}"}
     )
     bob_profile = response.json()
-    print(f"Bob profile is_complete: {bob_profile.get('is_complete')}")
     assert bob_profile.get('is_complete') == True, f"Bob profile not complete: {bob_profile}"
 
     return test_users

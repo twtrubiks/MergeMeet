@@ -493,7 +493,8 @@ async def upload_photo(
             )
     except HTTPException:
         raise
-    except Exception:
+    except (Image.UnidentifiedImageError, IOError, ValueError) as e:
+        # 捕獲特定的圖片相關異常
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="無效的圖片檔案，請上傳有效的圖片"

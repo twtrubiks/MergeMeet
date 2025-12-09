@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE: int = 5 * 1024 * 1024  # 5MB
     UPLOAD_DIR: str = "uploads"
 
+    # WebSocket 訊息限制
+    MAX_MESSAGE_LENGTH: int = int(os.getenv("MAX_MESSAGE_LENGTH", "2000"))  # 即時聊天訊息長度限制
+
     # Email（暫時使用控制台輸出）
     SMTP_HOST: Optional[str] = None
     SMTP_PORT: Optional[int] = None

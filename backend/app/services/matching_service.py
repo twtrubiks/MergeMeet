@@ -1,6 +1,6 @@
 """配對推薦服務"""
 from typing import Dict, List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import math
 
 
@@ -56,7 +56,8 @@ class MatchingService:
             if isinstance(last_active, str):
                 last_active = datetime.fromisoformat(last_active.replace('Z', '+00:00'))
 
-            hours_ago = (datetime.now() - last_active.replace(tzinfo=None)).total_seconds() / 3600
+            # 統一使用 UTC 時區進行比較
+            hours_ago = (datetime.now(timezone.utc) - last_active).total_seconds() / 3600
 
             if hours_ago < 1:
                 score += 20

@@ -28,7 +28,7 @@ class ContentModerationService:
     _cache: OrderedDict = OrderedDict()  # 使用 OrderedDict 支持 LRU 策略
     _cache_time: Dict[str, datetime] = {}  # 每個快取項的時間戳
     _cache_ttl: int = 300  # 快取 5 分鐘
-    _max_cache_size: int = 100  # 最大快取項數（防止內存無限增長）
+    _max_cache_size: int = 500  # 最大快取項數（提升至 500 以減少頻繁清除）
     _cache_lock: asyncio.Lock = asyncio.Lock()  # 快取鎖，確保線程安全
 
     # 可疑模式（正則表達式）- 保留靜態模式
