@@ -1,13 +1,17 @@
 """WebSocket 即時通訊測試"""
 import pytest
 import json
+import uuid
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from datetime import datetime, timezone, timedelta
 
 from app.models.user import User
 from app.models.match import Match, Message
+from app.models.moderation import SensitiveWord
 from app.websocket.manager import manager
+from app.services.content_moderation import ContentModerationService
 
 
 @pytest.fixture
@@ -182,10 +186,6 @@ async def test_message_content_moderation(
     test_db: AsyncSession
 ):
     """測試訊息內容審核"""
-    from app.services.content_moderation import ContentModerationService
-    from app.models.moderation import SensitiveWord
-    import uuid
-
     alice_user_id = matched_users_for_ws["alice"]["user_id"]
 
     # 創建敏感詞數據
@@ -225,10 +225,6 @@ async def test_message_with_unsafe_content_rejected(
     test_db: AsyncSession
 ):
     """測試包含不當內容的訊息應被拒絕"""
-    from app.services.content_moderation import ContentModerationService
-    from app.models.moderation import SensitiveWord
-    import uuid
-
     match_id = matched_users_for_ws["match_id"]
     alice_user_id = matched_users_for_ws["alice"]["user_id"]
 
@@ -365,8 +361,6 @@ class TestWebSocketHeartbeat:
     @pytest.mark.asyncio
     async def test_update_heartbeat(self):
         """測試更新心跳時間"""
-        from datetime import datetime, timezone, timedelta
-
         user_id = "test-heartbeat-user"
 
         # 設置初始心跳（舊時間）
@@ -400,7 +394,6 @@ class TestWebSocketHeartbeat:
     @pytest.mark.asyncio
     async def test_stale_connection_detection(self):
         """測試過期連接檢測"""
-        from datetime import datetime, timezone, timedelta
 
         user_id = "test-stale-user"
 
@@ -420,7 +413,6 @@ class TestWebSocketHeartbeat:
     @pytest.mark.asyncio
     async def test_active_connection_detection(self):
         """測試活躍連接檢測"""
-        from datetime import datetime, timezone, timedelta
 
         user_id = "test-active-user"
 
@@ -440,7 +432,6 @@ class TestWebSocketHeartbeat:
     @pytest.mark.asyncio
     async def test_heartbeat_cleared_on_disconnect(self):
         """測試斷開連接時清除心跳"""
-        from datetime import datetime, timezone
 
         user_id = "test-disconnect-heartbeat"
 
@@ -459,7 +450,6 @@ class TestWebSocketHeartbeat:
     @pytest.mark.asyncio
     async def test_cleanup_stale_connections(self):
         """測試清理過期連接"""
-        from datetime import datetime, timezone, timedelta
 
         # 創建過期和活躍的心跳
         stale_user = "test-stale-cleanup"

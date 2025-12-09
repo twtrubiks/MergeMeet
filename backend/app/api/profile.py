@@ -7,11 +7,14 @@ from geoalchemy2.functions import ST_MakePoint, ST_SetSRID
 from datetime import date
 from dateutil.relativedelta import relativedelta
 from typing import List
+from PIL import Image
 import uuid
 import logging
+import io
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
+from app.core.config import settings
 from app.models.user import User
 from app.models.profile import Profile, Photo, InterestTag
 from app.schemas.profile import (
@@ -443,10 +446,6 @@ async def upload_photo(
     - MIME 類型驗證
     - 實際圖片格式驗證（使用 PIL）
     """
-    from app.core.config import settings
-    from PIL import Image
-    import io
-
     # 安全檢查 1：預先驗證 Content-Type
     if file.content_type not in {"image/jpeg", "image/png", "image/gif", "image/webp"}:
         raise HTTPException(

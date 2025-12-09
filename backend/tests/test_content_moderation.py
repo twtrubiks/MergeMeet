@@ -2,6 +2,7 @@
 import pytest
 import pytest_asyncio
 import uuid
+import asyncio
 from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -375,7 +376,6 @@ class TestModerationLogging:
 
         # 驗證日誌已創建（使用獨立 session，需要重新查詢）
         # 注意：由於日誌使用獨立事務，需要等待一下
-        import asyncio
         await asyncio.sleep(0.1)
 
         result = await test_db.execute(

@@ -1,8 +1,10 @@
 """聊天訊息 REST API 測試"""
 import pytest
+import uuid
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from unittest.mock import AsyncMock, patch
 
 from app.models.user import User
 from app.models.match import Match, Message
@@ -506,7 +508,6 @@ async def test_deleted_messages_not_in_history(client: AsyncClient, matched_user
 @pytest.mark.asyncio
 async def test_delete_message_websocket_broadcast(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
     """測試刪除訊息時 WebSocket 廣播通知"""
-    from unittest.mock import AsyncMock, patch
 
     match_id = matched_users["match_id"]
     alice_token = matched_users["alice"]["token"]
@@ -554,7 +555,6 @@ async def test_delete_message_websocket_broadcast(client: AsyncClient, matched_u
 @pytest.mark.asyncio
 async def test_delete_message_websocket_event_format(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
     """測試刪除訊息 WebSocket 事件格式正確性"""
-    from unittest.mock import AsyncMock, patch
 
     match_id = matched_users["match_id"]
     bob_token = matched_users["bob"]["token"]
@@ -591,7 +591,6 @@ async def test_delete_message_websocket_event_format(client: AsyncClient, matche
         assert broadcast_data["type"] == "message_deleted"
 
         # 驗證 UUID 格式
-        import uuid
         assert uuid.UUID(broadcast_data["message_id"])
         assert uuid.UUID(broadcast_data["match_id"])
         assert uuid.UUID(broadcast_data["deleted_by"])

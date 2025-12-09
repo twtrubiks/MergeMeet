@@ -248,8 +248,6 @@ class ContentModerationService:
                 await log_db.commit()
             except Exception as e:
                 # 日誌記錄失敗不應影響主流程
-                import logging
-                logger = logging.getLogger(__name__)
                 logger.error(f"Failed to log moderation: {e}", exc_info=True)
                 await log_db.rollback()
 

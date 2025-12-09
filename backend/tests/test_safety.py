@@ -1,7 +1,9 @@
 """安全功能測試 - 封鎖與舉報"""
 import pytest
+import uuid
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.models.user import User
 from app.models.match import Match
@@ -50,7 +52,6 @@ async def test_users_for_safety(client: AsyncClient):
 async def test_block_user_success(client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession):
     """測試：成功封鎖用戶"""
     # 取得 Bob 的 user_id
-    from sqlalchemy import select
     result = await test_db.execute(
         select(User).where(User.email == test_users_for_safety['bob']['email'])
     )
@@ -73,7 +74,6 @@ async def test_block_user_success(client: AsyncClient, test_users_for_safety: di
 async def test_cannot_block_self(client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession):
     """測試：無法封鎖自己"""
     # 取得 Alice 自己的 user_id
-    from sqlalchemy import select
     result = await test_db.execute(
         select(User).where(User.email == test_users_for_safety['alice']['email'])
     )
@@ -93,7 +93,6 @@ async def test_cannot_block_self(client: AsyncClient, test_users_for_safety: dic
 @pytest.mark.asyncio
 async def test_cannot_block_twice(client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession):
     """測試：無法重複封鎖同一用戶"""
-    from sqlalchemy import select
     result = await test_db.execute(
         select(User).where(User.email == test_users_for_safety['bob']['email'])
     )
@@ -120,7 +119,6 @@ async def test_cannot_block_twice(client: AsyncClient, test_users_for_safety: di
 @pytest.mark.asyncio
 async def test_unblock_user_success(client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession):
     """測試：成功解除封鎖"""
-    from sqlalchemy import select
     result = await test_db.execute(
         select(User).where(User.email == test_users_for_safety['bob']['email'])
     )
@@ -148,7 +146,6 @@ async def test_unblock_user_success(client: AsyncClient, test_users_for_safety: 
 @pytest.mark.asyncio
 async def test_get_blocked_users_list(client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession):
     """測試：取得封鎖列表"""
-    from sqlalchemy import select
 
     # 取得 Bob 和 Charlie 的 user_id
     result = await test_db.execute(
@@ -189,8 +186,6 @@ async def test_get_blocked_users_list(client: AsyncClient, test_users_for_safety
 @pytest.mark.asyncio
 async def test_block_cancels_match(client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession):
     """測試：封鎖自動取消配對"""
-    from sqlalchemy import select
-    import uuid
 
     # 取得 Alice 和 Bob 的 user_id
     result = await test_db.execute(
@@ -240,7 +235,6 @@ async def test_block_cancels_match(client: AsyncClient, test_users_for_safety: d
 @pytest.mark.asyncio
 async def test_report_user_success(client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession):
     """測試：成功舉報用戶"""
-    from sqlalchemy import select
     result = await test_db.execute(
         select(User).where(User.email == test_users_for_safety['bob']['email'])
     )
@@ -268,7 +262,6 @@ async def test_report_user_success(client: AsyncClient, test_users_for_safety: d
 @pytest.mark.asyncio
 async def test_cannot_report_self(client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession):
     """測試：無法舉報自己"""
-    from sqlalchemy import select
     result = await test_db.execute(
         select(User).where(User.email == test_users_for_safety['alice']['email'])
     )
@@ -292,7 +285,6 @@ async def test_cannot_report_self(client: AsyncClient, test_users_for_safety: di
 @pytest.mark.asyncio
 async def test_report_requires_valid_type(client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession):
     """測試：舉報類型必須有效"""
-    from sqlalchemy import select
     result = await test_db.execute(
         select(User).where(User.email == test_users_for_safety['bob']['email'])
     )
@@ -316,7 +308,6 @@ async def test_report_requires_valid_type(client: AsyncClient, test_users_for_sa
 @pytest.mark.asyncio
 async def test_report_nonexistent_user(client: AsyncClient, test_users_for_safety: dict):
     """測試：舉報不存在的用戶"""
-    import uuid
 
     # Alice 舉報不存在的用戶
     fake_user_id = str(uuid.uuid4())
@@ -337,7 +328,6 @@ async def test_report_nonexistent_user(client: AsyncClient, test_users_for_safet
 @pytest.mark.asyncio
 async def test_get_my_reports(client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession):
     """測試：取得我的舉報記錄"""
-    from sqlalchemy import select
 
     # 取得 Bob 和 Charlie 的 user_id
     result = await test_db.execute(
@@ -388,7 +378,6 @@ async def test_get_my_reports(client: AsyncClient, test_users_for_safety: dict, 
 @pytest.mark.asyncio
 async def test_report_increases_warning_count(client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession):
     """測試：舉報會增加被舉報用戶的警告次數"""
-    from sqlalchemy import select
 
     # 取得 Bob 的初始警告次數
     result = await test_db.execute(

@@ -2,6 +2,7 @@
 import pytest
 import os
 import io
+import asyncio
 import tempfile
 import shutil
 from pathlib import Path
@@ -417,8 +418,6 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_concurrent_uploads(self, storage_service, sample_image_bytes):
         """測試並發上傳"""
-        import asyncio
-
         user_id = "concurrent-user"
 
         async def upload():

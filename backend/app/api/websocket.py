@@ -13,11 +13,12 @@ import json
 import logging
 import uuid
 
-from app.core.database import get_db
+from app.core.database import get_db, AsyncSessionLocal
 from app.core.config import settings
 from app.websocket.manager import manager
 from app.models.match import Message, Match
 from app.models.user import User
+from app.services.content_moderation import ContentModerationService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -121,9 +122,6 @@ async def handle_chat_message(data: dict, sender_id: uuid.UUID):
         data: 訊息資料，包含 match_id 和 content
         sender_id: 發送者 ID (UUID 類型)
     """
-    from app.core.database import AsyncSessionLocal
-    from app.services.content_moderation import ContentModerationService
-
     async with AsyncSessionLocal() as db:
         try:
             match_id_str = data.get("match_id")
@@ -307,8 +305,6 @@ async def handle_read_receipt(data: dict, user_id: str):
         data: 包含 message_id 的資料
         user_id: 讀取訊息的用戶 ID
     """
-    from app.core.database import AsyncSessionLocal
-
     async with AsyncSessionLocal() as db:
         try:
             message_id_str = data.get("message_id")

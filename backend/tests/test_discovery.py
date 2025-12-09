@@ -2,7 +2,10 @@
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from datetime import date
+from io import BytesIO
+from PIL import Image
 
 from app.models.user import User
 from app.models.profile import Profile, InterestTag
@@ -96,9 +99,6 @@ async def completed_profiles(client: AsyncClient, test_users: dict, test_db: Asy
     assert response.status_code == 200, f"Failed to update Bob preferences: status={response.status_code}, body={response.text}"
 
     # 建立測試用的興趣標籤
-    from app.models.profile import InterestTag
-    from sqlalchemy import select
-
     result = await test_db.execute(select(InterestTag).limit(5))
     existing_tags = result.scalars().all()
 
@@ -136,9 +136,6 @@ async def completed_profiles(client: AsyncClient, test_users: dict, test_db: Asy
     assert response.status_code == 200, f"Failed to set Bob interests: status={response.status_code}, body={response.text}"
 
     # 上傳測試照片
-    from io import BytesIO
-    from PIL import Image
-
     def create_test_image():
         """創建一個有效的測試圖片"""
         img = Image.new('RGB', (100, 100), color='red')

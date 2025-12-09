@@ -11,7 +11,7 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_admin_user
 from app.core.utils import mask_email
 from app.models.user import User
-from app.models.match import Match, BlockedUser
+from app.models.match import Match, BlockedUser, Message
 from app.models.profile import Profile
 from app.models.report import Report
 from app.schemas.admin import (
@@ -42,8 +42,6 @@ async def get_dashboard_stats(
     - 封鎖統計
     """
     # 用戶統計
-    from app.models.match import Message
-
     total_users_result = await db.execute(select(func.count(User.id)))
     total_users = total_users_result.scalar()
 

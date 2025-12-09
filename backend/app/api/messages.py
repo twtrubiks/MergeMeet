@@ -18,6 +18,7 @@ from app.schemas.message import (
     MatchWithLastMessageResponse,
     MarkAsReadRequest
 )
+from app.websocket.manager import manager
 
 router = APIRouter(prefix="/api/messages")
 logger = logging.getLogger(__name__)
@@ -294,8 +295,6 @@ async def delete_message(
     - 使用軟刪除，不實際從資料庫移除
     - 通過 WebSocket 即時通知配對中的另一方
     """
-    from app.websocket.manager import manager
-
     # 查詢訊息
     result = await db.execute(
         select(Message).where(Message.id == message_id)

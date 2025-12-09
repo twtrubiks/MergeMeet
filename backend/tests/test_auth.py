@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import date
 
 from app.models.user import User
+from app.api.auth import verification_codes
 
 
 @pytest.mark.asyncio
@@ -185,7 +186,6 @@ async def test_verify_email_success(client: AsyncClient):
     })
 
     # 從 auth.py 的 verification_codes 字典中取得驗證碼
-    from app.api.auth import verification_codes
     code = await verification_codes.get("verify@example.com")  # ✅ 添加 await
 
     # 驗證 Email
