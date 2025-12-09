@@ -137,26 +137,26 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   /**
-   * 標記訊息為已讀
+   * 標記訊息為已讀（使用 WebSocket 即時處理）
+   *
+   * 重構說明：
+   * - 改為只用 WebSocket 處理已讀回條（業界標準做法）
+   * - WebSocket 即時性更好，適合聊天場景
+   * - 避免 REST API 和 WebSocket 的重複處理和競爭條件
+   * - 參考：WhatsApp、Telegram 都只用 WebSocket 處理即時已讀狀態
    */
   const markAsRead = async (messageIds) => {
     if (!messageIds || messageIds.length === 0) {
       return
     }
 
-    try {
-      await apiClient.post('/messages/messages/read', {
-        message_ids: messageIds
-      })
+    // 只通過 WebSocket 發送已讀回條
+    // 後端會標記資料庫並通知對方
+    messageIds.forEach(msgId => {
+      ws.sendReadReceipt(msgId)
+    })
 
-      // 更新本地狀態
-      messageIds.forEach(msgId => {
-        // 發送已讀回條
-        ws.sendReadReceipt(msgId)
-      })
-    } catch (err) {
-      logger.error('標記訊息為已讀失敗:', err)
-    }
+    logger.debug('[Chat] Sent read receipts via WebSocket:', messageIds)
   }
 
   /**
@@ -318,7 +318,6 @@ export const useChatStore = defineStore('chat', () => {
    * 處理已讀回條
    */
   const handleReadReceipt = (data) => {
-    console.log('🔥 [DEBUG] Read receipt received:', data)
     logger.debug('[Chat] Received read receipt:', data)
     const { message_id, read_at } = data
 
@@ -326,20 +325,14 @@ export const useChatStore = defineStore('chat', () => {
     for (const matchId in messages.value) {
       const messageIndex = messages.value[matchId].findIndex(m => m.id === message_id)
       if (messageIndex > -1) {
-        console.log('🔥 [DEBUG] Found message at index:', messageIndex, 'in match:', matchId)
-        console.log('🔥 [DEBUG] Message before update:', messages.value[matchId][messageIndex])
-
         // 創建新陣列以觸發 Vue 響應式更新
         messages.value[matchId] = messages.value[matchId].map((m, index) =>
           index === messageIndex ? { ...m, is_read: read_at } : m
         )
-
-        console.log('🔥 [DEBUG] Message after update:', messages.value[matchId][messageIndex])
         logger.debug('[Chat] Message marked as read:', message_id)
         break
       }
     }
-    console.log('🔥 [DEBUG] All messages in current match:', messages.value[currentMatchId.value])
   }
 
   /**

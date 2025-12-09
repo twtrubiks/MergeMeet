@@ -372,30 +372,26 @@ async def handle_read_receipt(data: dict, user_id: str):
             if str(message.sender_id) == user_id:
                 return
 
-            # 更新訊息狀態（如果尚未標記）
-            read_time = None
+            # 標記為已讀（如果尚未標記）
             if not message.is_read:
-                # 使用 Python datetime 而不是 SQL func.now()
                 read_time = datetime.now(timezone.utc)
                 message.is_read = read_time
                 await db.commit()
-                logger.info(f"Message {message_id} marked as read by {user_id}")
-            else:
-                # 已經被 REST API 標記過，使用現有時間
-                read_time = message.is_read
-                logger.debug(f"Message {message_id} already marked as read, sending notification anyway")
 
-            # 通知發送者（無論是否剛標記，都發送通知）
-            await manager.send_personal_message(
-                str(message.sender_id),
-                {
-                    "type": "read_receipt",
-                    "message_id": str(message.id),
-                    "read_by": user_id,
-                    "read_at": read_time.isoformat()
-                }
-            )
-            logger.debug(f"Read receipt sent to {message.sender_id} for message {message_id}")
+                # 通知發送者（只用 WebSocket，避免與 REST API 重複）
+                await manager.send_personal_message(
+                    str(message.sender_id),
+                    {
+                        "type": "read_receipt",
+                        "message_id": str(message.id),
+                        "read_by": user_id,
+                        "read_at": read_time.isoformat()
+                    }
+                )
+
+                logger.info(f"Message {message_id} marked as read by {user_id} via WebSocket")
+            else:
+                logger.debug(f"Message {message_id} already marked as read, skipping")
 
         except Exception as e:
             logger.error(f"Error handling read receipt: {e}", exc_info=True)
