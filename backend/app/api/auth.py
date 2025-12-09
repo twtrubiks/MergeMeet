@@ -37,6 +37,37 @@ import logging
 from typing import Dict, Tuple, Optional
 
 from app.core.database import get_db
+
+
+def mask_email(email: str) -> str:
+    """
+    Email 脫敏處理，保護用戶隱私
+
+    示例:
+    - user@example.com -> us***@example.com
+    - a@test.com -> a***@test.com
+    - longname@domain.com -> lo***e@domain.com
+
+    Args:
+        email: 原始 email 地址
+
+    Returns:
+        脫敏後的 email 地址
+    """
+    if not email or '@' not in email:
+        return '***@***'
+
+    local, domain = email.split('@', 1)
+
+    if len(local) <= 1:
+        masked_local = local[0] + '***'
+    elif len(local) <= 3:
+        masked_local = local[0] + '***'
+    else:
+        # 保留前兩個和最後一個字符，中間替換為 ***
+        masked_local = local[:2] + '***' + local[-1]
+
+    return f"{masked_local}@{domain}"
 from app.core.security import (
     verify_password,
     get_password_hash,
@@ -247,7 +278,7 @@ async def register(
     except IntegrityError:
         # 並發情況下，另一個請求已創建了同樣的用戶
         await db.rollback()
-        logger.warning(f"Concurrent registration attempt for email: {request.email}")
+        logger.warning(f"Concurrent registration attempt for email: {mask_email(request.email)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="註冊失敗，請檢查輸入資料"
@@ -255,10 +286,12 @@ async def register(
 
     # 生成驗證碼
     # TODO: 整合 Email 發送服務（如 SendGrid、AWS SES）後移除模擬邏輯
-    # 目前驗證碼會輸出到 log，開發測試時請查看終端輸出
+    # 暫時不會發信，開發測試時可從日誌查看驗證碼（安全起見已註解）
     verification_code = generate_verification_code()
     await verification_codes.set(request.email, verification_code)
-    logger.info(f"📧 [模擬] 發送驗證碼到 {request.email}: {verification_code}")
+    # 開發環境可取消註解以查看驗證碼（生產環境禁止）
+    # logger.info(f"📧 [開發] 驗證碼: {verification_code} (Email: {mask_email(request.email)})")
+    logger.info(f"Verification code sent to {mask_email(request.email)}")
 
     # 生成 JWT Token
     access_token, refresh_token = _generate_auth_tokens(str(new_user.id))
@@ -553,10 +586,12 @@ async def resend_verification(
 
     # 生成新的驗證碼
     # TODO: 整合 Email 發送服務後移除模擬邏輯
-    # 目前驗證碼會輸出到 log，開發測試時請查看終端輸出
+    # 暫時不會發信，開發測試時可從日誌查看驗證碼（安全起見已註解）
     verification_code = generate_verification_code()
     await verification_codes.set(email, verification_code)
-    logger.info(f"📧 [模擬] 重新發送驗證碼到 {email}: {verification_code}")
+    # 開發環境可取消註解以查看驗證碼（生產環境禁止）
+    # logger.info(f"📧 [開發] 驗證碼: {verification_code} (Email: {mask_email(email)})")
+    logger.info(f"Verification code resent to {mask_email(email)}")
 
     return {
         "message": "驗證碼已重新發送",

@@ -8,10 +8,10 @@ from app.core.config import settings
 # 建立非同步引擎
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=True,  # 開發環境顯示 SQL
+    echo=settings.ENVIRONMENT == "development",  # 僅開發環境顯示 SQL，生產環境關閉以提升性能
     future=True,
-    pool_size=5,  # 減少基礎連接數（適合小型應用）
-    max_overflow=10,  # 減少最大溢出連接數
+    pool_size=settings.DB_POOL_SIZE,  # 從配置讀取連接池大小
+    max_overflow=settings.DB_MAX_OVERFLOW,  # 從配置讀取最大溢出連接數
     pool_recycle=3600,  # 1 小時回收連接
     pool_pre_ping=True,  # 連接前先 ping，確保連接有效
 )
