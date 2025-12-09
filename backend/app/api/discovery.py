@@ -14,7 +14,7 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.models.profile import Profile
-from app.models.match import Like, Match, BlockedUser, Message
+from app.models.match import Like, Match, BlockedUser, Message, Pass
 from app.schemas.discovery import ProfileCard, LikeResponse, MatchSummary, MatchDetail
 from app.services.matching_service import matching_service
 
@@ -143,6 +143,14 @@ async def browse_users(
         BlockedUser.blocked_id == current_user.id
     )
     query = query.where(Profile.user_id.notin_(blocked_me_subquery))
+
+    # 排除 24 小時內跳過的用戶（類似 Tinder 做法）
+    pass_cutoff = datetime.now() - timedelta(hours=24)
+    passed_users_subquery = select(Pass.to_user_id).where(
+        Pass.from_user_id == current_user.id,
+        Pass.passed_at > pass_cutoff  # 只排除 24 小時內跳過的
+    )
+    query = query.where(Profile.user_id.notin_(passed_users_subquery))
 
     # 限制數量（先取較多候選人，稍後排序後再限制）
     query = query.limit(limit * 3)
@@ -377,8 +385,8 @@ async def pass_user(
     """
     跳過用戶
 
-    註：目前簡化實作，跳過不留記錄
-    未來可以加入「跳過記錄」以避免重複顯示
+    記錄跳過操作，24 小時內跳過的用戶不會再次出現。
+    24 小時後可重新配對（類似 Tinder），給用戶第二次機會。
     """
     # 不能跳過自己
     if user_id == current_user.id:
@@ -386,6 +394,38 @@ async def pass_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="不能跳過自己"
         )
+
+    # 創建或更新跳過記錄
+    try:
+        new_pass = Pass(
+            from_user_id=current_user.id,
+            to_user_id=user_id
+        )
+        db.add(new_pass)
+        await db.commit()
+    except IntegrityError:
+        # 已經跳過過，更新時間（使用 ON CONFLICT）
+        await db.rollback()
+        await db.execute(
+            select(Pass)
+            .where(
+                Pass.from_user_id == current_user.id,
+                Pass.to_user_id == user_id
+            )
+            .with_for_update()
+        )
+        # 刪除舊記錄，創建新記錄（更新時間）
+        await db.execute(
+            Pass.__table__.delete().where(
+                and_(
+                    Pass.from_user_id == current_user.id,
+                    Pass.to_user_id == user_id
+                )
+            )
+        )
+        new_pass = Pass(from_user_id=current_user.id, to_user_id=user_id)
+        db.add(new_pass)
+        await db.commit()
 
     return {"passed": True, "message": "已跳過此用戶"}
 
