@@ -165,13 +165,18 @@ class ConnectionManager:
             message: 訊息內容 (dict)
             exclude_user: 要排除的用戶 ID (通常是發送者)
         """
+        print(f"🔥 [DEBUG] send_to_match called: match_id={match_id}, message_type={message.get('type')}")
+        print(f"🔥 [DEBUG] match_rooms keys: {list(self.match_rooms.keys())}")
+        print(f"🔥 [DEBUG] users in room {match_id}: {self.match_rooms.get(match_id, [])}")
         logger.debug(f"send_to_match called: match_id={match_id}, rooms={list(self.match_rooms.keys())}, users_in_room={self.match_rooms.get(match_id, [])}")
         if match_id in self.match_rooms:
             for user_id in self.match_rooms[match_id]:
                 if user_id != exclude_user:
+                    print(f"🔥 [DEBUG] Sending {message.get('type')} to user {user_id}")
                     logger.debug(f"Sending message to user {user_id} in match {match_id}")
                     await self.send_personal_message(user_id, message)
         else:
+            print(f"⚠️ [DEBUG] Match room {match_id} NOT FOUND in match_rooms!")
             logger.warning(f"Match room {match_id} not found in match_rooms")
 
     async def join_match_room(self, match_id: str, user_id: str):
