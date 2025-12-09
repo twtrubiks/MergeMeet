@@ -33,8 +33,11 @@ export function useWebSocket() {
   )
 
   /**
-   * 建立 WebSocket 連接
-   * @returns {Promise<void>} 當連接成功時 resolve
+   * 建立 WebSocket 連接（使用首次訊息認證）
+   *
+   * 安全改進：Token 不再透過 URL 傳遞，而是在連接建立後通過首次訊息發送
+   *
+   * @returns {Promise<void>} 當連接成功並認證完成時 resolve
    */
   const connect = () => {
     if (socket.value?.readyState === WebSocket.OPEN) {
@@ -53,26 +56,64 @@ export function useWebSocket() {
 
     return new Promise((resolve, reject) => {
       try {
-        // 建立 WebSocket 連接
+        // 建立 WebSocket 連接（URL 中不包含 Token，避免洩漏）
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
         const wsHost = import.meta.env.VITE_WS_URL || 'localhost:8000'
         const token = userStore.accessToken
         const userId = userStore.user.id
 
-        const wsUrl = `${wsProtocol}//${wsHost}/ws?token=${token}&user_id=${userId}`
+        const wsUrl = `${wsProtocol}//${wsHost}/ws`
 
         socket.value = new WebSocket(wsUrl)
 
-        // 連接成功
+        // 連接成功後立即發送認證訊息
         socket.value.onopen = () => {
-          logger.log('WebSocket connected')
-          connectionState.value = ConnectionState.CONNECTED
-          reconnectAttempts.value = 0
-          resolve()
+          logger.log('WebSocket connected, sending auth...')
+
+          // 發送認證訊息（Token 安全地通過 WebSocket 訊息傳遞）
+          socket.value.send(JSON.stringify({
+            type: 'auth',
+            token: token,
+            user_id: userId
+          }))
+
+          // 等待認證成功回應
+          const authTimeout = setTimeout(() => {
+            logger.error('WebSocket authentication timeout')
+            socket.value.close()
+            reject(new Error('Authentication timeout'))
+          }, 5000) // 5 秒超時
+
+          // 暫存 onmessage 處理器以接收認證回應
+          const tempMessageHandler = (event) => {
+            try {
+              const data = JSON.parse(event.data)
+
+              if (data.type === 'auth_success') {
+                clearTimeout(authTimeout)
+                logger.log('WebSocket authenticated successfully')
+                connectionState.value = ConnectionState.CONNECTED
+                reconnectAttempts.value = 0
+
+                // 移除臨時處理器，啟用正常訊息處理
+                socket.value.onmessage = normalMessageHandler
+                resolve()
+              } else if (data.type === 'error' && data.message?.includes('auth')) {
+                clearTimeout(authTimeout)
+                logger.error('WebSocket authentication failed:', data.message)
+                socket.value.close()
+                reject(new Error('Authentication failed'))
+              }
+            } catch (error) {
+              logger.error('Error parsing auth response:', error)
+            }
+          }
+
+          socket.value.onmessage = tempMessageHandler
         }
 
-        // 接收訊息
-        socket.value.onmessage = (event) => {
+        // 正常訊息處理器（認證成功後使用）
+        const normalMessageHandler = (event) => {
           try {
             const data = JSON.parse(event.data)
             handleMessage(data)

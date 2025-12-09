@@ -55,45 +55,51 @@ class ConnectionManager:
         self._cleanup_task: Optional[asyncio.Task] = None
         self._heartbeat_task: Optional[asyncio.Task] = None
 
-    async def connect(self, websocket: WebSocket, user_id: str, token: str) -> bool:
+    async def connect(self, websocket: WebSocket, user_id: str, token: str, already_accepted: bool = False) -> bool:
         """建立 WebSocket 連接
 
         Args:
             websocket: WebSocket 連接實例
             user_id: 用戶 ID
             token: JWT Token
+            already_accepted: 是否已經接受連接（首次訊息認證時為 True）
 
         Returns:
             bool: 連接是否成功
         """
         # 檢查 Token 是否在黑名單中（已登出）
         if await token_blacklist.is_blacklisted(token):
-            await websocket.close(code=1008, reason="Token revoked")
+            if not already_accepted:
+                await websocket.close(code=1008, reason="Token revoked")
             logger.warning(f"WebSocket connection with blacklisted token for user {user_id}")
             return False
 
         # 驗證 Token
         payload = decode_token(token)
         if not payload or payload.get("sub") != user_id:
-            await websocket.close(code=1008, reason="Invalid token")
+            if not already_accepted:
+                await websocket.close(code=1008, reason="Invalid token")
             logger.warning(f"Invalid token for user {user_id}")
             return False
 
         # 檢查 Token 類型（必須是 access token）
         if payload.get("type") != "access":
-            await websocket.close(code=1008, reason="Invalid token type")
+            if not already_accepted:
+                await websocket.close(code=1008, reason="Invalid token type")
             logger.warning(f"WebSocket connection with wrong token type for user {user_id}")
             return False
 
         # 明確檢查 Token 過期時間（雙重保險）
         exp = payload.get("exp")
         if exp and datetime.fromtimestamp(exp, tz=timezone.utc) < datetime.now(timezone.utc):
-            await websocket.close(code=1008, reason="Token expired")
+            if not already_accepted:
+                await websocket.close(code=1008, reason="Token expired")
             logger.warning(f"WebSocket connection with expired token for user {user_id}")
             return False
 
-        # 接受連接
-        await websocket.accept()
+        # 接受連接（如果尚未接受）
+        if not already_accepted:
+            await websocket.accept()
 
         # 並發安全：使用鎖保護字典操作
         async with self._connections_lock:
@@ -101,12 +107,6 @@ class ConnectionManager:
             # 初始化心跳時間（防止異常斷線）
             self.connection_heartbeats[user_id] = datetime.now(timezone.utc)
         logger.info(f"User {user_id} connected via WebSocket")
-
-        # 發送連接成功訊息
-        await self.send_personal_message(
-            user_id,
-            {"type": "connection", "status": "connected", "user_id": user_id}
-        )
 
         return True
 

@@ -1,9 +1,12 @@
 """WebSocket API 端點
 
-TODO(Security): WebSocket Token 目前透過 Query Parameter 傳遞，存在以下風險：
-- Token 會出現在伺服器日誌和瀏覽器歷史記錄中
-- 建議改用 Sec-WebSocket-Protocol header 或首次訊息認證
-- 參考: https://devcenter.heroku.com/articles/websocket-security
+安全性改進：使用首次訊息認證機制，Token 不再透過 Query Parameter 傳遞。
+
+認證流程：
+1. 客戶端建立 WebSocket 連接（無需 Query Parameters）
+2. 連接成功後立即發送認證訊息：{"type": "auth", "token": "...", "user_id": "..."}
+3. 伺服器驗證 Token 並標記連接為已認證
+4. 認證成功後才允許其他操作
 """
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +15,7 @@ from datetime import datetime
 import json
 import logging
 import uuid
+import asyncio
 
 from app.core.database import get_db, AsyncSessionLocal
 from app.core.config import settings
@@ -44,38 +48,78 @@ def validate_uuid(value: str, field_name: str = "ID") -> uuid.UUID | None:
 
 
 @router.websocket("/ws")
-async def websocket_endpoint(
-    websocket: WebSocket,
-    token: str = Query(..., description="JWT Token"),
-    user_id: str = Query(..., description="用戶 ID")
-):
+async def websocket_endpoint(websocket: WebSocket):
     """
-    WebSocket 連接端點
+    WebSocket 連接端點（首次訊息認證機制）
 
-    用於建立即時聊天連接，支援:
+    安全認證流程：
+    1. 客戶端建立連接（無 Query Parameters，Token 不暴露在 URL）
+    2. 伺服器接受連接並等待認證訊息（5 秒超時）
+    3. 客戶端發送：{"type": "auth", "token": "JWT...", "user_id": "uuid"}
+    4. 伺服器驗證 Token 並建立連接
+    5. 認證成功後才允許其他操作
+
+    支援功能：
     - 聊天訊息發送/接收
     - 打字狀態指示器
     - 訊息已讀回條
     - 加入/離開配對聊天室
-
-    Query Parameters:
-        - token: JWT access token
-        - user_id: 當前用戶的 ID
+    - 心跳 ping/pong
     """
-    # 轉換 user_id 為 UUID 類型
-    try:
-        user_uuid = uuid.UUID(user_id)
-    except ValueError:
-        logger.error(f"Invalid user_id format: {user_id}")
-        await websocket.close(code=1008, reason="Invalid user_id format")
-        return
+    # 接受連接（但尚未認證）
+    await websocket.accept()
 
-    # 建立連接
-    connected = await manager.connect(websocket, user_id, token)
-    if not connected:
-        return
+    authenticated = False
+    user_id = None
 
     try:
+        # 等待首次認證訊息（5 秒超時）
+        try:
+            auth_data = await asyncio.wait_for(websocket.receive_json(), timeout=5.0)
+        except asyncio.TimeoutError:
+            await websocket.close(code=1008, reason="Authentication timeout")
+            logger.warning("WebSocket authentication timeout")
+            return
+
+        # 驗證是否為認證訊息
+        if auth_data.get("type") != "auth":
+            await websocket.close(code=1008, reason="First message must be auth")
+            logger.warning(f"WebSocket first message not auth: {auth_data.get('type')}")
+            return
+
+        # 提取認證資訊
+        token = auth_data.get("token")
+        user_id_str = auth_data.get("user_id")
+
+        if not token or not user_id_str:
+            await websocket.close(code=1008, reason="Missing token or user_id")
+            logger.warning("WebSocket auth missing credentials")
+            return
+
+        # 驗證 user_id 格式
+        user_uuid = validate_uuid(user_id_str, "user_id")
+        if not user_uuid:
+            await websocket.close(code=1008, reason="Invalid user_id format")
+            return
+
+        user_id = user_id_str
+
+        # 建立連接並驗證 Token（連接已接受，傳入 already_accepted=True）
+        connected = await manager.connect(websocket, user_id, token, already_accepted=True)
+        if not connected:
+            return
+
+        authenticated = True
+
+        # 發送認證成功回應
+        await websocket.send_json({
+            "type": "auth_success",
+            "message": "Authentication successful",
+            "user_id": user_id
+        })
+        logger.info(f"WebSocket authenticated successfully for user {user_id}")
+
+        # 進入訊息處理循環
         while True:
             # 接收訊息
             data = await websocket.receive_text()
