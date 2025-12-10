@@ -149,6 +149,7 @@ export function useWebSocket() {
           logger.log('WebSocket closed:', event.code, event.reason)
           connectionState.value = ConnectionState.DISCONNECTED
           socket.value = null
+          connectingPromise = null
 
           // 嘗試重新連接 (除非是正常關閉)
           if (event.code !== 1000 && reconnectAttempts.value < maxReconnectAttempts) {
@@ -192,6 +193,7 @@ export function useWebSocket() {
    * 斷開連接
    */
   const disconnect = () => {
+    connectingPromise = null
     if (socket.value) {
       socket.value.close(1000, 'Client disconnect')
       socket.value = null
