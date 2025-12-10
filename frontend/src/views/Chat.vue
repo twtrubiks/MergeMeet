@@ -101,8 +101,8 @@
         </n-button>
       </div>
 
-      <!-- WebSocket 連接狀態提示 -->
-      <div v-if="!chatStore.ws.isConnected" class="connection-warning">
+      <!-- WebSocket 連接狀態提示（只在初始化完成後顯示，避免初始連接時閃現） -->
+      <div v-if="!isInitializing && !chatStore.ws.isConnected" class="connection-warning">
         <n-alert type="warning" :show-icon="false">
           連接已斷開，正在重新連接...
         </n-alert>
@@ -149,6 +149,9 @@ const defaultAvatar = 'https://via.placeholder.com/40'
 const nextCursor = ref(null) // 下一頁的 cursor（最舊訊息 ID）
 const hasMore = ref(true)
 const isLoadingMore = ref(false)
+
+// WebSocket 初始化狀態（避免初始化期間顯示斷線警告）
+const isInitializing = ref(true)
 
 // 舉報功能
 const showReportModal = ref(false)
@@ -400,6 +403,9 @@ onMounted(async () => {
   // 滾動到底部
   await nextTick()
   scrollToBottom(false)
+
+  // 初始化完成，現在可以顯示斷線警告了
+  isInitializing.value = false
 })
 
 onUnmounted(() => {
