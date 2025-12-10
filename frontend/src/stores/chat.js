@@ -81,24 +81,50 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   /**
-   * 獲取聊天記錄
+   * 獲取聊天記錄 (Cursor-based pagination)
    *
-   * 簡化設計：直接用 API 返回的訊息覆蓋本地狀態
-   * - API 是單一真相來源（Single Source of Truth）
-   * - 避免複雜的合併邏輯和狀態不一致
-   * - 符合業界標準（Telegram、Discord 等都這樣做）
+   * @param {string} matchId - 配對 ID
+   * @param {string|null} beforeId - Cursor: 載入比此訊息 ID 更早的訊息
+   * @param {number} limit - 每次載入數量
+   * @returns {Promise<Object>} API 回應 (含 messages, has_more, next_cursor, total)
+   *
+   * 使用方式：
+   * - 初次載入：fetchChatHistory(matchId) - 取最新 50 條
+   * - 載入更多：fetchChatHistory(matchId, next_cursor) - 取更早的訊息
    */
-  const fetchChatHistory = async (matchId, page = 1, pageSize = 50) => {
+  const fetchChatHistory = async (matchId, beforeId = null, limit = 50) => {
     loading.value = true
     error.value = null
     try {
+      const params = { limit }
+      if (beforeId) {
+        params.before_id = beforeId
+      }
+
       const response = await apiClient.get(`/messages/matches/${matchId}/messages`, {
-        params: { page, page_size: pageSize }
+        params
       })
 
-      // 簡單：直接覆蓋（API 是權威來源）
-      // API 已經返回正序（舊的在前），直接使用
-      messages.value[matchId] = response.data.messages
+      if (beforeId) {
+        // 載入更多歷史訊息：將歷史訊息插入到開頭
+        // response.data.messages 是正序（舊的在前）
+        const existingMessages = messages.value[matchId] || []
+        messages.value[matchId] = [
+          ...response.data.messages,
+          ...existingMessages
+        ]
+      } else {
+        // 初次載入：直接覆蓋（API 是權威來源）
+        messages.value[matchId] = response.data.messages
+      }
+
+      logger.debug('[Chat] Fetched messages:', {
+        matchId,
+        beforeId,
+        count: response.data.messages.length,
+        hasMore: response.data.has_more,
+        nextCursor: response.data.next_cursor
+      })
 
       return response.data
     } catch (err) {
@@ -206,6 +232,7 @@ export const useChatStore = defineStore('chat', () => {
 
   /**
    * 加入配對聊天室
+   * @returns {Promise<Object>} API 回應 (含 has_more, next_cursor 供前端分頁使用)
    */
   const joinMatchRoom = async (matchId) => {
     currentMatchId.value = matchId
@@ -213,10 +240,13 @@ export const useChatStore = defineStore('chat', () => {
 
     // 每次進入聊天室都重新載入最新訊息
     // 這確保用戶能看到離開期間的新訊息
-    await fetchChatHistory(matchId)
+    const result = await fetchChatHistory(matchId)
 
     // 標記已讀（確保訊息已載入後再執行）
     await markConversationAsRead(matchId)
+
+    // 返回結果供前端使用 cursor 資訊
+    return result
   }
 
   /**

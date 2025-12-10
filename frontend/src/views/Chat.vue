@@ -145,8 +145,8 @@ const messageListRef = ref(null)
 const typingTimer = ref(null)
 const defaultAvatar = 'https://via.placeholder.com/40'
 
-// 分頁載入狀態
-const currentPage = ref(1)
+// Cursor-based 分頁載入狀態
+const nextCursor = ref(null) // 下一頁的 cursor（最舊訊息 ID）
 const hasMore = ref(true)
 const isLoadingMore = ref(false)
 
@@ -306,9 +306,9 @@ const scrollToBottom = (smooth = true) => {
   }
 }
 
-// 載入更多歷史訊息
+// 載入更多歷史訊息 (Cursor-based pagination)
 const loadMoreMessages = async () => {
-  if (isLoadingMore.value || !hasMore.value) {
+  if (isLoadingMore.value || !hasMore.value || !nextCursor.value) {
     return
   }
 
@@ -319,30 +319,21 @@ const loadMoreMessages = async () => {
     const scrollHeightBefore = messageListRef.value?.scrollHeight || 0
     const scrollTopBefore = messageListRef.value?.scrollTop || 0
 
-    // 載入下一頁
-    const nextPage = currentPage.value + 1
-    const result = await chatStore.fetchChatHistory(matchId.value, nextPage)
+    // 使用 cursor 載入更早的訊息
+    const result = await chatStore.fetchChatHistory(matchId.value, nextCursor.value)
 
-    // 檢查是否還有更多訊息
-    if (result.messages && result.messages.length > 0) {
-      currentPage.value = nextPage
+    // 更新分頁狀態
+    hasMore.value = result.has_more
+    nextCursor.value = result.next_cursor
 
-      // 檢查是否還有下一頁
-      const total = result.total || 0
-      const loadedCount = currentPage.value * 50 // 假設每頁 50 條
-      hasMore.value = loadedCount < total
+    // 等待 DOM 更新後恢復滾動位置
+    await nextTick()
 
-      // 等待 DOM 更新後恢復滾動位置
-      await nextTick()
-
-      // 恢復滾動位置（加上新載入內容的高度）
-      if (messageListRef.value) {
-        const scrollHeightAfter = messageListRef.value.scrollHeight
-        const heightDiff = scrollHeightAfter - scrollHeightBefore
-        messageListRef.value.scrollTop = scrollTopBefore + heightDiff
-      }
-    } else {
-      hasMore.value = false
+    // 恢復滾動位置（加上新載入內容的高度）
+    if (messageListRef.value) {
+      const scrollHeightAfter = messageListRef.value.scrollHeight
+      const heightDiff = scrollHeightAfter - scrollHeightBefore
+      messageListRef.value.scrollTop = scrollTopBefore + heightDiff
     }
   } catch (error) {
     logger.error('載入更多訊息失敗:', error)
@@ -377,7 +368,7 @@ watch(
 
 onMounted(async () => {
   // 重置分頁狀態
-  currentPage.value = 1
+  nextCursor.value = null
   hasMore.value = true
   isLoadingMore.value = false
 
@@ -397,8 +388,14 @@ onMounted(async () => {
     await chatStore.fetchConversations()
   }
 
-  // 加入聊天室（等待訊息載入和已讀標記完成）
-  await chatStore.joinMatchRoom(matchId.value)
+  // 加入聊天室並取得 cursor 資訊
+  const result = await chatStore.joinMatchRoom(matchId.value)
+
+  // 從 API 回應中取得分頁資訊
+  if (result) {
+    hasMore.value = result.has_more ?? true
+    nextCursor.value = result.next_cursor ?? null
+  }
 
   // 滾動到底部
   await nextTick()

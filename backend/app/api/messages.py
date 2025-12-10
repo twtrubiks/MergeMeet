@@ -27,16 +27,17 @@ logger = logging.getLogger(__name__)
 @router.get("/matches/{match_id}/messages", response_model=ChatHistoryResponse)
 async def get_chat_history(
     match_id: str,
-    page: int = Query(1, ge=1, description="頁碼"),
-    page_size: int = Query(50, ge=1, le=100, description="每頁訊息數"),
+    before_id: str = Query(None, description="Cursor: 載入比此訊息 ID 更早的訊息"),
+    limit: int = Query(50, ge=1, le=100, description="每次載入訊息數"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    取得配對的聊天記錄
+    取得配對的聊天記錄 (Cursor-based pagination)
 
-    - 分頁載入訊息
-    - 按時間倒序排列 (最新的在前)
+    - 初次載入：不傳 before_id，取最新 N 條訊息
+    - 載入更多：傳入 before_id，取比該訊息更早的 N 條
+    - 訊息按時間正序返回（舊的在前，新的在後）
     - 只有配對的成員可以查看
     """
     # 驗證配對是否存在且用戶是成員
@@ -71,32 +72,58 @@ async def get_chat_history(
     )
     total = count_result.scalar()
 
-    # 查詢訊息（倒序取最新 N 條，聊天室應該顯示最新訊息）
-    # 不使用 offset，直接取最新的 page_size 條
+    # 構建查詢條件
+    conditions = [
+        Message.match_id == match_id,
+        Message.deleted_at.is_(None)
+    ]
+
+    # 如果有 cursor，添加 before 條件
+    if before_id:
+        # 先查詢 cursor 訊息的 sent_at
+        cursor_result = await db.execute(
+            select(Message.sent_at).where(Message.id == before_id)
+        )
+        cursor_sent_at = cursor_result.scalar_one_or_none()
+
+        if cursor_sent_at:
+            # 取比 cursor 更早的訊息
+            # 使用 (sent_at, id) 組合條件處理相同時間的訊息
+            conditions.append(
+                or_(
+                    Message.sent_at < cursor_sent_at,
+                    and_(
+                        Message.sent_at == cursor_sent_at,
+                        Message.id < before_id
+                    )
+                )
+            )
+
+    # 查詢訊息：倒序取 limit+1 條（多取一條判斷 has_more）
     result = await db.execute(
         select(Message)
-        .where(
-            and_(
-                Message.match_id == match_id,
-                Message.deleted_at.is_(None)
-            )
-        )
-        .order_by(desc(Message.sent_at))  # 倒序：最新的在前
-        .limit(page_size)  # 只取最新 N 條
+        .where(and_(*conditions))
+        .order_by(desc(Message.sent_at), desc(Message.id))
+        .limit(limit + 1)
     )
     messages = result.scalars().all()
 
-    # 反轉為正序（前端期望舊的在前）
+    # 判斷是否有更多
+    has_more = len(messages) > limit
+    if has_more:
+        messages = messages[:limit]  # 移除多取的一條
+
+    # 反轉為正序（舊的在前，前端期望的格式）
     messages = list(reversed(messages))
 
-    has_more = total > (page * page_size)
+    # 計算 next_cursor（本次結果中最舊訊息的 ID，供下次查詢使用）
+    next_cursor = messages[0].id if messages and has_more else None
 
     return ChatHistoryResponse(
         messages=[MessageResponse.model_validate(msg) for msg in messages],
-        total=total,
-        page=page,
-        page_size=page_size,
-        has_more=has_more
+        has_more=has_more,
+        next_cursor=next_cursor,
+        total=total
     )
 
 

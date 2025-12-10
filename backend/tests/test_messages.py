@@ -101,8 +101,8 @@ async def test_get_chat_history_empty(client: AsyncClient, matched_users: dict):
     data = response.json()
     assert data["messages"] == []
     assert data["total"] == 0
-    assert data["page"] == 1
     assert data["has_more"] is False
+    assert data["next_cursor"] is None
 
 
 @pytest.mark.asyncio
@@ -133,18 +133,78 @@ async def test_get_chat_history_with_messages(client: AsyncClient, matched_users
     data = response.json()
     assert len(data["messages"]) == 5
     assert data["total"] == 5
-    assert data["page"] == 1
+    assert data["has_more"] is False
+    assert data["next_cursor"] is None
 
 
 @pytest.mark.asyncio
-async def test_get_chat_history_pagination(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
-    """測試聊天記錄分頁"""
+async def test_get_chat_history_cursor_pagination(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+    """測試 cursor-based 聊天記錄分頁"""
+    from datetime import datetime, timedelta
+
     match_id = matched_users["match_id"]
     alice_token = matched_users["alice"]["token"]
     alice_user_id = matched_users["alice"]["user_id"]
 
-    # 創建 15 條訊息
+    # 創建 15 條訊息（確保有時間間隔以便排序）
+    base_time = datetime.now()
     for i in range(15):
+        message = Message(
+            match_id=match_id,
+            sender_id=alice_user_id,
+            content=f"Test message {i+1}",
+            message_type="TEXT"
+        )
+        # 手動設置 sent_at 確保順序
+        message.sent_at = base_time + timedelta(seconds=i)
+        test_db.add(message)
+        await test_db.flush()
+    await test_db.commit()
+
+    # 初次載入（不傳 before_id）- 取最新 10 條
+    response = await client.get(
+        f"/api/messages/matches/{match_id}/messages?limit=10",
+        headers={"Authorization": f"Bearer {alice_token}"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["messages"]) == 10
+    assert data["total"] == 15
+    assert data["has_more"] is True
+    assert data["next_cursor"] is not None
+
+    # 驗證訊息順序（舊的在前）- 最新 10 條是 message 6-15
+    assert data["messages"][0]["content"] == "Test message 6"
+    assert data["messages"][-1]["content"] == "Test message 15"
+
+    # 載入更多（使用 cursor）- 應該取到剩餘 5 條
+    next_cursor = data["next_cursor"]
+    response = await client.get(
+        f"/api/messages/matches/{match_id}/messages?before_id={next_cursor}&limit=10",
+        headers={"Authorization": f"Bearer {alice_token}"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["messages"]) == 5
+    assert data["has_more"] is False
+    assert data["next_cursor"] is None
+
+    # 驗證訊息順序
+    assert data["messages"][0]["content"] == "Test message 1"
+    assert data["messages"][-1]["content"] == "Test message 5"
+
+
+@pytest.mark.asyncio
+async def test_get_chat_history_invalid_cursor(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+    """測試無效 cursor 的情況"""
+    match_id = matched_users["match_id"]
+    alice_token = matched_users["alice"]["token"]
+    alice_user_id = matched_users["alice"]["user_id"]
+
+    # 創建一些訊息
+    for i in range(5):
         message = Message(
             match_id=match_id,
             sender_id=alice_user_id,
@@ -154,28 +214,48 @@ async def test_get_chat_history_pagination(client: AsyncClient, matched_users: d
         test_db.add(message)
     await test_db.commit()
 
-    # 第一頁（預設每頁 50 條）
+    # 使用不存在的 cursor
+    fake_cursor = "00000000-0000-0000-0000-000000000000"
     response = await client.get(
-        f"/api/messages/matches/{match_id}/messages?page=1&page_size=10",
+        f"/api/messages/matches/{match_id}/messages?before_id={fake_cursor}",
+        headers={"Authorization": f"Bearer {alice_token}"}
+    )
+
+    # 應該返回最新訊息（cursor 不存在時忽略條件）
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["messages"]) == 5
+
+
+@pytest.mark.asyncio
+async def test_get_chat_history_boundary(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+    """測試邊界條件：訊息數量剛好等於 limit"""
+    match_id = matched_users["match_id"]
+    alice_token = matched_users["alice"]["token"]
+    alice_user_id = matched_users["alice"]["user_id"]
+
+    # 創建剛好 10 條訊息
+    for i in range(10):
+        message = Message(
+            match_id=match_id,
+            sender_id=alice_user_id,
+            content=f"Test message {i+1}",
+            message_type="TEXT"
+        )
+        test_db.add(message)
+    await test_db.commit()
+
+    # 請求 limit=10
+    response = await client.get(
+        f"/api/messages/matches/{match_id}/messages?limit=10",
         headers={"Authorization": f"Bearer {alice_token}"}
     )
 
     assert response.status_code == 200
     data = response.json()
     assert len(data["messages"]) == 10
-    assert data["total"] == 15
-    assert data["has_more"] is True
-
-    # 第二頁
-    response = await client.get(
-        f"/api/messages/matches/{match_id}/messages?page=2&page_size=10",
-        headers={"Authorization": f"Bearer {alice_token}"}
-    )
-
-    assert response.status_code == 200
-    data = response.json()
-    assert len(data["messages"]) == 5
     assert data["has_more"] is False
+    assert data["next_cursor"] is None
 
 
 @pytest.mark.asyncio

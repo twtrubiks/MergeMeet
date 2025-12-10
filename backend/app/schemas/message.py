@@ -19,12 +19,16 @@ class MessageResponse(BaseModel):
 
 
 class ChatHistoryResponse(BaseModel):
-    """聊天記錄回應"""
+    """聊天記錄回應 (Cursor-based pagination)
+
+    使用游標分頁而非傳統的 offset 分頁，適合聊天等即時場景：
+    - 初次載入：不傳 before_id，取最新 N 條
+    - 載入更多：傳入 next_cursor，取更早的訊息
+    """
     messages: List[MessageResponse]
-    total: int
-    page: int
-    page_size: int
     has_more: bool
+    next_cursor: Optional[UUID4] = None  # 最舊訊息 ID，供下次查詢
+    total: int  # 總訊息數（供 UI 顯示）
 
 
 class MatchWithLastMessageResponse(BaseModel):
