@@ -427,6 +427,16 @@ onUnmounted(() => {
   background-color: #f5f5f5;
 }
 
+/* 修復 n-spin 組件破壞 flex 佈局的問題 */
+.chat-page :deep(.n-spin-container),
+.chat-page :deep(.n-spin-content) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0; /* 關鍵：允許 flex 子元素縮小 */
+  overflow: hidden;
+}
+
 .chat-header {
   display: flex;
   align-items: center;
