@@ -22,7 +22,7 @@
         :max="99"
         :show="notificationStore.unreadCount > 0"
       >
-        <n-button text @click="toggleDropdown" class="bell-button">
+        <n-button text class="bell-button">
           <template #icon>
             <n-icon size="24"><Notifications /></n-icon>
           </template>
@@ -101,13 +101,6 @@ const notificationStore = useNotificationStore()
 
 // State
 const showDropdown = ref(false)
-
-/**
- * 切換下拉選單
- */
-const toggleDropdown = () => {
-  showDropdown.value = !showDropdown.value
-}
 
 /**
  * 取得通知圖示組件
