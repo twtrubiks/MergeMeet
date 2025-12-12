@@ -14,7 +14,13 @@ class Profile(Base):
     __tablename__ = "profiles"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+        index=True
+    )
 
     # 基本資訊
     display_name = Column(String(100), nullable=False)
@@ -42,8 +48,17 @@ class Profile(Base):
 
     # 關聯
     user = relationship("User", back_populates="profile")
-    photos = relationship("Photo", back_populates="profile", cascade="all, delete-orphan", order_by="Photo.display_order")
-    interests = relationship("InterestTag", secondary="profile_interests", back_populates="profiles")
+    photos = relationship(
+        "Photo",
+        back_populates="profile",
+        cascade="all, delete-orphan",
+        order_by="Photo.display_order"
+    )
+    interests = relationship(
+        "InterestTag",
+        secondary="profile_interests",
+        back_populates="profiles"
+    )
 
     def __repr__(self):
         return f"<Profile {self.display_name}>"
@@ -54,7 +69,12 @@ class Photo(Base):
     __tablename__ = "photos"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    profile_id = Column(UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False, index=True)
+    profile_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("profiles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
 
     url = Column(String(500), nullable=False)
     thumbnail_url = Column(String(500))
@@ -82,14 +102,19 @@ class InterestTag(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(50), unique=True, nullable=False, index=True)
-    category = Column(String(50), nullable=False, index=True)  # sports, music, food, travel, etc.
+    # sports, music, food, travel, etc.
+    category = Column(String(50), nullable=False, index=True)
     icon = Column(String(10))  # emoji icon
     is_active = Column(Boolean, default=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 關聯
-    profiles = relationship("Profile", secondary="profile_interests", back_populates="interests")
+    profiles = relationship(
+        "Profile",
+        secondary="profile_interests",
+        back_populates="interests"
+    )
 
     def __repr__(self):
         return f"<InterestTag {self.name}>"
@@ -99,7 +124,17 @@ class InterestTag(Base):
 profile_interests = Table(
     'profile_interests',
     Base.metadata,
-    Column('profile_id', UUID(as_uuid=True), ForeignKey('profiles.id', ondelete="CASCADE"), primary_key=True),
-    Column('interest_id', UUID(as_uuid=True), ForeignKey('interest_tags.id', ondelete="CASCADE"), primary_key=True),
+    Column(
+        'profile_id',
+        UUID(as_uuid=True),
+        ForeignKey('profiles.id', ondelete="CASCADE"),
+        primary_key=True
+    ),
+    Column(
+        'interest_id',
+        UUID(as_uuid=True),
+        ForeignKey('interest_tags.id', ondelete="CASCADE"),
+        primary_key=True
+    ),
     Column('created_at', DateTime(timezone=True), server_default=func.now())
 )

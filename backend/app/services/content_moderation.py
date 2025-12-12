@@ -9,7 +9,7 @@ Redis Key 設計：
 from typing import Tuple, List, Optional, Dict
 from collections import OrderedDict
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import uuid
@@ -105,7 +105,10 @@ class ContentModerationService:
                     logger.debug("Sensitive words loaded from Redis cache")
                     return json.loads(cached)
             except aioredis.RedisError as e:
-                logger.warning(f"Redis unavailable for sensitive words, falling back to memory: {e}")
+                logger.warning(
+                    f"Redis unavailable for sensitive words, "
+                    f"falling back to memory: {e}"
+                )
                 cls._use_redis = False
 
         cache_key = "words"
@@ -126,7 +129,7 @@ class ContentModerationService:
 
             # 3. 快取失效，從資料庫載入啟用的敏感詞
             result = await db.execute(
-                select(SensitiveWord).where(SensitiveWord.is_active == True)
+                select(SensitiveWord).where(SensitiveWord.is_active.is_(True))
             )
             words = result.scalars().all()
 
@@ -315,8 +318,14 @@ class ContentModerationService:
                     content_type=content_type,
                     original_content=content,
                     is_approved=is_approved,
-                    violations=json.dumps(violations, ensure_ascii=False) if violations else None,
-                    triggered_word_ids=json.dumps([str(wid) for wid in triggered_word_ids]) if triggered_word_ids else None,
+                    violations=(
+                        json.dumps(violations, ensure_ascii=False)
+                        if violations else None
+                    ),
+                    triggered_word_ids=(
+                        json.dumps([str(wid) for wid in triggered_word_ids])
+                        if triggered_word_ids else None
+                    ),
                     action_taken=action_taken
                 )
 

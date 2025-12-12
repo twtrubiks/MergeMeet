@@ -45,7 +45,12 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # 關聯
-    profile = relationship("Profile", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    profile = relationship(
+        "Profile",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<User {self.email}>"

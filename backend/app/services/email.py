@@ -103,7 +103,7 @@ class EmailService:
         expire_minutes = settings.PASSWORD_RESET_TOKEN_EXPIRE_MINUTES
 
         # HTML 郵件模板
-        html_content = f"""
+        html_content = f"""  # noqa: E501
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -199,7 +199,7 @@ Hi {username},
         Returns:
             bool: 是否成功發送
         """
-        html_content = f"""
+        html_content = f"""  # noqa: E501
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>

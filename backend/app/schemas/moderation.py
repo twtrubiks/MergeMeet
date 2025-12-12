@@ -9,7 +9,11 @@ from datetime import datetime
 class SensitiveWordCreate(BaseModel):
     """創建敏感詞請求"""
     word: str = Field(..., min_length=1, max_length=100, description="敏感詞")
-    category: str = Field(..., description="分類: SEXUAL, SCAM, HARASSMENT, VIOLENCE, PERSONAL_INFO, OTHER")
+    category: str = Field(
+        ...,
+        description="分類: SEXUAL, SCAM, HARASSMENT, VIOLENCE, "
+                    "PERSONAL_INFO, OTHER"
+    )
     severity: str = Field("MEDIUM", description="嚴重程度: LOW, MEDIUM, HIGH, CRITICAL")
     action: str = Field("WARN", description="處理動作: WARN, REJECT, AUTO_BAN")
     is_regex: bool = Field(False, description="是否為正則表達式")

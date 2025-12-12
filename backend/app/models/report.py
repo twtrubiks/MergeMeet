@@ -2,7 +2,6 @@
 from sqlalchemy import Column, String, DateTime, Text, ForeignKey, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
 import uuid
 
 from app.core.database import Base
@@ -29,17 +28,21 @@ class Report(Base):
         index=True
     )
 
-    # 舉報內容
-    report_type = Column(String(50), nullable=False)  # INAPPROPRIATE, HARASSMENT, FAKE, SCAM, OTHER
+    # 舉報內容 (INAPPROPRIATE, HARASSMENT, FAKE, SCAM, OTHER)
+    report_type = Column(String(50), nullable=False)
     reason = Column(Text, nullable=False)
     evidence = Column(Text, nullable=True)
 
-    # 處理狀態
-    status = Column(String(20), default="PENDING")  # PENDING, UNDER_REVIEW, RESOLVED, DISMISSED
+    # 處理狀態 (PENDING, UNDER_REVIEW, RESOLVED, DISMISSED)
+    status = Column(String(20), default="PENDING")
 
     # 管理員備註
     admin_notes = Column(Text, nullable=True)
-    reviewed_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reviewed_by = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True
+    )
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
 
     # 時間戳記

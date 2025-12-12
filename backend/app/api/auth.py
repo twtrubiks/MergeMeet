@@ -43,7 +43,6 @@ from app.schemas.auth import (
     LoginRequest,
     TokenResponse,
     RefreshTokenRequest,
-    UserResponse,
     EmailVerificationRequest,
     ForgotPasswordRequest,
     ResetPasswordRequest,
@@ -125,7 +124,10 @@ class VerificationCodeStore:
                 logger.debug(f"Verification code stored in Redis for {email}")
                 return
             except aioredis.RedisError as e:
-                logger.warning(f"Redis unavailable for verification code, falling back to memory: {e}")
+                logger.warning(
+                    f"Redis unavailable for verification code, "
+                    f"falling back to memory: {e}"
+                )
                 self._use_redis = False
 
         # 內存回退
@@ -150,7 +152,10 @@ class VerificationCodeStore:
             try:
                 return await self._redis.get(key)
             except aioredis.RedisError as e:
-                logger.warning(f"Redis unavailable for verification code get, falling back to memory: {e}")
+                logger.warning(
+                    f"Redis unavailable for verification code get, "
+                    f"falling back to memory: {e}"
+                )
                 self._use_redis = False
 
         # 內存回退
@@ -204,7 +209,10 @@ class VerificationCodeStore:
                 del self._fallback[email]
 
             if expired_keys:
-                logger.info(f"Cleaned up {len(expired_keys)} expired verification codes from memory")
+                logger.info(
+                    f"Cleaned up {len(expired_keys)} expired verification codes "
+                    f"from memory"
+                )
 
             return len(expired_keys)
 
@@ -630,7 +638,9 @@ async def logout(
         expires_at = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
     else:
         # 如果無法取得過期時間，使用預設的 access token 過期時間
-        expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        expires_at = datetime.now(timezone.utc) + timedelta(
+            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        )
 
     # 將 Token 加入黑名單
     await token_blacklist.add(token, expires_at)

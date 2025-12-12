@@ -1,10 +1,9 @@
 """管理後台 API"""
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func
 from typing import List
 from datetime import datetime, timedelta, timezone
-import uuid
 import re
 
 from app.core.database import get_db
@@ -12,7 +11,6 @@ from app.core.dependencies import get_current_admin_user
 from app.core.utils import mask_email
 from app.models.user import User
 from app.models.match import Match, BlockedUser, Message
-from app.models.profile import Profile
 from app.models.report import Report
 from app.schemas.admin import (
     DashboardStatsResponse,
@@ -46,12 +44,12 @@ async def get_dashboard_stats(
     total_users = total_users_result.scalar()
 
     active_users_result = await db.execute(
-        select(func.count(User.id)).where(User.is_active == True)
+        select(func.count(User.id)).where(User.is_active.is_(True))
     )
     active_users = active_users_result.scalar()
 
     banned_users_result = await db.execute(
-        select(func.count(User.id)).where(User.is_active == False)
+        select(func.count(User.id)).where(User.is_active.is_(False))
     )
     banned_users = banned_users_result.scalar()
 

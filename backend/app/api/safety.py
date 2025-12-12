@@ -3,7 +3,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func
 from typing import List
-from datetime import datetime
 import uuid
 
 from app.core.database import get_db
@@ -14,7 +13,6 @@ from app.models.report import Report
 from app.schemas.safety import (
     BlockUserRequest,
     BlockedUserResponse,
-    UnblockUserRequest,
     ReportUserRequest,
     ReportResponse,
 )

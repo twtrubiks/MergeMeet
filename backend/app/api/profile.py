@@ -492,7 +492,7 @@ async def upload_photo(
             )
     except HTTPException:
         raise
-    except (Image.UnidentifiedImageError, IOError, ValueError) as e:
+    except (Image.UnidentifiedImageError, IOError, ValueError):
         # 捕獲特定的圖片相關異常
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -663,7 +663,7 @@ async def get_interest_tags(
     db: AsyncSession = Depends(get_db)
 ):
     """取得所有興趣標籤"""
-    query = select(InterestTag).where(InterestTag.is_active == True)
+    query = select(InterestTag).where(InterestTag.is_active.is_(True))
 
     if category:
         query = query.where(InterestTag.category == category)
@@ -682,7 +682,11 @@ async def get_interest_tags(
     ]
 
 
-@router.post("/interest-tags", response_model=InterestTagResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/interest-tags",
+    response_model=InterestTagResponse,
+    status_code=status.HTTP_201_CREATED
+)
 async def create_interest_tag(
     request: InterestTagCreateRequest,
     current_user: User = Depends(get_current_user),

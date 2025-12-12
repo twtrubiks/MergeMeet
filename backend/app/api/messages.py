@@ -4,7 +4,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func, desc
 from sqlalchemy.orm import selectinload
 from typing import List
-from datetime import datetime
 import logging
 
 from app.core.database import get_db
@@ -444,7 +443,9 @@ async def upload_chat_image(
 
     # 儲存圖片
     try:
-        image_id, image_url, thumbnail_url, width, height, is_gif = await file_storage.save_chat_image(
+        (
+            image_id, image_url, thumbnail_url, width, height, is_gif
+        ) = await file_storage.save_chat_image(
             match_id=match_id,
             user_id=str(current_user.id),
             file_content=file_content,

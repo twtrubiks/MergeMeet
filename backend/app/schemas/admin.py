@@ -1,7 +1,7 @@
 """管理後台相關 Schemas"""
 from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 
 class DashboardStatsResponse(BaseModel):

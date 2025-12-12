@@ -16,12 +16,13 @@ import logging
 import asyncio
 
 from app.core.config import settings
-from app.core.database import init_db, close_db
+from app.core.database import close_db
 from app.websocket.manager import manager
 from app.services.redis_client import redis_client, get_redis
 from app.services.token_blacklist import token_blacklist
 from app.services.content_moderation import ContentModerationService
 from app.api.auth import verification_codes
+from app.api import auth, profile, discovery, safety, websocket, messages, admin, moderation
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +151,6 @@ async def hello_world():
 
 
 # ==================== API 路由 ====================
-from app.api import auth, profile, discovery, safety, websocket, messages, admin, moderation
 
 app.include_router(auth.router, prefix=f"{settings.API_V1_PREFIX}/auth", tags=["認證"])
 app.include_router(profile.router, tags=["個人檔案"])

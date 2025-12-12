@@ -1,10 +1,10 @@
 """探索與配對 API"""
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, not_, func, case, delete
+from sqlalchemy import select, and_, or_, func, case, delete
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
-from geoalchemy2.functions import ST_Distance, ST_DWithin
+from geoalchemy2.functions import ST_DWithin
 from typing import Optional, List
 from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta
@@ -14,9 +14,9 @@ import logging
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.user import User
-from app.models.profile import Profile, Photo
+from app.models.profile import Profile
 from app.models.match import Like, Match, BlockedUser, Message, Pass
-from app.schemas.discovery import ProfileCard, LikeResponse, MatchSummary, MatchDetail
+from app.schemas.discovery import ProfileCard, LikeResponse, MatchSummary
 from app.services.matching_service import matching_service
 
 logger = logging.getLogger(__name__)
@@ -90,9 +90,9 @@ async def browse_users(
         .where(
             and_(
                 Profile.user_id != current_user.id,
-                Profile.is_visible == True,
-                Profile.is_complete == True,
-                User.is_active == True,
+                Profile.is_visible.is_(True),
+                Profile.is_complete.is_(True),
+                User.is_active.is_(True),
                 # 年齡篩選
                 User.date_of_birth >= min_birth_date,
                 User.date_of_birth <= max_birth_date,
@@ -262,8 +262,8 @@ async def like_user(
         select(Profile).where(
             and_(
                 Profile.user_id == user_id,
-                Profile.is_visible == True,
-                Profile.is_complete == True
+                Profile.is_visible.is_(True),
+                Profile.is_complete.is_(True)
             )
         )
     )
@@ -368,7 +368,7 @@ async def like_user(
 
     try:
         await db.commit()
-    except Exception as e:
+    except Exception:
         await db.rollback()
         raise
 
@@ -431,8 +431,14 @@ async def like_user(
                 "type": "notification_match",
                 "match_id": str(match_id),
                 "matched_user_id": str(user_id),
-                "matched_user_name": target_profile_with_photos.display_name if target_profile_with_photos else "用戶",
-                "matched_user_avatar": get_user_avatar(target_profile_with_photos),
+                "matched_user_name": (
+                    target_profile_with_photos.display_name
+                    if target_profile_with_photos
+                    else "用戶"
+                ),
+                "matched_user_avatar": get_user_avatar(
+                    target_profile_with_photos
+                ),
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
         )
@@ -595,7 +601,12 @@ async def get_matches(
 
         # 取得興趣和照片
         interests = [interest.name for interest in matched_profile.interests]
-        photos = [photo.url for photo in sorted(matched_profile.photos, key=lambda p: p.display_order)]
+        photos = [
+            photo.url
+            for photo in sorted(
+                matched_profile.photos, key=lambda p: p.display_order
+            )
+        ]
 
         # 建立 ProfileCard
         profile_card = ProfileCard(

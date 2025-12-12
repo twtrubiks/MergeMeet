@@ -1,8 +1,8 @@
 """內容審核管理 API - 敏感詞管理和申訴處理"""
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_, desc
-from typing import List, Optional
+from sqlalchemy import select, func, and_, desc
+from typing import Optional
 from datetime import datetime, timedelta
 import uuid
 
@@ -74,7 +74,11 @@ async def get_sensitive_words(
     )
 
 
-@router.post("/sensitive-words", response_model=SensitiveWordResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/sensitive-words",
+    response_model=SensitiveWordResponse,
+    status_code=status.HTTP_201_CREATED
+)
 async def create_sensitive_word(
     word_data: SensitiveWordCreate,
     current_admin: User = Depends(get_current_admin_user),
@@ -410,7 +414,7 @@ async def get_moderation_stats(
     total_sensitive_words = total_words_result.scalar()
 
     active_words_result = await db.execute(
-        select(func.count(SensitiveWord.id)).where(SensitiveWord.is_active == True)
+        select(func.count(SensitiveWord.id)).where(SensitiveWord.is_active.is_(True))
     )
     active_sensitive_words = active_words_result.scalar()
 
@@ -442,7 +446,7 @@ async def get_moderation_stats(
     today_violations_result = await db.execute(
         select(func.count(ModerationLog.id)).where(
             and_(
-                ModerationLog.is_approved == False,
+                ModerationLog.is_approved.is_(False),
                 ModerationLog.created_at >= today_start
             )
         )
@@ -452,7 +456,7 @@ async def get_moderation_stats(
     week_violations_result = await db.execute(
         select(func.count(ModerationLog.id)).where(
             and_(
-                ModerationLog.is_approved == False,
+                ModerationLog.is_approved.is_(False),
                 ModerationLog.created_at >= week_start
             )
         )
@@ -462,7 +466,7 @@ async def get_moderation_stats(
     month_violations_result = await db.execute(
         select(func.count(ModerationLog.id)).where(
             and_(
-                ModerationLog.is_approved == False,
+                ModerationLog.is_approved.is_(False),
                 ModerationLog.created_at >= month_start
             )
         )

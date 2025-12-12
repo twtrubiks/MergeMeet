@@ -1,8 +1,7 @@
 """內容審核相關資料模型"""
-from sqlalchemy import Column, String, DateTime, Text, Boolean, Integer, ForeignKey, CheckConstraint
+from sqlalchemy import Column, String, DateTime, Text, Boolean, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
 import uuid
 
 from app.core.database import Base
@@ -19,7 +18,8 @@ class SensitiveWord(Base):
     word = Column(String(100), nullable=False, unique=True, index=True)
 
     # 分類
-    category = Column(String(50), nullable=False)  # SEXUAL, SCAM, HARASSMENT, VIOLENCE, PERSONAL_INFO, OTHER
+    # SEXUAL, SCAM, HARASSMENT, VIOLENCE, PERSONAL_INFO, OTHER
+    category = Column(String(50), nullable=False)
 
     # 嚴重程度
     severity = Column(String(20), nullable=False, default="MEDIUM")  # LOW, MEDIUM, HIGH, CRITICAL
@@ -37,7 +37,11 @@ class SensitiveWord(Base):
     is_active = Column(Boolean, default=True, index=True)
 
     # 創建者（管理員）
-    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_by = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True
+    )
 
     # 時間戳記
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -74,12 +78,16 @@ class ContentAppeal(Base):
     # 申訴理由
     reason = Column(Text, nullable=False)
 
-    # 處理狀態
-    status = Column(String(20), default="PENDING", index=True)  # PENDING, APPROVED, REJECTED
+    # 處理狀態 (PENDING, APPROVED, REJECTED)
+    status = Column(String(20), default="PENDING", index=True)
 
     # 管理員回覆
     admin_response = Column(Text, nullable=True)
-    reviewed_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reviewed_by = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True
+    )
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
 
     # 時間戳記
@@ -120,8 +128,8 @@ class ModerationLog(Base):
     # 觸發的敏感詞 ID
     triggered_word_ids = Column(Text, nullable=True)  # JSON array of UUIDs as string
 
-    # 處理動作
-    action_taken = Column(String(50), nullable=False)  # APPROVED, REJECTED, WARNING_ISSUED, USER_BANNED
+    # 處理動作 (APPROVED, REJECTED, WARNING_ISSUED, USER_BANNED)
+    action_taken = Column(String(50), nullable=False)
 
     # 時間戳記
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)

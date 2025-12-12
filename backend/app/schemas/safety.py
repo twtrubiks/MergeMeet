@@ -11,7 +11,6 @@ class BlockUserRequest(BaseModel):
 
 class UnblockUserRequest(BaseModel):
     """解除封鎖請求"""
-    pass
 
 
 class BlockedUserResponse(BaseModel):

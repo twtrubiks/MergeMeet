@@ -9,7 +9,6 @@ Redis 整合備註（暫未使用）：
 """
 from fastapi import WebSocket
 from typing import Dict, List, Optional
-import json
 import logging
 import asyncio
 from datetime import datetime, timezone, timedelta
@@ -55,7 +54,13 @@ class ConnectionManager:
         self._cleanup_task: Optional[asyncio.Task] = None
         self._heartbeat_task: Optional[asyncio.Task] = None
 
-    async def connect(self, websocket: WebSocket, user_id: str, token: str, already_accepted: bool = False) -> bool:
+    async def connect(
+        self,
+        websocket: WebSocket,
+        user_id: str,
+        token: str,
+        already_accepted: bool = False
+    ) -> bool:
         """建立 WebSocket 連接
 
         Args:
@@ -86,15 +91,22 @@ class ConnectionManager:
         if payload.get("type") != "access":
             if not already_accepted:
                 await websocket.close(code=1008, reason="Invalid token type")
-            logger.warning(f"WebSocket connection with wrong token type for user {user_id}")
+            logger.warning(
+                f"WebSocket connection with wrong token type "
+                f"for user {user_id}"
+            )
             return False
 
         # 明確檢查 Token 過期時間（雙重保險）
         exp = payload.get("exp")
-        if exp and datetime.fromtimestamp(exp, tz=timezone.utc) < datetime.now(timezone.utc):
+        exp_time = datetime.fromtimestamp(exp, tz=timezone.utc) if exp else None
+        if exp_time and exp_time < datetime.now(timezone.utc):
             if not already_accepted:
                 await websocket.close(code=1008, reason="Token expired")
-            logger.warning(f"WebSocket connection with expired token for user {user_id}")
+            logger.warning(
+                f"WebSocket connection with expired token "
+                f"for user {user_id}"
+            )
             return False
 
         # 接受連接（如果尚未接受）
@@ -165,7 +177,11 @@ class ConnectionManager:
             message: 訊息內容 (dict)
             exclude_user: 要排除的用戶 ID (通常是發送者)
         """
-        logger.debug(f"send_to_match called: match_id={match_id}, rooms={list(self.match_rooms.keys())}, users_in_room={self.match_rooms.get(match_id, [])}")
+        logger.debug(
+            f"send_to_match called: match_id={match_id}, "
+            f"rooms={list(self.match_rooms.keys())}, "
+            f"users_in_room={self.match_rooms.get(match_id, [])}"
+        )
         if match_id in self.match_rooms:
             for user_id in self.match_rooms[match_id]:
                 if user_id != exclude_user:
@@ -305,7 +321,10 @@ class ConnectionManager:
 
         # 斷開過期連接
         for user_id in stale_users:
-            logger.warning(f"Cleaning up stale connection for user {user_id} (no heartbeat response)")
+            logger.warning(
+                f"Cleaning up stale connection for user {user_id} "
+                f"(no heartbeat response)"
+            )
             await self.disconnect(user_id)
 
         if stale_users:

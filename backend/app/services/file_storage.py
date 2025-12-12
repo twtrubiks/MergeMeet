@@ -1,5 +1,4 @@
 """本地檔案儲存服務"""
-import os
 import uuid
 import logging
 from pathlib import Path

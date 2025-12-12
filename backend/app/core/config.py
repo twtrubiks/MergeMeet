@@ -1,6 +1,5 @@
 """應用程式配置"""
 from pydantic_settings import BaseSettings
-from typing import Optional
 import os
 
 

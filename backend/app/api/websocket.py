@@ -8,16 +8,15 @@
 3. 伺服器驗證 Token 並標記連接為已認證
 4. 認證成功後才允許其他操作
 """
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from sqlalchemy import select, and_
 from datetime import datetime, timezone
 import json
 import logging
 import uuid
 import asyncio
 
-from app.core.database import get_db, AsyncSessionLocal
+from app.core.database import AsyncSessionLocal
 from app.core.config import settings
 from app.websocket.manager import manager
 from app.models.match import Message, Match
@@ -70,7 +69,6 @@ async def websocket_endpoint(websocket: WebSocket):
     # 接受連接（但尚未認證）
     await websocket.accept()
 
-    authenticated = False
     user_id = None
 
     try:
@@ -109,8 +107,6 @@ async def websocket_endpoint(websocket: WebSocket):
         connected = await manager.connect(websocket, user_id, token, already_accepted=True)
         if not connected:
             return
-
-        authenticated = True
 
         # 發送認證成功回應
         await websocket.send_json({
@@ -224,7 +220,9 @@ async def handle_chat_message(data: dict, sender_id: uuid.UUID):
                     return
 
                 # 內容審核：檢查敏感詞
-                is_approved, violations, action = await ContentModerationService.check_message_content(
+                (
+                    is_approved, violations, action
+                ) = await ContentModerationService.check_message_content(
                     content, db, sender_id
                 )
                 if not is_approved:
@@ -247,7 +245,10 @@ async def handle_chat_message(data: dict, sender_id: uuid.UUID):
                         if user:
                             user.warning_count += 1
                             await db.commit()
-                            logger.info(f"User {sender_id} warning count increased to {user.warning_count}")
+                            logger.info(
+                                f"User {sender_id} warning count increased to "
+                                f"{user.warning_count}"
+                            )
                     except Exception as e:
                         await db.rollback()
                         logger.error(f"Failed to update warning count: {e}")
@@ -366,7 +367,10 @@ async def handle_chat_message(data: dict, sender_id: uuid.UUID):
                             "timestamp": datetime.now(timezone.utc).isoformat()
                         }
                     )
-                    logger.info(f"Sent notification_message to user {receiver_id_str} (not in chat room)")
+                    logger.info(
+                        f"Sent notification_message to user {receiver_id_str} "
+                        f"(not in chat room)"
+                    )
 
             except Exception as e:
                 # 事務失敗，回滾並通知用戶

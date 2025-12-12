@@ -115,7 +115,10 @@ class TokenBlacklist:
                 result = await self._redis.exists(f"blacklist:{token_hash}")
                 return result > 0
             except aioredis.RedisError as e:
-                logger.warning(f"Redis unavailable for blacklist check, falling back to memory: {e}")
+                logger.warning(
+                    f"Redis unavailable for blacklist check, "
+                    f"falling back to memory: {e}"
+                )
                 self._use_redis = False
 
         # 內存回退檢查
@@ -174,7 +177,10 @@ class TokenBlacklist:
                 del self._fallback[token]
 
             if expired_tokens:
-                logger.info(f"Cleaned up {len(expired_tokens)} expired tokens from memory blacklist")
+                logger.info(
+                    f"Cleaned up {len(expired_tokens)} expired tokens "
+                    f"from memory blacklist"
+                )
 
             return len(expired_tokens)
 

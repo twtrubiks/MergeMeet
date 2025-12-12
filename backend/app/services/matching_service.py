@@ -1,7 +1,6 @@
 """配對推薦服務"""
-from typing import Dict, List, Optional
-from datetime import datetime, timedelta, timezone
-import math
+from typing import Dict, List
+from datetime import datetime, timezone
 
 
 class MatchingService:
