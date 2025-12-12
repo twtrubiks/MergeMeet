@@ -82,9 +82,98 @@ class ContentModerationService:
         return cls._use_redis and cls._redis is not None
 
     @classmethod
+    async def _try_load_from_redis(cls) -> Optional[List[Dict]]:
+        """嘗試從 Redis 載入敏感詞
+
+        Returns:
+            敏感詞列表（如果快取命中），否則 None
+        """
+        if not (cls._redis and cls._use_redis):
+            return None
+
+        try:
+            cached = await cls._redis.get(REDIS_KEY_SENSITIVE_WORDS)
+            if cached:
+                logger.debug("Sensitive words loaded from Redis cache")
+                return json.loads(cached)
+        except aioredis.RedisError as e:
+            logger.warning(
+                f"Redis unavailable for sensitive words, "
+                f"falling back to memory: {e}"
+            )
+            cls._use_redis = False
+
+        return None
+
+    @classmethod
+    def _try_load_from_memory_cache(cls, cache_key: str) -> Optional[List[Dict]]:
+        """嘗試從內存快取載入敏感詞
+
+        Args:
+            cache_key: 快取鍵
+
+        Returns:
+            敏感詞列表（如果快取有效），否則 None
+        """
+        now = datetime.now()
+        cache_timestamp = cls._cache_time.get(cache_key)
+
+        if not cache_timestamp:
+            return None
+
+        if (now - cache_timestamp).total_seconds() >= cls._cache_ttl:
+            return None
+
+        cached_words = cls._cache.get(cache_key)
+        if cached_words is not None:
+            cls._cache.move_to_end(cache_key)
+            logger.debug("Sensitive words loaded from memory cache")
+            return cached_words
+
+        return None
+
+    @classmethod
+    async def _cache_to_redis(cls, words_data: List[Dict]) -> None:
+        """將敏感詞快取到 Redis
+
+        Args:
+            words_data: 敏感詞列表
+        """
+        if not (cls._redis and cls._use_redis):
+            return
+
+        try:
+            await cls._redis.setex(
+                REDIS_KEY_SENSITIVE_WORDS,
+                cls._cache_ttl,
+                json.dumps(words_data, ensure_ascii=False)
+            )
+            logger.info(f"Sensitive words cached to Redis ({len(words_data)} words)")
+        except aioredis.RedisError as e:
+            logger.warning(f"Failed to cache sensitive words to Redis: {e}")
+
+    @classmethod
+    def _cache_to_memory(cls, cache_key: str, words_data: List[Dict]) -> None:
+        """將敏感詞快取到內存
+
+        Args:
+            cache_key: 快取鍵
+            words_data: 敏感詞列表
+        """
+        if len(cls._cache) >= cls._max_cache_size:
+            oldest_key = next(iter(cls._cache))
+            cls._cache.pop(oldest_key)
+            cls._cache_time.pop(oldest_key, None)
+            logger.warning(f"Memory cache evicted due to size limit: {oldest_key}")
+
+        cls._cache[cache_key] = words_data
+        cls._cache_time[cache_key] = datetime.now()
+        logger.info(f"Sensitive words cached to memory ({len(words_data)} words)")
+
+    @classmethod
     async def _load_sensitive_words(cls, db: AsyncSession) -> List[Dict]:
         """
-        從 Redis 或資料庫載入敏感詞（帶快取機制、LRU 策略和線程安全保護）
+        從 Redis 或資料庫載入敏感詞（協調器函數）
 
         優先順序：
         1. Redis 快取（如果可用）
@@ -98,34 +187,17 @@ class ContentModerationService:
             敏感詞字典列表（已序列化，可安全緩存）
         """
         # 1. 嘗試從 Redis 讀取
-        if cls._redis and cls._use_redis:
-            try:
-                cached = await cls._redis.get(REDIS_KEY_SENSITIVE_WORDS)
-                if cached:
-                    logger.debug("Sensitive words loaded from Redis cache")
-                    return json.loads(cached)
-            except aioredis.RedisError as e:
-                logger.warning(
-                    f"Redis unavailable for sensitive words, "
-                    f"falling back to memory: {e}"
-                )
-                cls._use_redis = False
+        redis_result = await cls._try_load_from_redis()
+        if redis_result is not None:
+            return redis_result
 
         cache_key = "words"
 
-        # 2. 嘗試內存快取
+        # 2. 嘗試內存快取（需要鎖保護）
         async with cls._get_lock():
-            now = datetime.now()
-            cache_timestamp = cls._cache_time.get(cache_key)
-
-            # 檢查內存快取是否有效
-            if cache_timestamp and (now - cache_timestamp).total_seconds() < cls._cache_ttl:
-                cached_words = cls._cache.get(cache_key)
-                if cached_words is not None:
-                    # LRU: 移到最後（最近使用）
-                    cls._cache.move_to_end(cache_key)
-                    logger.debug("Sensitive words loaded from memory cache")
-                    return cached_words
+            memory_result = cls._try_load_from_memory_cache(cache_key)
+            if memory_result is not None:
+                return memory_result
 
             # 3. 快取失效，從資料庫載入啟用的敏感詞
             result = await db.execute(
@@ -147,29 +219,11 @@ class ContentModerationService:
                 for w in words
             ]
 
-            # 4. 存入 Redis（如果可用）
-            if cls._redis and cls._use_redis:
-                try:
-                    await cls._redis.setex(
-                        REDIS_KEY_SENSITIVE_WORDS,
-                        cls._cache_ttl,
-                        json.dumps(words_data, ensure_ascii=False)
-                    )
-                    logger.info(f"Sensitive words cached to Redis ({len(words_data)} words)")
-                except aioredis.RedisError as e:
-                    logger.warning(f"Failed to cache sensitive words to Redis: {e}")
+            # 4. 存入 Redis
+            await cls._cache_to_redis(words_data)
 
-            # 5. 同時存入內存快取（作為回退）
-            if len(cls._cache) >= cls._max_cache_size:
-                # 移除最舊的項目
-                oldest_key = next(iter(cls._cache))
-                cls._cache.pop(oldest_key)
-                cls._cache_time.pop(oldest_key, None)
-                logger.warning(f"Memory cache evicted due to size limit: {oldest_key}")
-
-            cls._cache[cache_key] = words_data
-            cls._cache_time[cache_key] = now
-            logger.info(f"Sensitive words cached to memory ({len(words_data)} words)")
+            # 5. 存入內存快取
+            cls._cache_to_memory(cache_key, words_data)
 
             return words_data
 
@@ -191,6 +245,120 @@ class ContentModerationService:
             logger.info("Memory cache cleared")
 
     @classmethod
+    def _match_sensitive_word(
+        cls,
+        word_obj: Dict,
+        content: str,
+        content_lower: str
+    ) -> bool:
+        """匹配單個敏感詞
+
+        Args:
+            word_obj: 敏感詞字典
+            content: 原始內容
+            content_lower: 小寫內容
+
+        Returns:
+            是否匹配成功
+        """
+        if word_obj["is_regex"]:
+            try:
+                pattern = re.compile(word_obj["word"], re.IGNORECASE)
+                return bool(pattern.search(content))
+            except re.error:
+                return False
+        return word_obj["word"] in content_lower
+
+    @classmethod
+    def _check_sensitive_words(
+        cls,
+        sensitive_words: List[Dict],
+        content: str,
+        content_lower: str
+    ) -> Tuple[List[str], List[uuid.UUID], Optional[str], str]:
+        """檢查所有敏感詞
+
+        Args:
+            sensitive_words: 敏感詞列表
+            content: 原始內容
+            content_lower: 小寫內容
+
+        Returns:
+            (violations, triggered_word_ids, max_severity, action_to_take)
+        """
+        violations = []
+        triggered_word_ids = []
+        max_severity = None
+        action_to_take = "APPROVED"
+        severity_order = {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
+
+        for word_obj in sensitive_words:
+            if not cls._match_sensitive_word(word_obj, content, content_lower):
+                continue
+
+            violations.append(f"{word_obj['category']}: {word_obj['word']}")
+            triggered_word_ids.append(uuid.UUID(word_obj["id"]))
+
+            # 更新最高嚴重程度
+            current_severity = severity_order.get(word_obj["severity"], 0)
+            max_severity_value = (
+                severity_order.get(max_severity, 0) if max_severity else 0
+            )
+
+            if current_severity > max_severity_value:
+                max_severity = word_obj["severity"]
+                action_to_take = word_obj["action"]
+
+        return violations, triggered_word_ids, max_severity, action_to_take
+
+    @classmethod
+    def _check_suspicious_patterns(
+        cls,
+        content: str,
+        current_violations: List[str],
+        current_action: str
+    ) -> Tuple[List[str], str]:
+        """檢查可疑模式
+
+        Args:
+            content: 原始內容
+            current_violations: 當前違規列表
+            current_action: 當前動作
+
+        Returns:
+            (updated_violations, updated_action)
+        """
+        violations = current_violations.copy()
+        action_to_take = current_action
+
+        for pattern in cls.SUSPICIOUS_PATTERNS:
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            if matches:
+                violations.append(f"包含可疑內容: {pattern}")
+                if action_to_take == "APPROVED":
+                    action_to_take = "WARN"
+
+        return violations, action_to_take
+
+    @staticmethod
+    def _should_log_moderation(
+        user_id: Optional[uuid.UUID],
+        violations: List[str],
+        is_approved: bool
+    ) -> bool:
+        """判斷是否需要記錄審核日誌
+
+        Args:
+            user_id: 用戶 ID
+            violations: 違規列表
+            is_approved: 是否通過
+
+        Returns:
+            是否需要記錄日誌
+        """
+        return bool(user_id and (violations or not is_approved))
+
+    @classmethod
     async def check_content(
         cls,
         content: str,
@@ -199,7 +367,7 @@ class ContentModerationService:
         content_type: str = "TEXT"
     ) -> Tuple[bool, List[str], List[uuid.UUID], str]:
         """
-        檢查內容是否包含敏感詞或不當內容
+        檢查內容是否包含敏感詞或不當內容（協調器函數）
 
         Args:
             content: 要檢查的內容
@@ -211,64 +379,30 @@ class ContentModerationService:
             (is_approved, violations, triggered_word_ids, action):
             (是否通過, 違規項目列表, 觸發的敏感詞ID, 應採取的動作)
         """
+        # 空內容直接通過
         if not content:
             return True, [], [], "APPROVED"
 
-        violations = []
-        triggered_word_ids = []
-        max_severity = None
-        action_to_take = "APPROVED"
-
         content_lower = content.lower()
 
-        # 載入敏感詞
+        # 1. 載入敏感詞
         sensitive_words = await cls._load_sensitive_words(db)
 
-        # 檢查敏感詞
-        for word_obj in sensitive_words:
-            matched = False
+        # 2. 檢查敏感詞
+        violations, triggered_word_ids, _, action_to_take = cls._check_sensitive_words(
+            sensitive_words, content, content_lower
+        )
 
-            if word_obj["is_regex"]:
-                # 正則表達式匹配
-                try:
-                    pattern = re.compile(word_obj["word"], re.IGNORECASE)
-                    if pattern.search(content):
-                        matched = True
-                except re.error:
-                    # 正則表達式無效，跳過
-                    continue
-            else:
-                # 簡單字串匹配
-                if word_obj["word"] in content_lower:
-                    matched = True
+        # 3. 檢查可疑模式
+        violations, action_to_take = cls._check_suspicious_patterns(
+            content, violations, action_to_take
+        )
 
-            if matched:
-                violations.append(f"{word_obj['category']}: {word_obj['word']}")
-                triggered_word_ids.append(uuid.UUID(word_obj["id"]))
-
-                # 更新最高嚴重程度和動作
-                severity_order = {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
-                current_severity = severity_order.get(word_obj["severity"], 0)
-                max_severity_value = severity_order.get(max_severity, 0) if max_severity else 0
-
-                if current_severity > max_severity_value:
-                    max_severity = word_obj["severity"]
-                    action_to_take = word_obj["action"]
-
-        # 檢查可疑模式
-        for pattern in cls.SUSPICIOUS_PATTERNS:
-            matches = re.findall(pattern, content, re.IGNORECASE)
-            if matches:
-                violations.append(f"包含可疑內容: {pattern}")
-                # 可疑模式預設為 WARN
-                if action_to_take == "APPROVED":
-                    action_to_take = "WARN"
-
-        # 判斷是否通過
+        # 4. 判斷是否通過
         is_approved = action_to_take in ["APPROVED", "WARN"]
 
-        # 記錄審核日誌
-        if user_id and (violations or not is_approved):
+        # 5. 記錄審核日誌
+        if cls._should_log_moderation(user_id, violations, is_approved):
             await cls._log_moderation(
                 db=db,
                 user_id=user_id,
