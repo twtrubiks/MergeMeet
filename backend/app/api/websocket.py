@@ -47,6 +47,256 @@ def validate_uuid(value: str, field_name: str = "ID") -> uuid.UUID | None:
         return None
 
 
+# ========== handle_chat_message 輔助函數 ==========
+
+
+async def _send_error(sender_id: uuid.UUID, message: str) -> None:
+    """發送錯誤訊息給用戶"""
+    await manager.send_personal_message(
+        str(sender_id),
+        {"type": "error", "message": message}
+    )
+
+
+def _validate_chat_input(
+    data: dict, sender_id: uuid.UUID
+) -> tuple[bool, str | None, dict | None]:
+    """驗證聊天訊息輸入
+
+    Args:
+        data: 訊息資料
+        sender_id: 發送者 ID
+
+    Returns:
+        (is_valid, error_message, parsed_data)
+        parsed_data 包含: match_id (UUID), content (str), message_type (str)
+    """
+    match_id_str = data.get("match_id")
+    content = data.get("content", "").strip()
+    message_type = data.get("message_type", "TEXT").upper()
+
+    # 驗證訊息類型
+    if message_type not in ("TEXT", "IMAGE", "GIF"):
+        message_type = "TEXT"
+
+    # 驗證 match_id 格式
+    match_id = validate_uuid(match_id_str, "match_id")
+    if not match_id or not content:
+        logger.warning(f"Invalid message data from {sender_id}: {data}")
+        return False, "無效的配對 ID 或訊息內容", None
+
+    return True, None, {
+        "match_id": match_id,
+        "content": content,
+        "message_type": message_type
+    }
+
+
+def _validate_image_content(content: str, sender_id: uuid.UUID) -> tuple[bool, str | None]:
+    """驗證圖片/GIF 訊息格式
+
+    Args:
+        content: 訊息內容（應為 JSON 字串）
+        sender_id: 發送者 ID
+
+    Returns:
+        (is_valid, error_message)
+    """
+    try:
+        image_data = json.loads(content)
+        if not image_data.get("image_url") or not image_data.get("thumbnail_url"):
+            raise ValueError("Missing required fields")
+        return True, None
+    except (json.JSONDecodeError, ValueError) as e:
+        logger.warning(f"Invalid image message format from {sender_id}: {e}")
+        return False, "無效的圖片訊息格式"
+
+
+async def _validate_text_content(
+    content: str,
+    sender_id: uuid.UUID,
+    db
+) -> tuple[bool, str | None, list | None]:
+    """驗證文字訊息（長度和內容審核）
+
+    Args:
+        content: 訊息內容
+        sender_id: 發送者 ID
+        db: 資料庫 session
+
+    Returns:
+        (is_valid, error_message, violations)
+    """
+    # 驗證訊息長度
+    if len(content) > settings.MAX_MESSAGE_LENGTH:
+        logger.warning(f"Message too long from {sender_id}: {len(content)} chars")
+        return False, f"訊息過長，最多 {settings.MAX_MESSAGE_LENGTH} 字符", None
+
+    # 內容審核
+    is_approved, violations, _ = await ContentModerationService.check_message_content(
+        content, db, sender_id
+    )
+    if not is_approved:
+        logger.warning(f"Unsafe content detected from {sender_id}: {violations}")
+        return False, "訊息包含不當內容，已被系統拒絕", violations
+
+    return True, None, None
+
+
+async def _validate_match_access(
+    match_id: uuid.UUID,
+    sender_id: uuid.UUID,
+    db
+) -> tuple[bool, str | None, Match | None]:
+    """驗證配對存在且發送者是成員
+
+    Args:
+        match_id: 配對 ID
+        sender_id: 發送者 ID
+        db: 資料庫 session
+
+    Returns:
+        (is_valid, error_message, match_object)
+    """
+    result = await db.execute(
+        select(Match).where(
+            and_(
+                Match.id == match_id,
+                Match.status == "ACTIVE"
+            )
+        )
+    )
+    match = result.scalar_one_or_none()
+
+    if not match:
+        logger.warning(f"Match {match_id} not found or inactive")
+        return False, "配對不存在或已取消", None
+
+    if sender_id not in [match.user1_id, match.user2_id]:
+        logger.warning(f"User {sender_id} not in match {match_id}")
+        return False, "您不是這個配對的成員", None
+
+    return True, None, match
+
+
+async def _record_content_violation(sender_id: uuid.UUID, db) -> None:
+    """記錄用戶內容違規"""
+    try:
+        result = await db.execute(
+            select(User).where(User.id == sender_id)
+        )
+        user = result.scalar_one_or_none()
+        if user:
+            user.warning_count += 1
+            await db.commit()
+            logger.info(
+                f"User {sender_id} warning count increased to {user.warning_count}"
+            )
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Failed to update warning count: {e}")
+
+
+async def _save_and_broadcast_message(
+    match: Match,
+    sender_id: uuid.UUID,
+    parsed: dict,
+    db
+) -> Message:
+    """儲存訊息到資料庫並廣播
+
+    Args:
+        match: 配對對象
+        sender_id: 發送者 ID
+        parsed: 解析後的訊息資料
+        db: 資料庫 session
+
+    Returns:
+        儲存的 Message 對象
+    """
+    message = Message(
+        match_id=parsed["match_id"],
+        sender_id=sender_id,
+        content=parsed["content"],
+        message_type=parsed["message_type"]
+    )
+    db.add(message)
+    await db.commit()
+    await db.refresh(message)
+
+    message_payload = {
+        "type": "new_message",
+        "message": {
+            "id": str(message.id),
+            "match_id": str(message.match_id),
+            "sender_id": str(message.sender_id),
+            "content": message.content,
+            "message_type": message.message_type,
+            "sent_at": message.sent_at.isoformat(),
+            "is_read": message.is_read.isoformat() if message.is_read else None
+        }
+    }
+
+    logger.info(f"Preparing to send message {message.id} to match {parsed['match_id']}")
+    logger.debug(f"Message payload: {message_payload}")
+
+    await manager.send_to_match(str(parsed["match_id"]), message_payload)
+    logger.info(f"Message {message.id} sent in match {parsed['match_id']}")
+
+    return message
+
+
+async def _send_message_notification(
+    match: Match,
+    sender_id: uuid.UUID,
+    message: Message,
+    db
+) -> None:
+    """如果接收者不在聊天室，發送通知
+
+    Args:
+        match: 配對對象
+        sender_id: 發送者 ID
+        message: 訊息對象
+        db: 資料庫 session
+    """
+    receiver_id = match.user2_id if match.user1_id == sender_id else match.user1_id
+    receiver_id_str = str(receiver_id)
+    match_id_str = str(match.id)
+    users_in_room = manager.match_rooms.get(match_id_str, [])
+
+    if receiver_id_str in users_in_room:
+        return
+
+    # 查詢發送者 Profile
+    sender_profile_result = await db.execute(
+        select(Profile).where(Profile.user_id == sender_id)
+    )
+    sender_profile = sender_profile_result.scalar_one_or_none()
+    sender_name = sender_profile.display_name if sender_profile else "用戶"
+
+    # 準備訊息預覽
+    if message.message_type == "IMAGE":
+        preview = "[圖片]"
+    elif message.message_type == "GIF":
+        preview = "[GIF]"
+    else:
+        preview = message.content[:50] + "..." if len(message.content) > 50 else message.content
+
+    await manager.send_personal_message(
+        receiver_id_str,
+        {
+            "type": "notification_message",
+            "match_id": str(match.id),
+            "sender_id": str(sender_id),
+            "sender_name": sender_name,
+            "preview": preview,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    )
+    logger.info(f"Sent notification_message to user {receiver_id_str} (not in chat room)")
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """
@@ -157,7 +407,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 async def handle_chat_message(data: dict, sender_id: uuid.UUID):
-    """處理聊天訊息
+    """處理聊天訊息 - 協調器
 
     Args:
         data: 訊息資料，包含 match_id 和 content
@@ -165,228 +415,49 @@ async def handle_chat_message(data: dict, sender_id: uuid.UUID):
     """
     async with AsyncSessionLocal() as db:
         try:
-            match_id_str = data.get("match_id")
-            content = data.get("content", "").strip()
-            message_type = data.get("message_type", "TEXT").upper()
-
-            # 驗證訊息類型
-            if message_type not in ("TEXT", "IMAGE", "GIF"):
-                message_type = "TEXT"
-
-            # 驗證 match_id 格式
-            match_id = validate_uuid(match_id_str, "match_id")
-            if not match_id or not content:
-                logger.warning(f"Invalid message data from {sender_id}: {data}")
-                await manager.send_personal_message(
-                    str(sender_id),
-                    {
-                        "type": "error",
-                        "message": "無效的配對 ID 或訊息內容"
-                    }
-                )
+            # 1. 輸入驗證
+            is_valid, error, parsed = _validate_chat_input(data, sender_id)
+            if not is_valid:
+                await _send_error(sender_id, error)
                 return
 
-            # 對於圖片/GIF 訊息，驗證 content 是有效 JSON
-            if message_type in ("IMAGE", "GIF"):
-                try:
-                    image_data = json.loads(content)
-                    # 檢查必要欄位
-                    if not image_data.get("image_url") or not image_data.get("thumbnail_url"):
-                        raise ValueError("Missing required fields")
-                except (json.JSONDecodeError, ValueError) as e:
-                    logger.warning(f"Invalid image message format from {sender_id}: {e}")
-                    await manager.send_personal_message(
-                        str(sender_id),
-                        {
-                            "type": "error",
-                            "message": "無效的圖片訊息格式"
-                        }
-                    )
+            # 2. 內容驗證（根據類型）
+            if parsed["message_type"] in ("IMAGE", "GIF"):
+                is_valid, error = _validate_image_content(
+                    parsed["content"], sender_id
+                )
+                if not is_valid:
+                    await _send_error(sender_id, error)
                     return
             else:
-                # 只對文字訊息執行以下驗證
-
-                # 驗證訊息長度（防止 DoS 攻擊）
-                # 即時聊天訊息建議限制在 2000 字符以內
-                if len(content) > settings.MAX_MESSAGE_LENGTH:
-                    await manager.send_personal_message(
-                        str(sender_id),
-                        {
-                            "type": "error",
-                            "message": f"訊息過長，最多 {settings.MAX_MESSAGE_LENGTH} 字符"
-                        }
-                    )
-                    logger.warning(f"Message too long from {sender_id}: {len(content)} chars")
+                is_valid, error, violations = await _validate_text_content(
+                    parsed["content"], sender_id, db
+                )
+                if not is_valid:
+                    if violations:
+                        await _record_content_violation(sender_id, db)
+                    await _send_error(sender_id, error)
                     return
 
-                # 內容審核：檢查敏感詞
-                (
-                    is_approved, violations, action
-                ) = await ContentModerationService.check_message_content(
-                    content, db, sender_id
-                )
-                if not is_approved:
-                    logger.warning(f"Unsafe content detected from {sender_id}: {violations}")
-                    await manager.send_personal_message(
-                        str(sender_id),
-                        {
-                            "type": "error",
-                            "message": "訊息包含不當內容，已被系統拒絕",
-                            "violations": violations
-                        }
-                    )
-
-                    # 記錄違規行為（可選：增加警告次數）
-                    try:
-                        result = await db.execute(
-                            select(User).where(User.id == sender_id)
-                        )
-                        user = result.scalar_one_or_none()
-                        if user:
-                            user.warning_count += 1
-                            await db.commit()
-                            logger.info(
-                                f"User {sender_id} warning count increased to "
-                                f"{user.warning_count}"
-                            )
-                    except Exception as e:
-                        await db.rollback()
-                        logger.error(f"Failed to update warning count: {e}")
-
-                    return
-
-            # 驗證配對是否存在且為活躍狀態
-            result = await db.execute(
-                select(Match).where(
-                    and_(
-                        Match.id == match_id,
-                        Match.status == "ACTIVE"
-                    )
-                )
+            # 3. 配對驗證
+            is_valid, error, match = await _validate_match_access(
+                parsed["match_id"], sender_id, db
             )
-            match = result.scalar_one_or_none()
-
-            if not match:
-                logger.warning(f"Match {match_id} not found or inactive")
-                await manager.send_personal_message(
-                    str(sender_id),
-                    {
-                        "type": "error",
-                        "message": "配對不存在或已取消"
-                    }
-                )
+            if not is_valid:
+                await _send_error(sender_id, error)
                 return
 
-            # 驗證發送者是否為配對的成員
-            if sender_id not in [match.user1_id, match.user2_id]:
-                logger.warning(f"User {sender_id} not in match {match_id}")
-                await manager.send_personal_message(
-                    str(sender_id),
-                    {
-                        "type": "error",
-                        "message": "您不是這個配對的成員"
-                    }
-                )
-                return
+            # 4. 存儲並發送
+            message = await _save_and_broadcast_message(
+                match, sender_id, parsed, db
+            )
 
-            # 儲存訊息到資料庫（確保事務完整性）
-            try:
-                message = Message(
-                    match_id=match_id,
-                    sender_id=sender_id,
-                    content=content,
-                    message_type=message_type
-                )
-                db.add(message)
-                await db.commit()
-                await db.refresh(message)
-
-                # 準備要發送的訊息資料
-                message_payload = {
-                    "type": "new_message",
-                    "message": {
-                        "id": str(message.id),
-                        "match_id": str(message.match_id),
-                        "sender_id": str(message.sender_id),
-                        "content": message.content,
-                        "message_type": message.message_type,
-                        "sent_at": message.sent_at.isoformat(),
-                        "is_read": message.is_read.isoformat() if message.is_read else None
-                    }
-                }
-
-                logger.info(f"Preparing to send message {message.id} to match {match_id}")
-                logger.debug(f"Message payload: {message_payload}")
-
-                # 發送給配對的所有用戶 (包括發送者自己，用於確認)
-                # 注意：match_rooms 的 key 是字符串，需要轉換
-                await manager.send_to_match(str(match_id), message_payload)
-
-                logger.info(f"Message {message.id} sent in match {match_id}")
-
-                # ========== 即時通知功能 ==========
-                # 實作三種通知類型之三：
-                # 3. notification_message - 新訊息通知（接收者不在聊天室時）
-                # ========================================
-
-                # 確定接收者（對方）的 user_id
-                receiver_id = match.user2_id if match.user1_id == sender_id else match.user1_id
-                receiver_id_str = str(receiver_id)
-
-                # 檢查接收者是否在這個聊天室中
-                # 如果接收者不在聊天室，發送通知提醒
-                match_id_str_key = str(match_id)
-                users_in_room = manager.match_rooms.get(match_id_str_key, [])
-
-                if receiver_id_str not in users_in_room:
-                    # 查詢發送者的 Profile 資訊（用於通知顯示名稱）
-                    sender_profile_result = await db.execute(
-                        select(Profile).where(Profile.user_id == sender_id)
-                    )
-                    sender_profile = sender_profile_result.scalar_one_or_none()
-                    sender_name = sender_profile.display_name if sender_profile else "用戶"
-
-                    # 準備訊息預覽（根據訊息類型）
-                    if message_type == "IMAGE":
-                        preview = "[圖片]"
-                    elif message_type == "GIF":
-                        preview = "[GIF]"
-                    else:
-                        # 文字訊息：截取前 50 字
-                        preview = content[:50] + "..." if len(content) > 50 else content
-
-                    # 【通知類型 3】新訊息通知 (notification_message)
-                    await manager.send_personal_message(
-                        receiver_id_str,
-                        {
-                            "type": "notification_message",
-                            "match_id": str(match_id),
-                            "sender_id": str(sender_id),
-                            "sender_name": sender_name,
-                            "preview": preview,
-                            "timestamp": datetime.now(timezone.utc).isoformat()
-                        }
-                    )
-                    logger.info(
-                        f"Sent notification_message to user {receiver_id_str} "
-                        f"(not in chat room)"
-                    )
-
-            except Exception as e:
-                # 事務失敗，回滾並通知用戶
-                await db.rollback()
-                logger.error(f"Database error while saving message: {e}", exc_info=True)
-                raise  # 重新拋出異常，由外層處理
+            # 5. 離線通知
+            await _send_message_notification(match, sender_id, message, db)
 
         except Exception as e:
             logger.error(f"Error handling chat message: {e}", exc_info=True)
-            await manager.send_personal_message(
-                str(sender_id),
-                {
-                    "type": "error",
-                    "message": "訊息發送失敗"
-                }
-            )
+            await _send_error(sender_id, "訊息發送失敗")
 
 
 async def handle_typing_indicator(data: dict, user_id: str):
