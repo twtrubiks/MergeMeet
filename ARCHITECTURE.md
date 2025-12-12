@@ -98,6 +98,8 @@
 | **Redis** | 7.x | 快取/Session | 🔄 未完全使用 |
 | **Pydantic** | 2.5+ | 資料驗證 | ✅ |
 | **JWT** | python-jose | 認證機制 | ✅ |
+| **aiosmtplib** | 3.0+ | Email 發送服務 | ✅ |
+| **Mailpit** | latest | Email 測試工具（開發） | ✅ |
 | **Alembic** | 1.13+ | 資料庫遷移 | ✅ |
 | **pytest** | 7.4+ | 測試框架 | ✅ |
 
@@ -572,6 +574,10 @@ const hasBlockedUsers = computed(() => blockedUsers.value.length > 0)
 | POST | `/register` | 用戶註冊 | ✅ |
 | POST | `/login` | 用戶登入 | ✅ |
 | POST | `/verify-email` | Email 驗證 | ✅ |
+| POST | `/resend-verification` | 重發驗證碼 | ✅ |
+| POST | `/forgot-password` | 忘記密碼（發送重置郵件） | ✅ |
+| GET | `/verify-reset-token` | 驗證重置 Token | ✅ |
+| POST | `/reset-password` | 重置密碼 | ✅ |
 | POST | `/refresh` | 刷新 Token | ✅ |
 | POST | `/logout` | 登出 | ✅ |
 | POST | `/admin-login` | 管理員登入 | ✅ |
@@ -627,7 +633,7 @@ const hasBlockedUsers = computed(() => blockedUsers.value.length > 0)
 | PUT | `/users/{id}/ban` | 封禁用戶 | ✅ |
 | PUT | `/users/{id}/unban` | 解封用戶 | ✅ |
 
-**總計：40+ 個 API 端點**
+**總計：43+ 個 API 端點**（新增 3 個密碼重置端點）
 
 ---
 
@@ -640,6 +646,8 @@ src/views/
 ├── Home.vue              # 首頁
 ├── Register.vue          # 註冊頁面
 ├── Login.vue             # 登入頁面
+├── ForgotPassword.vue    # 忘記密碼頁面
+├── ResetPassword.vue     # 重置密碼頁面
 ├── Profile.vue           # 個人檔案
 ├── Discovery.vue         # 探索配對（含舉報按鈕）
 ├── Matches.vue           # 配對列表
@@ -651,7 +659,7 @@ src/views/
     └── AdminDashboard.vue # 管理員儀表板
 ```
 
-**總計：11 個頁面**
+**總計：13 個頁面**（新增密碼重置相關頁面）
 
 ### 7.2 組件結構
 
@@ -995,12 +1003,16 @@ services:
 
 ### 16.1 P0 - 阻塞性問題（上線前必須解決）
 
-| ID | 問題 | 位置 | 工作量 | 影響 |
-|----|------|------|--------|------|
-| P0-1 | 密碼重置功能缺失 | auth.py | 2-3 小時 | 用戶流失 |
-| P0-2 | Email 服務未整合 | auth.py | 2-4 小時 | 假帳號氾濫 |
-| P0-3 | 登入失敗無限制 | auth.py | 1 小時 | 暴力破解風險 |
-| P0-4 | 全局速率限制缺失 | main.py | 1 小時 | DoS 攻擊風險 |
+| ID | 問題 | 位置 | 工作量 | 影響 | 狀態 |
+|----|------|------|--------|------|------|
+| ~~P0-1~~ | ~~密碼重置功能缺失~~ | auth.py | 2-3 小時 | 用戶流失 | ✅ 已完成 |
+| ~~P0-2~~ | ~~Email 服務未整合~~ | auth.py | 2-4 小時 | 假帳號氾濫 | ✅ 已完成 |
+| P0-3 | 登入失敗無限制 | auth.py | 1 小時 | 暴力破解風險 | ❌ 待實作 |
+| P0-4 | 全局速率限制缺失 | main.py | 1 小時 | DoS 攻擊風險 | ❌ 待實作 |
+
+**已完成 P0 項目（2025-12-12）**：
+- ✅ P0-1: 密碼重置功能（3 個 API 端點 + 2 個前端頁面）
+- ✅ P0-2: Email 服務整合（Mailpit + aiosmtplib + 美觀 HTML 模板）
 
 ### 16.2 P1 - 高優先級（本週內處理）
 
@@ -1080,8 +1092,8 @@ services:
 | 分類 | 功能 | 狀態 | 阻塞性 |
 |------|------|------|--------|
 | **認證** | 註冊/登入 | ✅ 完成 | - |
-| | 密碼重置 | ❌ 缺失 | **是** |
-| | Email 驗證 | ⚠️ 模擬 | **是** |
+| | 密碼重置 | ✅ 完成 | - |
+| | Email 驗證 | ✅ 完成（Mailpit） | - |
 | | 登入失敗限制 | ❌ 缺失 | **是** |
 | **個人檔案** | 建立檔案 | ✅ 完成 | - |
 | | 上傳照片 | ✅ 完成 | - |
@@ -1106,12 +1118,12 @@ services:
 | 監控/日誌 | ❌ 缺失 |
 | Rate Limiting | ❌ 缺失 |
 
-**整體準備度**: 72% (地理位置自動定位 + WebSocket Token 改進 + 推播通知已完成，HTTPS/SSL 和資料庫備份不需要)
+**整體準備度**: 78% (密碼重置 + Email 服務 + 地理位置自動定位 + WebSocket Token 改進 + 推播通知已完成)
 
 ---
 
-**文檔版本：** 2.0.0
-**最後更新：** 2025-12-10
+**文檔版本：** 2.1.0
+**最後更新：** 2025-12-12（新增密碼重置 + Email 服務）
 **維護者：** MergeMeet Development Team
 
 ---

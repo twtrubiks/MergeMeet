@@ -174,6 +174,10 @@ mergemeet/
 # 查看 API 文檔
 open http://localhost:8000/docs
 
+# 查看 Mailpit Email 測試工具
+open http://localhost:8025
+# 可查看所有發送的郵件（註冊驗證碼、密碼重置連結等）
+
 # 查看資料庫（pgAdmin）
 docker-compose --profile admin up -d pgadmin
 open http://localhost:5050
@@ -184,7 +188,8 @@ open http://localhost:5050
 ### ✅ Week 1: 認證系統
 - 用戶註冊（Email + 密碼）
 - 用戶登入（JWT Token）
-- Email 驗證
+- Email 驗證（Mailpit 真實郵件發送）
+- 密碼重置功能（忘記密碼 / 重設密碼）
 - Token 刷新機制
 - 管理員登入（is_admin 權限檢查）
 
@@ -262,6 +267,8 @@ open http://localhost:5050
 - ✅ FastAPI 異步框架
 - ✅ SQLAlchemy 2.0 Async ORM
 - ✅ JWT 認證 + Refresh Token
+- ✅ Email 服務整合（Mailpit 開發環境 / SendGrid 生產環境）
+- ✅ 密碼重置功能（Token 一次性使用、30分鐘有效期）
 - ✅ WebSocket 即時通訊
 - ✅ PostGIS 地理位置查詢
 - ✅ Redis 快取（未來擴充）
@@ -279,7 +286,8 @@ open http://localhost:5050
 - ✅ 載入狀態與錯誤處理
 
 ### DevOps
-- ✅ Docker Compose
+- ✅ Docker Compose（PostgreSQL + Redis + Mailpit）
+- ✅ Mailpit Email 測試工具（開發環境）
 - ✅ 一鍵設置腳本
 - ✅ 自動化測試
 - ✅ API 文檔自動生成（Swagger）
