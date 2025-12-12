@@ -22,6 +22,7 @@ from app.core.config import settings
 from app.websocket.manager import manager
 from app.models.match import Message, Match
 from app.models.user import User
+from app.models.profile import Profile
 from app.services.content_moderation import ContentModerationService
 
 logger = logging.getLogger(__name__)
@@ -296,6 +297,45 @@ async def handle_chat_message(data: dict, sender_id: uuid.UUID):
                 await manager.send_to_match(str(match_id), message_payload)
 
                 logger.info(f"Message {message.id} sent in match {match_id}")
+
+                # ========== 即時通知功能 ==========
+                # 實作三種通知類型之三：
+                # 3. notification_message - 新訊息通知（接收者不在聊天室時）
+                # ========================================
+
+                # 確定接收者（對方）的 user_id
+                receiver_id = match.user2_id if match.user1_id == sender_id else match.user1_id
+                receiver_id_str = str(receiver_id)
+
+                # 檢查接收者是否在這個聊天室中
+                # 如果接收者不在聊天室，發送通知提醒
+                match_id_str_key = str(match_id)
+                users_in_room = manager.match_rooms.get(match_id_str_key, [])
+
+                if receiver_id_str not in users_in_room:
+                    # 查詢發送者的 Profile 資訊（用於通知顯示名稱）
+                    sender_profile_result = await db.execute(
+                        select(Profile).where(Profile.user_id == sender_id)
+                    )
+                    sender_profile = sender_profile_result.scalar_one_or_none()
+                    sender_name = sender_profile.display_name if sender_profile else "用戶"
+
+                    # 準備訊息預覽（截取前 50 字）
+                    preview = content[:50] + "..." if len(content) > 50 else content
+
+                    # 【通知類型 3】新訊息通知 (notification_message)
+                    await manager.send_personal_message(
+                        receiver_id_str,
+                        {
+                            "type": "notification_message",
+                            "match_id": str(match_id),
+                            "sender_id": str(sender_id),
+                            "sender_name": sender_name,
+                            "preview": preview,
+                            "timestamp": datetime.now(timezone.utc).isoformat()
+                        }
+                    )
+                    logger.info(f"Sent notification_message to user {receiver_id_str} (not in chat room)")
 
             except Exception as e:
                 # 事務失敗，回滾並通知用戶

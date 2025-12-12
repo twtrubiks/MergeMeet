@@ -6,17 +6,20 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
 from geoalchemy2.functions import ST_Distance, ST_DWithin
 from typing import Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta
 import uuid
+import logging
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.user import User
-from app.models.profile import Profile
+from app.models.profile import Profile, Photo
 from app.models.match import Like, Match, BlockedUser, Message, Pass
 from app.schemas.discovery import ProfileCard, LikeResponse, MatchSummary, MatchDetail
 from app.services.matching_service import matching_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/discovery", tags=["discovery"])
 
@@ -368,6 +371,84 @@ async def like_user(
     except Exception as e:
         await db.rollback()
         raise
+
+    # ========== 即時通知功能 ==========
+    # 實作三種通知類型之二：
+    # 1. notification_match - 新配對通知（互相喜歡時）
+    # 2. notification_liked - 有人喜歡你通知（單方喜歡時）
+    # ========================================
+
+    # 在函數內部 import 避免循環依賴
+    from app.websocket.manager import manager
+
+    # 輔助函數：取得用戶頭像 URL
+    def get_user_avatar(profile: Profile) -> Optional[str]:
+        if not profile or not profile.photos:
+            return None
+        # 優先取 is_profile_picture 的照片
+        profile_photo = next((p for p in profile.photos if p.is_profile_picture), None)
+        if profile_photo:
+            return profile_photo.url
+        # 否則取第一張照片
+        return profile.photos[0].url if profile.photos else None
+
+    if is_match and match_id:
+        # 【通知類型 1】新配對通知 (notification_match)
+        # 查詢當前用戶的 Profile 資訊（用於通知內容）
+        current_profile_result = await db.execute(
+            select(Profile)
+            .options(selectinload(Profile.photos))
+            .where(Profile.user_id == current_user.id)
+        )
+        current_profile = current_profile_result.scalar_one_or_none()
+
+        # 查詢對方的 Profile 資訊（用 selectinload 載入 photos）
+        target_profile_result = await db.execute(
+            select(Profile)
+            .options(selectinload(Profile.photos))
+            .where(Profile.user_id == user_id)
+        )
+        target_profile_with_photos = target_profile_result.scalar_one_or_none()
+
+        # 發送通知給對方（配對成功）
+        await manager.send_personal_message(
+            str(user_id),
+            {
+                "type": "notification_match",
+                "match_id": str(match_id),
+                "matched_user_id": str(current_user.id),
+                "matched_user_name": current_profile.display_name if current_profile else "用戶",
+                "matched_user_avatar": get_user_avatar(current_profile),
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        )
+        logger.info(f"Sent notification_match to user {user_id} for match {match_id}")
+
+        # 發送通知給當前用戶（配對成功）
+        await manager.send_personal_message(
+            str(current_user.id),
+            {
+                "type": "notification_match",
+                "match_id": str(match_id),
+                "matched_user_id": str(user_id),
+                "matched_user_name": target_profile_with_photos.display_name if target_profile_with_photos else "用戶",
+                "matched_user_avatar": get_user_avatar(target_profile_with_photos),
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        )
+        logger.info(f"Sent notification_match to user {current_user.id} for match {match_id}")
+    else:
+        # 【通知類型 2】有人喜歡你通知 (notification_liked)
+        # 對方還沒喜歡我，發送「有人喜歡你」通知給對方
+        # 注意：不透露是誰喜歡，保持神秘感
+        await manager.send_personal_message(
+            str(user_id),
+            {
+                "type": "notification_liked",
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        )
+        logger.info(f"Sent notification_liked to user {user_id}")
 
     return LikeResponse(
         liked=True,

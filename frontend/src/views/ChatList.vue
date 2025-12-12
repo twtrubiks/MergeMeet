@@ -9,13 +9,8 @@
 
       <h1 class="page-title">訊息</h1>
 
-      <n-badge :value="chatStore.unreadCount" :max="99" :show="chatStore.unreadCount > 0">
-        <n-button text @click="handleNotificationClick">
-          <template #icon>
-            <n-icon size="24"><Notifications /></n-icon>
-          </template>
-        </n-button>
-      </n-badge>
+      <!-- 通知鈴鐺已移至全域 NavBar -->
+      <div class="header-spacer"></div>
     </div>
 
       <!-- 載入中 -->
@@ -90,7 +85,7 @@
       </div>
 
     <!-- WebSocket 連接狀態 -->
-    <div v-if="!chatStore.ws.isConnected" class="connection-warning">
+    <div v-if="!wsStore.isConnected" class="connection-warning">
       <n-alert type="warning" :show-icon="false" size="small">
         連接已斷開
       </n-alert>
@@ -102,9 +97,10 @@
 import { onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { NBadge, NButton, NIcon, NAvatar, NAlert, useMessage } from 'naive-ui'
-import { Notifications, ChevronForward, Home } from '@vicons/ionicons5'
+import { ChevronForward, Home } from '@vicons/ionicons5'
 import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
+import { useWebSocketStore } from '@/stores/websocket'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 import HeartLoader from '@/components/ui/HeartLoader.vue'
 import { safeFormatDate } from '@/utils/dateFormat'
@@ -114,18 +110,13 @@ const router = useRouter()
 const message = useMessage()
 const chatStore = useChatStore()
 const userStore = useUserStore()
+const wsStore = useWebSocketStore()
 
 const defaultAvatar = 'https://via.placeholder.com/50'
 
 // 前往探索頁面
 const goToDiscovery = () => {
   router.push('/discovery')
-}
-
-// 處理通知點擊
-const handleNotificationClick = () => {
-  // 可以在這裡實現通知面板或標記所有訊息為已讀等功能
-  message.info('目前沒有新通知')
 }
 
 // 開啟聊天視窗
@@ -157,12 +148,8 @@ const getMessagePreview = (message) => {
 
 onMounted(async () => {
   try {
-    // 初始化 WebSocket
-    if (!chatStore.ws.isConnected) {
-      chatStore.initWebSocket()
-    }
-
     // 載入對話列表
+    // WebSocket 由 App.vue 統一管理，這裡不需要初始化
     await chatStore.fetchConversations()
   } catch (error) {
     message.error('載入對話列表失敗')
@@ -239,6 +226,12 @@ onUnmounted(() => {
   background-clip: text;
   flex: 1;
   text-align: center;
+}
+
+/* 右側佔位符（與左側返回按鈕對稱） */
+.header-spacer {
+  width: 120px;
+  flex-shrink: 0;
 }
 
 .chat-list-container {

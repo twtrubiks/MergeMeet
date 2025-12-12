@@ -1,17 +1,22 @@
 /**
  * Chat Store
  * 管理聊天相關狀態和 API 呼叫
+ *
+ * 重構說明：
+ * - 移除內部 WebSocket 實例，改用全域 WebSocketStore
+ * - WebSocket 連接由 App.vue 統一管理
+ * - 本 Store 只負責聊天業務邏輯和訊息處理器註冊
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import apiClient from '@/api/client'
-import { useWebSocket } from '@/composables/useWebSocket'
+import { useWebSocketStore } from './websocket'
 import { useUserStore } from './user'
 import { logger } from '@/utils/logger'
 
 export const useChatStore = defineStore('chat', () => {
-  // WebSocket instance
-  const ws = useWebSocket()
+  // 使用全域 WebSocket Store（不再自己創建實例）
+  const wsStore = useWebSocketStore()
 
   // State
   const conversations = ref([]) // 對話列表
@@ -41,25 +46,51 @@ export const useChatStore = defineStore('chat', () => {
   })
 
   /**
-   * 初始化 WebSocket 連接和訊息處理器
-   * @returns {Promise<void>} 當 WebSocket 連接成功時 resolve
+   * 初始化聊天訊息處理器
+   *
+   * 重構說明：
+   * - 不再負責 WebSocket 連接（由 App.vue 統一管理）
+   * - 只負責註冊聊天相關的訊息處理器
+   * - 返回取消註冊函數，供組件卸載時調用
+   *
+   * @returns {function} 取消註冊所有處理器的函數
    */
-  const initWebSocket = () => {
-    // 註冊訊息處理器（在連接前註冊）
-    ws.onMessage('new_message', handleNewMessage)
-    ws.onMessage('typing', handleTypingIndicator)
-    ws.onMessage('read_receipt', handleReadReceipt)
-    ws.onMessage('message_deleted', handleMessageDeleted)
+  const initChatHandlers = () => {
+    // 註冊訊息處理器
+    const unsubscribers = [
+      wsStore.onMessage('new_message', handleNewMessage),
+      wsStore.onMessage('typing', handleTypingIndicator),
+      wsStore.onMessage('read_receipt', handleReadReceipt),
+      wsStore.onMessage('message_deleted', handleMessageDeleted)
+    ]
 
-    // 連接 WebSocket
-    return ws.connect()
+    logger.debug('[ChatStore] Chat handlers registered')
+
+    // 返回取消註冊函數
+    return () => {
+      unsubscribers.forEach(unsub => unsub())
+      logger.debug('[ChatStore] Chat handlers unregistered')
+    }
   }
 
   /**
-   * 關閉 WebSocket 連接
+   * 初始化 WebSocket 連接和訊息處理器（保留向後兼容）
+   * @deprecated 使用 initChatHandlers() 代替
+   * @returns {Promise<void>}
+   */
+  const initWebSocket = () => {
+    initChatHandlers()
+    // WebSocket 連接由全域 Store 管理，這裡只等待連接
+    return wsStore.connect()
+  }
+
+  /**
+   * 關閉 WebSocket 連接（保留向後兼容）
+   * @deprecated WebSocket 連接由 App.vue 統一管理
    */
   const closeWebSocket = () => {
-    ws.disconnect()
+    // 不再由 Chat Store 管理 WebSocket 連接
+    logger.debug('[ChatStore] closeWebSocket called (no-op, managed by App.vue)')
   }
 
   /**
@@ -144,8 +175,8 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     try {
-      // 透過 WebSocket 發送
-      const success = ws.sendChatMessage(matchId, content, messageType)
+      // 透過全域 WebSocket Store 發送
+      const success = wsStore.sendChatMessage(matchId, content, messageType)
 
       if (!success) {
         throw new Error('WebSocket 未連接')
@@ -172,10 +203,10 @@ export const useChatStore = defineStore('chat', () => {
       return
     }
 
-    // 只通過 WebSocket 發送已讀回條
+    // 只通過全域 WebSocket Store 發送已讀回條
     // 後端會標記資料庫並通知對方
     messageIds.forEach(msgId => {
-      ws.sendReadReceipt(msgId)
+      wsStore.sendReadReceipt(msgId)
     })
 
     logger.debug('[Chat] Sent read receipts via WebSocket:', messageIds)
@@ -227,7 +258,7 @@ export const useChatStore = defineStore('chat', () => {
    * 發送打字指示器
    */
   const sendTyping = (matchId, isTyping) => {
-    ws.sendTypingIndicator(matchId, isTyping)
+    wsStore.sendTypingIndicator(matchId, isTyping)
   }
 
   /**
@@ -236,7 +267,7 @@ export const useChatStore = defineStore('chat', () => {
    */
   const joinMatchRoom = async (matchId) => {
     currentMatchId.value = matchId
-    ws.joinMatch(matchId)
+    wsStore.joinMatch(matchId)
 
     // 每次進入聊天室都重新載入最新訊息
     // 這確保用戶能看到離開期間的新訊息
@@ -254,7 +285,7 @@ export const useChatStore = defineStore('chat', () => {
    */
   const leaveMatchRoom = () => {
     if (currentMatchId.value) {
-      ws.leaveMatch(currentMatchId.value)
+      wsStore.leaveMatch(currentMatchId.value)
       currentMatchId.value = null
     }
   }
@@ -403,7 +434,7 @@ export const useChatStore = defineStore('chat', () => {
     loading.value = false
     error.value = null
     typingUsers.value = {}
-    closeWebSocket()
+    // 不再由 Chat Store 管理 WebSocket 連接
   }
 
   return {
@@ -421,10 +452,11 @@ export const useChatStore = defineStore('chat', () => {
     unreadCount,
     isTyping,
 
-    // WebSocket
-    ws,
-    initWebSocket,
-    closeWebSocket,
+    // WebSocket（全域 Store 參考）
+    wsStore,
+    initWebSocket,       // 保留向後兼容
+    closeWebSocket,      // 保留向後兼容
+    initChatHandlers,    // 新方法：只註冊訊息處理器
 
     // Actions
     fetchConversations,

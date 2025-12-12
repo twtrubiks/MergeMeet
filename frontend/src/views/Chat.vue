@@ -86,11 +86,11 @@
           }"
           @keydown.enter.exact="handleSendMessage"
           @input="handleTyping"
-          :disabled="!chatStore.ws.isConnected"
+          :disabled="!wsStore.isConnected"
         />
         <n-button
           type="primary"
-          :disabled="!messageInput.trim() || !chatStore.ws.isConnected"
+          :disabled="!messageInput.trim() || !wsStore.isConnected"
           @click="handleSendMessage"
           class="send-button"
         >
@@ -102,7 +102,7 @@
       </div>
 
       <!-- WebSocket 連接狀態提示（只在初始化完成後顯示，避免初始連接時閃現） -->
-      <div v-if="!isInitializing && !chatStore.ws.isConnected" class="connection-warning">
+      <div v-if="!isInitializing && !wsStore.isConnected" class="connection-warning">
         <n-alert type="warning" :show-icon="false">
           連接已斷開，正在重新連接...
         </n-alert>
@@ -127,6 +127,7 @@ import { ArrowBack, Send, EllipsisVertical, BanOutline, AlertCircleOutline } fro
 import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
 import { useSafetyStore } from '@/stores/safety'
+import { useWebSocketStore } from '@/stores/websocket'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
 import ReportModal from '@/components/ReportModal.vue'
 import { logger } from '@/utils/logger'
@@ -138,6 +139,7 @@ const dialog = useDialog()
 const chatStore = useChatStore()
 const userStore = useUserStore()
 const safetyStore = useSafetyStore()
+const wsStore = useWebSocketStore()
 
 const matchId = computed(() => route.params.matchId)
 const messageInput = ref('')
@@ -376,9 +378,10 @@ onMounted(async () => {
   isLoadingMore.value = false
 
   // 初始化 WebSocket 並等待連接成功
-  if (!chatStore.ws.isConnected) {
+  // 全域 WebSocket 已在 App.vue 中自動連接，這裡只需確認連接狀態
+  if (!wsStore.isConnected) {
     try {
-      await chatStore.initWebSocket()
+      await wsStore.connect()
       logger.debug('[Chat.vue] WebSocket connected successfully')
     } catch (error) {
       logger.error('[Chat.vue] Failed to connect WebSocket:', error)
