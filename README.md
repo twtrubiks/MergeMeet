@@ -211,6 +211,7 @@ open http://localhost:5050
 ### ✅ Week 4: 即時聊天
 - WebSocket 連接管理
 - 即時訊息發送/接收
+- 圖片/GIF 訊息（上傳、縮圖、預覽）
 - 打字指示器（Typing Indicator）
 - 已讀回條（Read Receipts）
 - 聊天記錄分頁載入

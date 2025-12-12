@@ -608,6 +608,7 @@ const hasBlockedUsers = computed(() => blockedUsers.value.length > 0)
 | GET | `/conversations/` | 對話列表 | ✅ |
 | GET | `/matches/{id}/messages/` | 聊天記錄 | ✅ |
 | POST | `/messages/read/` | 標記已讀 | ✅ |
+| POST | `/matches/{id}/upload-image/` | 上傳聊天圖片/GIF | ✅ |
 | DELETE | `/messages/{id}/` | 刪除訊息 | ✅ |
 
 ### 6.5 WebSocket（/ws）
@@ -633,7 +634,7 @@ const hasBlockedUsers = computed(() => blockedUsers.value.length > 0)
 | PUT | `/users/{id}/ban` | 封禁用戶 | ✅ |
 | PUT | `/users/{id}/unban` | 解封用戶 | ✅ |
 
-**總計：43+ 個 API 端點**（新增 3 個密碼重置端點）
+**總計：44+ 個 API 端點**（含密碼重置、圖片訊息上傳等）
 
 ---
 
@@ -665,15 +666,28 @@ src/views/
 
 ```
 src/components/
-├── InterestSelector.vue  # 興趣選擇器
-├── MatchModal.vue        # 配對成功彈窗
-├── PhotoUploader.vue     # 照片上傳器
-├── ReportModal.vue       # 舉報彈窗
-└── chat/
-    └── MessageBubble.vue # 訊息氣泡
+├── InterestSelector.vue      # 興趣選擇器
+├── NotificationBell.vue      # 通知鈴鐺
+├── PhotoUploader.vue         # 照片上傳器
+├── UserDetailModal.vue       # 用戶詳情模態框
+├── MatchModal.vue            # 配對成功彈窗
+├── ReportModal.vue           # 舉報彈窗
+├── layout/
+│   └── NavBar.vue            # 導航欄
+├── chat/
+│   ├── MessageBubble.vue     # 訊息氣泡
+│   ├── ChatImagePicker.vue   # 圖片選擇器
+│   └── ImagePreviewModal.vue # 圖片預覽模態框
+└── ui/
+    ├── AnimatedButton.vue    # 動畫按鈕
+    ├── FloatingInput.vue     # 浮動輸入框
+    ├── HeartLoader.vue       # 愛心載入動畫
+    ├── GlassCard.vue         # 玻璃卡片
+    ├── Badge.vue             # 徽章組件
+    └── FeatureCard.vue       # 功能卡片
 ```
 
-**總計：5 個組件**
+**總計：16 個組件**（含 UI 組件）
 
 ### 7.3 狀態管理（Pinia Stores）
 
@@ -943,9 +957,9 @@ services:
 ✅ 已完成:
   - 8 個 API 模組
   - 8 個資料模型
-  - 40+ 個 API 端點
-  - 11 個前端頁面
-  - 5 個 Vue 組件
+  - 44+ 個 API 端點
+  - 13 個前端頁面
+  - 16 個 Vue 組件
   - 7 個 Pinia Stores
   - 70+ 個測試案例
 
@@ -1016,14 +1030,17 @@ services:
 
 ### 16.2 P1 - 高優先級（本週內處理）
 
-| ID | 問題 | 工作量 |
-|----|------|--------|
-| P1-2 | 照片審核機制 | 4-8 小時 |
-| P1-3 | 每日喜歡次數限制 | 2 小時 |
-| P1-4 | 圖片/GIF 訊息 | 4-6 小時 |
-| P1-5 | WebSocket 單實例限制 | 1 週 |
-| P1-6 | Match 表查詢效率 | 4 小時 |
-| P1-7 | 監控與日誌系統 | 3-4 小時 |
+| ID | 問題 | 工作量 | 狀態 |
+|----|------|--------|------|
+| P1-2 | 照片審核機制 | 4-8 小時 | ❌ 待實作 |
+| P1-3 | 每日喜歡次數限制 | 2 小時 | ❌ 待實作 |
+| ~~P1-4~~ | ~~圖片/GIF 訊息~~ | 4-6 小時 | ✅ 已完成 |
+| P1-5 | WebSocket 單實例限制 | 1 週 | ❌ 待實作 |
+| P1-6 | Match 表查詢效率 | 4 小時 | ❌ 待實作 |
+| P1-7 | 監控與日誌系統 | 3-4 小時 | ❌ 待實作 |
+
+**已完成 P1 項目**：
+- ✅ P1-4: 圖片/GIF 訊息（上傳端點 + 縮圖 + WebSocket 傳輸 + UI 組件）
 
 ### 16.3 技術債務清單
 
