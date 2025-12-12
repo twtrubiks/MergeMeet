@@ -222,25 +222,51 @@ async def browse_users(
     return profile_cards[:limit]
 
 
-@router.post("/like/{user_id}", response_model=LikeResponse)
-async def like_user(
-    user_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    喜歡用戶
+# ========== like_user 輔助函數 ==========
 
-    - 建立喜歡記錄
-    - 檢查是否互相喜歡
-    - 如果互相喜歡，建立配對
+
+def _get_user_avatar(profile: Profile) -> Optional[str]:
+    """取得用戶頭像 URL
+
+    Args:
+        profile: 用戶的 Profile 對象
+
+    Returns:
+        頭像 URL，如果沒有則返回 None
+    """
+    if not profile or not profile.photos:
+        return None
+    # 優先取 is_profile_picture 的照片
+    profile_photo = next((p for p in profile.photos if p.is_profile_picture), None)
+    if profile_photo:
+        return profile_photo.url
+    # 否則取第一張照片
+    return profile.photos[0].url if profile.photos else None
+
+
+async def _validate_like_request(
+    user_id: uuid.UUID,
+    current_user: User,
+    db: AsyncSession
+) -> tuple[bool, int, str, Optional[Profile]]:
+    """驗證喜歡請求
+
+    驗證:
+    - 不能喜歡自己
+    - 是否已經喜歡過
+    - 對方用戶是否存在且可見
+
+    Args:
+        user_id: 目標用戶 ID
+        current_user: 當前用戶
+        db: 資料庫 session
+
+    Returns:
+        (is_valid, status_code, error_detail, target_profile)
     """
     # 不能喜歡自己
     if user_id == current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="不能喜歡自己"
-        )
+        return False, status.HTTP_400_BAD_REQUEST, "不能喜歡自己", None
 
     # 檢查是否已經喜歡
     result = await db.execute(
@@ -252,10 +278,7 @@ async def like_user(
         )
     )
     if result.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="已經喜歡過此用戶"
-        )
+        return False, status.HTTP_400_BAD_REQUEST, "已經喜歡過此用戶", None
 
     # 檢查對方用戶是否存在且可見
     result = await db.execute(
@@ -269,48 +292,109 @@ async def like_user(
     )
     target_profile = result.scalar_one_or_none()
     if not target_profile:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="用戶不存在或不可見"
-        )
+        return False, status.HTTP_404_NOT_FOUND, "用戶不存在或不可見", None
 
-    # 建立喜歡記錄（修復：使用資料庫唯一約束處理並發點讚）
+    return True, 0, "", target_profile
+
+
+async def _create_like_record(
+    from_user_id: uuid.UUID,
+    to_user_id: uuid.UUID,
+    db: AsyncSession
+) -> tuple[bool, int, str, Optional[Like]]:
+    """創建 Like 記錄（含並發處理）
+
+    Args:
+        from_user_id: 發起者 ID
+        to_user_id: 目標用戶 ID
+        db: 資料庫 session
+
+    Returns:
+        (success, status_code, error_detail, like_record)
+    """
     like = Like(
-        from_user_id=current_user.id,
-        to_user_id=user_id
+        from_user_id=from_user_id,
+        to_user_id=to_user_id
     )
     db.add(like)
 
     try:
         await db.flush()  # 先刷新以檢測唯一約束
+        return True, 0, "", like
     except IntegrityError:
         # 並發情況下，另一個請求已創建了同樣的喜歡記錄
         await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="已經喜歡過此用戶"
-        )
+        return False, status.HTTP_400_BAD_REQUEST, "已經喜歡過此用戶", None
 
+
+async def _check_mutual_like_and_create_match(
+    current_user_id: uuid.UUID,
+    target_user_id: uuid.UUID,
+    db: AsyncSession
+) -> tuple[bool, Optional[uuid.UUID], Optional[str]]:
+    """檢查是否互相喜歡並創建配對
+
+    Args:
+        current_user_id: 當前用戶 ID
+        target_user_id: 目標用戶 ID
+        db: 資料庫 session
+
+    Returns:
+        (is_match, match_id, error_detail)
+    """
     # 檢查對方是否也喜歡我（使用 SELECT FOR UPDATE 鎖定，避免競態條件）
     result = await db.execute(
         select(Like).where(
             and_(
-                Like.from_user_id == user_id,
-                Like.to_user_id == current_user.id
+                Like.from_user_id == target_user_id,
+                Like.to_user_id == current_user_id
             )
         ).with_for_update()
     )
     mutual_like = result.scalar_one_or_none()
 
-    is_match = False
-    match_id = None
+    if not mutual_like:
+        return False, None, None
 
-    if mutual_like:
-        # 建立配對（保證 user1_id < user2_id）
-        user1_id = min(current_user.id, user_id, key=lambda x: str(x))
-        user2_id = max(current_user.id, user_id, key=lambda x: str(x))
+    # 有互相喜歡，建立配對
+    # 保證 user1_id < user2_id
+    user1_id = min(current_user_id, target_user_id, key=lambda x: str(x))
+    user2_id = max(current_user_id, target_user_id, key=lambda x: str(x))
 
-        # 檢查是否已存在配對
+    # 檢查是否已存在配對
+    result = await db.execute(
+        select(Match).where(
+            and_(
+                Match.user1_id == user1_id,
+                Match.user2_id == user2_id
+            )
+        )
+    )
+    existing_match = result.scalar_one_or_none()
+
+    if existing_match:
+        # 如果配對曾經取消，重新啟用
+        if existing_match.status == "UNMATCHED":
+            existing_match.status = "ACTIVE"
+            existing_match.matched_at = func.now()
+            existing_match.unmatched_at = None
+            existing_match.unmatched_by = None
+        return True, existing_match.id, None
+
+    # 建立新配對
+    match = Match(
+        user1_id=user1_id,
+        user2_id=user2_id,
+        status="ACTIVE"
+    )
+    db.add(match)
+
+    try:
+        await db.flush()
+        return True, match.id, None
+    except IntegrityError:
+        # 並發情況下，另一個請求已創建了配對
+        db.expunge(match)  # 從 session 移除失敗的 match 對象
         result = await db.execute(
             select(Match).where(
                 and_(
@@ -320,77 +404,31 @@ async def like_user(
             )
         )
         existing_match = result.scalar_one_or_none()
-
         if existing_match:
-            # 如果配對曾經取消，重新啟用
-            if existing_match.status == "UNMATCHED":
-                existing_match.status = "ACTIVE"
-                existing_match.matched_at = func.now()
-                existing_match.unmatched_at = None
-                existing_match.unmatched_by = None
-                match_id = existing_match.id
-        else:
-            # 建立新配對
-            match = Match(
-                user1_id=user1_id,
-                user2_id=user2_id,
-                status="ACTIVE"
-            )
-            db.add(match)
-            try:
-                await db.flush()
-                match_id = match.id
-            except IntegrityError:
-                # 並發情況下，另一個請求已創建了配對
-                # 重要：不要 rollback！否則會回滾前面的 like 記錄
-                # 直接重新查詢已存在的配對即可
-                db.expunge(match)  # 從 session 移除失敗的 match 對象
-                result = await db.execute(
-                    select(Match).where(
-                        and_(
-                            Match.user1_id == user1_id,
-                            Match.user2_id == user2_id
-                        )
-                    )
-                )
-                existing_match = result.scalar_one_or_none()
-                if existing_match:
-                    match_id = existing_match.id
-                else:
-                    # 如果還是查不到，說明有其他問題
-                    await db.rollback()
-                    raise HTTPException(
-                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail="配對創建失敗"
-                    )
-
-        is_match = True
-
-    try:
-        await db.commit()
-    except Exception:
+            return True, existing_match.id, None
+        # 如果還是查不到，說明有其他問題
         await db.rollback()
-        raise
+        return False, None, "配對創建失敗"
 
-    # ========== 即時通知功能 ==========
-    # 實作三種通知類型之二：
-    # 1. notification_match - 新配對通知（互相喜歡時）
-    # 2. notification_liked - 有人喜歡你通知（單方喜歡時）
-    # ========================================
 
+async def _send_like_notifications(
+    is_match: bool,
+    match_id: Optional[uuid.UUID],
+    current_user_id: uuid.UUID,
+    target_user_id: uuid.UUID,
+    db: AsyncSession
+) -> None:
+    """發送喜歡/配對通知
+
+    Args:
+        is_match: 是否為配對
+        match_id: 配對 ID（如果是配對）
+        current_user_id: 當前用戶 ID
+        target_user_id: 目標用戶 ID
+        db: 資料庫 session
+    """
     # 在函數內部 import 避免循環依賴
     from app.websocket.manager import manager
-
-    # 輔助函數：取得用戶頭像 URL
-    def get_user_avatar(profile: Profile) -> Optional[str]:
-        if not profile or not profile.photos:
-            return None
-        # 優先取 is_profile_picture 的照片
-        profile_photo = next((p for p in profile.photos if p.is_profile_picture), None)
-        if profile_photo:
-            return profile_photo.url
-        # 否則取第一張照片
-        return profile.photos[0].url if profile.photos else None
 
     if is_match and match_id:
         # 【通知類型 1】新配對通知 (notification_match)
@@ -398,7 +436,7 @@ async def like_user(
         current_profile_result = await db.execute(
             select(Profile)
             .options(selectinload(Profile.photos))
-            .where(Profile.user_id == current_user.id)
+            .where(Profile.user_id == current_user_id)
         )
         current_profile = current_profile_result.scalar_one_or_none()
 
@@ -406,55 +444,105 @@ async def like_user(
         target_profile_result = await db.execute(
             select(Profile)
             .options(selectinload(Profile.photos))
-            .where(Profile.user_id == user_id)
+            .where(Profile.user_id == target_user_id)
         )
-        target_profile_with_photos = target_profile_result.scalar_one_or_none()
+        target_profile = target_profile_result.scalar_one_or_none()
 
         # 發送通知給對方（配對成功）
         await manager.send_personal_message(
-            str(user_id),
+            str(target_user_id),
             {
                 "type": "notification_match",
                 "match_id": str(match_id),
-                "matched_user_id": str(current_user.id),
-                "matched_user_name": current_profile.display_name if current_profile else "用戶",
-                "matched_user_avatar": get_user_avatar(current_profile),
+                "matched_user_id": str(current_user_id),
+                "matched_user_name": (
+                    current_profile.display_name if current_profile else "用戶"
+                ),
+                "matched_user_avatar": _get_user_avatar(current_profile),
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
         )
-        logger.info(f"Sent notification_match to user {user_id} for match {match_id}")
+        logger.info(f"Sent notification_match to user {target_user_id} for match {match_id}")
 
         # 發送通知給當前用戶（配對成功）
         await manager.send_personal_message(
-            str(current_user.id),
+            str(current_user_id),
             {
                 "type": "notification_match",
                 "match_id": str(match_id),
-                "matched_user_id": str(user_id),
+                "matched_user_id": str(target_user_id),
                 "matched_user_name": (
-                    target_profile_with_photos.display_name
-                    if target_profile_with_photos
-                    else "用戶"
+                    target_profile.display_name if target_profile else "用戶"
                 ),
-                "matched_user_avatar": get_user_avatar(
-                    target_profile_with_photos
-                ),
+                "matched_user_avatar": _get_user_avatar(target_profile),
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
         )
-        logger.info(f"Sent notification_match to user {current_user.id} for match {match_id}")
+        logger.info(f"Sent notification_match to user {current_user_id} for match {match_id}")
     else:
         # 【通知類型 2】有人喜歡你通知 (notification_liked)
         # 對方還沒喜歡我，發送「有人喜歡你」通知給對方
         # 注意：不透露是誰喜歡，保持神秘感
         await manager.send_personal_message(
-            str(user_id),
+            str(target_user_id),
             {
                 "type": "notification_liked",
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
         )
-        logger.info(f"Sent notification_liked to user {user_id}")
+        logger.info(f"Sent notification_liked to user {target_user_id}")
+
+
+@router.post("/like/{user_id}", response_model=LikeResponse)
+async def like_user(
+    user_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """喜歡用戶 - 協調器
+
+    流程：
+    1. 驗證請求（不能喜歡自己、已喜歡、對方存在）
+    2. 創建 Like 記錄
+    3. 檢查互相喜歡並創建配對
+    4. 提交事務
+    5. 發送通知
+    """
+    # 1. 驗證請求
+    is_valid, status_code, error, _ = await _validate_like_request(
+        user_id, current_user, db
+    )
+    if not is_valid:
+        raise HTTPException(status_code=status_code, detail=error)
+
+    # 2. 創建 Like 記錄
+    success, status_code, error, _ = await _create_like_record(
+        current_user.id, user_id, db
+    )
+    if not success:
+        raise HTTPException(status_code=status_code, detail=error)
+
+    # 3. 檢查互相喜歡並創建配對
+    is_match, match_id, error = await _check_mutual_like_and_create_match(
+        current_user.id, user_id, db
+    )
+    if error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=error
+        )
+
+    # 4. 提交事務
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+
+    # 5. 發送通知
+    await _send_like_notifications(
+        is_match, match_id, current_user.id, user_id, db
+    )
 
     return LikeResponse(
         liked=True,
