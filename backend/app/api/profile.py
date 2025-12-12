@@ -432,32 +432,45 @@ async def update_interests(
     )
 
 
-@router.post("/photos", response_model=PhotoResponse, status_code=status.HTTP_201_CREATED)
-async def upload_photo(
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    上傳照片
+# ========== upload_photo 輔助函數 ==========
 
-    安全措施：
-    - 檔案大小限制（5MB）
-    - MIME 類型驗證
-    - 實際圖片格式驗證（使用 PIL）
+
+def _validate_photo_content_type(content_type: str | None) -> tuple[bool, int, str]:
+    """驗證照片 Content-Type
+
+    Args:
+        content_type: 檔案的 MIME 類型
+
+    Returns:
+        (is_valid, status_code, error_detail)
     """
-    # 安全檢查 1：預先驗證 Content-Type
-    if file.content_type not in {"image/jpeg", "image/png", "image/gif", "image/webp"}:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="不支援的圖片格式，僅支援: jpg, jpeg, png, gif, webp"
+    ALLOWED_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+    if content_type not in ALLOWED_TYPES:
+        return (
+            False,
+            status.HTTP_400_BAD_REQUEST,
+            "不支援的圖片格式，僅支援: jpg, jpeg, png, gif, webp",
         )
+    return True, 0, ""
 
-    # 安全檢查 2：流式讀取並限制大小（防止 DoS）
-    max_size = settings.MAX_UPLOAD_SIZE  # 5MB
+
+async def _read_file_with_size_limit(
+    file: UploadFile,
+    max_size: int = settings.MAX_UPLOAD_SIZE,
+    chunk_size: int = 64 * 1024,
+) -> tuple[bool, int, str, bytes | None]:
+    """流式讀取檔案並限制大小（防止 DoS）
+
+    Args:
+        file: 上傳的檔案
+        max_size: 最大允許大小（bytes）
+        chunk_size: 讀取區塊大小
+
+    Returns:
+        (is_valid, status_code, error_detail, file_content)
+    """
     chunks = []
     total_size = 0
-    chunk_size = 64 * 1024  # 64KB chunks
 
     while True:
         chunk = await file.read(chunk_size)
@@ -465,111 +478,214 @@ async def upload_photo(
             break
         total_size += len(chunk)
         if total_size > max_size:
-            raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail=f"檔案過大，最大允許 {max_size / 1024 / 1024:.0f}MB"
+            return (
+                False,
+                status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                f"檔案過大，最大允許 {max_size / 1024 / 1024:.0f}MB",
+                None,
             )
         chunks.append(chunk)
 
     file_content = b"".join(chunks)
-    file_size = len(file_content)
+    if len(file_content) == 0:
+        return False, status.HTTP_400_BAD_REQUEST, "檔案不能為空", None
 
-    if file_size == 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="檔案不能為空"
-        )
+    return True, 0, "", file_content
 
-    # 安全檢查 3：驗證實際圖片格式（防止偽造 Content-Type）
+
+def _validate_image_format(file_content: bytes) -> tuple[bool, int, str]:
+    """驗證實際圖片格式（使用 PIL，防止偽造 Content-Type）
+
+    Args:
+        file_content: 檔案二進制內容
+
+    Returns:
+        (is_valid, status_code, error_detail)
+    """
+    ALLOWED_FORMATS = {"JPEG", "PNG", "GIF", "WEBP"}
     try:
         img = Image.open(io.BytesIO(file_content))
-        img.verify()  # 驗證圖片完整性
-        # 確認是支援的格式
-        if img.format not in {"JPEG", "PNG", "GIF", "WEBP"}:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="無效的圖片格式"
-            )
-    except HTTPException:
-        raise
+        img.verify()
+        if img.format not in ALLOWED_FORMATS:
+            return False, status.HTTP_400_BAD_REQUEST, "無效的圖片格式"
     except (Image.UnidentifiedImageError, IOError, ValueError):
-        # 捕獲特定的圖片相關異常
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="無效的圖片檔案，請上傳有效的圖片"
+        return (
+            False,
+            status.HTTP_400_BAD_REQUEST,
+            "無效的圖片檔案，請上傳有效的圖片",
         )
+    return True, 0, ""
 
-    # 取得檔案（一次性載入照片和興趣以便後續檢查完整度）
+
+async def _get_profile_with_photos(
+    user_id: uuid.UUID, db: AsyncSession
+) -> tuple[bool, int, str, Profile | None]:
+    """取得用戶個人檔案並檢查照片數量限制
+
+    Args:
+        user_id: 用戶 ID
+        db: 資料庫 session
+
+    Returns:
+        (is_valid, status_code, error_detail, profile)
+    """
     result = await db.execute(
         select(Profile)
-        .options(
-            selectinload(Profile.photos),
-            selectinload(Profile.interests)
-        )
-        .where(Profile.user_id == current_user.id)
+        .options(selectinload(Profile.photos), selectinload(Profile.interests))
+        .where(Profile.user_id == user_id)
     )
     profile = result.scalar_one_or_none()
 
     if not profile:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="個人檔案不存在，請先建立"
-        )
+        return False, status.HTTP_404_NOT_FOUND, "個人檔案不存在，請先建立", None
+    if len(profile.photos) >= 6:
+        return False, status.HTTP_400_BAD_REQUEST, "最多只能上傳 6 張照片", None
+    return True, 0, "", profile
 
-    # 檢查照片數量（最多 6 張）
-    existing_photos = profile.photos
 
-    if len(existing_photos) >= 6:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="最多只能上傳 6 張照片"
-        )
+async def _save_photo_file(
+    user_id: uuid.UUID,
+    file_content: bytes,
+    filename: str | None,
+    content_type: str | None,
+) -> tuple[bool, int, str, tuple | None]:
+    """儲存照片到本地儲存
 
-    # 儲存照片到本地
+    Args:
+        user_id: 用戶 ID
+        file_content: 檔案二進制內容
+        filename: 原始檔名
+        content_type: MIME 類型
+
+    Returns:
+        (success, status_code, error_detail, (photo_id, photo_url, thumbnail_url))
+    """
     try:
         photo_id, photo_url, thumbnail_url = await file_storage.save_photo(
-            user_id=str(current_user.id),
+            user_id=str(user_id),
             file_content=file_content,
-            filename=file.filename or "photo.jpg",
-            content_type=file.content_type,
+            filename=filename or "photo.jpg",
+            content_type=content_type,
         )
+        return True, 0, "", (photo_id, photo_url, thumbnail_url)
     except Exception as e:
-        logger.error(f"Failed to save photo for user {current_user.id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="照片儲存失敗，請稍後再試"
+        logger.error(f"Failed to save photo for user {user_id}: {e}")
+        return (
+            False,
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "照片儲存失敗，請稍後再試",
+            None,
         )
 
-    # 建立照片記錄
+
+async def _create_photo_record(
+    profile: Profile,
+    photo_url: str,
+    thumbnail_url: str,
+    content_type: str | None,
+    db: AsyncSession,
+) -> tuple[bool, int, str, Photo | None]:
+    """建立照片資料庫記錄並更新個人檔案完整度
+
+    Args:
+        profile: 個人檔案對象
+        photo_url: 照片 URL
+        thumbnail_url: 縮圖 URL
+        content_type: MIME 類型
+        db: 資料庫 session
+
+    Returns:
+        (success, status_code, error_detail, photo)
+    """
+    existing_count = len(profile.photos)
     new_photo = Photo(
         profile_id=profile.id,
         url=photo_url,
         thumbnail_url=thumbnail_url,
-        display_order=len(existing_photos),
-        is_profile_picture=(len(existing_photos) == 0),  # 第一張設為頭像
-        mime_type=file.content_type,
+        display_order=existing_count,
+        is_profile_picture=(existing_count == 0),
+        mime_type=content_type,
     )
 
-    # 合併事務：添加照片並更新個人檔案完整度
     try:
         db.add(new_photo)
-        # 在 commit 前完成所有資料庫操作
-        await db.flush()  # 確保 new_photo 有 ID
-
-        # 重新載入 profile 的關聯以檢查完整度
+        await db.flush()
         await db.refresh(profile, ["photos", "interests"])
         profile.is_complete = check_profile_completeness(profile)
-
-        # 一次性提交所有更改
         await db.commit()
         await db.refresh(new_photo)
+        return True, 0, "", new_photo
     except Exception as e:
         await db.rollback()
-        logger.error(f"Failed to add photo for user {current_user.id}: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="照片上傳失敗，請稍後再試"
+        logger.error(
+            f"Failed to add photo for profile {profile.id}: {e}", exc_info=True
         )
+        return (
+            False,
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "照片上傳失敗，請稍後再試",
+            None,
+        )
+
+
+@router.post("/photos", response_model=PhotoResponse, status_code=status.HTTP_201_CREATED)
+async def upload_photo(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """上傳照片 - 協調器
+
+    流程：
+    1. 驗證 Content-Type
+    2. 流式讀取並驗證大小
+    3. 驗證圖片格式（PIL）
+    4. 取得個人檔案並檢查照片數量
+    5. 儲存照片檔案
+    6. 建立資料庫記錄
+
+    安全措施：
+    - 檔案大小限制（5MB）
+    - MIME 類型驗證
+    - 實際圖片格式驗證（使用 PIL）
+    """
+    # 1. 驗證 Content-Type
+    is_valid, status_code, error = _validate_photo_content_type(file.content_type)
+    if not is_valid:
+        raise HTTPException(status_code=status_code, detail=error)
+
+    # 2. 流式讀取並驗證大小
+    is_valid, status_code, error, file_content = await _read_file_with_size_limit(file)
+    if not is_valid:
+        raise HTTPException(status_code=status_code, detail=error)
+
+    # 3. 驗證圖片格式（PIL）
+    is_valid, status_code, error = _validate_image_format(file_content)
+    if not is_valid:
+        raise HTTPException(status_code=status_code, detail=error)
+
+    # 4. 取得個人檔案並檢查照片數量
+    is_valid, status_code, error, profile = await _get_profile_with_photos(
+        current_user.id, db
+    )
+    if not is_valid:
+        raise HTTPException(status_code=status_code, detail=error)
+
+    # 5. 儲存照片檔案
+    success, status_code, error, photo_data = await _save_photo_file(
+        current_user.id, file_content, file.filename, file.content_type
+    )
+    if not success:
+        raise HTTPException(status_code=status_code, detail=error)
+
+    _, photo_url, thumbnail_url = photo_data
+
+    # 6. 建立資料庫記錄
+    success, status_code, error, new_photo = await _create_photo_record(
+        profile, photo_url, thumbnail_url, file.content_type, db
+    )
+    if not success:
+        raise HTTPException(status_code=status_code, detail=error)
 
     return PhotoResponse(
         id=str(new_photo.id),
@@ -577,7 +693,7 @@ async def upload_photo(
         thumbnail_url=new_photo.thumbnail_url,
         display_order=new_photo.display_order,
         is_profile_picture=new_photo.is_profile_picture,
-        created_at=new_photo.created_at
+        created_at=new_photo.created_at,
     )
 
 
