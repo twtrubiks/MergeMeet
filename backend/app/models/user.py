@@ -21,6 +21,10 @@ class User(Base):
     email_verified = Column(Boolean, default=False)
     date_of_birth = Column(Date, nullable=False)
 
+    # 密碼重置
+    password_reset_token = Column(String(255), nullable=True, index=True)
+    password_reset_expires = Column(DateTime(timezone=True), nullable=True)
+
     # 信任機制
     # TODO: 信任分數系統尚未實現完整邏輯
     # 預計功能：

@@ -14,6 +14,7 @@ pydantic==2.5.3
 pydantic-settings==2.1.0
 email-validator==2.1.0
 aiofiles==23.2.1
+aiosmtplib==3.0.1
 geoalchemy2==0.14.3
 python-dateutil==2.8.2
 

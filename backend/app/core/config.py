@@ -51,11 +51,22 @@ class Settings(BaseSettings):
     # WebSocket 訊息限制
     MAX_MESSAGE_LENGTH: int = int(os.getenv("MAX_MESSAGE_LENGTH", "2000"))  # 即時聊天訊息長度限制
 
-    # Email（暫時使用控制台輸出）
-    SMTP_HOST: Optional[str] = None
-    SMTP_PORT: Optional[int] = None
-    SMTP_USER: Optional[str] = None
-    SMTP_PASSWORD: Optional[str] = None
+    # Email 服務配置 (開發環境使用 Mailpit)
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "localhost")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "1025"))
+    SMTP_USER: str = os.getenv("SMTP_USER", "mergemeet")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "noreply@mergemeet.com")
+    SMTP_FROM_NAME: str = os.getenv("SMTP_FROM_NAME", "MergeMeet")
+    SMTP_TLS: bool = os.getenv("SMTP_TLS", "false").lower() == "true"
+
+    # 前端 URL (用於生成重置密碼鏈接)
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+    # 密碼重置 Token 有效期 (分鐘)
+    PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = int(
+        os.getenv("PASSWORD_RESET_TOKEN_EXPIRE_MINUTES", "30")
+    )
 
     class Config:
         env_file = ".env"

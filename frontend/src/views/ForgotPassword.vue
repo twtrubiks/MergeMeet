@@ -3,14 +3,35 @@
     <div class="auth-card">
       <div class="auth-header">
         <div class="logo-animation">
-          <span class="logo-heart">💕</span>
+          <span class="logo-icon">🔐</span>
         </div>
-        <h1>歡迎回來</h1>
-        <p>登入 MergeMeet 開始配對</p>
+        <h1>忘記密碼</h1>
+        <p>輸入您的 Email，我們將發送重置連結</p>
       </div>
 
-      <form @submit.prevent="handleLogin" class="auth-form">
-        <!-- Email -->
+      <!-- 成功狀態 -->
+      <div v-if="emailSent" class="success-message">
+        <div class="success-icon">✉️</div>
+        <h2>郵件已發送！</h2>
+        <p class="success-text">
+          我們已發送密碼重置郵件到
+        </p>
+        <p class="email-display">{{ formData.email }}</p>
+        <p class="hint-text">
+          請查看您的收件匣（包括垃圾郵件）。<br>
+          重置鏈接將在 <strong>30 分鐘</strong>後失效。
+        </p>
+        <AnimatedButton
+          variant="primary"
+          @click="goToLogin"
+          class="return-btn"
+        >
+          返回登入
+        </AnimatedButton>
+      </div>
+
+      <!-- 表單 -->
+      <form v-else @submit.prevent="handleSubmit" class="auth-form">
         <FloatingInput
           id="email"
           v-model="formData.email"
@@ -19,41 +40,30 @@
           autocomplete="email"
           :disabled="isLoading"
           :required="true"
-        />
-
-        <!-- 密碼 -->
-        <FloatingInput
-          id="password"
-          v-model="formData.password"
-          label="密碼"
-          type="password"
-          autocomplete="current-password"
-          :disabled="isLoading"
-          :required="true"
           :error="error"
         />
 
-        <!-- 忘記密碼連結 -->
-        <div class="forgot-password-link">
-          <router-link to="/forgot-password">忘記密碼？</router-link>
-        </div>
+        <!-- 速率限制提示 -->
+        <p v-if="rateLimitMessage" class="rate-limit-message">
+          {{ rateLimitMessage }}
+        </p>
 
         <!-- 送出按鈕 -->
         <AnimatedButton
           type="submit"
           variant="primary"
-          :disabled="!isFormValid"
+          :disabled="!isFormValid || isLoading"
           :loading="isLoading"
         >
-          <span v-if="!isLoading">✨ 登入</span>
+          <span v-if="!isLoading">📧 發送重置郵件</span>
         </AnimatedButton>
       </form>
 
-      <!-- 前往註冊 -->
+      <!-- 返回登入 -->
       <div class="auth-footer">
         <p>
-          還沒有帳號？
-          <router-link to="/register" class="register-link">立即註冊 →</router-link>
+          記起密碼了？
+          <router-link to="/login" class="login-link">返回登入 →</router-link>
         </p>
       </div>
     </div>
@@ -70,49 +80,58 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useUserStore } from '@/stores/user'
+import apiClient from '@/api/client'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 import FloatingInput from '@/components/ui/FloatingInput.vue'
 
 const router = useRouter()
-const userStore = useUserStore()
 
 // 表單資料
 const formData = ref({
-  email: '',
-  password: '',
+  email: ''
 })
 
-// 錯誤訊息
+// 狀態管理
+const isLoading = ref(false)
 const error = ref('')
+const emailSent = ref(false)
+const rateLimitMessage = ref('')
 
-// 載入狀態
-const isLoading = computed(() => userStore.isLoading)
-
-// 表單驗證
+// 計算屬性
 const isFormValid = computed(() => {
-  return formData.value.email && formData.value.password
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return formData.value.email && emailRegex.test(formData.value.email)
 })
 
-/**
- * 處理登入
- */
-const handleLogin = async () => {
+// 方法
+const handleSubmit = async () => {
   error.value = ''
+  rateLimitMessage.value = ''
+  isLoading.value = true
 
-  // 呼叫 API
-  const success = await userStore.login({
-    email: formData.value.email,
-    password: formData.value.password,
-  })
+  try {
+    // API 呼叫 - 無尾隨斜線
+    await apiClient.post('/auth/forgot-password', {
+      email: formData.value.email
+    })
 
-  if (success) {
-    // 登入成功，導向首頁
-    router.push('/')
-  } else {
-    // 顯示錯誤訊息
-    error.value = userStore.error
+    // 顯示成功狀態
+    emailSent.value = true
+  } catch (err) {
+    if (err.response?.status === 429) {
+      // 速率限制
+      rateLimitMessage.value = err.response.data.detail
+    } else {
+      error.value = '發送失敗，請稍後再試'
+    }
+    console.error('忘記密碼錯誤:', err)
+  } finally {
+    isLoading.value = false
   }
+}
+
+const goToLogin = () => {
+  router.push('/login')
 }
 </script>
 
@@ -217,22 +236,19 @@ const handleLogin = async () => {
   margin-bottom: 20px;
 }
 
-.logo-heart {
+.logo-icon {
   display: inline-block;
   font-size: 4rem;
-  animation: heartBeat 1.5s infinite;
-  filter: drop-shadow(0 4px 8px rgba(255, 107, 107, 0.3));
+  animation: pulse 2s infinite;
+  filter: drop-shadow(0 4px 8px rgba(102, 126, 234, 0.3));
 }
 
-@keyframes heartBeat {
+@keyframes pulse {
   0%, 100% {
     transform: scale(1);
   }
-  10%, 30% {
-    transform: scale(1.1);
-  }
-  20%, 40% {
-    transform: scale(0.9);
+  50% {
+    transform: scale(1.05);
   }
 }
 
@@ -257,23 +273,66 @@ const handleLogin = async () => {
   gap: 8px;
 }
 
-.forgot-password-link {
-  text-align: right;
-  margin-top: 4px;
-  margin-bottom: 8px;
-}
-
-.forgot-password-link a {
-  color: #667eea;
-  text-decoration: none;
+.rate-limit-message {
+  color: #ff9800;
   font-size: 0.9rem;
-  font-weight: 500;
-  transition: color 0.3s ease;
+  text-align: center;
+  padding: 12px;
+  background: #fff3e0;
+  border-radius: 8px;
+  margin-top: 8px;
 }
 
-.forgot-password-link a:hover {
-  color: #764ba2;
-  text-decoration: underline;
+.success-message {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.success-icon {
+  font-size: 4rem;
+  margin-bottom: 20px;
+  animation: bounce 0.6s ease-out;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.success-message h2 {
+  color: #4caf50;
+  font-size: 1.8rem;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.success-text {
+  color: #666;
+  margin-bottom: 8px;
+  font-size: 1rem;
+}
+
+.email-display {
+  color: #667eea;
+  font-weight: 600;
+  font-size: 1.1rem;
+  margin-bottom: 16px;
+  word-break: break-all;
+}
+
+.hint-text {
+  color: #999;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+
+.return-btn {
+  margin-top: 16px;
 }
 
 .auth-footer {
@@ -288,7 +347,7 @@ const handleLogin = async () => {
   font-size: 0.95rem;
 }
 
-.register-link {
+.login-link {
   color: #667eea;
   text-decoration: none;
   font-weight: 600;
@@ -298,7 +357,7 @@ const handleLogin = async () => {
   gap: 4px;
 }
 
-.register-link:hover {
+.login-link:hover {
   color: #764ba2;
   gap: 8px;
 }
@@ -313,7 +372,7 @@ const handleLogin = async () => {
     font-size: 1.8rem;
   }
 
-  .logo-heart {
+  .logo-icon {
     font-size: 3rem;
   }
 }

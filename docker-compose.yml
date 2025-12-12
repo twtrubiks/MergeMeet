@@ -45,6 +45,24 @@ services:
   #   profiles:
   #     - admin
 
+  # Mailpit - Email 測試工具 (開發環境)
+  # Web UI: http://localhost:8025
+  # SMTP: localhost:1025
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: mergemeet_mailpit
+    ports:
+      - "1025:1025"   # SMTP 端口
+      - "8025:8025"   # Web UI 端口
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8025/api/v1/info"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
 volumes:
   postgres_data:
   redis_data:

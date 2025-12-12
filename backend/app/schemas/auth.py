@@ -129,3 +129,63 @@ class EmailVerificationRequest(BaseModel):
                 "verification_code": "123456"
             }
         }
+
+
+class ForgotPasswordRequest(BaseModel):
+    """忘記密碼請求"""
+    email: EmailStr = Field(..., description="註冊時使用的 Email")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "email": "user@example.com"
+            }
+        }
+
+
+class ResetPasswordRequest(BaseModel):
+    """重置密碼請求"""
+    token: str = Field(..., description="密碼重置 Token")
+    new_password: str = Field(..., min_length=8, max_length=50, description="新密碼（至少 8 個字元）")
+
+    @validator("new_password")
+    def validate_password(cls, v):
+        """驗證密碼強度（複用 RegisterRequest 的邏輯）"""
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("密碼必須包含至少一個大寫字母")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("密碼必須包含至少一個小寫字母")
+        if not re.search(r"\d", v):
+            raise ValueError("密碼必須包含至少一個數字")
+
+        # 檢查常見弱密碼
+        weak_passwords = [
+            '12345678', 'password', 'qwerty123',
+            '11111111', '88888888', 'admin123', '1q2w3e4r'
+        ]
+        if v.lower() in weak_passwords:
+            raise ValueError("密碼太常見，請使用更強的密碼")
+
+        return v
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "token": "abc123def456...",
+                "new_password": "NewPassword123"
+            }
+        }
+
+
+class VerifyResetTokenResponse(BaseModel):
+    """驗證重置 Token 回應"""
+    valid: bool = Field(..., description="Token 是否有效")
+    email: Optional[str] = Field(None, description="關聯的 Email（僅當 valid=True 時返回）")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "valid": True,
+                "email": "user@example.com"
+            }
+        }

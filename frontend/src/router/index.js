@@ -3,6 +3,8 @@ import { useUserStore } from '@/stores/user'
 import Home from '@/views/Home.vue'
 import Login from '@/views/Login.vue'
 import Register from '@/views/Register.vue'
+import ForgotPassword from '@/views/ForgotPassword.vue'
+import ResetPassword from '@/views/ResetPassword.vue'
 import Profile from '@/views/Profile.vue'
 import Discovery from '@/views/Discovery.vue'
 import Matches from '@/views/Matches.vue'
@@ -31,6 +33,18 @@ const router = createRouter({
       path: '/register',
       name: 'register',
       component: Register,
+      meta: { requiresAuth: false }
+    },
+    {
+      path: '/forgot-password',
+      name: 'forgot-password',
+      component: ForgotPassword,
+      meta: { requiresAuth: false }
+    },
+    {
+      path: '/reset-password',
+      name: 'reset-password',
+      component: ResetPassword,
       meta: { requiresAuth: false }
     },
     {
