@@ -54,8 +54,8 @@
             ✨ NEW
           </div>
 
-          <!-- 用戶頭像 -->
-          <div class="match-avatar">
+          <!-- 用戶頭像（可點擊查看詳情） -->
+          <div class="match-avatar clickable" @click="openUserDetail(match)">
             <div class="avatar-ring" :class="{ online: isOnline(match.matched_user.last_active) }">
               <img
                 v-if="match.matched_user.photos && match.matched_user.photos.length > 0"
@@ -69,8 +69,8 @@
             <div class="online-pulse" v-if="isOnline(match.matched_user.last_active)"></div>
           </div>
 
-          <!-- 用戶資訊 -->
-          <div class="match-info">
+          <!-- 用戶資訊（可點擊查看詳情） -->
+          <div class="match-info clickable" @click="openUserDetail(match)">
             <div class="match-header">
               <h3 class="match-name">{{ match.matched_user.display_name }}</h3>
               <span class="match-age">{{ match.matched_user.age }}</span>
@@ -132,6 +132,13 @@
       </div>
     </div>
 
+    <!-- 用戶詳情彈窗 -->
+    <UserDetailModal
+      :show="showUserDetail"
+      :user="selectedUser || {}"
+      @close="closeUserDetail"
+    />
+
     <!-- 取消配對確認彈窗 -->
     <Transition name="modal">
       <div
@@ -182,6 +189,7 @@ import { useDiscoveryStore } from '@/stores/discovery'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 import HeartLoader from '@/components/ui/HeartLoader.vue'
 import Badge from '@/components/ui/Badge.vue'
+import UserDetailModal from '@/components/UserDetailModal.vue'
 import { formatMatchDate } from '@/utils/dateFormat'
 import { useMessage } from 'naive-ui'
 import { logger } from '@/utils/logger'
@@ -192,6 +200,26 @@ const message = useMessage()
 
 const unmatchTarget = ref(null)
 const isUnmatching = ref(false)
+
+// 用戶詳情 Modal 狀態
+const showUserDetail = ref(false)
+const selectedUser = ref(null)
+
+/**
+ * 開啟用戶詳情 Modal
+ */
+const openUserDetail = (match) => {
+  selectedUser.value = match.matched_user
+  showUserDetail.value = true
+}
+
+/**
+ * 關閉用戶詳情 Modal
+ */
+const closeUserDetail = () => {
+  showUserDetail.value = false
+  selectedUser.value = null
+}
 
 /**
  * 格式化距離顯示
@@ -536,6 +564,16 @@ onUnmounted(() => {
   50% {
     box-shadow: 0 4px 16px rgba(255, 215, 0, 0.6);
   }
+}
+
+/* 可點擊區域 */
+.clickable {
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.clickable:hover {
+  opacity: 0.85;
 }
 
 /* 用戶頭像 */

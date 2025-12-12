@@ -9,7 +9,12 @@
           </template>
         </n-button>
 
-        <div v-if="currentConversation" class="chat-user-info">
+        <div
+          v-if="currentConversation"
+          class="chat-user-info clickable"
+          @click="openUserDetail"
+          title="點擊查看詳情"
+        >
           <n-avatar
             :src="currentConversation.other_user_avatar"
             :fallback-src="defaultAvatar"
@@ -18,6 +23,7 @@
           />
           <div class="user-details">
             <div class="user-name">{{ currentConversation.other_user_name }}</div>
+            <div class="user-hint">點擊查看詳情</div>
           </div>
         </div>
 
@@ -130,6 +136,13 @@
       v-model:show="showImagePreview"
       :image-url="previewImageUrl"
     />
+
+    <!-- 用戶詳情彈窗 -->
+    <UserDetailModal
+      :show="showUserDetail"
+      :user="matchedUser || {}"
+      @close="closeUserDetail"
+    />
   </div>
 </template>
 
@@ -142,10 +155,12 @@ import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
 import { useSafetyStore } from '@/stores/safety'
 import { useWebSocketStore } from '@/stores/websocket'
+import { useDiscoveryStore } from '@/stores/discovery'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
 import ChatImagePicker from '@/components/chat/ChatImagePicker.vue'
 import ImagePreviewModal from '@/components/chat/ImagePreviewModal.vue'
 import ReportModal from '@/components/ReportModal.vue'
+import UserDetailModal from '@/components/UserDetailModal.vue'
 import { logger } from '@/utils/logger'
 
 const route = useRoute()
@@ -156,8 +171,13 @@ const chatStore = useChatStore()
 const userStore = useUserStore()
 const safetyStore = useSafetyStore()
 const wsStore = useWebSocketStore()
+const discoveryStore = useDiscoveryStore()
 
 const matchId = computed(() => route.params.matchId)
+
+// 用戶詳情 Modal 狀態
+const showUserDetail = ref(false)
+const matchedUser = ref(null)
 const messageInput = ref('')
 const messageListRef = ref(null)
 const typingTimer = ref(null)
@@ -205,6 +225,51 @@ const moreOptions = computed(() => [
 // 返回上一頁
 const goBack = () => {
   router.push('/messages')
+}
+
+/**
+ * 開啟用戶詳情 Modal
+ * 從 discoveryStore 獲取完整的 ProfileCard 資料
+ */
+const openUserDetail = async () => {
+  if (!currentConversation.value) return
+
+  try {
+    // 確保已載入配對列表
+    if (!discoveryStore.matches.length) {
+      await discoveryStore.fetchMatches()
+    }
+
+    // 從配對列表中找到對應的用戶資料
+    const match = discoveryStore.matches.find(
+      m => m.match_id === matchId.value
+    )
+
+    if (match) {
+      matchedUser.value = match.matched_user
+      showUserDetail.value = true
+    } else {
+      // 如果在配對列表中找不到，使用基本資訊
+      matchedUser.value = {
+        display_name: currentConversation.value.other_user_name,
+        photos: currentConversation.value.other_user_avatar
+          ? [currentConversation.value.other_user_avatar]
+          : []
+      }
+      showUserDetail.value = true
+    }
+  } catch (error) {
+    logger.error('無法載入用戶詳情:', error)
+    message.error('無法載入用戶詳情')
+  }
+}
+
+/**
+ * 關閉用戶詳情 Modal
+ */
+const closeUserDetail = () => {
+  showUserDetail.value = false
+  matchedUser.value = null
 }
 
 // 刪除訊息
@@ -493,6 +558,24 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   flex: 1;
+}
+
+.chat-user-info.clickable {
+  cursor: pointer;
+  padding: 8px;
+  margin: -8px;
+  border-radius: 8px;
+  transition: background-color 0.2s;
+}
+
+.chat-user-info.clickable:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.user-hint {
+  font-size: 12px;
+  color: #999;
+  margin-top: 2px;
 }
 
 .more-button {
