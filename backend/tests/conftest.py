@@ -3,6 +3,7 @@ import pytest
 import asyncio
 import os
 from typing import AsyncGenerator
+from unittest.mock import AsyncMock, MagicMock
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool
@@ -83,3 +84,61 @@ def sample_user_data():
         "password": "Test1234!",
         "date_of_birth": "1995-01-01"
     }
+
+
+# ==================== Redis Mock Fixtures ====================
+
+@pytest.fixture
+def mock_redis():
+    """建立 Mock Redis 連線
+
+    模擬 Redis 的基本操作：setex, get, exists, delete, ttl
+    """
+    redis = AsyncMock()
+    # 內部存儲（模擬 Redis 行為）
+    _storage = {}
+
+    async def mock_setex(key: str, ttl: int, value: str):
+        _storage[key] = value
+        return True
+
+    async def mock_get(key: str):
+        return _storage.get(key)
+
+    async def mock_exists(key: str):
+        return 1 if key in _storage else 0
+
+    async def mock_delete(key: str):
+        if key in _storage:
+            del _storage[key]
+            return 1
+        return 0
+
+    async def mock_ttl(key: str):
+        return 300 if key in _storage else -2
+
+    redis.setex = AsyncMock(side_effect=mock_setex)
+    redis.get = AsyncMock(side_effect=mock_get)
+    redis.exists = AsyncMock(side_effect=mock_exists)
+    redis.delete = AsyncMock(side_effect=mock_delete)
+    redis.ttl = AsyncMock(side_effect=mock_ttl)
+    redis._storage = _storage  # 暴露存儲供測試使用
+
+    return redis
+
+
+@pytest.fixture
+def mock_redis_error():
+    """建立會拋出 RedisError 的 Mock Redis
+
+    用於測試 Redis 不可用時的回退行為
+    """
+    import redis.asyncio as aioredis
+
+    redis = AsyncMock()
+    redis.setex = AsyncMock(side_effect=aioredis.RedisError("Connection refused"))
+    redis.get = AsyncMock(side_effect=aioredis.RedisError("Connection refused"))
+    redis.exists = AsyncMock(side_effect=aioredis.RedisError("Connection refused"))
+    redis.delete = AsyncMock(side_effect=aioredis.RedisError("Connection refused"))
+
+    return redis

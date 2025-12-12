@@ -77,61 +77,148 @@ def _generate_auth_tokens(user_id: str) -> Tuple[str, str]:
 class VerificationCodeStore:
     """帶過期機制的驗證碼存儲
 
-    Redis 整合備註（暫未使用）：
-    - 生產環境建議使用 Redis: redis.setex(f"verify:{email}", 600, code)
-    - 支援多實例部署時的驗證碼共享
-    - 天然支援 TTL 自動過期
+    支援 Redis 存儲（優先）和內存回退。
+    當 Redis 不可用時，自動回退到內存存儲並記錄警告。
+
+    Redis Key 設計：
+    - verify:{email} - 驗證碼 (value: 6 位數碼, TTL: 600 秒)
     """
 
-    def __init__(self, ttl_minutes: int = 10):
-        self._store: Dict[str, Tuple[str, datetime]] = {}
+    def __init__(self, ttl_minutes: int = 10, redis_client: Optional[aioredis.Redis] = None):
+        """初始化驗證碼存儲
+
+        Args:
+            ttl_minutes: 驗證碼過期時間（分鐘）
+            redis_client: Redis 連線（可選，不提供時使用純內存模式）
+        """
+        self._redis: Optional[aioredis.Redis] = redis_client
+        self._use_redis: bool = redis_client is not None
+        # 內存回退存儲: email -> (code, expires_at)
+        self._fallback: Dict[str, Tuple[str, datetime]] = {}
         self._lock = asyncio.Lock()
         self._ttl = timedelta(minutes=ttl_minutes)
+        self._ttl_seconds = ttl_minutes * 60
+
+    async def set_redis(self, redis_client: aioredis.Redis) -> None:
+        """設置或更新 Redis 連線
+
+        Args:
+            redis_client: Redis 連線
+        """
+        self._redis = redis_client
+        self._use_redis = True
+        logger.info("VerificationCodeStore Redis connection configured")
 
     async def set(self, email: str, code: str) -> None:
-        """設置驗證碼，帶過期時間"""
+        """設置驗證碼，帶過期時間
+
+        Args:
+            email: 用戶 Email
+            code: 6 位數驗證碼
+        """
+        key = f"verify:{email.lower()}"
+
+        # 嘗試 Redis
+        if self._redis and self._use_redis:
+            try:
+                await self._redis.setex(key, self._ttl_seconds, code)
+                logger.debug(f"Verification code stored in Redis for {email}")
+                return
+            except aioredis.RedisError as e:
+                logger.warning(f"Redis unavailable for verification code, falling back to memory: {e}")
+                self._use_redis = False
+
+        # 內存回退
         async with self._lock:
             expires_at = datetime.now(timezone.utc) + self._ttl
-            self._store[email] = (code, expires_at)
+            self._fallback[email.lower()] = (code, expires_at)
+            logger.debug(f"Verification code stored in memory (fallback) for {email}")
 
     async def get(self, email: str) -> Optional[str]:
-        """獲取驗證碼，自動檢查過期"""
+        """獲取驗證碼，自動檢查過期
+
+        Args:
+            email: 用戶 Email
+
+        Returns:
+            驗證碼，如果不存在或已過期返回 None
+        """
+        key = f"verify:{email.lower()}"
+
+        # 嘗試 Redis
+        if self._redis and self._use_redis:
+            try:
+                return await self._redis.get(key)
+            except aioredis.RedisError as e:
+                logger.warning(f"Redis unavailable for verification code get, falling back to memory: {e}")
+                self._use_redis = False
+
+        # 內存回退
         async with self._lock:
-            if email not in self._store:
+            email_lower = email.lower()
+            if email_lower not in self._fallback:
                 return None
 
-            code, expires_at = self._store[email]
+            code, expires_at = self._fallback[email_lower]
 
             # 檢查是否過期
             if datetime.now(timezone.utc) > expires_at:
-                del self._store[email]
+                del self._fallback[email_lower]
                 return None
 
             return code
 
     async def delete(self, email: str) -> None:
-        """刪除驗證碼"""
+        """刪除驗證碼
+
+        Args:
+            email: 用戶 Email
+        """
+        key = f"verify:{email.lower()}"
+
+        # 嘗試從 Redis 刪除
+        if self._redis and self._use_redis:
+            try:
+                await self._redis.delete(key)
+            except aioredis.RedisError as e:
+                logger.warning(f"Redis unavailable for verification code delete: {e}")
+
+        # 同時從內存刪除
         async with self._lock:
-            self._store.pop(email, None)
+            self._fallback.pop(email.lower(), None)
 
     async def cleanup_expired(self) -> int:
-        """清理過期的驗證碼，返回清理數量"""
+        """清理過期的內存驗證碼（Redis 有自動 TTL）
+
+        Returns:
+            清理的驗證碼數量
+        """
         async with self._lock:
             now = datetime.now(timezone.utc)
             expired_keys = [
-                email for email, (_, expires_at) in self._store.items()
+                email for email, (_, expires_at) in self._fallback.items()
                 if now > expires_at
             ]
 
             for email in expired_keys:
-                del self._store[email]
+                del self._fallback[email]
+
+            if expired_keys:
+                logger.info(f"Cleaned up {len(expired_keys)} expired verification codes from memory")
 
             return len(expired_keys)
 
+    def is_using_redis(self) -> bool:
+        """檢查是否正在使用 Redis
+
+        Returns:
+            bool: True 如果使用 Redis，False 如果使用內存回退
+        """
+        return self._use_redis and self._redis is not None
+
 
 # 驗證碼儲存（10 分鐘過期）
-# 注意：目前 Email 發送服務尚未整合，驗證碼會記錄在後端 log 中
-# 開發測試時請查看 uvicorn 終端輸出，搜尋 "📧 [模擬] 發送驗證碼" 取得驗證碼
+# 初始無 Redis，在 main.py lifespan 中設置
 verification_codes = VerificationCodeStore(ttl_minutes=10)
 
 # Email 發送速率限制（防止濫用）
