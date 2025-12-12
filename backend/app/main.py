@@ -17,6 +17,7 @@ import logging
 from app.core.config import settings
 from app.core.database import init_db, close_db
 from app.websocket.manager import manager
+from app.services.redis_client import redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,7 @@ async def lifespan(app: FastAPI):
     yield
     # 關閉時執行
     logger.info("👋 MergeMeet 關閉中...")
+    await redis_client.close()
     await close_db()
 
 

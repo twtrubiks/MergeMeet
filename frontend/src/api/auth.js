@@ -22,11 +22,26 @@ export const authAPI = {
    * @param {Object} credentials - 登入憑證
    * @param {string} credentials.email - Email
    * @param {string} credentials.password - 密碼
-   * @returns {Promise} 包含 access_token 和 refresh_token
+   * @returns {Promise} 包含 success 狀態、data 或錯誤資訊（含登入限制資訊）
    */
   async login(credentials) {
-    const response = await apiClient.post('/auth/login', credentials)
-    return response.data
+    try {
+      const response = await apiClient.post('/auth/login', credentials)
+      return { success: true, data: response.data }
+    } catch (err) {
+      // 解析登入限制相關的 headers
+      const headers = err.response?.headers || {}
+      const remainingAttempts = parseInt(headers['x-ratelimit-remaining'], 10)
+      const lockoutSeconds = parseInt(headers['x-lockout-seconds'], 10)
+
+      return {
+        success: false,
+        error: err.response?.data?.detail || '登入失敗',
+        remainingAttempts: isNaN(remainingAttempts) ? null : remainingAttempts,
+        lockoutSeconds: isNaN(lockoutSeconds) ? 0 : lockoutSeconds,
+        isLocked: err.response?.status === 429
+      }
+    }
   },
 
   /**

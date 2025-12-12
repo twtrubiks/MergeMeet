@@ -20,6 +20,13 @@ export const useUserStore = defineStore('user', () => {
   const isLoading = ref(false)
   const error = ref(null)
 
+  // 登入限制狀態
+  const loginLimitInfo = ref({
+    remainingAttempts: null,
+    lockoutSeconds: 0,
+    isLocked: false
+  })
+
   // 計算屬性
   const isAuthenticated = computed(() => !!accessToken.value)
   const userEmail = computed(() => user.value?.email || null)
@@ -82,21 +89,44 @@ export const useUserStore = defineStore('user', () => {
   const login = async (credentials) => {
     isLoading.value = true
     error.value = null
+    // 重置登入限制狀態
+    loginLimitInfo.value = { remainingAttempts: null, lockoutSeconds: 0, isLocked: false }
 
     try {
-      const response = await authAPI.login(credentials)
-      saveTokens(response)
+      const result = await authAPI.login(credentials)
 
-      // 從 Token 初始化用戶資訊（包含 user.id）
-      initializeFromToken()
-
-      return true
+      if (result.success) {
+        saveTokens(result.data)
+        // 從 Token 初始化用戶資訊（包含 user.id）
+        initializeFromToken()
+        return true
+      } else {
+        // 登入失敗，更新限制狀態
+        error.value = result.error
+        loginLimitInfo.value = {
+          remainingAttempts: result.remainingAttempts,
+          lockoutSeconds: result.lockoutSeconds,
+          isLocked: result.isLocked
+        }
+        return false
+      }
     } catch (err) {
-      error.value = err.response?.data?.detail || '登入失敗'
+      error.value = '登入失敗'
       logger.error('登入錯誤:', err)
       return false
     } finally {
       isLoading.value = false
+    }
+  }
+
+  /**
+   * 重置登入限制狀態
+   */
+  const resetLoginLimitInfo = () => {
+    loginLimitInfo.value = {
+      remainingAttempts: null,
+      lockoutSeconds: 0,
+      isLocked: false
     }
   }
 
@@ -213,6 +243,7 @@ export const useUserStore = defineStore('user', () => {
     refreshToken,
     isLoading,
     error,
+    loginLimitInfo,
     // 計算屬性
     isAuthenticated,
     userEmail,
@@ -227,5 +258,6 @@ export const useUserStore = defineStore('user', () => {
     saveTokens,
     clearTokens,
     initializeFromToken,
+    resetLoginLimitInfo,
   }
 })

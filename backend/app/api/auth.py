@@ -2,23 +2,13 @@
 
 提供用戶註冊、登入、登出、Token 刷新、Email 驗證等功能。
 
+已實現功能:
+- ✅ 登入失敗次數限制：5 次失敗後鎖定 15 分鐘（使用 Redis）
+- ✅ 密碼重置功能：發送郵件 + 重置 Token
+
 TODO: 未實現功能（上線前建議完成）
 
-1. 密碼重置功能（高優先級）
-   - POST /forgot-password: 發送密碼重置郵件
-   - POST /reset-password: 使用重置令牌設定新密碼
-   - 需整合 Email 發送服務
-   - 重置 Token 建議 1 小時過期
-   - 風險：用戶忘記密碼無法恢復帳號
-
-2. 登入失敗次數限制（高優先級）
-   - 目前登入端點無失敗次數限制
-   - 建議：5 次失敗後鎖定帳戶 15 分鐘
-   - 可使用 Redis 或內存字典實現
-   - 風險：密碼暴力破解攻擊
-   - 影響端點：/login, /admin-login
-
-3. 密碼修改功能（中優先級）
+1. 密碼修改功能（中優先級）
    - POST /change-password: 修改密碼（需舊密碼驗證）
    - 建議：禁止使用最近 3 次的密碼（密碼歷史檢查）
    - 風險：用戶無法主動修改密碼
@@ -61,6 +51,9 @@ from app.schemas.auth import (
 )
 from app.services.token_blacklist import token_blacklist
 from app.services.email import EmailService
+from app.services.redis_client import get_redis
+from app.services.login_limiter import LoginLimiter
+import redis.asyncio as aioredis
 import secrets
 
 router = APIRouter()
@@ -290,15 +283,35 @@ async def register(
 @router.post("/login", response_model=TokenResponse)
 async def login(
     request: LoginRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    redis_conn: aioredis.Redis = Depends(get_redis)
 ):
     """
     用戶登入
 
     - 驗證 Email 和密碼
     - 檢查帳號狀態
+    - 登入失敗限制：5 次失敗後鎖定 15 分鐘
     - 返回 JWT Token
+
+    Response Headers:
+        X-RateLimit-Remaining: 剩餘嘗試次數
+        X-Lockout-Seconds: 鎖定剩餘秒數（鎖定時）
     """
+    limiter = LoginLimiter(redis_conn)
+
+    # 檢查是否被鎖定
+    limit_status = await limiter.check_status(request.email)
+    if limit_status.is_locked:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="登入嘗試次數過多，帳號已暫時鎖定",
+            headers={
+                "X-RateLimit-Remaining": "0",
+                "X-Lockout-Seconds": str(limit_status.lockout_seconds)
+            }
+        )
+
     # 查找用戶
     result = await db.execute(
         select(User).where(User.email == request.email)
@@ -307,11 +320,29 @@ async def login(
 
     # 驗證用戶存在且密碼正確
     if not user or not verify_password(request.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email 或密碼錯誤",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        # 記錄失敗並獲取更新狀態
+        attempt_result = await limiter.record_failure(request.email)
+
+        # 根據是否觸發鎖定決定狀態碼
+        if attempt_result.is_locked:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="登入嘗試次數過多，帳號已暫時鎖定",
+                headers={
+                    "X-RateLimit-Remaining": "0",
+                    "X-Lockout-Seconds": str(attempt_result.lockout_seconds)
+                }
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Email 或密碼錯誤",
+                headers={
+                    "WWW-Authenticate": "Bearer",
+                    "X-RateLimit-Remaining": str(attempt_result.remaining_attempts),
+                    "X-Lockout-Seconds": "0"
+                }
+            )
 
     # 檢查帳號是否啟用
     if not user.is_active:
@@ -327,6 +358,9 @@ async def login(
             detail=f"帳號已被封禁至 {user.banned_until}"
         )
 
+    # 登入成功，清除失敗記錄
+    await limiter.clear_attempts(request.email)
+
     # 生成 JWT Token
     access_token, refresh_token = _generate_auth_tokens(str(user.id))
 
@@ -341,15 +375,35 @@ async def login(
 @router.post("/admin-login", response_model=TokenResponse)
 async def admin_login(
     request: LoginRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    redis_conn: aioredis.Redis = Depends(get_redis)
 ):
     """
     管理員登入
 
     - 驗證 Email 和密碼
     - 檢查管理員權限
+    - 登入失敗限制：5 次失敗後鎖定 15 分鐘
     - 返回 JWT Token
+
+    Response Headers:
+        X-RateLimit-Remaining: 剩餘嘗試次數
+        X-Lockout-Seconds: 鎖定剩餘秒數（鎖定時）
     """
+    limiter = LoginLimiter(redis_conn)
+
+    # 檢查是否被鎖定
+    limit_status = await limiter.check_status(request.email)
+    if limit_status.is_locked:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="登入嘗試次數過多，帳號已暫時鎖定",
+            headers={
+                "X-RateLimit-Remaining": "0",
+                "X-Lockout-Seconds": str(limit_status.lockout_seconds)
+            }
+        )
+
     # 查找用戶
     result = await db.execute(
         select(User).where(User.email == request.email)
@@ -358,11 +412,28 @@ async def admin_login(
 
     # 驗證用戶存在且密碼正確
     if not user or not verify_password(request.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email 或密碼錯誤",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        # 記錄失敗並獲取更新狀態
+        attempt_result = await limiter.record_failure(request.email)
+
+        if attempt_result.is_locked:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="登入嘗試次數過多，帳號已暫時鎖定",
+                headers={
+                    "X-RateLimit-Remaining": "0",
+                    "X-Lockout-Seconds": str(attempt_result.lockout_seconds)
+                }
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Email 或密碼錯誤",
+                headers={
+                    "WWW-Authenticate": "Bearer",
+                    "X-RateLimit-Remaining": str(attempt_result.remaining_attempts),
+                    "X-Lockout-Seconds": "0"
+                }
+            )
 
     # 檢查是否為管理員
     if not user.is_admin:
@@ -384,6 +455,9 @@ async def admin_login(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"帳號已被封禁至 {user.banned_until}"
         )
+
+    # 登入成功，清除失敗記錄
+    await limiter.clear_attempts(request.email)
 
     # 生成 JWT Token
     access_token, refresh_token = _generate_auth_tokens(str(user.id))

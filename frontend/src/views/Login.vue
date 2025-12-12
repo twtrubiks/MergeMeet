@@ -9,7 +9,16 @@
         <p>登入 MergeMeet 開始配對</p>
       </div>
 
-      <form @submit.prevent="handleLogin" class="auth-form">
+      <!-- 鎖定警告 -->
+      <div v-if="isLocked" class="lockout-warning">
+        <div class="lockout-icon">🔒</div>
+        <div class="lockout-message">帳號已暫時鎖定</div>
+        <div class="lockout-countdown">
+          請於 {{ formatCountdown(lockoutCountdown) }} 後再試
+        </div>
+      </div>
+
+      <form v-else @submit.prevent="handleLogin" class="auth-form">
         <!-- Email -->
         <FloatingInput
           id="email"
@@ -32,6 +41,11 @@
           :required="true"
           :error="error"
         />
+
+        <!-- 剩餘嘗試次數警告 -->
+        <div v-if="showAttemptsWarning" class="attempts-warning">
+          ⚠️ 剩餘 {{ loginLimitInfo.remainingAttempts }} 次嘗試機會
+        </div>
 
         <!-- 忘記密碼連結 -->
         <div class="forgot-password-link">
@@ -68,7 +82,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
@@ -88,6 +102,54 @@ const error = ref('')
 
 // 載入狀態
 const isLoading = computed(() => userStore.isLoading)
+
+// 登入限制狀態
+const loginLimitInfo = computed(() => userStore.loginLimitInfo)
+const isLocked = computed(() => loginLimitInfo.value.isLocked)
+
+// 倒計時相關
+const lockoutCountdown = ref(0)
+let countdownTimer = null
+
+// 是否顯示剩餘次數警告（少於等於 3 次時顯示）
+const showAttemptsWarning = computed(() => {
+  const remaining = loginLimitInfo.value.remainingAttempts
+  return remaining !== null && remaining <= 3 && remaining > 0
+})
+
+// 格式化倒計時（分:秒）
+const formatCountdown = (seconds) => {
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+// 開始倒計時
+const startCountdown = (seconds) => {
+  lockoutCountdown.value = seconds
+  clearInterval(countdownTimer)
+
+  countdownTimer = setInterval(() => {
+    lockoutCountdown.value--
+    if (lockoutCountdown.value <= 0) {
+      clearInterval(countdownTimer)
+      // 重置鎖定狀態
+      userStore.resetLoginLimitInfo()
+    }
+  }, 1000)
+}
+
+// 監聽鎖定狀態變化
+watch(() => loginLimitInfo.value.lockoutSeconds, (newVal) => {
+  if (newVal > 0) {
+    startCountdown(newVal)
+  }
+})
+
+// 清理定時器
+onUnmounted(() => {
+  clearInterval(countdownTimer)
+})
 
 // 表單驗證
 const isFormValid = computed(() => {
@@ -255,6 +317,45 @@ const handleLogin = async () => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* 鎖定警告樣式 */
+.lockout-warning {
+  text-align: center;
+  padding: 2rem;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
+  border-radius: 12px;
+  color: white;
+  margin-bottom: 1.5rem;
+}
+
+.lockout-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.lockout-message {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.lockout-countdown {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 剩餘嘗試次數警告 */
+.attempts-warning {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  color: #856404;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  text-align: center;
+  font-weight: 500;
 }
 
 .forgot-password-link {
