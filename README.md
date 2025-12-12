@@ -190,6 +190,7 @@ open http://localhost:5050
 - 用戶登入（JWT Token）
 - Email 驗證（Mailpit 真實郵件發送）
 - 密碼重置功能（忘記密碼 / 重設密碼）
+- 登入失敗次數限制（5 次失敗後鎖定 15 分鐘，使用 Redis）
 - Token 刷新機制
 - 管理員登入（is_admin 權限檢查）
 
