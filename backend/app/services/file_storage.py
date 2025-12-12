@@ -28,18 +28,26 @@ class FileStorageService:
         """初始化儲存服務，建立上傳目錄"""
         self.upload_dir = Path(settings.UPLOAD_DIR)
         self.photos_dir = self.upload_dir / "photos"
+        self.chat_dir = self.upload_dir / "chat"
         self._ensure_directories()
 
     def _ensure_directories(self):
         """確保上傳目錄存在"""
         self.upload_dir.mkdir(parents=True, exist_ok=True)
         self.photos_dir.mkdir(parents=True, exist_ok=True)
+        self.chat_dir.mkdir(parents=True, exist_ok=True)
 
     def _get_user_photo_dir(self, user_id: str) -> Path:
         """取得使用者照片目錄"""
         user_dir = self.photos_dir / str(user_id)
         user_dir.mkdir(parents=True, exist_ok=True)
         return user_dir
+
+    def _get_chat_image_dir(self, match_id: str) -> Path:
+        """取得聊天圖片目錄"""
+        chat_image_dir = self.chat_dir / str(match_id)
+        chat_image_dir.mkdir(parents=True, exist_ok=True)
+        return chat_image_dir
 
     def _get_file_extension(self, filename: str, content_type: str) -> str:
         """取得檔案副檔名"""
@@ -255,6 +263,145 @@ class FileStorageService:
             return "檔案不能為空"
 
         return None
+
+    def _process_gif_thumbnail(self, file_content: bytes) -> bytes:
+        """
+        建立 GIF 縮圖（使用第一幀）
+
+        Args:
+            file_content: 原始 GIF 檔案內容
+
+        Returns:
+            縮圖內容（JPEG 格式）
+        """
+        img = Image.open(io.BytesIO(file_content))
+
+        # 取得第一幀
+        if hasattr(img, "n_frames") and img.n_frames > 1:
+            img.seek(0)
+
+        # 轉換為 RGB
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+
+        # 建立縮圖（裁切為正方形）
+        width, height = img.size
+        min_dim = min(width, height)
+
+        # 從中心裁切
+        left = (width - min_dim) // 2
+        top = (height - min_dim) // 2
+        right = left + min_dim
+        bottom = top + min_dim
+
+        img = img.crop((left, top, right, bottom))
+        img.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
+
+        # 儲存到記憶體
+        output = io.BytesIO()
+        img.save(output, format="JPEG", quality=80, optimize=True)
+        output.seek(0)
+
+        return output.read()
+
+    async def save_chat_image(
+        self,
+        match_id: str,
+        user_id: str,
+        file_content: bytes,
+        filename: str,
+        content_type: str,
+    ) -> Tuple[str, str, str, int, int, bool]:
+        """
+        儲存聊天圖片及縮圖
+
+        Args:
+            match_id: 配對 ID
+            user_id: 使用者 ID
+            file_content: 檔案內容
+            filename: 原始檔名
+            content_type: MIME 類型
+
+        Returns:
+            Tuple[image_id, image_url, thumbnail_url, width, height, is_gif]
+        """
+        # 產生唯一 ID
+        image_id = str(uuid.uuid4())
+
+        # 取得聊天圖片目錄
+        chat_image_dir = self._get_chat_image_dir(match_id)
+
+        # 判斷是否為 GIF
+        is_gif = content_type == "image/gif"
+
+        # 取得原始圖片尺寸
+        img = Image.open(io.BytesIO(file_content))
+        original_width, original_height = img.size
+
+        if is_gif:
+            # GIF 保持原格式
+            image_filename = f"{image_id}.gif"
+            image_path = chat_image_dir / image_filename
+
+            # 縮圖使用第一幀
+            thumbnail_content = self._process_gif_thumbnail(file_content)
+            thumbnail_filename = f"{image_id}_thumb.jpg"
+            thumbnail_path = chat_image_dir / thumbnail_filename
+
+            # 寫入檔案
+            try:
+                with open(image_path, "wb") as f:
+                    f.write(file_content)
+
+                with open(thumbnail_path, "wb") as f:
+                    f.write(thumbnail_content)
+
+                logger.info(f"Chat GIF saved: {image_path}")
+
+            except Exception as e:
+                # 清理失敗的檔案
+                if image_path.exists():
+                    image_path.unlink()
+                if thumbnail_path.exists():
+                    thumbnail_path.unlink()
+                logger.error(f"Failed to save chat GIF: {e}")
+                raise
+
+        else:
+            # 一般圖片處理
+            processed_image = self._process_image(file_content, MAX_IMAGE_SIZE)
+            image_filename = f"{image_id}.jpg"
+            image_path = chat_image_dir / image_filename
+
+            # 建立縮圖
+            thumbnail_content = self._create_thumbnail(file_content)
+            thumbnail_filename = f"{image_id}_thumb.jpg"
+            thumbnail_path = chat_image_dir / thumbnail_filename
+
+            # 寫入檔案
+            try:
+                with open(image_path, "wb") as f:
+                    f.write(processed_image)
+
+                with open(thumbnail_path, "wb") as f:
+                    f.write(thumbnail_content)
+
+                logger.info(f"Chat image saved: {image_path}")
+
+            except Exception as e:
+                # 清理失敗的檔案
+                if image_path.exists():
+                    image_path.unlink()
+                if thumbnail_path.exists():
+                    thumbnail_path.unlink()
+                logger.error(f"Failed to save chat image: {e}")
+                raise
+
+        # 回傳 URL 路徑
+        image_url = f"/uploads/chat/{match_id}/{image_filename}"
+        thumbnail_url = f"/uploads/chat/{match_id}/{thumbnail_filename}"
+
+        return image_id, image_url, thumbnail_url, original_width, original_height, is_gif
 
 
 # 建立單例

@@ -255,6 +255,57 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   /**
+   * 上傳聊天圖片
+   * @param {string} matchId - 配對 ID
+   * @param {File} file - 圖片檔案
+   * @returns {Promise<Object>} 上傳結果 (含 image_url, thumbnail_url, width, height, is_gif)
+   */
+  const uploadChatImage = async (matchId, file) => {
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await apiClient.post(
+        `/messages/matches/${matchId}/upload-image`,
+        formData,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        }
+      )
+
+      logger.debug('[Chat] Image uploaded:', response.data)
+      return response.data
+    } catch (err) {
+      error.value = err.response?.data?.detail || '上傳圖片失敗'
+      throw err
+    }
+  }
+
+  /**
+   * 發送圖片訊息
+   * @param {string} matchId - 配對 ID
+   * @param {Object} imageData - 圖片資料 (來自 uploadChatImage)
+   */
+  const sendImageMessage = async (matchId, imageData) => {
+    const content = JSON.stringify({
+      image_url: imageData.image_url,
+      thumbnail_url: imageData.thumbnail_url,
+      width: imageData.width,
+      height: imageData.height
+    })
+
+    const messageType = imageData.is_gif ? 'GIF' : 'IMAGE'
+
+    try {
+      await sendMessage(matchId, content, messageType)
+      logger.debug('[Chat] Image message sent:', { matchId, messageType })
+    } catch (err) {
+      error.value = err.message || '發送圖片訊息失敗'
+      throw err
+    }
+  }
+
+  /**
    * 發送打字指示器
    */
   const sendTyping = (matchId, isTyping) => {
@@ -297,7 +348,7 @@ export const useChatStore = defineStore('chat', () => {
     const message = data.message
     const matchId = message.match_id
 
-    logger.debug('[Chat] Received new message:', { matchId, messageId: message.id })
+    logger.debug('[Chat] Received new message:', { matchId, messageId: message.id, messageType: message.message_type })
 
     // 確保該配對的訊息陣列存在，使用解構賦值確保響應式
     if (!messages.value[matchId]) {
@@ -465,6 +516,8 @@ export const useChatStore = defineStore('chat', () => {
     markAsRead,
     markConversationAsRead,
     deleteMessage,
+    uploadChatImage,
+    sendImageMessage,
     sendTyping,
     joinMatchRoom,
     leaveMatchRoom,

@@ -1,5 +1,5 @@
 """聊天訊息 REST API"""
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func, desc
 from sqlalchemy.orm import selectinload
@@ -16,9 +16,12 @@ from app.schemas.message import (
     ChatHistoryResponse,
     MessageResponse,
     MatchWithLastMessageResponse,
-    MarkAsReadRequest
+    MarkAsReadRequest,
+    ChatImageUploadResponse
 )
 from app.websocket.manager import manager
+from app.services.file_storage import file_storage
+from app.core.config import settings
 
 router = APIRouter(prefix="/api/messages")
 logger = logging.getLogger(__name__)
@@ -371,3 +374,95 @@ async def delete_message(
     )
 
     return None
+
+
+@router.post("/matches/{match_id}/upload-image", response_model=ChatImageUploadResponse)
+async def upload_chat_image(
+    match_id: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    上傳聊天圖片
+
+    - 支援 JPEG, PNG, GIF, WebP 格式
+    - 最大檔案大小: 5MB
+    - 只有配對成員可以上傳
+    - 返回圖片和縮圖 URL
+    """
+    # 驗證配對是否存在且用戶是成員
+    result = await db.execute(
+        select(Match).where(
+            and_(
+                Match.id == match_id,
+                Match.status == "ACTIVE",
+                or_(
+                    Match.user1_id == current_user.id,
+                    Match.user2_id == current_user.id
+                )
+            )
+        )
+    )
+    match = result.scalar_one_or_none()
+
+    if not match:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="配對不存在或您無權上傳"
+        )
+
+    # 驗證 MIME 類型
+    content_type = file.content_type
+    if content_type not in {"image/jpeg", "image/png", "image/gif", "image/webp"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="不支援的圖片格式，僅支援 JPEG, PNG, GIF, WebP"
+        )
+
+    # 讀取檔案內容（流式讀取防止 DoS）
+    file_content = b""
+    chunk_size = 64 * 1024  # 64KB
+    max_size = settings.MAX_UPLOAD_SIZE
+
+    while True:
+        chunk = await file.read(chunk_size)
+        if not chunk:
+            break
+        file_content += chunk
+        if len(file_content) > max_size:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"檔案過大，最大允許 {max_size // 1024 // 1024}MB"
+            )
+
+    if len(file_content) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="檔案不能為空"
+        )
+
+    # 儲存圖片
+    try:
+        image_id, image_url, thumbnail_url, width, height, is_gif = await file_storage.save_chat_image(
+            match_id=match_id,
+            user_id=str(current_user.id),
+            file_content=file_content,
+            filename=file.filename or "image",
+            content_type=content_type
+        )
+    except Exception as e:
+        logger.error(f"Failed to save chat image: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="圖片儲存失敗，請稍後再試"
+        )
+
+    return ChatImageUploadResponse(
+        image_id=image_id,
+        image_url=image_url,
+        thumbnail_url=thumbnail_url,
+        width=width,
+        height=height,
+        is_gif=is_gif
+    )

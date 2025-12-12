@@ -135,7 +135,17 @@ const getMessagePreview = (message) => {
   const isOwn = message.sender_id === userStore.user?.id
   const prefix = isOwn ? '你: ' : ''
 
-  // 限制長度
+  // 處理圖片訊息
+  if (message.message_type === 'IMAGE') {
+    return prefix + '[圖片]'
+  }
+
+  // 處理 GIF 訊息
+  if (message.message_type === 'GIF') {
+    return prefix + '[GIF]'
+  }
+
+  // 處理文字訊息
   const maxLength = 50
   const content = message.content || ''
 

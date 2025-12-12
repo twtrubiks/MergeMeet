@@ -58,4 +58,14 @@ class SendMessageRequest(BaseModel):
 
 class MarkAsReadRequest(BaseModel):
     """標記為已讀請求"""
-    message_ids: List[UUID4] = Field(..., min_items=1)
+    message_ids: List[UUID4] = Field(..., min_length=1)
+
+
+class ChatImageUploadResponse(BaseModel):
+    """聊天圖片上傳回應"""
+    image_id: UUID4
+    image_url: str
+    thumbnail_url: str
+    width: int
+    height: int
+    is_gif: bool = False

@@ -171,6 +171,11 @@ async def handle_chat_message(data: dict, sender_id: uuid.UUID):
         try:
             match_id_str = data.get("match_id")
             content = data.get("content", "").strip()
+            message_type = data.get("message_type", "TEXT").upper()
+
+            # 驗證訊息類型
+            if message_type not in ("TEXT", "IMAGE", "GIF"):
+                message_type = "TEXT"
 
             # 驗證 match_id 格式
             match_id = validate_uuid(match_id_str, "match_id")
@@ -185,49 +190,69 @@ async def handle_chat_message(data: dict, sender_id: uuid.UUID):
                 )
                 return
 
-            # 驗證訊息長度（防止 DoS 攻擊）
-            # 即時聊天訊息建議限制在 2000 字符以內
-            if len(content) > settings.MAX_MESSAGE_LENGTH:
-                await manager.send_personal_message(
-                    str(sender_id),
-                    {
-                        "type": "error",
-                        "message": f"訊息過長，最多 {settings.MAX_MESSAGE_LENGTH} 字符"
-                    }
-                )
-                logger.warning(f"Message too long from {sender_id}: {len(content)} chars")
-                return
-
-            # 內容審核：檢查敏感詞
-            is_approved, violations, action = await ContentModerationService.check_message_content(
-                content, db, sender_id
-            )
-            if not is_approved:
-                logger.warning(f"Unsafe content detected from {sender_id}: {violations}")
-                await manager.send_personal_message(
-                    str(sender_id),
-                    {
-                        "type": "error",
-                        "message": "訊息包含不當內容，已被系統拒絕",
-                        "violations": violations
-                    }
-                )
-
-                # 記錄違規行為（可選：增加警告次數）
+            # 對於圖片/GIF 訊息，驗證 content 是有效 JSON
+            if message_type in ("IMAGE", "GIF"):
                 try:
-                    result = await db.execute(
-                        select(User).where(User.id == sender_id)
+                    image_data = json.loads(content)
+                    # 檢查必要欄位
+                    if not image_data.get("image_url") or not image_data.get("thumbnail_url"):
+                        raise ValueError("Missing required fields")
+                except (json.JSONDecodeError, ValueError) as e:
+                    logger.warning(f"Invalid image message format from {sender_id}: {e}")
+                    await manager.send_personal_message(
+                        str(sender_id),
+                        {
+                            "type": "error",
+                            "message": "無效的圖片訊息格式"
+                        }
                     )
-                    user = result.scalar_one_or_none()
-                    if user:
-                        user.warning_count += 1
-                        await db.commit()
-                        logger.info(f"User {sender_id} warning count increased to {user.warning_count}")
-                except Exception as e:
-                    await db.rollback()
-                    logger.error(f"Failed to update warning count: {e}")
+                    return
+            else:
+                # 只對文字訊息執行以下驗證
 
-                return
+                # 驗證訊息長度（防止 DoS 攻擊）
+                # 即時聊天訊息建議限制在 2000 字符以內
+                if len(content) > settings.MAX_MESSAGE_LENGTH:
+                    await manager.send_personal_message(
+                        str(sender_id),
+                        {
+                            "type": "error",
+                            "message": f"訊息過長，最多 {settings.MAX_MESSAGE_LENGTH} 字符"
+                        }
+                    )
+                    logger.warning(f"Message too long from {sender_id}: {len(content)} chars")
+                    return
+
+                # 內容審核：檢查敏感詞
+                is_approved, violations, action = await ContentModerationService.check_message_content(
+                    content, db, sender_id
+                )
+                if not is_approved:
+                    logger.warning(f"Unsafe content detected from {sender_id}: {violations}")
+                    await manager.send_personal_message(
+                        str(sender_id),
+                        {
+                            "type": "error",
+                            "message": "訊息包含不當內容，已被系統拒絕",
+                            "violations": violations
+                        }
+                    )
+
+                    # 記錄違規行為（可選：增加警告次數）
+                    try:
+                        result = await db.execute(
+                            select(User).where(User.id == sender_id)
+                        )
+                        user = result.scalar_one_or_none()
+                        if user:
+                            user.warning_count += 1
+                            await db.commit()
+                            logger.info(f"User {sender_id} warning count increased to {user.warning_count}")
+                    except Exception as e:
+                        await db.rollback()
+                        logger.error(f"Failed to update warning count: {e}")
+
+                    return
 
             # 驗證配對是否存在且為活躍狀態
             result = await db.execute(
@@ -269,7 +294,7 @@ async def handle_chat_message(data: dict, sender_id: uuid.UUID):
                     match_id=match_id,
                     sender_id=sender_id,
                     content=content,
-                    message_type=data.get("message_type", "TEXT")
+                    message_type=message_type
                 )
                 db.add(message)
                 await db.commit()
@@ -320,8 +345,14 @@ async def handle_chat_message(data: dict, sender_id: uuid.UUID):
                     sender_profile = sender_profile_result.scalar_one_or_none()
                     sender_name = sender_profile.display_name if sender_profile else "用戶"
 
-                    # 準備訊息預覽（截取前 50 字）
-                    preview = content[:50] + "..." if len(content) > 50 else content
+                    # 準備訊息預覽（根據訊息類型）
+                    if message_type == "IMAGE":
+                        preview = "[圖片]"
+                    elif message_type == "GIF":
+                        preview = "[GIF]"
+                    else:
+                        # 文字訊息：截取前 50 字
+                        preview = content[:50] + "..." if len(content) > 50 else content
 
                     # 【通知類型 3】新訊息通知 (notification_message)
                     await manager.send_personal_message(

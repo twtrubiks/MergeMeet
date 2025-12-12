@@ -17,36 +17,77 @@
 
     <!-- 訊息內容 -->
     <div class="message-content-wrapper">
-      <!-- 訊息氣泡（自己的訊息可以右鍵刪除） -->
-      <n-dropdown
-        v-if="isOwn"
-        trigger="manual"
-        :show="showDropdown"
-        :options="dropdownOptions"
-        @select="handleDropdownSelect"
-        @clickoutside="showDropdown = false"
-      >
+      <!-- 文字訊息（自己的訊息可以右鍵刪除） -->
+      <template v-if="isTextMessage">
+        <n-dropdown
+          v-if="isOwn"
+          trigger="manual"
+          :show="showDropdown"
+          :options="dropdownOptions"
+          @select="handleDropdownSelect"
+          @clickoutside="showDropdown = false"
+        >
+          <div
+            :class="[
+              'message-content',
+              isOwn ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-900'
+            ]"
+            @contextmenu.prevent="handleContextMenu"
+          >
+            {{ message.content }}
+          </div>
+        </n-dropdown>
+
+        <!-- 對方的訊息（不可刪除） -->
         <div
+          v-else
           :class="[
             'message-content',
             isOwn ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-900'
           ]"
-          @contextmenu.prevent="handleContextMenu"
         >
           {{ message.content }}
         </div>
-      </n-dropdown>
+      </template>
 
-      <!-- 對方的訊息（不可刪除） -->
-      <div
-        v-else
-        :class="[
-          'message-content',
-          isOwn ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-900'
-        ]"
-      >
-        {{ message.content }}
-      </div>
+      <!-- 圖片/GIF 訊息 -->
+      <template v-else-if="isImageMessage">
+        <n-dropdown
+          v-if="isOwn"
+          trigger="manual"
+          :show="showDropdown"
+          :options="dropdownOptions"
+          @select="handleDropdownSelect"
+          @clickoutside="showDropdown = false"
+        >
+          <div
+            class="message-image"
+            @click="handleImageClick"
+            @contextmenu.prevent="handleContextMenu"
+          >
+            <img
+              :src="imageContent.thumbnail_url"
+              :alt="isGif ? 'GIF' : '圖片'"
+              loading="lazy"
+            />
+            <div v-if="isGif" class="gif-badge">GIF</div>
+          </div>
+        </n-dropdown>
+
+        <!-- 對方的圖片（不可刪除） -->
+        <div
+          v-else
+          class="message-image"
+          @click="handleImageClick"
+        >
+          <img
+            :src="imageContent.thumbnail_url"
+            :alt="isGif ? 'GIF' : '圖片'"
+            loading="lazy"
+          />
+          <div v-if="isGif" class="gif-badge">GIF</div>
+        </div>
+      </template>
 
       <!-- 訊息資訊 (時間、已讀狀態) -->
       <div class="message-info">
@@ -89,10 +130,37 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['delete'])
+const emit = defineEmits(['delete', 'preview-image'])
 
 const defaultAvatar = 'https://via.placeholder.com/40'
 const showDropdown = ref(false)
+
+// 判斷訊息類型
+const isTextMessage = computed(() => {
+  return !props.message.message_type || props.message.message_type === 'TEXT'
+})
+
+const isImageMessage = computed(() => {
+  return ['IMAGE', 'GIF'].includes(props.message.message_type)
+})
+
+const isGif = computed(() => {
+  return props.message.message_type === 'GIF'
+})
+
+// 解析圖片內容
+const imageContent = computed(() => {
+  if (!isImageMessage.value) return null
+  try {
+    return JSON.parse(props.message.content)
+  } catch {
+    // 如果解析失敗，假設 content 本身就是 URL
+    return {
+      image_url: props.message.content,
+      thumbnail_url: props.message.content
+    }
+  }
+})
 
 // 右鍵選單選項
 const dropdownOptions = [
@@ -115,6 +183,13 @@ const handleDropdownSelect = (key) => {
     emit('delete', props.message.id)
   }
   showDropdown.value = false
+}
+
+// 處理圖片點擊（放大查看）
+const handleImageClick = () => {
+  if (imageContent.value) {
+    emit('preview-image', imageContent.value.image_url)
+  }
 }
 
 // 格式化時間
@@ -198,6 +273,39 @@ const formattedTime = computed(() => {
 
 .message-other .message-content {
   border-bottom-left-radius: 4px;
+}
+
+/* 圖片訊息樣式 */
+.message-image {
+  position: relative;
+  max-width: 250px;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s ease;
+}
+
+.message-image:hover {
+  transform: scale(1.02);
+}
+
+.message-image img {
+  width: 100%;
+  display: block;
+  background-color: #f5f5f5;
+}
+
+.gif-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .message-info {

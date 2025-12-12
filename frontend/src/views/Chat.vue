@@ -60,6 +60,7 @@
             :show-avatar="message.sender_id !== userStore.user?.id"
             :other-user-avatar="currentConversation?.other_user_avatar"
             @delete="handleDeleteMessage"
+            @preview-image="handlePreviewImage"
           />
         </div>
       </div>
@@ -76,6 +77,13 @@
 
       <!-- 輸入區域 -->
       <div class="chat-input-area">
+        <!-- 圖片選擇器 -->
+        <ChatImagePicker
+          :match-id="matchId"
+          :disabled="!wsStore.isConnected"
+          @image-sent="handleImageSent"
+        />
+
         <n-input
           v-model:value="messageInput"
           type="textarea"
@@ -116,6 +124,12 @@
       @close="showReportModal = false"
       @reported="handleReported"
     />
+
+    <!-- 圖片預覽燈箱 -->
+    <ImagePreviewModal
+      v-model:show="showImagePreview"
+      :image-url="previewImageUrl"
+    />
   </div>
 </template>
 
@@ -129,6 +143,8 @@ import { useUserStore } from '@/stores/user'
 import { useSafetyStore } from '@/stores/safety'
 import { useWebSocketStore } from '@/stores/websocket'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
+import ChatImagePicker from '@/components/chat/ChatImagePicker.vue'
+import ImagePreviewModal from '@/components/chat/ImagePreviewModal.vue'
 import ReportModal from '@/components/ReportModal.vue'
 import { logger } from '@/utils/logger'
 
@@ -154,6 +170,10 @@ const isLoadingMore = ref(false)
 
 // WebSocket 初始化狀態（避免初始化期間顯示斷線警告）
 const isInitializing = ref(true)
+
+// 圖片預覽燈箱
+const showImagePreview = ref(false)
+const previewImageUrl = ref('')
 
 // 舉報功能
 const showReportModal = ref(false)
@@ -252,6 +272,20 @@ const handleReportUser = () => {
 const handleReported = () => {
   message.success('舉報已送出，感謝您的協助')
   showReportModal.value = false
+}
+
+// 處理圖片預覽
+const handlePreviewImage = (imageUrl) => {
+  previewImageUrl.value = imageUrl
+  showImagePreview.value = true
+}
+
+// 處理圖片發送完成
+const handleImageSent = () => {
+  // 滾動到底部
+  nextTick(() => {
+    scrollToBottom()
+  })
 }
 
 // 發送訊息
