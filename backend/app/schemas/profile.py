@@ -1,5 +1,5 @@
 """個人檔案相關的 Pydantic Schemas"""
-from pydantic import BaseModel, ConfigDict, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, ValidationInfo
 from datetime import datetime
 from typing import Optional, List
 from enum import Enum
@@ -79,11 +79,12 @@ class ProfileUpdateRequest(BaseModel):
     max_distance_km: Optional[int] = Field(None, ge=1, le=500, description="最大距離（公里）")
     gender_preference: Optional[GenderPreferenceEnum] = Field(None, description="性別偏好")
 
-    @validator("max_age_preference")
-    def validate_age_range(cls, v, values):
+    @field_validator("max_age_preference")
+    @classmethod
+    def validate_age_range(cls, v: Optional[int], info: ValidationInfo) -> Optional[int]:
         """驗證年齡範圍"""
-        if "min_age_preference" in values and v is not None:
-            if v < values["min_age_preference"]:
+        if info.data.get("min_age_preference") is not None and v is not None:
+            if v < info.data["min_age_preference"]:
                 raise ValueError("最大年齡必須大於或等於最小年齡")
         return v
 

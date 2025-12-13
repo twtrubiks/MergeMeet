@@ -1,5 +1,5 @@
 """認證相關的 Pydantic Schemas"""
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from datetime import date, datetime
 from typing import Optional
 import re
@@ -19,8 +19,9 @@ class RegisterRequest(BaseModel):
     password: str = Field(..., min_length=8, max_length=50, description="密碼（至少 8 個字元）")
     date_of_birth: date = Field(..., description="出生日期（用於年齡驗證）")
 
-    @validator("password")
-    def validate_password(cls, v):
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
         """驗證密碼強度
 
         要求:
@@ -147,8 +148,9 @@ class ResetPasswordRequest(BaseModel):
     token: str = Field(..., description="密碼重置 Token")
     new_password: str = Field(..., min_length=8, max_length=50, description="新密碼（至少 8 個字元）")
 
-    @validator("new_password")
-    def validate_password(cls, v):
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
         """驗證密碼強度（複用 RegisterRequest 的邏輯）"""
         if not re.search(r"[A-Z]", v):
             raise ValueError("密碼必須包含至少一個大寫字母")
