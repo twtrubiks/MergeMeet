@@ -70,8 +70,8 @@ backend/
 - [ ] **認證保護** - `Depends(get_current_user)`
 - [ ] **資料庫 Session** - `Depends(get_db)` Async
 - [ ] **回應模型** - `response_model` 參數
-- [ ] **測試** - pytest 覆蓋率 >80%
 - [ ] **文檔** - Docstring 說明
+- [ ] **複雜度檢查** - 函數複雜度 ≤ 10 (C901)
 
 ---
 
@@ -348,7 +348,30 @@ await db.refresh(profile)
 return profile
 ```
 
----
+### 錯誤 4: 函數複雜度過高 (C901)
+```python
+# ❌ 錯誤 - 過多巢狀導致複雜度 > 10
+def process(data):
+    if data:
+        for item in data["items"]:
+            if item.get("active"):
+                if item.get("value") > 0:
+                    for sub in item["subs"]:
+                        if sub.valid:
+                            ...  # 太深了！
+
+# ✅ 正確 - 提取小函數、使用 early return
+def is_valid(item) -> bool:
+    return item.get("active") and item.get("value", 0) > 0
+
+def process(data):
+    if not data:
+        return
+    for item in data["items"]:
+        if is_valid(item):
+            handle_subs(item["subs"])
+```
+> ⚠️ `max-complexity = 10`（`backend/setup.cfg`），用 `flake8 backend/` 檢查
 
 ## 🔗 相關 Skills
 
