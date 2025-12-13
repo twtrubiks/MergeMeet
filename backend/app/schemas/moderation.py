@@ -1,5 +1,5 @@
 """內容審核相關 Schema"""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 from datetime import datetime
 
@@ -32,6 +32,8 @@ class SensitiveWordUpdate(BaseModel):
 
 class SensitiveWordResponse(BaseModel):
     """敏感詞回應"""
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     word: str
     category: str
@@ -43,9 +45,6 @@ class SensitiveWordResponse(BaseModel):
     created_by: Optional[str]
     created_at: datetime
     updated_at: Optional[datetime]
-
-    class Config:
-        from_attributes = True
 
 
 class SensitiveWordListResponse(BaseModel):
@@ -72,6 +71,8 @@ class ContentAppealReview(BaseModel):
 
 class ContentAppealResponse(BaseModel):
     """申訴回應"""
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     user_id: str
     appeal_type: str
@@ -83,9 +84,6 @@ class ContentAppealResponse(BaseModel):
     reviewed_by: Optional[str]
     reviewed_at: Optional[datetime]
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class ContentAppealListResponse(BaseModel):
@@ -109,6 +107,8 @@ class ModerationLogCreate(BaseModel):
 
 class ModerationLogResponse(BaseModel):
     """審核日誌回應"""
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     user_id: str
     content_type: str
@@ -118,9 +118,6 @@ class ModerationLogResponse(BaseModel):
     triggered_word_ids: Optional[str]
     action_taken: str
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class ModerationLogListResponse(BaseModel):

@@ -1,11 +1,13 @@
 """管理後台相關 Schemas"""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
 from typing import Optional
 
 
 class DashboardStatsResponse(BaseModel):
     """管理後台統計數據"""
+    model_config = ConfigDict(from_attributes=True)
+
     total_users: int
     active_users: int
     banned_users: int
@@ -16,12 +18,11 @@ class DashboardStatsResponse(BaseModel):
     pending_reports: int
     total_blocked_users: int
 
-    class Config:
-        from_attributes = True
-
 
 class ReportDetailResponse(BaseModel):
     """舉報詳情"""
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     reporter_id: str
     reporter_email: str
@@ -36,9 +37,6 @@ class ReportDetailResponse(BaseModel):
     reviewed_at: Optional[datetime]
     reviewed_by: Optional[str]
 
-    class Config:
-        from_attributes = True
-
 
 class ReviewReportRequest(BaseModel):
     """處理舉報請求"""
@@ -49,6 +47,8 @@ class ReviewReportRequest(BaseModel):
 
 class UserManagementResponse(BaseModel):
     """用戶管理響應"""
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     email: str
     is_active: bool
@@ -59,9 +59,6 @@ class UserManagementResponse(BaseModel):
     banned_until: Optional[datetime]
     created_at: datetime
     email_verified: bool
-
-    class Config:
-        from_attributes = True
 
 
 class BanUserRequest(BaseModel):

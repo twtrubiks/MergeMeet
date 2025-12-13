@@ -1,10 +1,11 @@
 """應用程式配置"""
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 import os
 
 
 class Settings(BaseSettings):
     """應用程式設定"""
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
 
     # 專案資訊
     PROJECT_NAME: str = "MergeMeet"
@@ -66,10 +67,6 @@ class Settings(BaseSettings):
     PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = int(
         os.getenv("PASSWORD_RESET_TOKEN_EXPIRE_MINUTES", "30")
     )
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

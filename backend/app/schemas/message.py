@@ -1,11 +1,13 @@
 """訊息相關 Schema"""
-from pydantic import BaseModel, Field, UUID4
+from pydantic import BaseModel, ConfigDict, Field, UUID4
 from datetime import datetime
 from typing import Optional, List
 
 
 class MessageResponse(BaseModel):
     """訊息回應"""
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID4
     match_id: UUID4
     sender_id: UUID4
@@ -13,9 +15,6 @@ class MessageResponse(BaseModel):
     message_type: str
     is_read: Optional[datetime] = None
     sent_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class ChatHistoryResponse(BaseModel):
@@ -33,6 +32,8 @@ class ChatHistoryResponse(BaseModel):
 
 class MatchWithLastMessageResponse(BaseModel):
     """配對與最後一條訊息"""
+    model_config = ConfigDict(from_attributes=True)
+
     match_id: UUID4
     other_user_id: UUID4
     other_user_name: str
@@ -40,9 +41,6 @@ class MatchWithLastMessageResponse(BaseModel):
     last_message: Optional[MessageResponse] = None
     unread_count: int
     matched_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class SendMessageRequest(BaseModel):

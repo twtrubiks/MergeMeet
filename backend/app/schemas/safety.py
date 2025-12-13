@@ -1,5 +1,5 @@
 """安全功能相關 Schema"""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
 from datetime import datetime
 
@@ -15,14 +15,13 @@ class UnblockUserRequest(BaseModel):
 
 class BlockedUserResponse(BaseModel):
     """封鎖用戶回應"""
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     blocked_user_id: str
     blocked_user_email: str
     reason: Optional[str]
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class ReportUserRequest(BaseModel):
@@ -35,12 +34,11 @@ class ReportUserRequest(BaseModel):
 
 class ReportResponse(BaseModel):
     """舉報回應"""
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     reported_user_id: str
     report_type: str
     reason: str
     status: str
     created_at: datetime
-
-    class Config:
-        from_attributes = True
