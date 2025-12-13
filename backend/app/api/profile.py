@@ -153,10 +153,7 @@ async def get_my_profile(
     """取得自己的個人檔案"""
     result = await db.execute(
         select(Profile)
-        .options(
-            selectinload(Profile.photos),
-            selectinload(Profile.interests)
-        )
+        .options(selectinload(Profile.photos), selectinload(Profile.interests))
         .where(Profile.user_id == current_user.id)
     )
     profile = result.scalar_one_or_none()
@@ -167,10 +164,80 @@ async def get_my_profile(
             detail="個人檔案不存在，請先建立"
         )
 
-    # 計算年齡
     age = calculate_age(current_user.date_of_birth)
+    return _build_profile_response(profile, age)
 
-    # 轉換照片
+
+# ========== update_profile 輔助函數 ==========
+
+
+async def _validate_bio_content(
+    db: AsyncSession, user_id: uuid.UUID, bio: str | None
+) -> tuple[bool, int, str | dict]:
+    """驗證個人簡介內容
+
+    Args:
+        db: 資料庫 session
+        user_id: 用戶 ID
+        bio: 個人簡介內容
+
+    Returns:
+        (is_valid, status_code, error_detail)
+    """
+    if bio is None:
+        return True, 0, ""
+
+    is_approved, violations, action = await ContentModerationService.check_profile_content(
+        db=db, user_id=user_id, bio=bio
+    )
+    if not is_approved:
+        return False, status.HTTP_400_BAD_REQUEST, {
+            "message": "個人簡介包含不當內容",
+            "violations": violations,
+            "action": action
+        }
+    return True, 0, ""
+
+
+def _apply_profile_updates(profile: Profile, request: ProfileUpdateRequest) -> None:
+    """套用所有欄位更新到 profile
+
+    Args:
+        profile: 個人檔案對象
+        request: 更新請求
+    """
+    if request.display_name is not None:
+        profile.display_name = request.display_name
+    if request.gender is not None:
+        profile.gender = request.gender.value
+    if request.bio is not None:
+        profile.bio = request.bio
+    if request.location is not None:
+        profile.location = ST_SetSRID(
+            ST_MakePoint(request.location.longitude, request.location.latitude),
+            4326
+        )
+        profile.location_name = request.location.location_name
+    if request.min_age_preference is not None:
+        profile.min_age_preference = request.min_age_preference
+    if request.max_age_preference is not None:
+        profile.max_age_preference = request.max_age_preference
+    if request.max_distance_km is not None:
+        profile.max_distance_km = request.max_distance_km
+    if request.gender_preference is not None:
+        profile.gender_preference = request.gender_preference.value
+
+
+def _build_profile_response(profile: Profile, age: int) -> ProfileResponse:
+    """構建 ProfileResponse（共用輔助函數）
+
+    Args:
+        profile: 個人檔案對象（需預載入 photos 和 interests）
+        age: 用戶年齡
+
+    Returns:
+        ProfileResponse 對象
+    """
     photos = [
         PhotoResponse(
             id=str(photo.id),
@@ -183,7 +250,6 @@ async def get_my_profile(
         for photo in profile.photos
     ]
 
-    # 轉換興趣標籤
     interests = [
         InterestTagResponse(
             id=str(tag.id),
@@ -222,12 +288,10 @@ async def update_profile(
     db: AsyncSession = Depends(get_db)
 ):
     """更新個人檔案"""
+    # 1. 取得 profile
     result = await db.execute(
         select(Profile)
-        .options(
-            selectinload(Profile.photos),
-            selectinload(Profile.interests)
-        )
+        .options(selectinload(Profile.photos), selectinload(Profile.interests))
         .where(Profile.user_id == current_user.id)
     )
     profile = result.scalar_one_or_none()
@@ -238,97 +302,24 @@ async def update_profile(
             detail="個人檔案不存在，請先建立"
         )
 
-    # 內容審核：檢查個人簡介
-    if request.bio is not None:
-        is_approved, violations, action = await ContentModerationService.check_profile_content(
-            db=db,
-            user_id=current_user.id,
-            bio=request.bio
-        )
-        if not is_approved:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={
-                    "message": "個人簡介包含不當內容",
-                    "violations": violations,
-                    "action": action
-                }
-            )
+    # 2. 內容審核
+    is_valid, status_code, error = await _validate_bio_content(
+        db, current_user.id, request.bio
+    )
+    if not is_valid:
+        raise HTTPException(status_code=status_code, detail=error)
 
-    # 更新欄位
-    if request.display_name is not None:
-        profile.display_name = request.display_name
-    if request.gender is not None:
-        profile.gender = request.gender.value
-    if request.bio is not None:
-        profile.bio = request.bio
-    if request.location is not None:
-        # 使用 GeoAlchemy2 函數避免 SQL 注入
-        profile.location = ST_SetSRID(
-            ST_MakePoint(request.location.longitude, request.location.latitude),
-            4326
-        )
-        profile.location_name = request.location.location_name
-    if request.min_age_preference is not None:
-        profile.min_age_preference = request.min_age_preference
-    if request.max_age_preference is not None:
-        profile.max_age_preference = request.max_age_preference
-    if request.max_distance_km is not None:
-        profile.max_distance_km = request.max_distance_km
-    if request.gender_preference is not None:
-        profile.gender_preference = request.gender_preference.value
+    # 3. 套用更新
+    _apply_profile_updates(profile, request)
 
-    # 檢查檔案完整度
+    # 4. 檢查完整度並儲存
     profile.is_complete = check_profile_completeness(profile)
-
     await db.commit()
     await db.refresh(profile)
 
-    # 計算年齡
+    # 5. 回傳響應
     age = calculate_age(current_user.date_of_birth)
-
-    # 轉換照片和興趣
-    photos = [
-        PhotoResponse(
-            id=str(photo.id),
-            url=photo.url,
-            thumbnail_url=photo.thumbnail_url,
-            display_order=photo.display_order,
-            is_profile_picture=photo.is_profile_picture,
-            created_at=photo.created_at
-        )
-        for photo in profile.photos
-    ]
-
-    interests = [
-        InterestTagResponse(
-            id=str(tag.id),
-            name=tag.name,
-            category=tag.category,
-            icon=tag.icon
-        )
-        for tag in profile.interests
-    ]
-
-    return ProfileResponse(
-        id=str(profile.id),
-        user_id=str(profile.user_id),
-        display_name=profile.display_name,
-        gender=profile.gender,
-        bio=profile.bio,
-        location_name=profile.location_name,
-        age=age,
-        min_age_preference=profile.min_age_preference,
-        max_age_preference=profile.max_age_preference,
-        max_distance_km=profile.max_distance_km,
-        gender_preference=profile.gender_preference,
-        is_complete=profile.is_complete,
-        is_visible=profile.is_visible,
-        photos=photos,
-        interests=interests,
-        created_at=profile.created_at,
-        updated_at=profile.updated_at,
-    )
+    return _build_profile_response(profile, age)
 
 
 @router.put("/interests", response_model=ProfileResponse)
@@ -341,10 +332,7 @@ async def update_interests(
     # 取得檔案
     result = await db.execute(
         select(Profile)
-        .options(
-            selectinload(Profile.photos),
-            selectinload(Profile.interests)
-        )
+        .options(selectinload(Profile.photos), selectinload(Profile.interests))
         .where(Profile.user_id == current_user.id)
     )
     profile = result.scalar_one_or_none()
@@ -379,57 +367,14 @@ async def update_interests(
     # 更新興趣標籤
     profile.interests = list(tags)
 
-    # 檢查檔案完整度
+    # 檢查檔案完整度並儲存
     profile.is_complete = check_profile_completeness(profile)
-
     await db.commit()
     await db.refresh(profile)
 
-    # 計算年齡
+    # 回傳響應
     age = calculate_age(current_user.date_of_birth)
-
-    # 轉換照片和興趣
-    photos = [
-        PhotoResponse(
-            id=str(photo.id),
-            url=photo.url,
-            thumbnail_url=photo.thumbnail_url,
-            display_order=photo.display_order,
-            is_profile_picture=photo.is_profile_picture,
-            created_at=photo.created_at
-        )
-        for photo in profile.photos
-    ]
-
-    interests = [
-        InterestTagResponse(
-            id=str(tag.id),
-            name=tag.name,
-            category=tag.category,
-            icon=tag.icon
-        )
-        for tag in profile.interests
-    ]
-
-    return ProfileResponse(
-        id=str(profile.id),
-        user_id=str(profile.user_id),
-        display_name=profile.display_name,
-        gender=profile.gender,
-        bio=profile.bio,
-        location_name=profile.location_name,
-        age=age,
-        min_age_preference=profile.min_age_preference,
-        max_age_preference=profile.max_age_preference,
-        max_distance_km=profile.max_distance_km,
-        gender_preference=profile.gender_preference,
-        is_complete=profile.is_complete,
-        is_visible=profile.is_visible,
-        photos=photos,
-        interests=interests,
-        created_at=profile.created_at,
-        updated_at=profile.updated_at,
-    )
+    return _build_profile_response(profile, age)
 
 
 # ========== upload_photo 輔助函數 ==========
