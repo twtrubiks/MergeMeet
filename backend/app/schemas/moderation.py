@@ -2,6 +2,7 @@
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 from datetime import datetime
+from uuid import UUID
 
 
 # ============ Sensitive Word Schemas ============
@@ -34,7 +35,7 @@ class SensitiveWordResponse(BaseModel):
     """敏感詞回應"""
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
+    id: UUID
     word: str
     category: str
     severity: str
@@ -42,7 +43,7 @@ class SensitiveWordResponse(BaseModel):
     is_regex: bool
     description: Optional[str]
     is_active: bool
-    created_by: Optional[str]
+    created_by: Optional[UUID]
     created_at: datetime
     updated_at: Optional[datetime]
 
@@ -73,15 +74,15 @@ class ContentAppealResponse(BaseModel):
     """申訴回應"""
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
-    user_id: str
+    id: UUID
+    user_id: UUID
     appeal_type: str
     rejected_content: str
     violations: str
     reason: str
     status: str
     admin_response: Optional[str]
-    reviewed_by: Optional[str]
+    reviewed_by: Optional[UUID]
     reviewed_at: Optional[datetime]
     created_at: datetime
 
@@ -109,8 +110,8 @@ class ModerationLogResponse(BaseModel):
     """審核日誌回應"""
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
-    user_id: str
+    id: UUID
+    user_id: UUID
     content_type: str
     original_content: str
     is_approved: bool
