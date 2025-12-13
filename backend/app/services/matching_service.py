@@ -3,6 +3,73 @@ from typing import Dict, List
 from datetime import datetime, timezone
 
 
+def _calculate_distance_score(distance_km: float) -> float:
+    """計算距離分數（最高 20 分）
+
+    Args:
+        distance_km: 距離（公里）
+
+    Returns:
+        距離分數
+    """
+    if distance_km < 5:
+        return 20
+    if distance_km < 10:
+        return 15
+    if distance_km < 25:
+        return 10
+    if distance_km < 50:
+        return 5
+    return 0
+
+
+def _calculate_activity_score(last_active) -> float:
+    """計算活躍度分數（最高 20 分）
+
+    Args:
+        last_active: 最後活躍時間
+
+    Returns:
+        活躍度分數
+    """
+    if not last_active:
+        return 0
+
+    if isinstance(last_active, str):
+        last_active = datetime.fromisoformat(last_active.replace('Z', '+00:00'))
+
+    hours_ago = (datetime.now(timezone.utc) - last_active).total_seconds() / 3600
+
+    if hours_ago < 1:
+        return 20
+    if hours_ago < 24:
+        return 15
+    if hours_ago < 72:
+        return 10
+    if hours_ago < 168:  # 7天
+        return 5
+    return 0
+
+
+def _calculate_completeness_score(candidate: Dict) -> float:
+    """計算檔案完整度分數（最高 10 分）
+
+    Args:
+        candidate: 候選人資料
+
+    Returns:
+        完整度分數
+    """
+    score = 0.0
+    # 照片：每張 1 分，最多 6 分
+    photo_count = candidate.get("photo_count", 0)
+    score += min(photo_count, 6)
+    # 自我介紹：4 分
+    if candidate.get("bio"):
+        score += 4
+    return score
+
+
 class MatchingService:
     """配對推薦服務"""
 
@@ -33,49 +100,16 @@ class MatchingService:
         user_interests = set(user_profile.get("interests", []))
         candidate_interests = set(candidate.get("interests", []))
         common_interests = user_interests & candidate_interests
-
-        # 每個共同興趣 10 分，最多 5 個共同興趣
         score += min(len(common_interests) * 10, 50)
 
         # 2. 距離因素（最高 20 分）
-        distance_km = candidate.get("distance_km", 999)
-
-        if distance_km < 5:
-            score += 20
-        elif distance_km < 10:
-            score += 15
-        elif distance_km < 25:
-            score += 10
-        elif distance_km < 50:
-            score += 5
+        score += _calculate_distance_score(candidate.get("distance_km", 999))
 
         # 3. 活躍度（最高 20 分）
-        last_active = candidate.get("last_active")
-        if last_active:
-            if isinstance(last_active, str):
-                last_active = datetime.fromisoformat(last_active.replace('Z', '+00:00'))
-
-            # 統一使用 UTC 時區進行比較
-            hours_ago = (datetime.now(timezone.utc) - last_active).total_seconds() / 3600
-
-            if hours_ago < 1:
-                score += 20
-            elif hours_ago < 24:
-                score += 15
-            elif hours_ago < 72:
-                score += 10
-            elif hours_ago < 168:  # 7天
-                score += 5
+        score += _calculate_activity_score(candidate.get("last_active"))
 
         # 4. 檔案完整度（最高 10 分）
-        photo_count = candidate.get("photo_count", 0)
-        has_bio = bool(candidate.get("bio"))
-
-        # 照片：每張 1 分，最多 6 分
-        score += min(photo_count, 6)
-
-        # 自我介紹：4 分
-        score += 4 if has_bio else 0
+        score += _calculate_completeness_score(candidate)
 
         return min(score, 100)
 
