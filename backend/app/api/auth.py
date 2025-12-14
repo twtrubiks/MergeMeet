@@ -231,6 +231,23 @@ verification_codes = VerificationCodeStore(ttl_minutes=10)
 
 # Email 發送速率限制（防止濫用）
 # 格式: {email: (last_sent_time, send_count_today)}
+#
+# TODO [Redis 擴展] 多實例部署時需改用 Redis
+# 目前使用內存存儲，僅支援單實例部署。
+# 如需水平擴展，建議改用 Redis 實現：
+#
+# Redis Key 設計：
+# - email_rate:{email}:last_sent - 上次發送時間戳 (Unix timestamp)
+# - email_rate:{email}:count - 今日發送次數 (integer, TTL: 到午夜)
+#
+# 實現參考：
+# class EmailRateLimiter:
+#     async def check_and_record(self, email: str) -> bool:
+#         key_last = f"email_rate:{email}:last_sent"
+#         key_count = f"email_rate:{email}:count"
+#         # 使用 Redis MULTI/EXEC 確保原子性
+#         # ...
+#
 email_rate_limit: Dict[str, Tuple[datetime, int]] = {}
 email_rate_limit_lock = asyncio.Lock()
 

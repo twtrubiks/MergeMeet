@@ -1,11 +1,32 @@
 """WebSocket 連接管理器
 
-Redis 整合備註（暫未使用）：
-- 目前使用內存管理連接，僅支援單實例部署
-- 生產環境如需水平擴展，可整合 Redis Pub/Sub：
-  - 發送訊息: redis.publish(f"match:{match_id}", message)
-  - 訂閱頻道: redis.subscribe(f"match:{match_id}")
-- 可實現跨實例的即時訊息廣播
+TODO [Redis 擴展] 多實例部署時需整合 Redis
+
+目前使用內存管理連接，僅支援單實例部署。
+生產環境如需水平擴展，需要整合 Redis Pub/Sub 和在線狀態存儲：
+
+1. Redis Pub/Sub（跨實例訊息廣播）：
+   - 發送訊息: await redis.publish(f"ws:match:{match_id}", json.dumps(message))
+   - 訂閱頻道: pubsub = redis.pubsub(); await pubsub.subscribe(f"ws:match:{match_id}")
+   - 每個實例訂閱自己管理的 match 頻道，收到訊息後轉發給本地連接
+
+2. 用戶在線狀態（跨實例查詢）：
+   Redis Key 設計：
+   - ws:online:{user_id} - 用戶在線狀態 (value: instance_id, TTL: 心跳間隔*2)
+   - ws:instance:{instance_id}:users - 該實例管理的用戶集合 (Set)
+
+3. 配對房間成員（跨實例管理）：
+   Redis Key 設計：
+   - ws:room:{match_id} - 房間成員 (Set: user_ids)
+
+實現參考：
+class RedisConnectionManager:
+    async def is_online(self, user_id: str) -> bool:
+        return await redis.exists(f"ws:online:{user_id}") > 0
+
+    async def send_to_match(self, match_id: str, message: dict):
+        # 發布到 Redis 頻道，所有實例都會收到
+        await redis.publish(f"ws:match:{match_id}", json.dumps(message))
 """
 from fastapi import WebSocket
 from typing import Dict, List, Optional

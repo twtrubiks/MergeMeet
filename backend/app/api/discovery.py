@@ -1,4 +1,30 @@
-"""探索與配對 API"""
+"""探索與配對 API
+
+TODO [Redis 擴展] 效能優化時可加入 Redis 快取
+
+目前每次請求都直接查詢資料庫。當用戶量增加、查詢效能成為瓶頸時，
+可以考慮使用 Redis 快取以下資料：
+
+1. 推薦用戶快取（browse_users）：
+   Redis Key 設計：
+   - discovery:browse:{user_id}:{hash(偏好設定)} - 推薦用戶 ID 列表 (List, TTL: 5-10 分鐘)
+   - 當用戶更新偏好設定時，清除該用戶的快取
+
+2. 配對列表快取（get_matches）：
+   Redis Key 設計：
+   - discovery:matches:{user_id} - 配對摘要 JSON (String, TTL: 1-2 分鐘)
+   - 當有新配對、配對狀態變更、新訊息時，清除相關用戶的快取
+
+3. 熱門用戶快取：
+   Redis Key 設計：
+   - discovery:popular - 熱門用戶 ID 列表 (Sorted Set by 活躍度分數)
+   - 定期更新（每小時）
+
+快取失效策略：
+- 用戶互動（like/pass/unmatch）時主動清除相關快取
+- 使用較短的 TTL 確保資料新鮮度
+- 可考慮使用 Redis 的 pub/sub 做跨實例快取失效通知
+"""
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func, case, delete
