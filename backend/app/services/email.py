@@ -256,3 +256,95 @@ Hi {username},
             html_content=html_content,
             text_content=text_content
         )
+
+    @staticmethod
+    async def send_password_changed_email(
+        to_email: str,
+        username: str
+    ) -> bool:
+        """
+        發送密碼變更通知郵件
+
+        Args:
+            to_email: 收件人 Email
+            username: 用戶名稱
+
+        Returns:
+            bool: 是否成功發送
+        """
+        from datetime import datetime
+
+        change_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        html_content = f"""  # noqa: E501
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }}
+        .container {{ max-width: 600px; margin: 20px auto; padding: 0; }}
+        .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0; }}
+        .header h1 {{ margin: 0; font-size: 28px; font-weight: 600; }}
+        .content {{ background: white; padding: 40px 30px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }}
+        .info-box {{ background: #e8f5e9; border-left: 4px solid #4caf50; padding: 16px; margin: 24px 0; border-radius: 0 8px 8px 0; }}
+        .warning {{ background: #fff3cd; border-left: 4px solid #ffc107; padding: 16px; margin: 24px 0; border-radius: 0 8px 8px 0; }}
+        .warning strong {{ color: #856404; }}
+        .footer {{ text-align: center; color: #999; font-size: 12px; margin-top: 30px; padding: 20px; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔒 密碼已變更</h1>
+        </div>
+        <div class="content">
+            <p>Hi <strong>{username}</strong>,</p>
+            <p>您的 MergeMeet 帳號密碼已成功變更。</p>
+
+            <div class="info-box">
+                <p><strong>✅ 變更資訊：</strong></p>
+                <p>變更時間：{change_time}</p>
+            </div>
+
+            <div class="warning">
+                <p><strong>⚠️ 安全提醒：</strong></p>
+                <p>如果這不是您本人的操作，請立即：</p>
+                <ul style="margin: 8px 0; padding-left: 20px;">
+                    <li>使用「忘記密碼」功能重置密碼</li>
+                    <li>聯繫客服尋求協助</li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer">
+            <p>© 2025 MergeMeet. All rights reserved.</p>
+            <p>這是系統自動發送的郵件，請勿直接回覆。</p>
+        </div>
+    </div>
+</body>
+</html>
+        """
+
+        text_content = f"""
+Hi {username},
+
+您的 MergeMeet 帳號密碼已成功變更。
+
+變更時間：{change_time}
+
+⚠️ 安全提醒：
+如果這不是您本人的操作，請立即：
+- 使用「忘記密碼」功能重置密碼
+- 聯繫客服尋求協助
+
+© 2025 MergeMeet
+這是系統自動發送的郵件，請勿直接回覆。
+        """
+
+        return await EmailService.send_email(
+            to_email=to_email,
+            subject="🔒 MergeMeet - 密碼變更通知",
+            html_content=html_content,
+            text_content=text_content
+        )

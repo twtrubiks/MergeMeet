@@ -236,3 +236,294 @@ async def test_resend_verification(client: AsyncClient):
 
     assert response.status_code == 200
     assert "重新發送" in response.json()["message"]
+
+
+# ==================== 密碼修改功能測試 ====================
+
+
+@pytest.fixture
+async def user_for_password_change(client: AsyncClient):
+    """建立測試用戶（用於密碼修改測試）"""
+    response = await client.post("/api/auth/register", json={
+        "email": "pwdchange@example.com",
+        "password": "OldPassword123",
+        "date_of_birth": "1995-01-01"
+    })
+    assert response.status_code == 201
+    return {
+        "token": response.json()["access_token"],
+        "email": "pwdchange@example.com",
+        "password": "OldPassword123"
+    }
+
+
+# === 成功案例 ===
+
+
+@pytest.mark.asyncio
+async def test_change_password_success(client: AsyncClient, user_for_password_change: dict):
+    """測試密碼修改成功"""
+    token = user_for_password_change["token"]
+
+    response = await client.post(
+        "/api/auth/change-password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "current_password": "OldPassword123",
+            "new_password": "NewPassword456"
+        }
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "成功" in data["message"]
+    assert data["tokens_invalidated"] is True
+
+
+@pytest.mark.asyncio
+async def test_change_password_token_invalidated(client: AsyncClient, user_for_password_change: dict):
+    """測試修改密碼後原 Token 失效"""
+    token = user_for_password_change["token"]
+
+    # 修改密碼
+    response = await client.post(
+        "/api/auth/change-password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "current_password": "OldPassword123",
+            "new_password": "NewPassword456"
+        }
+    )
+    assert response.status_code == 200
+
+    # 使用舊 Token 存取 API 應失敗
+    response = await client.get(
+        "/api/profile",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_change_password_can_login_with_new(client: AsyncClient, user_for_password_change: dict):
+    """測試修改密碼後可用新密碼登入"""
+    token = user_for_password_change["token"]
+    email = user_for_password_change["email"]
+
+    # 修改密碼
+    await client.post(
+        "/api/auth/change-password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "current_password": "OldPassword123",
+            "new_password": "NewPassword456"
+        }
+    )
+
+    # 用新密碼登入
+    response = await client.post("/api/auth/login", json={
+        "email": email,
+        "password": "NewPassword456"
+    })
+    assert response.status_code == 200
+    assert "access_token" in response.json()
+
+
+@pytest.mark.asyncio
+async def test_change_password_cannot_login_with_old(client: AsyncClient, user_for_password_change: dict):
+    """測試修改密碼後舊密碼無法登入"""
+    token = user_for_password_change["token"]
+    email = user_for_password_change["email"]
+
+    # 修改密碼
+    await client.post(
+        "/api/auth/change-password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "current_password": "OldPassword123",
+            "new_password": "NewPassword456"
+        }
+    )
+
+    # 用舊密碼登入應失敗
+    response = await client.post("/api/auth/login", json={
+        "email": email,
+        "password": "OldPassword123"
+    })
+    assert response.status_code == 401
+
+
+# === 當前密碼驗證 ===
+
+
+@pytest.mark.asyncio
+async def test_change_password_wrong_current(client: AsyncClient, user_for_password_change: dict):
+    """測試當前密碼錯誤"""
+    token = user_for_password_change["token"]
+
+    response = await client.post(
+        "/api/auth/change-password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "current_password": "WrongPassword123",
+            "new_password": "NewPassword456"
+        }
+    )
+
+    assert response.status_code == 400
+    assert "當前密碼錯誤" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_change_password_empty_current(client: AsyncClient, user_for_password_change: dict):
+    """測試當前密碼為空"""
+    token = user_for_password_change["token"]
+
+    response = await client.post(
+        "/api/auth/change-password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "current_password": "",
+            "new_password": "NewPassword456"
+        }
+    )
+
+    assert response.status_code == 422
+
+
+# === 新密碼驗證 ===
+
+
+@pytest.mark.asyncio
+async def test_change_password_same_as_current(client: AsyncClient, user_for_password_change: dict):
+    """測試新密碼與舊密碼相同"""
+    token = user_for_password_change["token"]
+
+    response = await client.post(
+        "/api/auth/change-password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "current_password": "OldPassword123",
+            "new_password": "OldPassword123"
+        }
+    )
+
+    assert response.status_code == 400
+    assert "相同" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_change_password_too_short(client: AsyncClient, user_for_password_change: dict):
+    """測試新密碼少於 8 字元"""
+    token = user_for_password_change["token"]
+
+    response = await client.post(
+        "/api/auth/change-password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "current_password": "OldPassword123",
+            "new_password": "Short1"
+        }
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_change_password_no_uppercase(client: AsyncClient, user_for_password_change: dict):
+    """測試新密碼無大寫字母"""
+    token = user_for_password_change["token"]
+
+    response = await client.post(
+        "/api/auth/change-password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "current_password": "OldPassword123",
+            "new_password": "newpassword123"
+        }
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_change_password_no_lowercase(client: AsyncClient, user_for_password_change: dict):
+    """測試新密碼無小寫字母"""
+    token = user_for_password_change["token"]
+
+    response = await client.post(
+        "/api/auth/change-password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "current_password": "OldPassword123",
+            "new_password": "NEWPASSWORD123"
+        }
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_change_password_no_digit(client: AsyncClient, user_for_password_change: dict):
+    """測試新密碼無數字"""
+    token = user_for_password_change["token"]
+
+    response = await client.post(
+        "/api/auth/change-password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "current_password": "OldPassword123",
+            "new_password": "NewPasswordOnly"
+        }
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_change_password_weak(client: AsyncClient, user_for_password_change: dict):
+    """測試新密碼為弱密碼"""
+    token = user_for_password_change["token"]
+
+    response = await client.post(
+        "/api/auth/change-password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "current_password": "OldPassword123",
+            "new_password": "Password"  # 常見弱密碼
+        }
+    )
+
+    assert response.status_code == 422
+
+
+# === 認證 ===
+
+
+@pytest.mark.asyncio
+async def test_change_password_unauthorized(client: AsyncClient):
+    """測試未帶 Token 修改密碼"""
+    response = await client.post(
+        "/api/auth/change-password",
+        json={
+            "current_password": "OldPassword123",
+            "new_password": "NewPassword456"
+        }
+    )
+
+    assert response.status_code in [401, 403]
+
+
+@pytest.mark.asyncio
+async def test_change_password_invalid_token(client: AsyncClient):
+    """測試無效 Token 修改密碼"""
+    response = await client.post(
+        "/api/auth/change-password",
+        headers={"Authorization": "Bearer invalid_token_here"},
+        json={
+            "current_password": "OldPassword123",
+            "new_password": "NewPassword456"
+        }
+    )
+
+    assert response.status_code == 401

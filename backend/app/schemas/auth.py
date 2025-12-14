@@ -181,3 +181,50 @@ class VerifyResetTokenResponse(BaseModel):
 
     valid: bool = Field(..., description="Token 是否有效")
     email: Optional[str] = Field(None, description="關聯的 Email（僅當 valid=True 時返回）")
+
+
+class ChangePasswordRequest(BaseModel):
+    """修改密碼請求"""
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "current_password": "OldPassword123",
+            "new_password": "NewPassword456"
+        }
+    })
+
+    current_password: str = Field(..., min_length=1, description="當前密碼")
+    new_password: str = Field(..., min_length=8, max_length=50, description="新密碼（至少 8 個字元）")
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, v: str) -> str:
+        """驗證新密碼強度（複用 RegisterRequest 的邏輯）"""
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("密碼必須包含至少一個大寫字母")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("密碼必須包含至少一個小寫字母")
+        if not re.search(r"\d", v):
+            raise ValueError("密碼必須包含至少一個數字")
+
+        # 檢查常見弱密碼
+        weak_passwords = [
+            '12345678', 'password', 'qwerty123',
+            '11111111', '88888888', 'admin123', '1q2w3e4r'
+        ]
+        if v.lower() in weak_passwords:
+            raise ValueError("密碼太常見，請使用更強的密碼")
+
+        return v
+
+
+class ChangePasswordResponse(BaseModel):
+    """修改密碼回應"""
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "message": "密碼修改成功，請重新登入",
+            "tokens_invalidated": True
+        }
+    })
+
+    message: str = Field(..., description="結果訊息")
+    tokens_invalidated: bool = Field(..., description="是否已使所有 Token 失效")

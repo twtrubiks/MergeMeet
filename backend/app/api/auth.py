@@ -5,13 +5,7 @@
 已實現功能:
 - ✅ 登入失敗次數限制：5 次失敗後鎖定 15 分鐘（使用 Redis）
 - ✅ 密碼重置功能：發送郵件 + 重置 Token
-
-TODO: 未實現功能（上線前建議完成）
-
-1. 密碼修改功能（中優先級）
-   - POST /change-password: 修改密碼（需舊密碼驗證）
-   - 建議：禁止使用最近 3 次的密碼（密碼歷史檢查）
-   - 風險：用戶無法主動修改密碼
+- ✅ 密碼修改功能：POST /change-password（需舊密碼驗證，修改後 Token 失效）
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -47,6 +41,8 @@ from app.schemas.auth import (
     ForgotPasswordRequest,
     ResetPasswordRequest,
     VerifyResetTokenResponse,
+    ChangePasswordRequest,
+    ChangePasswordResponse,
 )
 from app.services.token_blacklist import token_blacklist
 from app.services.email import EmailService
@@ -921,3 +917,69 @@ async def reset_password(
     logger.info(f"Password reset successful for user: {mask_email(user.email)}")
 
     return {"message": "密碼重置成功，請使用新密碼登入"}
+
+
+@router.post("/change-password", response_model=ChangePasswordResponse)
+async def change_password(
+    request: ChangePasswordRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    修改密碼
+
+    已登入用戶修改自己的密碼：
+    - 驗證當前密碼
+    - 檢查新密碼不能與舊密碼相同
+    - 更新密碼
+    - 使當前 Token 失效（強制重新登入）
+    - 發送密碼變更通知 Email
+    """
+    # 1. 驗證當前密碼
+    if not verify_password(request.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="當前密碼錯誤"
+        )
+
+    # 2. 檢查新密碼不能與舊密碼相同
+    if verify_password(request.new_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="新密碼不能與當前密碼相同"
+        )
+
+    # 3. 更新密碼
+    current_user.password_hash = get_password_hash(request.new_password)
+    await db.commit()
+
+    # 4. 將當前 Token 加入黑名單（使其失效）
+    token = credentials.credentials
+    payload = decode_token(token)
+    if payload and payload.get("exp"):
+        expires_at = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+    else:
+        expires_at = datetime.now(timezone.utc) + timedelta(
+            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        )
+    await token_blacklist.add(token, expires_at)
+
+    # 5. 發送密碼變更通知 Email
+    username = current_user.email.split('@')[0]
+    email_sent = await EmailService.send_password_changed_email(
+        to_email=current_user.email,
+        username=username
+    )
+
+    if email_sent:
+        logger.info(f"Password changed notification sent to {mask_email(current_user.email)}")
+    else:
+        logger.warning(f"Failed to send password changed notification to {mask_email(current_user.email)}")
+
+    logger.info(f"Password changed for user: {mask_email(current_user.email)}")
+
+    return ChangePasswordResponse(
+        message="密碼修改成功，請重新登入",
+        tokens_invalidated=True
+    )
