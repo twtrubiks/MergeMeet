@@ -4,6 +4,7 @@ from app.models.profile import Profile, Photo, InterestTag, profile_interests
 from app.models.match import Like, Match, Message, BlockedUser
 from app.models.report import Report
 from app.models.moderation import SensitiveWord, ContentAppeal, ModerationLog
+from app.models.notification import Notification
 
 __all__ = [
     "User",
@@ -19,4 +20,5 @@ __all__ = [
     "SensitiveWord",
     "ContentAppeal",
     "ModerationLog",
+    "Notification",
 ]

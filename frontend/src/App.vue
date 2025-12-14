@@ -34,10 +34,10 @@ const notificationStore = useNotificationStore()
 const chatStore = useChatStore()
 
 // 初始化：從 token 恢復用戶資料
-onMounted(() => {
+onMounted(async () => {
   userStore.initializeFromToken()
 
-  // 初始化通知監聽器（註冊三種通知類型的處理器）
+  // 初始化通知監聯器（註冊三種通知類型的處理器）
   notificationStore.initNotificationListeners()
 
   // 初始化聊天訊息處理器
@@ -45,13 +45,29 @@ onMounted(() => {
 
   // 啟動全域 WebSocket 自動連接監聽
   wsStore.initAutoConnect()
+
+  // 若已登入，載入持久化通知
+  if (userStore.isAuthenticated) {
+    try {
+      await notificationStore.fetchNotifications()
+    } catch (error) {
+      console.error('Failed to fetch notifications:', error)
+    }
+  }
 })
 
-// 監聽用戶登出，重置相關 Store
+// 監聽登入/登出狀態變化
 watch(
   () => userStore.isAuthenticated,
-  (isAuth) => {
-    if (!isAuth) {
+  async (isAuth) => {
+    if (isAuth) {
+      // 用戶登入時，載入持久化通知
+      try {
+        await notificationStore.fetchNotifications()
+      } catch (error) {
+        console.error('Failed to fetch notifications on login:', error)
+      }
+    } else {
       // 用戶登出時，重置通知和聊天狀態
       notificationStore.$reset()
       chatStore.$reset()

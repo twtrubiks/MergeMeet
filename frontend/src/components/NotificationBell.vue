@@ -145,19 +145,30 @@ const getIconClass = (type) => {
  * 處理通知點擊
  * @param {object} notification - 通知物件
  */
-const handleNotificationClick = (notification) => {
-  // 標記為已讀
-  notificationStore.markAsRead(notification.id)
+const handleNotificationClick = async (notification) => {
+  // 標記為已讀（API 通知使用 API 方法，即時通知使用本地方法）
+  if (notification.fromAPI) {
+    try {
+      await notificationStore.markAsReadAPI(notification.id)
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error)
+    }
+  } else {
+    notificationStore.markAsRead(notification.id)
+  }
 
   // 關閉下拉選單
   showDropdown.value = false
 
   // 根據通知類型導航到對應頁面
+  // 注意：API 通知的 data 結構使用 snake_case (match_id)，WebSocket 通知使用 camelCase (matchId)
+  const matchId = notification.data?.matchId || notification.data?.match_id
+
   switch (notification.type) {
     case NotificationType.NEW_MESSAGE:
       // 【通知類型 1】新訊息 → 導航到聊天頁面
-      if (notification.data?.matchId) {
-        router.push(`/messages/${notification.data.matchId}`)
+      if (matchId) {
+        router.push(`/messages/${matchId}`)
       } else {
         router.push('/messages')
       }
@@ -165,8 +176,8 @@ const handleNotificationClick = (notification) => {
 
     case NotificationType.NEW_MATCH:
       // 【通知類型 2】新配對 → 導航到聊天頁面（開始對話）
-      if (notification.data?.matchId) {
-        router.push(`/messages/${notification.data.matchId}`)
+      if (matchId) {
+        router.push(`/messages/${matchId}`)
       } else {
         router.push('/matches')
       }
@@ -183,10 +194,16 @@ const handleNotificationClick = (notification) => {
 }
 
 /**
- * 標記全部已讀
+ * 標記全部已讀（呼叫 API）
  */
-const markAllRead = () => {
-  notificationStore.markAllAsRead()
+const markAllRead = async () => {
+  try {
+    await notificationStore.markAllAsReadAPI()
+  } catch (error) {
+    console.error('Failed to mark all notifications as read:', error)
+    // 降級：使用本地方法
+    notificationStore.markAllAsRead()
+  }
 }
 
 /**

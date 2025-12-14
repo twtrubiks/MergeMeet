@@ -40,6 +40,9 @@ mergemeet/
 - [FRONTEND_UNIT_TEST_PLAN.md](testing/FRONTEND_UNIT_TEST_PLAN.md) - 前端單元測試計劃
 - [COVERAGE_SUMMARY.md](testing/COVERAGE_SUMMARY.md) - 測試覆蓋率總結
 
+### 功能規劃文檔
+- [NOTIFICATION_PERSISTENCE_PLAN.md](NOTIFICATION_PERSISTENCE_PLAN.md) - 通知持久化功能 ✅ 已完成
+
 ### 測試報告
 - [MANUAL_TEST_REPORT_2025-11-14.md](reports/MANUAL_TEST_REPORT_2025-11-14.md) - 手動測試報告
 - [FRONTEND_MANUAL_TEST_REPORT_2025-11-14.md](reports/FRONTEND_MANUAL_TEST_REPORT_2025-11-14.md) - 前端手動測試
@@ -118,4 +121,4 @@ mergemeet/
 
 ---
 
-最後更新：2025-11-16
+最後更新：2025-12-14

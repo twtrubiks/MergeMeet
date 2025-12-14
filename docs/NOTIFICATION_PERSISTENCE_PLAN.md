@@ -1,8 +1,10 @@
 # 通知持久化功能規劃
 
-> **狀態**: 待實作
+> **狀態**: ✅ 已完成
 > **優先級**: 中
-> **預估工時**: 1-2 小時
+> **實作日期**: 2025-12-14
+> **實際工時**: ~2 小時
+> **實作方式**: TDD (測試驅動開發)
 
 ---
 
@@ -164,38 +166,42 @@ PUT /api/notifications/read-all
 
 ## 實作步驟
 
-### Phase 1: 後端
+### Phase 1: 後端 ✅
 
 #### 1.1 新增 Model（新增檔案）
-- [ ] 建立 `app/models/notification.py`
-- [ ] 在 `app/models/__init__.py` 匯出 Notification
-- [ ] 在 `User` model 新增 `notifications` relationship
+- [x] 建立 `app/models/notification.py`
+- [x] 在 `app/models/__init__.py` 匯出 Notification
+- [x] 在 `User` model 新增 `notifications` relationship
 
 #### 1.2 資料庫遷移
-- [ ] 執行 `alembic revision --autogenerate -m "add notifications table"`
-- [ ] 執行 `alembic upgrade head`
+- [x] 執行 `alembic revision --autogenerate -m "add notifications table"`
+- [x] 執行 `alembic upgrade head`
 
 #### 1.3 新增 API（新增檔案）
-- [ ] 建立 `app/api/notifications.py`
-- [ ] 實作 5 個端點
-- [ ] 在 `app/api/__init__.py` 註冊路由
+- [x] 建立 `app/api/notifications.py`
+- [x] 實作 5 個端點
+- [x] 在 `app/main.py` 註冊路由
 
 #### 1.4 修改 WebSocket 通知發送
-- [ ] `app/api/discovery.py` - 發送 `notification_match` / `notification_liked` 時寫入 DB
-- [ ] `app/api/websocket.py` - 發送 `notification_message` 時寫入 DB
+- [x] `app/api/discovery.py` - 發送 `notification_match` / `notification_liked` 時寫入 DB
+- [x] `app/api/websocket.py` - 發送 `notification_message` 時寫入 DB
 
-### Phase 2: 前端
+### Phase 2: 前端 ✅
 
 #### 2.1 修改 Notification Store
-- [ ] 新增 `fetchNotifications()` 方法
-- [ ] 新增 `fetchUnreadCount()` 方法
-- [ ] 新增 `markAsReadAPI()` 方法（呼叫後端 API）
+- [x] 新增 `fetchNotifications()` 方法
+- [x] 新增 `fetchUnreadCount()` 方法
+- [x] 新增 `markAsReadAPI()` 方法（呼叫後端 API）
+- [x] 新增 `markAllAsReadAPI()` 方法
+- [x] 新增 `deleteNotificationAPI()` 方法
 
 #### 2.2 修改 App.vue
-- [ ] 在 `onMounted` 時呼叫 `fetchNotifications()`
+- [x] 在 `onMounted` 時呼叫 `fetchNotifications()`
+- [x] 監聽登入狀態，登入時載入通知
 
-#### 2.3 修改 NotificationBell.vue（可選）
-- [ ] 點擊「全部已讀」時呼叫後端 API
+#### 2.3 修改 NotificationBell.vue
+- [x] 點擊「全部已讀」時呼叫後端 API
+- [x] 點擊單個通知時呼叫後端 API 標記已讀
 
 ---
 
@@ -235,16 +241,25 @@ PUT /api/notifications/read-all
 
 ## 測試計畫
 
-### 後端測試
-- [ ] 建立通知 API 測試
-- [ ] 取得通知列表測試
-- [ ] 標記已讀測試
-- [ ] WebSocket 發送時自動建立通知測試
+### 後端測試 ✅ (17 個測試案例)
+- [x] 建立通知 API 測試
+- [x] 取得通知列表測試
+- [x] 標記已讀測試
+- [x] WebSocket 發送時自動建立通知測試
 
-### 前端測試
-- [ ] 頁面載入時取得通知
-- [ ] 重整後通知保留
-- [ ] 即時通知 + 持久化同時運作
+**測試檔案**: `backend/tests/test_notification_persistence.py`
+
+```python
+# 測試類別
+class TestNotificationModel:     # 5 個測試
+class TestNotificationAPI:       # 10 個測試
+class TestNotificationAutoCreate: # 2 個測試
+```
+
+### 前端測試（手動驗證）✅
+- [x] 頁面載入時取得通知
+- [x] 重整後通知保留
+- [x] 即時通知 + 持久化同時運作
 
 ---
 

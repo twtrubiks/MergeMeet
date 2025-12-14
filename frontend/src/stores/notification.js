@@ -1,17 +1,26 @@
 /**
  * Notification Store
- * 管理即時通知狀態
+ * 管理即時通知狀態（含持久化）
  *
  * ========== 實作三種通知類型 ==========
  * 1. notification_message - 新訊息通知（接收者不在聊天室時）
  * 2. notification_match - 新配對通知（互相喜歡時）
  * 3. notification_liked - 有人喜歡你通知（單方喜歡時）
  * ========================================
+ *
+ * ========== API 端點 ==========
+ * GET  /api/notifications         - 取得通知列表（分頁）
+ * GET  /api/notifications/unread-count - 取得未讀數量
+ * PUT  /api/notifications/{id}/read    - 標記單個為已讀
+ * PUT  /api/notifications/read-all     - 標記全部已讀
+ * DELETE /api/notifications/{id}       - 刪除單個通知
+ * ==============================
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useWebSocketStore } from './websocket'
 import { logger } from '@/utils/logger'
+import apiClient from '@/api/client'
 
 // 通知類型常量
 export const NotificationType = {
@@ -234,6 +243,120 @@ export const useNotificationStore = defineStore('notification', () => {
     logger.debug('[Notification] Cleared all')
   }
 
+  // ========== API 方法（持久化） ==========
+
+  /**
+   * 從 API 載入通知
+   * @param {object} options - 查詢選項
+   * @param {number} options.limit - 每頁數量（預設 20）
+   * @param {number} options.offset - 偏移量（預設 0）
+   * @param {boolean} options.unreadOnly - 只取未讀（預設 false）
+   */
+  const fetchNotifications = async (options = {}) => {
+    const { limit = 20, offset = 0, unreadOnly = false } = options
+
+    loading.value = true
+    try {
+      const params = new URLSearchParams()
+      params.append('limit', limit)
+      params.append('offset', offset)
+      if (unreadOnly) params.append('unread_only', 'true')
+
+      const response = await apiClient.get(`/notifications?${params.toString()}`)
+      const data = response.data
+
+      // 將 API 回應轉換為前端格式
+      const apiNotifications = data.notifications.map(n => ({
+        id: n.id,
+        type: n.type,
+        title: n.title,
+        content: n.content,
+        data: n.data || {},
+        read: n.is_read,
+        createdAt: new Date(n.created_at),
+        // 用於區分 API 載入的通知和 WebSocket 即時通知
+        fromAPI: true
+      }))
+
+      // 如果是第一頁，覆蓋現有通知；否則追加
+      if (offset === 0) {
+        notifications.value = apiNotifications
+      } else {
+        notifications.value = [...notifications.value, ...apiNotifications]
+      }
+
+      logger.debug('[Notification] Fetched from API:', apiNotifications.length, 'total:', data.total)
+      return data
+    } catch (error) {
+      logger.error('[Notification] Failed to fetch:', error)
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * 取得未讀通知數量
+   * @returns {Promise<number>} 未讀數量
+   */
+  const fetchUnreadCount = async () => {
+    try {
+      const response = await apiClient.get('/notifications/unread-count')
+      logger.debug('[Notification] Unread count from API:', response.data.unread_count)
+      return response.data.unread_count
+    } catch (error) {
+      logger.error('[Notification] Failed to fetch unread count:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 呼叫 API 標記單個通知為已讀
+   * @param {string} notificationId - 通知 ID
+   */
+  const markAsReadAPI = async (notificationId) => {
+    try {
+      await apiClient.put(`/notifications/${notificationId}/read`)
+      // 同步更新本地狀態
+      markAsRead(notificationId)
+      logger.debug('[Notification] Marked as read via API:', notificationId)
+    } catch (error) {
+      logger.error('[Notification] Failed to mark as read:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 呼叫 API 標記全部通知為已讀
+   */
+  const markAllAsReadAPI = async () => {
+    try {
+      await apiClient.put('/notifications/read-all')
+      // 同步更新本地狀態
+      markAllAsRead()
+      logger.debug('[Notification] Marked all as read via API')
+    } catch (error) {
+      logger.error('[Notification] Failed to mark all as read:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 呼叫 API 刪除單個通知
+   * @param {string} notificationId - 通知 ID
+   */
+  const deleteNotificationAPI = async (notificationId) => {
+    try {
+      await apiClient.delete(`/notifications/${notificationId}`)
+      // 同步更新本地狀態
+      removeNotification(notificationId)
+      logger.debug('[Notification] Deleted via API:', notificationId)
+    } catch (error) {
+      logger.error('[Notification] Failed to delete:', error)
+      throw error
+    }
+  }
+
   /**
    * 重置 Store
    */
@@ -260,6 +383,13 @@ export const useNotificationStore = defineStore('notification', () => {
     removeNotification,
     clearAll,
     $reset,
+
+    // API Methods
+    fetchNotifications,
+    fetchUnreadCount,
+    markAsReadAPI,
+    markAllAsReadAPI,
+    deleteNotificationAPI,
 
     // Constants
     NotificationType

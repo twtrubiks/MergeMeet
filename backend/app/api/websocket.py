@@ -22,6 +22,7 @@ from app.websocket.manager import manager
 from app.models.match import Message, Match
 from app.models.user import User
 from app.models.profile import Profile
+from app.models.notification import Notification
 from app.services.content_moderation import ContentModerationService
 
 logger = logging.getLogger(__name__)
@@ -252,7 +253,7 @@ async def _send_message_notification(
     message: Message,
     db
 ) -> None:
-    """如果接收者不在聊天室，發送通知
+    """如果接收者不在聊天室，發送通知（含持久化）
 
     Args:
         match: 配對對象
@@ -283,6 +284,24 @@ async def _send_message_notification(
     else:
         preview = message.content[:50] + "..." if len(message.content) > 50 else message.content
 
+    # 持久化通知到資料庫
+    notification = Notification(
+        user_id=receiver_id,
+        type="notification_message",
+        title=f"{sender_name} 傳來新訊息",
+        content=preview,
+        data={
+            "match_id": str(match.id),
+            "sender_id": str(sender_id),
+            "sender_name": sender_name,
+            "message_id": str(message.id)
+        }
+    )
+    db.add(notification)
+    await db.commit()
+    logger.info(f"Persisted notification_message for user {receiver_id_str}")
+
+    # 發送 WebSocket 通知
     await manager.send_personal_message(
         receiver_id_str,
         {

@@ -42,6 +42,7 @@ from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.models.profile import Profile
 from app.models.match import Like, Match, BlockedUser, Message, Pass
+from app.models.notification import Notification
 from app.schemas.discovery import ProfileCard, LikeResponse, MatchSummary
 from app.services.matching_service import matching_service
 
@@ -444,7 +445,7 @@ async def _send_like_notifications(
     target_user_id: uuid.UUID,
     db: AsyncSession
 ) -> None:
-    """發送喜歡/配對通知
+    """發送喜歡/配對通知（含持久化）
 
     Args:
         is_match: 是否為配對
@@ -474,33 +475,66 @@ async def _send_like_notifications(
         )
         target_profile = target_profile_result.scalar_one_or_none()
 
-        # 發送通知給對方（配對成功）
+        current_name = current_profile.display_name if current_profile else "用戶"
+        target_name = target_profile.display_name if target_profile else "用戶"
+        current_avatar = _get_user_avatar(current_profile)
+        target_avatar = _get_user_avatar(target_profile)
+
+        # 持久化通知到資料庫（給對方）
+        notification_for_target = Notification(
+            user_id=target_user_id,
+            type="notification_match",
+            title="新配對成功！",
+            content=f"你和 {current_name} 配對成功了！",
+            data={
+                "match_id": str(match_id),
+                "matched_user_id": str(current_user_id),
+                "matched_user_name": current_name,
+                "matched_user_avatar": current_avatar
+            }
+        )
+        db.add(notification_for_target)
+
+        # 持久化通知到資料庫（給當前用戶）
+        notification_for_current = Notification(
+            user_id=current_user_id,
+            type="notification_match",
+            title="新配對成功！",
+            content=f"你和 {target_name} 配對成功了！",
+            data={
+                "match_id": str(match_id),
+                "matched_user_id": str(target_user_id),
+                "matched_user_name": target_name,
+                "matched_user_avatar": target_avatar
+            }
+        )
+        db.add(notification_for_current)
+        await db.commit()
+        logger.info(f"Persisted notification_match for users {target_user_id} and {current_user_id}")
+
+        # 發送 WebSocket 通知給對方（配對成功）
         await manager.send_personal_message(
             str(target_user_id),
             {
                 "type": "notification_match",
                 "match_id": str(match_id),
                 "matched_user_id": str(current_user_id),
-                "matched_user_name": (
-                    current_profile.display_name if current_profile else "用戶"
-                ),
-                "matched_user_avatar": _get_user_avatar(current_profile),
+                "matched_user_name": current_name,
+                "matched_user_avatar": current_avatar,
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
         )
         logger.info(f"Sent notification_match to user {target_user_id} for match {match_id}")
 
-        # 發送通知給當前用戶（配對成功）
+        # 發送 WebSocket 通知給當前用戶（配對成功）
         await manager.send_personal_message(
             str(current_user_id),
             {
                 "type": "notification_match",
                 "match_id": str(match_id),
                 "matched_user_id": str(target_user_id),
-                "matched_user_name": (
-                    target_profile.display_name if target_profile else "用戶"
-                ),
-                "matched_user_avatar": _get_user_avatar(target_profile),
+                "matched_user_name": target_name,
+                "matched_user_avatar": target_avatar,
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
         )
@@ -509,6 +543,20 @@ async def _send_like_notifications(
         # 【通知類型 2】有人喜歡你通知 (notification_liked)
         # 對方還沒喜歡我，發送「有人喜歡你」通知給對方
         # 注意：不透露是誰喜歡，保持神秘感
+
+        # 持久化通知到資料庫
+        notification_liked = Notification(
+            user_id=target_user_id,
+            type="notification_liked",
+            title="有人喜歡你！",
+            content="有人對你心動了，快去探索看看吧！",
+            data={}
+        )
+        db.add(notification_liked)
+        await db.commit()
+        logger.info(f"Persisted notification_liked for user {target_user_id}")
+
+        # 發送 WebSocket 通知
         await manager.send_personal_message(
             str(target_user_id),
             {
