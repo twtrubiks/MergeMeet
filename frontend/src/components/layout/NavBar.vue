@@ -142,7 +142,7 @@ const handleUserMenuSelect = (key) => {
       router.push('/profile')
       break
     case 'settings':
-      router.push('/profile')  // 暫時導向 profile，未來可新增設定頁
+      router.push('/settings')
       break
     case 'logout':
       userStore.logout()

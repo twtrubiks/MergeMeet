@@ -79,4 +79,16 @@ export const authAPI = {
     })
     return response.data
   },
+
+  /**
+   * 修改密碼（已登入用戶）
+   * @param {Object} data - 密碼資料
+   * @param {string} data.current_password - 當前密碼
+   * @param {string} data.new_password - 新密碼
+   * @returns {Promise} 包含 message 和 tokens_invalidated
+   */
+  async changePassword(data) {
+    const response = await apiClient.post('/auth/change-password', data)
+    return response.data
+  },
 }
