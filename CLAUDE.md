@@ -85,11 +85,11 @@ await axios.get('/api/profile/')         // ❌ 404
 
 ```
 mergemeet/
-├── backend/              # FastAPI (8 模組, 8 模型, 70+ 測試)
+├── backend/              # FastAPI (9 模組, 9 模型, 265+ 測試)
 │   ├── app/api/         # API 路由
 │   ├── app/models/      # SQLAlchemy 模型
 │   └── tests/           # pytest 測試
-├── frontend/            # Vue 3 (5 組件, 11 頁面, 7 stores)
+├── frontend/            # Vue 3 (16 組件, 13 頁面, 7 stores)
 │   └── src/
 └── .claude/skills/      # Skills 配置
 ```
@@ -117,7 +117,8 @@ docker compose down -v && docker compose up -d
 
 - **README.md** - 專案總覽
 - **ARCHITECTURE.md** - 技術架構
-- **00_進度追蹤表.md** - 開發進度
+- **QUICKSTART.md** - 快速開始指南
+- **docs/INDEX.md** - 文檔索引
 - **Skill: mergemeet-quickstart** - 完整開發指南 ⭐
 
 ---
