@@ -52,7 +52,9 @@ def _calculate_activity_score(last_active) -> float:
 
 
 def _calculate_completeness_score(candidate: Dict) -> float:
-    """計算檔案完整度分數（最高 10 分）
+    """計算檔案完整度分數（最高 5 分）
+
+    權重調整：原 10 分改為 5 分，騰出 5 分給信任分數
 
     Args:
         candidate: 候選人資料
@@ -61,13 +63,40 @@ def _calculate_completeness_score(candidate: Dict) -> float:
         完整度分數
     """
     score = 0.0
-    # 照片：每張 1 分，最多 6 分
+    # 照片：每張 0.5 分，最多 3 分
     photo_count = candidate.get("photo_count", 0)
-    score += min(photo_count, 6)
-    # 自我介紹：4 分
+    score += min(photo_count * 0.5, 3)
+    # 自我介紹：2 分
     if candidate.get("bio"):
-        score += 4
+        score += 2
     return score
+
+
+def _calculate_trust_score_weight(trust_score: int) -> float:
+    """計算信任分數權重（最高 5 分）
+
+    信任分數映射：
+    - trust_score >= 70: 5 分（高度信任）
+    - trust_score >= 50: 4 分（正常）
+    - trust_score >= 30: 2.5 分（需關注）
+    - trust_score >= 20: 1 分（受限）
+    - trust_score < 20: 0 分（高度可疑）
+
+    Args:
+        trust_score: 用戶信任分數 (0-100)
+
+    Returns:
+        信任權重分數
+    """
+    if trust_score >= 70:
+        return 5.0
+    if trust_score >= 50:
+        return 4.0
+    if trust_score >= 30:
+        return 2.5
+    if trust_score >= 20:
+        return 1.0
+    return 0.0
 
 
 class MatchingService:
@@ -81,11 +110,12 @@ class MatchingService:
         """
         計算配對分數
 
-        評分因素:
+        評分因素（總分 100 分）:
         - 興趣匹配: 50 分 (每個共同興趣 10 分)
         - 距離: 20 分
         - 活躍度: 20 分
-        - 檔案完整度: 10 分
+        - 檔案完整度: 5 分（原 10 分）
+        - 信任分數: 5 分（新增）
 
         Args:
             user_profile: 當前用戶的檔案資料
@@ -108,8 +138,12 @@ class MatchingService:
         # 3. 活躍度（最高 20 分）
         score += _calculate_activity_score(candidate.get("last_active"))
 
-        # 4. 檔案完整度（最高 10 分）
+        # 4. 檔案完整度（最高 5 分）
         score += _calculate_completeness_score(candidate)
+
+        # 5. 信任分數（最高 5 分）
+        trust_score = candidate.get("trust_score", 50)  # 預設 50 分
+        score += _calculate_trust_score_weight(trust_score)
 
         return min(score, 100)
 

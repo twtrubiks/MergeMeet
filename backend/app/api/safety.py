@@ -1,4 +1,5 @@
 """安全功能 API - 封鎖與舉報"""
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func
@@ -16,6 +17,9 @@ from app.schemas.safety import (
     ReportUserRequest,
     ReportResponse,
 )
+from app.services.trust_score import TrustScoreService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -98,6 +102,10 @@ async def block_user(
         match.unmatched_by = current_user.id
 
     await db.commit()
+
+    # 信任分數減分：被封鎖者 -2 分
+    await TrustScoreService.adjust_score(db, user_id, "blocked")
+    logger.info(f"Trust score -2 for user {user_id} (blocked)")
 
     return {
         "blocked": True,
@@ -249,6 +257,10 @@ async def report_user(
 
     await db.commit()
     await db.refresh(new_report)
+
+    # 信任分數減分：被舉報者 -5 分
+    await TrustScoreService.adjust_score(db, reported_user_uuid, "reported")
+    logger.info(f"Trust score -5 for user {reported_user_uuid} (reported)")
 
     return ReportResponse(
         id=str(new_report.id),

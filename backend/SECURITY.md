@@ -198,6 +198,37 @@ MergeMeet 使用 JWT (JSON Web Token) Bearer token 認證，而非 session cooki
    - 分頁限制（max 100 items）
    - 輸入長度限制
 
+## 信任分數系統（2025-12-14 新增）
+
+### 自動行為監控
+
+MergeMeet 使用信任分數系統自動追蹤用戶行為，維護平台安全。
+
+**核心機制**:
+- 分數範圍: 0-100（預設 50）
+- 正向行為加分：Email 驗證 +5、被喜歡 +1、配對 +2
+- 負向行為扣分：被舉報 -5、違規內容 -3、被封鎖 -2
+- 管理員確認舉報額外扣分 -10
+
+**安全應用**:
+
+1. **配對排序整合**
+   - 高信任用戶優先推薦（5 分權重）
+   - 低信任用戶（< 20 分）幾乎不被推薦
+
+2. **自動功能限制**
+   - 低信任用戶（< 20 分）每日訊息上限 20 則
+   - 使用 Redis 追蹤每日發送次數
+   - 防止垃圾訊息和騷擾行為
+
+3. **並發安全**
+   - 使用資料庫事務保證分數更新原子性
+   - 分數邊界保護（0-100）
+
+**實作位置**:
+- 服務層: `app/services/trust_score.py`
+- 測試: `tests/test_trust_score.py` (22 個測試案例)
+
 ## 安全配置清單
 
 ### ✅ 已實施
@@ -214,12 +245,13 @@ MergeMeet 使用 JWT (JSON Web Token) Bearer token 認證，而非 session cooki
 - [x] Email 脫敏
 - [x] 內容審核系統
 - [x] 輸入長度限制
+- [x] 登入失敗次數限制（Redis，5 次/15 分鐘）
+- [x] 信任分數系統（自動行為監控 + 功能限制）
 
 ### ⚠️ 建議改進
 
 - [ ] Content Security Policy (CSP) header
-- [ ] Rate limiting (API 速率限制)
-- [ ] 登入失敗次數限制
+- [ ] Rate limiting（API 速率限制，全局）
 - [ ] IP 黑名單機制
 - [ ] 安全 header (HSTS, X-Frame-Options, etc.)
 
@@ -253,5 +285,5 @@ MergeMeet 使用 JWT (JSON Web Token) Bearer token 認證，而非 session cooki
 
 ---
 
-**最後更新**: 2025-11-16
-**版本**: 1.0.0
+**最後更新**: 2025-12-14
+**版本**: 1.1.0（新增信任分數系統）

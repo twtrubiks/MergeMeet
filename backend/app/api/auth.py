@@ -48,6 +48,7 @@ from app.services.token_blacklist import token_blacklist
 from app.services.email import EmailService
 from app.services.redis_client import get_redis
 from app.services.login_limiter import LoginLimiter
+from app.services.trust_score import TrustScoreService
 import redis.asyncio as aioredis
 import secrets
 
@@ -706,6 +707,10 @@ async def verify_email(
 
     user.email_verified = True
     await db.commit()
+
+    # 信任分數加分：Email 驗證完成 +5
+    await TrustScoreService.adjust_score(db, user.id, "email_verified")
+    logger.info(f"Trust score increased for user {user.id} (email_verified)")
 
     # 刪除已使用的驗證碼
     await verification_codes.delete(request.email)

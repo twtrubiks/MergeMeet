@@ -1,4 +1,5 @@
 """管理後台 API"""
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -20,6 +21,9 @@ from app.schemas.admin import (
     BanUserRequest,
     UnbanUserRequest
 )
+from app.services.trust_score import TrustScoreService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -212,9 +216,17 @@ async def review_report(
                 user.ban_reason = f"舉報: {report.reason}"
             elif request.action == "WARNING":
                 user.warning_count += 1
-                user.trust_score = max(0, user.trust_score - 10)
 
     await db.commit()
+
+    # 舉報被確認時（APPROVED），額外扣分 -10
+    if request.status == "APPROVED":
+        await TrustScoreService.adjust_score(
+            db, report.reported_user_id, "report_confirmed"
+        )
+        logger.info(
+            f"Trust score -10 for user {report.reported_user_id} (report_confirmed)"
+        )
 
     return {
         "success": True,

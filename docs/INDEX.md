@@ -40,8 +40,9 @@ mergemeet/
 - [FRONTEND_UNIT_TEST_PLAN.md](testing/FRONTEND_UNIT_TEST_PLAN.md) - 前端單元測試計劃
 - [COVERAGE_SUMMARY.md](testing/COVERAGE_SUMMARY.md) - 測試覆蓋率總結
 
-### 功能規劃文檔
+### 功能規劃與實作文檔
 - [NOTIFICATION_PERSISTENCE_PLAN.md](NOTIFICATION_PERSISTENCE_PLAN.md) - 通知持久化功能 ✅ 已完成
+- [TRUST_SCORE_SYSTEM.md](TRUST_SCORE_SYSTEM.md) - 信任分數系統 ✅ 已完成（2025-12-14）
 
 ### 測試報告
 - [MANUAL_TEST_REPORT_2025-11-14.md](reports/MANUAL_TEST_REPORT_2025-11-14.md) - 手動測試報告
@@ -85,11 +86,12 @@ mergemeet/
 ## 📊 文檔統計
 
 - **核心文檔**: 4 份（根目錄）
+- **功能實作文檔**: 2 份（通知持久化 + 信任分數系統）
 - **測試指南**: 5 份
 - **測試報告**: 6 份
 - **Bug 修復記錄**: 12 份
 - **審查報告**: 4 份
-- **總計**: 31 份文檔
+- **總計**: 33 份文檔
 
 ---
 

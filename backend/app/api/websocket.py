@@ -24,6 +24,8 @@ from app.models.user import User
 from app.models.profile import Profile
 from app.models.notification import Notification
 from app.services.content_moderation import ContentModerationService
+from app.services.trust_score import TrustScoreService
+from app.services.redis_client import redis_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -193,9 +195,64 @@ async def _record_content_violation(sender_id: uuid.UUID, db) -> None:
             logger.info(
                 f"User {sender_id} warning count increased to {user.warning_count}"
             )
+
+            # 信任分數減分：內容違規 -3 分
+            await TrustScoreService.adjust_score(db, sender_id, "content_violation")
+            logger.info(f"Trust score -3 for user {sender_id} (content_violation)")
     except Exception as e:
         await db.rollback()
         logger.error(f"Failed to update warning count: {e}")
+
+
+async def _check_message_rate_limit(
+    sender_id: uuid.UUID, db
+) -> tuple[bool, str | None]:
+    """檢查低信任用戶的訊息發送限制
+
+    Args:
+        sender_id: 發送者 ID
+        db: 資料庫 session
+
+    Returns:
+        (can_send, error_message): 是否可發送，錯誤訊息
+    """
+    try:
+        # 獲取用戶信任分數
+        result = await db.execute(
+            select(User.trust_score).where(User.id == sender_id)
+        )
+        trust_score = result.scalar_one_or_none()
+
+        if trust_score is None:
+            return True, None  # 用戶不存在，跳過限制
+
+        # 正常用戶無限制
+        if trust_score >= TrustScoreService.RESTRICTION_THRESHOLD:
+            return True, None
+
+        # 低信任用戶檢查限制
+        redis = await redis_client.get_connection()
+        can_send, remaining = await TrustScoreService.check_message_rate_limit(
+            sender_id, trust_score, redis
+        )
+
+        if not can_send:
+            return False, (
+                f"訊息發送限制：您今日已達上限 "
+                f"({TrustScoreService.LOW_TRUST_MESSAGE_LIMIT} 則)"
+            )
+
+        # 記錄訊息發送
+        await TrustScoreService.record_message_sent(sender_id, redis)
+        logger.info(
+            f"Low trust user {sender_id} sent message, "
+            f"remaining: {remaining - 1}"
+        )
+        return True, None
+
+    except Exception as e:
+        logger.error(f"Error checking message rate limit: {e}")
+        return True, None  # 出錯時不阻擋發送
 
 
 async def _save_and_broadcast_message(
@@ -533,7 +590,13 @@ async def handle_chat_message(data: dict, sender_id: uuid.UUID):
                 await _send_error(sender_id, error)
                 return
 
-            # 2. 內容驗證（根據類型）
+            # 2. 訊息限制檢查（低信任用戶）
+            can_send, rate_error = await _check_message_rate_limit(sender_id, db)
+            if not can_send:
+                await _send_error(sender_id, rate_error)
+                return
+
+            # 3. 內容驗證（根據類型）
             if parsed["message_type"] in ("IMAGE", "GIF"):
                 is_valid, error = _validate_image_content(
                     parsed["content"], sender_id
@@ -551,7 +614,7 @@ async def handle_chat_message(data: dict, sender_id: uuid.UUID):
                     await _send_error(sender_id, error)
                     return
 
-            # 3. 配對驗證
+            # 4. 配對驗證
             is_valid, error, match = await _validate_match_access(
                 parsed["match_id"], sender_id, db
             )
@@ -559,12 +622,12 @@ async def handle_chat_message(data: dict, sender_id: uuid.UUID):
                 await _send_error(sender_id, error)
                 return
 
-            # 4. 存儲並發送
+            # 5. 存儲並發送
             message = await _save_and_broadcast_message(
                 match, sender_id, parsed, db
             )
 
-            # 5. 離線通知
+            # 6. 離線通知
             await _send_message_notification(match, sender_id, message, db)
 
         except Exception as e:

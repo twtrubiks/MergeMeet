@@ -25,12 +25,12 @@ class User(Base):
     password_reset_token = Column(String(255), nullable=True, index=True)
     password_reset_expires = Column(DateTime(timezone=True), nullable=True)
 
-    # 信任機制
-    # TODO: 信任分數系統尚未實現完整邏輯
-    # 預計功能：
-    # - 提高分數：完成驗證、正常互動、被喜歡
-    # - 降低分數：被舉報、發送違規內容、被封鎖
-    # - 影響：低分用戶在探索中排序靠後，極低分自動限制功能
+    # 信任機制（已實現：TrustScoreService）
+    # 功能：
+    # - 提高分數：Email 驗證 +5、被喜歡 +1、配對成功 +2
+    # - 降低分數：被舉報 -5、舉報確認 -10、違規內容 -3、被封鎖 -2
+    # - 影響：低分用戶在探索中排序靠後（配對算法 5 分權重）
+    # - 限制：< 20 分用戶每日訊息上限 20 則
     trust_score = Column(Integer, default=50)
     warning_count = Column(Integer, default=0)
 

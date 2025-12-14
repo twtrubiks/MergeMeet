@@ -45,6 +45,7 @@ from app.models.match import Like, Match, BlockedUser, Message, Pass
 from app.models.notification import Notification
 from app.schemas.discovery import ProfileCard, LikeResponse, MatchSummary
 from app.services.matching_service import matching_service
+from app.services.trust_score import TrustScoreService
 
 logger = logging.getLogger(__name__)
 
@@ -211,7 +212,8 @@ async def browse_users(
             "last_active": profile.last_active,
             "photo_count": len(photos),
             "bio": profile.bio,
-            "age": age
+            "age": age,
+            "trust_score": profile.user.trust_score  # 信任分數
         }
 
         # 建立用戶偏好資料字典
@@ -613,7 +615,18 @@ async def like_user(
         await db.rollback()
         raise
 
-    # 5. 發送通知
+    # 5. 信任分數調整
+    # 被喜歡者 +1 分
+    await TrustScoreService.adjust_score(db, user_id, "received_like")
+    logger.info(f"Trust score +1 for user {user_id} (received_like)")
+
+    # 配對成功時：雙方各 +2 分
+    if is_match:
+        await TrustScoreService.adjust_score(db, current_user.id, "match_created")
+        await TrustScoreService.adjust_score(db, user_id, "match_created")
+        logger.info(f"Trust score +2 for users {current_user.id} and {user_id} (match_created)")
+
+    # 6. 發送通知
     await _send_like_notifications(
         is_match, match_id, current_user.id, user_id, db
     )
