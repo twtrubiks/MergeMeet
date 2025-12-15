@@ -13,10 +13,10 @@ mergemeet/
 ├── backend/SECURITY.md        # 安全策略
 └── docs/
     ├── testing/               # 測試相關指南
-    ├── reports/               # 測試報告
     └── archived/              # 歷史文檔歸檔
         ├── bug-fixes/         # Bug 修復記錄
-        └── reviews/           # 代碼審查報告
+        ├── reviews/           # 代碼審查報告
+        └── reports/           # 測試報告（已歸檔）
 ```
 
 ---
@@ -37,20 +37,12 @@ mergemeet/
 - [TESTING_GUIDE.md](testing/TESTING_GUIDE.md) - 自動化測試指南
 - [MANUAL_TESTING_GUIDE.md](testing/MANUAL_TESTING_GUIDE.md) - 手動測試指南
 - [README_TEST_SETUP.md](testing/README_TEST_SETUP.md) - 測試環境設置
-- [FRONTEND_UNIT_TEST_PLAN.md](testing/FRONTEND_UNIT_TEST_PLAN.md) - 前端單元測試計劃
 - [COVERAGE_SUMMARY.md](testing/COVERAGE_SUMMARY.md) - 測試覆蓋率總結
 
-### 功能規劃與實作文檔
-- [NOTIFICATION_PERSISTENCE_PLAN.md](NOTIFICATION_PERSISTENCE_PLAN.md) - 通知持久化功能 ✅ 已完成
+### 技術參考文檔
 - [TRUST_SCORE_SYSTEM.md](TRUST_SCORE_SYSTEM.md) - 信任分數系統 ✅ 已完成（2025-12-14）
-
-### 測試報告
-- [MANUAL_TEST_REPORT_2025-11-14.md](reports/MANUAL_TEST_REPORT_2025-11-14.md) - 手動測試報告
-- [FRONTEND_MANUAL_TEST_REPORT_2025-11-14.md](reports/FRONTEND_MANUAL_TEST_REPORT_2025-11-14.md) - 前端手動測試
-- [WEEK4_CHAT_TEST_REPORT.md](reports/WEEK4_CHAT_TEST_REPORT.md) - Week 4 聊天功能測試
-- [WEEK4_ADVANCED_FEATURES_TEST_REPORT_2025-11-14.md](reports/WEEK4_ADVANCED_FEATURES_TEST_REPORT_2025-11-14.md) - Week 4 高級功能測試
-- [WEEK5_SAFETY_TEST_REPORT.md](reports/WEEK5_SAFETY_TEST_REPORT.md) - Week 5 安全功能測試
-- [WEEK5_BROWSER_TEST_REPORT_2025-11-16.md](reports/WEEK5_BROWSER_TEST_REPORT_2025-11-16.md) - Week 5 瀏覽器測試
+- [CURSOR_PAGINATION.md](CURSOR_PAGINATION.md) - Cursor 分頁技術說明
+- [MATCHING_ALGORITHM.md](MATCHING_ALGORITHM.md) - 配對算法說明
 
 ---
 
@@ -75,6 +67,23 @@ mergemeet/
 - Git Commit Analysis 2025-11-16
 - Git Pull Review Report 2025-11-16
 
+### 測試報告（7 份）
+存放於 [archived/reports/](archived/reports/)
+
+- 手動測試報告 (2025-11-14)
+- 前端手動測試報告 (2025-11-14)
+- Week 4 聊天功能測試
+- Week 4 高級功能測試 (2025-11-14)
+- Week 5 安全功能測試
+- Week 5 瀏覽器測試 (2025-11-16)
+- 前端代碼審查修復 (2025-11-16)
+
+### 已完成功能計劃（2 份）
+存放於 [archived/](archived/)
+
+- NOTIFICATION_PERSISTENCE_PLAN.md - 通知持久化功能計劃
+- FRONTEND_UNIT_TEST_PLAN.md - 前端單元測試計劃
+
 ---
 
 ## 🔒 安全文檔
@@ -85,13 +94,18 @@ mergemeet/
 
 ## 📊 文檔統計
 
+### 活躍文檔
 - **核心文檔**: 4 份（根目錄）
-- **功能實作文檔**: 2 份（通知持久化 + 信任分數系統）
-- **測試指南**: 5 份
-- **測試報告**: 6 份
+- **技術參考文檔**: 3 份
+- **測試指南**: 4 份
+- **總計**: 11 份
+
+### 歸檔文檔
 - **Bug 修復記錄**: 12 份
 - **審查報告**: 4 份
-- **總計**: 33 份文檔
+- **測試報告**: 7 份
+- **功能計劃**: 2 份
+- **總計**: 25 份
 
 ---
 
@@ -105,7 +119,7 @@ mergemeet/
 
 ### 對於測試人員
 1. 查看 `docs/testing/` 下的測試指南
-2. 參考 `docs/reports/` 下的歷史測試報告
+2. 參考 `docs/archived/reports/` 下的歷史測試報告
 
 ### 對於維護人員
 1. 歷史 Bug 修復記錄在 `docs/archived/bug-fixes/`
@@ -123,4 +137,4 @@ mergemeet/
 
 ---
 
-最後更新：2025-12-14
+最後更新：2025-12-15
