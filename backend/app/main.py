@@ -79,12 +79,22 @@ app = FastAPI(
 )
 
 # CORS 中間件（安全配置）
+# 支援 HttpOnly Cookie + CSRF Token 雙重認證模式
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,  # 僅允許指定來源
-    allow_credentials=True,
+    allow_credentials=True,  # 允許 Cookie 跨域傳送
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],  # 明確指定允許的 HTTP 方法
-    allow_headers=["Authorization", "Content-Type", "Accept"],  # 僅允許必要的 headers
+    allow_headers=[
+        "Authorization",      # Bearer Token 認證
+        "Content-Type",       # 請求內容類型
+        "Accept",             # 接受的響應類型
+        "X-CSRF-Token",       # CSRF Token（Double Submit Cookie Pattern）
+    ],
+    expose_headers=[
+        "X-RateLimit-Remaining",  # 登入限制剩餘次數
+        "X-Lockout-Seconds",      # 鎖定剩餘秒數
+    ],
 )
 
 # 靜態檔案（照片上傳）

@@ -7,7 +7,7 @@
 - ✅ 密碼重置功能：發送郵件 + 重置 Token
 - ✅ 密碼修改功能：POST /change-password（需舊密碼驗證，修改後 Token 失效）
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -31,6 +31,7 @@ from app.core.security import (
 )
 from app.core.config import settings
 from app.core.dependencies import get_current_user
+from app.core.cookie_utils import set_auth_cookies, clear_auth_cookies, generate_csrf_token
 from app.models.user import User
 from app.schemas.auth import (
     RegisterRequest,
@@ -304,16 +305,18 @@ def generate_verification_code() -> str:
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     request: RegisterRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    用戶註冊
+    用戶註冊（支援 HttpOnly Cookie + Bearer Token 雙模式）
 
     - 驗證年齡（必須 >= 18）
     - 檢查 Email 唯一性
     - 建立用戶帳號
-    - 發送驗證碼（模擬）
-    - 返回 JWT Token
+    - 發送驗證碼
+    - 設置 HttpOnly Cookie（Web 前端 XSS 防護）
+    - 同時返回 JWT Token（API 客戶端 / 移動端）
     """
     # 年齡驗證
     today = date.today()
@@ -381,6 +384,11 @@ async def register(
     # 生成 JWT Token
     access_token, refresh_token = _generate_auth_tokens(str(new_user.id))
 
+    # 生成 CSRF Token 並設置 Cookie（HttpOnly Cookie 模式）
+    csrf_token = generate_csrf_token()
+    set_auth_cookies(response, access_token, refresh_token, csrf_token)
+
+    # 同時返回 Token（向後兼容 Bearer Token 模式）
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
@@ -392,20 +400,27 @@ async def register(
 @router.post("/login", response_model=TokenResponse)
 async def login(
     request: LoginRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db),
     redis_conn: aioredis.Redis = Depends(get_redis)
 ):
     """
-    用戶登入
+    用戶登入（支援 HttpOnly Cookie + Bearer Token 雙模式）
 
     - 驗證 Email 和密碼
     - 檢查帳號狀態
     - 登入失敗限制：5 次失敗後鎖定 15 分鐘
-    - 返回 JWT Token
+    - 設置 HttpOnly Cookie（Web 前端 XSS 防護）
+    - 同時返回 JWT Token（API 客戶端 / 移動端）
 
     Response Headers:
         X-RateLimit-Remaining: 剩餘嘗試次數
         X-Lockout-Seconds: 鎖定剩餘秒數（鎖定時）
+
+    Cookie 設置:
+        access_token: HttpOnly Cookie
+        refresh_token: HttpOnly Cookie（限 /api/auth 路徑）
+        csrf_token: 非 HttpOnly（前端需讀取放入 Header）
     """
     limiter = LoginLimiter(redis_conn)
 
@@ -473,6 +488,11 @@ async def login(
     # 生成 JWT Token
     access_token, refresh_token = _generate_auth_tokens(str(user.id))
 
+    # 生成 CSRF Token 並設置 Cookie（HttpOnly Cookie 模式）
+    csrf_token = generate_csrf_token()
+    set_auth_cookies(response, access_token, refresh_token, csrf_token)
+
+    # 同時返回 Token（向後兼容 Bearer Token 模式）
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
@@ -484,16 +504,18 @@ async def login(
 @router.post("/admin-login", response_model=TokenResponse)
 async def admin_login(
     request: LoginRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db),
     redis_conn: aioredis.Redis = Depends(get_redis)
 ):
     """
-    管理員登入
+    管理員登入（支援 HttpOnly Cookie + Bearer Token 雙模式）
 
     - 驗證 Email 和密碼
     - 檢查管理員權限
     - 登入失敗限制：5 次失敗後鎖定 15 分鐘
-    - 返回 JWT Token
+    - 設置 HttpOnly Cookie（Web 前端 XSS 防護）
+    - 同時返回 JWT Token（API 客戶端 / 移動端）
 
     Response Headers:
         X-RateLimit-Remaining: 剩餘嘗試次數
@@ -571,6 +593,11 @@ async def admin_login(
     # 生成 JWT Token
     access_token, refresh_token = _generate_auth_tokens(str(user.id))
 
+    # 生成 CSRF Token 並設置 Cookie（HttpOnly Cookie 模式）
+    csrf_token = generate_csrf_token()
+    set_auth_cookies(response, access_token, refresh_token, csrf_token)
+
+    # 同時返回 Token（向後兼容 Bearer Token 模式）
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
@@ -580,18 +607,40 @@ async def admin_login(
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_token(
-    request: RefreshTokenRequest,
+async def refresh_token_endpoint(
+    response: Response,
+    request: Optional[RefreshTokenRequest] = None,
+    refresh_token_cookie: Optional[str] = Cookie(None, alias="refresh_token"),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    刷新 Access Token
+    刷新 Access Token（支援 HttpOnly Cookie + Bearer Token 雙模式）
 
-    - 驗證 Refresh Token
-    - 返回新的 Access Token 和 Refresh Token
+    - 優先從 Cookie 讀取 Refresh Token
+    - 回退到請求體中的 Refresh Token
+    - 驗證並返回新的 Token
+    - 設置新的 HttpOnly Cookie
     """
+    # 獲取 Refresh Token（優先 Cookie，回退 Request Body）
+    token = refresh_token_cookie or (request.refresh_token if request else None)
+
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="未提供 Refresh Token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 檢查 Token 是否在黑名單中
+    if await token_blacklist.is_blacklisted(token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh Token 已失效，請重新登入",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     # 解碼 Refresh Token
-    payload = decode_token(request.refresh_token)
+    payload = decode_token(token)
 
     if not payload or payload.get("type") != "refresh":
         raise HTTPException(
@@ -621,12 +670,26 @@ async def refresh_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # 生成新的 Token
-    access_token, refresh_token = _generate_auth_tokens(str(user.id))
+    # 將舊的 Refresh Token 加入黑名單（Token 輪換，增強安全性）
+    if payload.get("exp"):
+        old_expires_at = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+    else:
+        old_expires_at = datetime.now(timezone.utc) + timedelta(
+            days=settings.REFRESH_TOKEN_EXPIRE_DAYS
+        )
+    await token_blacklist.add(token, old_expires_at)
 
+    # 生成新的 Token
+    new_access_token, new_refresh_token = _generate_auth_tokens(str(user.id))
+
+    # 生成 CSRF Token 並設置新 Cookie
+    csrf_token = generate_csrf_token()
+    set_auth_cookies(response, new_access_token, new_refresh_token, csrf_token)
+
+    # 同時返回 Token（向後兼容 Bearer Token 模式）
     return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
+        access_token=new_access_token,
+        refresh_token=new_refresh_token,
         token_type="bearer",
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
@@ -634,36 +697,56 @@ async def refresh_token(
 
 @router.post("/logout", response_model=dict)
 async def logout(
+    response: Response,
     current_user: User = Depends(get_current_user),
-    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
+    access_token_cookie: Optional[str] = Cookie(None, alias="access_token"),
+    refresh_token_cookie: Optional[str] = Cookie(None, alias="refresh_token"),
 ):
     """
-    用戶登出
+    用戶登出（支援 HttpOnly Cookie + Bearer Token 雙模式）
 
-    - 將當前 Token 加入黑名單
+    - 將 Access Token 和 Refresh Token 加入黑名單
     - Token 在過期前都無法再使用
+    - 清除所有認證 Cookie
     - 同時使 WebSocket 連接失效
     """
-    token = credentials.credentials
+    tokens_blacklisted = []
 
-    # 解碼 Token 取得過期時間
-    payload = decode_token(token)
-    if payload and payload.get("exp"):
-        expires_at = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
-    else:
-        # 如果無法取得過期時間，使用預設的 access token 過期時間
-        expires_at = datetime.now(timezone.utc) + timedelta(
-            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-        )
+    # 1. 黑名單化 Access Token（優先 Cookie，回退 Bearer）
+    access_token = access_token_cookie or (credentials.credentials if credentials else None)
+    if access_token:
+        payload = decode_token(access_token)
+        if payload and payload.get("exp"):
+            expires_at = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+        else:
+            expires_at = datetime.now(timezone.utc) + timedelta(
+                minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+            )
+        await token_blacklist.add(access_token, expires_at)
+        tokens_blacklisted.append("access_token")
 
-    # 將 Token 加入黑名單
-    await token_blacklist.add(token, expires_at)
+    # 2. 黑名單化 Refresh Token（從 Cookie 獲取）
+    if refresh_token_cookie:
+        payload = decode_token(refresh_token_cookie)
+        if payload and payload.get("exp"):
+            expires_at = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+        else:
+            expires_at = datetime.now(timezone.utc) + timedelta(
+                days=settings.REFRESH_TOKEN_EXPIRE_DAYS
+            )
+        await token_blacklist.add(refresh_token_cookie, expires_at)
+        tokens_blacklisted.append("refresh_token")
 
-    logger.info(f"User {current_user.id} logged out, token blacklisted")
+    # 3. 清除所有認證 Cookie
+    clear_auth_cookies(response)
+
+    logger.info(f"User {current_user.id} logged out, tokens blacklisted: {tokens_blacklisted}")
 
     return {
         "message": "登出成功",
-        "user_id": str(current_user.id)
+        "user_id": str(current_user.id),
+        "tokens_invalidated": tokens_blacklisted
     }
 
 

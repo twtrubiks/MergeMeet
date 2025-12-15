@@ -91,4 +91,16 @@ export const authAPI = {
     const response = await apiClient.post('/auth/change-password', data)
     return response.data
   },
+
+  /**
+   * 用戶登出
+   *
+   * - 將 Access Token 和 Refresh Token 加入黑名單
+   * - 清除所有認證 Cookie
+   * @returns {Promise} 包含 message、user_id、tokens_invalidated
+   */
+  async logout() {
+    const response = await apiClient.post('/auth/logout')
+    return response.data
+  },
 }

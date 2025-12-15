@@ -1,11 +1,14 @@
 /**
  * 用戶狀態管理 (Pinia Store)
  *
- * TODO(Security): Token 目前儲存在 localStorage，存在 XSS 攻擊風險。
- * 建議改用 HttpOnly Cookie 存儲 Token：
- * - 後端設置 Set-Cookie: access_token=xxx; HttpOnly; Secure; SameSite=Strict
- * - 前端發送請求時使用 withCredentials: true
- * - 參考: https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html
+ * Token 存儲安全策略（雙模式支援）：
+ * 1. HttpOnly Cookie（優先）- 後端自動設置，防止 XSS 攻擊
+ * 2. localStorage（回退）- 向後兼容，支援開發過渡期
+ *
+ * 認證流程：
+ * - 登入/註冊：後端設置 HttpOnly Cookie，同時返回 Token 給前端存儲
+ * - 請求：前端自動帶 Cookie + CSRF Token，或回退到 Bearer Token
+ * - 登出：呼叫後端 API 使 Token 失效 + 清除 Cookie + 清除 localStorage
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
@@ -132,9 +135,26 @@ export const useUserStore = defineStore('user', () => {
 
   /**
    * 用戶登出
+   *
+   * 完整登出流程：
+   * 1. 呼叫後端 API 使 Token 失效（加入黑名單）
+   * 2. 後端清除 HttpOnly Cookie
+   * 3. 前端清除 localStorage（向後兼容）
+   *
+   * @returns {Promise<boolean>} 是否成功
    */
-  const logout = () => {
-    clearTokens()
+  const logout = async () => {
+    try {
+      // 呼叫後端登出 API（會清除 Cookie 並使 Token 失效）
+      await authAPI.logout()
+      logger.info('登出成功，Token 已失效')
+    } catch (err) {
+      // 即使 API 失敗也要清除本地狀態（例如網路錯誤）
+      logger.warn('登出 API 失敗，仍清除本地狀態:', err.message)
+    } finally {
+      // 無論如何都清除本地狀態
+      clearTokens()
+    }
   }
 
   /**

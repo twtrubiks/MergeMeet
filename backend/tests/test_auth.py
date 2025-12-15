@@ -4,6 +4,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import date
 
+from app.main import app
 from app.models.user import User
 from app.api.auth import verification_codes
 
@@ -252,6 +253,7 @@ async def user_for_password_change(client: AsyncClient):
     assert response.status_code == 201
     return {
         "token": response.json()["access_token"],
+        "csrf_token": response.cookies.get("csrf_token"),  # 新增：CSRF Token
         "email": "pwdchange@example.com",
         "password": "OldPassword123"
     }
@@ -264,10 +266,14 @@ async def user_for_password_change(client: AsyncClient):
 async def test_change_password_success(client: AsyncClient, user_for_password_change: dict):
     """測試密碼修改成功"""
     token = user_for_password_change["token"]
+    csrf_token = user_for_password_change["csrf_token"]
 
     response = await client.post(
         "/api/auth/change-password",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-CSRF-Token": csrf_token
+        },
         json={
             "current_password": "OldPassword123",
             "new_password": "NewPassword456"
@@ -284,11 +290,15 @@ async def test_change_password_success(client: AsyncClient, user_for_password_ch
 async def test_change_password_token_invalidated(client: AsyncClient, user_for_password_change: dict):
     """測試修改密碼後原 Token 失效"""
     token = user_for_password_change["token"]
+    csrf_token = user_for_password_change["csrf_token"]
 
     # 修改密碼
     response = await client.post(
         "/api/auth/change-password",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-CSRF-Token": csrf_token
+        },
         json={
             "current_password": "OldPassword123",
             "new_password": "NewPassword456"
@@ -296,24 +306,29 @@ async def test_change_password_token_invalidated(client: AsyncClient, user_for_p
     )
     assert response.status_code == 200
 
-    # 使用舊 Token 存取 API 應失敗
-    response = await client.get(
-        "/api/profile",
-        headers={"Authorization": f"Bearer {token}"}
-    )
-    assert response.status_code == 401
+    # 使用舊 Token 存取 API 應失敗（建立新 client 避免 Cookie 影響）
+    async with AsyncClient(app=app, base_url="http://test") as new_client:
+        response = await new_client.get(
+            "/api/profile",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_change_password_can_login_with_new(client: AsyncClient, user_for_password_change: dict):
     """測試修改密碼後可用新密碼登入"""
     token = user_for_password_change["token"]
+    csrf_token = user_for_password_change["csrf_token"]
     email = user_for_password_change["email"]
 
     # 修改密碼
     await client.post(
         "/api/auth/change-password",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-CSRF-Token": csrf_token
+        },
         json={
             "current_password": "OldPassword123",
             "new_password": "NewPassword456"
@@ -333,12 +348,16 @@ async def test_change_password_can_login_with_new(client: AsyncClient, user_for_
 async def test_change_password_cannot_login_with_old(client: AsyncClient, user_for_password_change: dict):
     """測試修改密碼後舊密碼無法登入"""
     token = user_for_password_change["token"]
+    csrf_token = user_for_password_change["csrf_token"]
     email = user_for_password_change["email"]
 
     # 修改密碼
     await client.post(
         "/api/auth/change-password",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-CSRF-Token": csrf_token
+        },
         json={
             "current_password": "OldPassword123",
             "new_password": "NewPassword456"
@@ -360,10 +379,14 @@ async def test_change_password_cannot_login_with_old(client: AsyncClient, user_f
 async def test_change_password_wrong_current(client: AsyncClient, user_for_password_change: dict):
     """測試當前密碼錯誤"""
     token = user_for_password_change["token"]
+    csrf_token = user_for_password_change["csrf_token"]
 
     response = await client.post(
         "/api/auth/change-password",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-CSRF-Token": csrf_token
+        },
         json={
             "current_password": "WrongPassword123",
             "new_password": "NewPassword456"
@@ -378,10 +401,14 @@ async def test_change_password_wrong_current(client: AsyncClient, user_for_passw
 async def test_change_password_empty_current(client: AsyncClient, user_for_password_change: dict):
     """測試當前密碼為空"""
     token = user_for_password_change["token"]
+    csrf_token = user_for_password_change["csrf_token"]
 
     response = await client.post(
         "/api/auth/change-password",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-CSRF-Token": csrf_token
+        },
         json={
             "current_password": "",
             "new_password": "NewPassword456"
@@ -398,10 +425,14 @@ async def test_change_password_empty_current(client: AsyncClient, user_for_passw
 async def test_change_password_same_as_current(client: AsyncClient, user_for_password_change: dict):
     """測試新密碼與舊密碼相同"""
     token = user_for_password_change["token"]
+    csrf_token = user_for_password_change["csrf_token"]
 
     response = await client.post(
         "/api/auth/change-password",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-CSRF-Token": csrf_token
+        },
         json={
             "current_password": "OldPassword123",
             "new_password": "OldPassword123"
@@ -416,10 +447,14 @@ async def test_change_password_same_as_current(client: AsyncClient, user_for_pas
 async def test_change_password_too_short(client: AsyncClient, user_for_password_change: dict):
     """測試新密碼少於 8 字元"""
     token = user_for_password_change["token"]
+    csrf_token = user_for_password_change["csrf_token"]
 
     response = await client.post(
         "/api/auth/change-password",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-CSRF-Token": csrf_token
+        },
         json={
             "current_password": "OldPassword123",
             "new_password": "Short1"
@@ -433,10 +468,14 @@ async def test_change_password_too_short(client: AsyncClient, user_for_password_
 async def test_change_password_no_uppercase(client: AsyncClient, user_for_password_change: dict):
     """測試新密碼無大寫字母"""
     token = user_for_password_change["token"]
+    csrf_token = user_for_password_change["csrf_token"]
 
     response = await client.post(
         "/api/auth/change-password",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-CSRF-Token": csrf_token
+        },
         json={
             "current_password": "OldPassword123",
             "new_password": "newpassword123"
@@ -450,10 +489,14 @@ async def test_change_password_no_uppercase(client: AsyncClient, user_for_passwo
 async def test_change_password_no_lowercase(client: AsyncClient, user_for_password_change: dict):
     """測試新密碼無小寫字母"""
     token = user_for_password_change["token"]
+    csrf_token = user_for_password_change["csrf_token"]
 
     response = await client.post(
         "/api/auth/change-password",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-CSRF-Token": csrf_token
+        },
         json={
             "current_password": "OldPassword123",
             "new_password": "NEWPASSWORD123"
@@ -467,10 +510,14 @@ async def test_change_password_no_lowercase(client: AsyncClient, user_for_passwo
 async def test_change_password_no_digit(client: AsyncClient, user_for_password_change: dict):
     """測試新密碼無數字"""
     token = user_for_password_change["token"]
+    csrf_token = user_for_password_change["csrf_token"]
 
     response = await client.post(
         "/api/auth/change-password",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-CSRF-Token": csrf_token
+        },
         json={
             "current_password": "OldPassword123",
             "new_password": "NewPasswordOnly"
@@ -484,10 +531,14 @@ async def test_change_password_no_digit(client: AsyncClient, user_for_password_c
 async def test_change_password_weak(client: AsyncClient, user_for_password_change: dict):
     """測試新密碼為弱密碼"""
     token = user_for_password_change["token"]
+    csrf_token = user_for_password_change["csrf_token"]
 
     response = await client.post(
         "/api/auth/change-password",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-CSRF-Token": csrf_token
+        },
         json={
             "current_password": "OldPassword123",
             "new_password": "Password"  # 常見弱密碼
@@ -503,27 +554,31 @@ async def test_change_password_weak(client: AsyncClient, user_for_password_chang
 @pytest.mark.asyncio
 async def test_change_password_unauthorized(client: AsyncClient):
     """測試未帶 Token 修改密碼"""
-    response = await client.post(
-        "/api/auth/change-password",
-        json={
-            "current_password": "OldPassword123",
-            "new_password": "NewPassword456"
-        }
-    )
+    # 使用新的 client 避免之前測試留下的 Cookie 影響
+    async with AsyncClient(app=app, base_url="http://test") as new_client:
+        response = await new_client.post(
+            "/api/auth/change-password",
+            json={
+                "current_password": "OldPassword123",
+                "new_password": "NewPassword456"
+            }
+        )
 
-    assert response.status_code in [401, 403]
+        assert response.status_code in [401, 403]
 
 
 @pytest.mark.asyncio
 async def test_change_password_invalid_token(client: AsyncClient):
     """測試無效 Token 修改密碼"""
-    response = await client.post(
-        "/api/auth/change-password",
-        headers={"Authorization": "Bearer invalid_token_here"},
-        json={
-            "current_password": "OldPassword123",
-            "new_password": "NewPassword456"
-        }
-    )
+    # 使用新的 client 避免之前測試留下的 Cookie 影響
+    async with AsyncClient(app=app, base_url="http://test") as new_client:
+        response = await new_client.post(
+            "/api/auth/change-password",
+            headers={"Authorization": "Bearer invalid_token_here"},
+            json={
+                "current_password": "OldPassword123",
+                "new_password": "NewPassword456"
+            }
+        )
 
-    assert response.status_code == 401
+        assert response.status_code == 401

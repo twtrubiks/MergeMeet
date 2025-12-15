@@ -68,6 +68,15 @@ class Settings(BaseSettings):
         os.getenv("PASSWORD_RESET_TOKEN_EXPIRE_MINUTES", "30")
     )
 
+    # Cookie 安全配置（HttpOnly Cookie 防止 XSS 攻擊）
+    COOKIE_SECURE: bool = os.getenv("COOKIE_SECURE", "false").lower() == "true"
+    COOKIE_SAMESITE: str = os.getenv("COOKIE_SAMESITE", "lax")  # 開發: lax, 生產: strict
+    COOKIE_DOMAIN: str = os.getenv("COOKIE_DOMAIN", "")  # 空字串表示當前域名
+    COOKIE_PATH: str = "/"
+
+    # CSRF Token 配置
+    CSRF_TOKEN_LENGTH: int = 32
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # 驗證 SECRET_KEY（生產環境強制要求）
