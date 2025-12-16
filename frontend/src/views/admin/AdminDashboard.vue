@@ -257,8 +257,150 @@
             </div>
           </div>
         </n-tab-pane>
+
+        <n-tab-pane name="photo-moderation" tab="📷 照片審核">
+          <div class="tab-content">
+            <!-- 照片審核統計 -->
+            <div class="photo-stats-section">
+              <h2>照片審核統計</h2>
+              <div class="stats-grid">
+                <div class="stat-card warning">
+                  <div class="stat-icon">⏳</div>
+                  <div class="stat-info">
+                    <div class="stat-value">{{ photoStats.pending_photos }}</div>
+                    <div class="stat-label">待審核照片</div>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon">✅</div>
+                  <div class="stat-info">
+                    <div class="stat-value">{{ photoStats.approved_photos }}</div>
+                    <div class="stat-label">已通過</div>
+                  </div>
+                </div>
+                <div class="stat-card danger">
+                  <div class="stat-icon">❌</div>
+                  <div class="stat-info">
+                    <div class="stat-value">{{ photoStats.rejected_photos }}</div>
+                    <div class="stat-label">已拒絕</div>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon">📊</div>
+                  <div class="stat-info">
+                    <div class="stat-value">{{ photoStats.today_reviewed }}</div>
+                    <div class="stat-label">今日已審核</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 待審核照片列表 -->
+            <div class="pending-photos-section">
+              <div class="section-header">
+                <h2>待審核照片</h2>
+                <n-button @click="loadPendingPhotos">刷新</n-button>
+              </div>
+
+              <n-spin :show="loadingPhotos">
+                <div v-if="pendingPhotos.length === 0" class="empty-state">
+                  <p>暫無待審核照片</p>
+                </div>
+
+                <div v-else class="photos-grid">
+                  <div
+                    v-for="photo in pendingPhotos"
+                    :key="photo.id"
+                    class="photo-card"
+                  >
+                    <div class="photo-image" @click="showPhotoDetail(photo)">
+                      <img :src="getPhotoUrl(photo.url)" :alt="photo.display_name" />
+                    </div>
+                    <div class="photo-info">
+                      <p class="photo-name"><strong>{{ photo.display_name }}</strong></p>
+                      <p class="photo-email">{{ photo.user_email }}</p>
+                      <p class="photo-time">{{ formatDate(photo.created_at) }}</p>
+                    </div>
+                    <div class="photo-actions">
+                      <n-button
+                        size="small"
+                        type="success"
+                        @click="reviewPhoto(photo.id, 'APPROVED')"
+                      >
+                        通過
+                      </n-button>
+                      <n-button
+                        size="small"
+                        type="error"
+                        @click="showRejectModal(photo)"
+                      >
+                        拒絕
+                      </n-button>
+                    </div>
+                  </div>
+                </div>
+              </n-spin>
+
+              <!-- 分頁 -->
+              <n-pagination
+                v-if="photoTotal > photoPageSize"
+                v-model:page="photoPage"
+                :page-count="Math.ceil(photoTotal / photoPageSize)"
+                @update:page="handlePhotoPageChange"
+                style="margin-top: 20px; justify-content: center;"
+              />
+            </div>
+          </div>
+        </n-tab-pane>
       </n-tabs>
     </div>
+
+    <!-- 拒絕照片理由 Modal -->
+    <n-modal v-model:show="showRejectReasonModal" preset="dialog" title="拒絕照片">
+      <n-form>
+        <n-form-item label="拒絕理由">
+          <n-select
+            v-model:value="rejectReason"
+            :options="rejectReasonOptions"
+            placeholder="選擇拒絕理由"
+          />
+        </n-form-item>
+        <n-form-item v-if="rejectReason === 'OTHER'" label="其他原因">
+          <n-input
+            v-model:value="customRejectReason"
+            type="textarea"
+            placeholder="請說明拒絕原因"
+            :rows="3"
+          />
+        </n-form-item>
+      </n-form>
+      <template #action>
+        <n-button @click="showRejectReasonModal = false">取消</n-button>
+        <n-button type="error" @click="confirmRejectPhoto">確認拒絕</n-button>
+      </template>
+    </n-modal>
+
+    <!-- 照片詳情 Modal -->
+    <n-modal v-model:show="showPhotoDetailModal" preset="card" title="照片詳情" style="width: 600px">
+      <div v-if="selectedPhoto" class="photo-detail">
+        <img :src="getPhotoUrl(selectedPhoto.url)" style="max-width: 100%; border-radius: 8px;" />
+        <div class="detail-info">
+          <p><strong>用戶:</strong> {{ selectedPhoto.display_name }}</p>
+          <p><strong>Email:</strong> {{ selectedPhoto.user_email }}</p>
+          <p><strong>尺寸:</strong> {{ selectedPhoto.width }} x {{ selectedPhoto.height }}</p>
+          <p><strong>大小:</strong> {{ formatFileSize(selectedPhoto.file_size) }}</p>
+          <p><strong>上傳時間:</strong> {{ formatDate(selectedPhoto.created_at) }}</p>
+        </div>
+        <div class="detail-actions" style="margin-top: 16px; display: flex; gap: 8px;">
+          <n-button type="success" @click="reviewPhoto(selectedPhoto.id, 'APPROVED'); showPhotoDetailModal = false">
+            通過
+          </n-button>
+          <n-button type="error" @click="showRejectModal(selectedPhoto); showPhotoDetailModal = false">
+            拒絕
+          </n-button>
+        </div>
+      </div>
+    </n-modal>
 
     <!-- 新增敏感詞 Modal -->
     <n-modal v-model:show="showAddWordModal" preset="dialog" title="新增敏感詞">
@@ -350,6 +492,7 @@ import { useRouter } from 'vue-router'
 import {
   NButton, NTag, NSpin, NTabs, NTabPane, NDataTable,
   NSelect, NModal, NForm, NFormItem, NInput, NCheckbox,
+  NPagination,
   useMessage, useDialog
 } from 'naive-ui'
 import apiClient from '@/api/client'
@@ -393,6 +536,37 @@ const appeals = ref([])
 const appealResponses = ref({})
 const loadingWords = ref(false)
 const loadingAppeals = ref(false)
+
+// Photo moderation related states
+const photoStats = ref({
+  total_photos: 0,
+  pending_photos: 0,
+  approved_photos: 0,
+  rejected_photos: 0,
+  today_pending: 0,
+  today_reviewed: 0
+})
+const pendingPhotos = ref([])
+const loadingPhotos = ref(false)
+const photoPage = ref(1)
+const photoPageSize = ref(20)
+const photoTotal = ref(0)
+const showRejectReasonModal = ref(false)
+const showPhotoDetailModal = ref(false)
+const selectedPhoto = ref(null)
+const rejectingPhoto = ref(null)
+const rejectReason = ref(null)
+const customRejectReason = ref('')
+
+// Reject reason options
+const rejectReasonOptions = [
+  { label: '裸露內容', value: 'NUDITY' },
+  { label: '暴力內容', value: 'VIOLENCE' },
+  { label: '仇恨言論', value: 'HATE' },
+  { label: '假照片/非本人', value: 'FAKE' },
+  { label: '垃圾內容', value: 'SPAM' },
+  { label: '其他', value: 'OTHER' }
+]
 
 const showAddWordModal = ref(false)
 const showEditWordModal = ref(false)
@@ -726,6 +900,113 @@ const reviewAppeal = async (appealId, status) => {
   }
 }
 
+// ==================== Photo Moderation Functions ====================
+
+// 載入照片審核統計
+const loadPhotoStats = async () => {
+  try {
+    const response = await apiClient.get('/admin/photos/stats')
+    photoStats.value = response.data
+  } catch (error) {
+    logger.error('載入照片統計失敗:', error)
+    message.error('載入照片統計失敗')
+  }
+}
+
+// 載入待審核照片
+const loadPendingPhotos = async () => {
+  loadingPhotos.value = true
+  try {
+    const response = await apiClient.get('/admin/photos/pending', {
+      params: {
+        page: photoPage.value,
+        page_size: photoPageSize.value,
+        status: 'PENDING'
+      }
+    })
+    pendingPhotos.value = response.data.photos
+    photoTotal.value = response.data.total
+  } catch (error) {
+    logger.error('載入待審核照片失敗:', error)
+    message.error('載入待審核照片失敗')
+  } finally {
+    loadingPhotos.value = false
+  }
+}
+
+// 審核照片
+const reviewPhoto = async (photoId, status, rejectionReason = null) => {
+  try {
+    await apiClient.post(`/admin/photos/${photoId}/review`, {
+      status,
+      rejection_reason: rejectionReason
+    })
+    message.success(status === 'APPROVED' ? '照片已通過' : '照片已拒絕')
+    await loadPendingPhotos()
+    await loadPhotoStats()
+  } catch (error) {
+    logger.error('審核照片失敗:', error)
+    message.error(error.response?.data?.detail || '審核失敗')
+  }
+}
+
+// 顯示拒絕 Modal
+const showRejectModal = (photo) => {
+  rejectingPhoto.value = photo
+  rejectReason.value = null
+  customRejectReason.value = ''
+  showRejectReasonModal.value = true
+}
+
+// 確認拒絕照片
+const confirmRejectPhoto = async () => {
+  if (!rejectReason.value) {
+    message.error('請選擇拒絕理由')
+    return
+  }
+
+  let reason = rejectReasonOptions.find(o => o.value === rejectReason.value)?.label || rejectReason.value
+  if (rejectReason.value === 'OTHER') {
+    if (!customRejectReason.value.trim()) {
+      message.error('請輸入拒絕原因')
+      return
+    }
+    reason = customRejectReason.value.trim()
+  }
+
+  await reviewPhoto(rejectingPhoto.value.id, 'REJECTED', reason)
+  showRejectReasonModal.value = false
+  rejectingPhoto.value = null
+}
+
+// 顯示照片詳情
+const showPhotoDetail = (photo) => {
+  selectedPhoto.value = photo
+  showPhotoDetailModal.value = true
+}
+
+// 取得照片 URL（處理相對路徑）
+const getPhotoUrl = (url) => {
+  if (!url) return ''
+  if (url.startsWith('http')) return url
+  // 後端 URL
+  return `http://localhost:8000${url}`
+}
+
+// 格式化檔案大小
+const formatFileSize = (bytes) => {
+  if (!bytes) return '-'
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / 1024 / 1024).toFixed(1) + ' MB'
+}
+
+// 照片分頁改變
+const handlePhotoPageChange = (page) => {
+  photoPage.value = page
+  loadPendingPhotos()
+}
+
 // 載入舉報列表
 const loadReports = async () => {
   loading.value = true
@@ -856,6 +1137,9 @@ const handleTabChange = (value) => {
     loadModerationStats()
     loadSensitiveWords()
     loadAppeals()
+  } else if (value === 'photo-moderation') {
+    loadPhotoStats()
+    loadPendingPhotos()
   }
 }
 
@@ -1120,5 +1404,104 @@ onMounted(() => {
 .response-time {
   font-size: 12px;
   color: #999;
+}
+
+/* Photo moderation styles */
+.photo-stats-section,
+.pending-photos-section {
+  margin-bottom: 40px;
+}
+
+.photo-stats-section h2,
+.pending-photos-section h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.photos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.photo-card {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.photo-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.photo-image {
+  width: 100%;
+  height: 200px;
+  overflow: hidden;
+  cursor: pointer;
+  background-color: #f5f7fa;
+}
+
+.photo-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.2s;
+}
+
+.photo-image:hover img {
+  transform: scale(1.05);
+}
+
+.photo-info {
+  padding: 12px 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.photo-info p {
+  margin: 4px 0;
+}
+
+.photo-name {
+  font-size: 14px;
+  color: #2c3e50;
+}
+
+.photo-email {
+  font-size: 12px;
+  color: #7f8c8d;
+}
+
+.photo-time {
+  font-size: 11px;
+  color: #bdc3c7;
+}
+
+.photo-actions {
+  padding: 12px 16px;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.photo-detail {
+  text-align: center;
+}
+
+.detail-info {
+  text-align: left;
+  margin-top: 16px;
+  padding: 16px;
+  background: #f5f7fa;
+  border-radius: 8px;
+}
+
+.detail-info p {
+  margin: 8px 0;
+  color: #666;
 }
 </style>

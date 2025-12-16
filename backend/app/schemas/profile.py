@@ -89,6 +89,13 @@ class ProfileUpdateRequest(BaseModel):
         return v
 
 
+class PhotoModerationStatusEnum(str, Enum):
+    """照片審核狀態枚舉"""
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
 class PhotoResponse(BaseModel):
     """照片回應"""
     model_config = ConfigDict(from_attributes=True)
@@ -98,6 +105,8 @@ class PhotoResponse(BaseModel):
     thumbnail_url: Optional[str] = Field(None, description="縮圖 URL")
     display_order: int = Field(..., description="顯示順序")
     is_profile_picture: bool = Field(..., description="是否為頭像")
+    moderation_status: str = Field(..., description="審核狀態")
+    rejection_reason: Optional[str] = Field(None, description="拒絕原因")
     created_at: datetime = Field(..., description="建立時間")
 
 

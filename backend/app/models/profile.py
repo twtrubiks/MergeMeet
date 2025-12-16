@@ -87,10 +87,30 @@ class Photo(Base):
     height = Column(Integer)
     mime_type = Column(String(50))
 
+    # 審核相關欄位
+    moderation_status = Column(
+        String(20),
+        default="PENDING",
+        nullable=False,
+        index=True
+    )  # PENDING, APPROVED, REJECTED
+    rejection_reason = Column(Text, nullable=True)
+    reviewed_by = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True
+    )
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # 預留自動審核擴展
+    auto_moderation_score = Column(Integer, nullable=True)  # 0-100
+    auto_moderation_labels = Column(Text, nullable=True)  # JSON 格式
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 關聯
     profile = relationship("Profile", back_populates="photos")
+    reviewer = relationship("User", foreign_keys=[reviewed_by])
 
     def __repr__(self):
         return f"<Photo {self.id}>"

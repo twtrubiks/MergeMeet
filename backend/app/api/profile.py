@@ -228,16 +228,27 @@ def _apply_profile_updates(profile: Profile, request: ProfileUpdateRequest) -> N
         profile.gender_preference = request.gender_preference.value
 
 
-def _build_profile_response(profile: Profile, age: int) -> ProfileResponse:
+def _build_profile_response(
+    profile: Profile,
+    age: int,
+    include_all_photos: bool = True
+) -> ProfileResponse:
     """構建 ProfileResponse（共用輔助函數）
 
     Args:
         profile: 個人檔案對象（需預載入 photos 和 interests）
         age: 用戶年齡
+        include_all_photos: 是否包含所有照片（含待審核）。用戶自己查看時為 True，其他人查看時為 False
 
     Returns:
         ProfileResponse 對象
     """
+    # 過濾照片：用戶自己可看到所有照片，其他用戶只能看到已審核的照片
+    filtered_photos = profile.photos if include_all_photos else [
+        photo for photo in profile.photos
+        if photo.moderation_status == "APPROVED"
+    ]
+
     photos = [
         PhotoResponse(
             id=str(photo.id),
@@ -245,9 +256,11 @@ def _build_profile_response(profile: Profile, age: int) -> ProfileResponse:
             thumbnail_url=photo.thumbnail_url,
             display_order=photo.display_order,
             is_profile_picture=photo.is_profile_picture,
+            moderation_status=photo.moderation_status,
+            rejection_reason=photo.rejection_reason,
             created_at=photo.created_at
         )
-        for photo in profile.photos
+        for photo in filtered_photos
     ]
 
     interests = [
@@ -550,6 +563,7 @@ async def _create_photo_record(
         display_order=existing_count,
         is_profile_picture=(existing_count == 0),
         mime_type=content_type,
+        moderation_status="PENDING",  # 新上傳的照片預設待審核
     )
 
     try:
@@ -638,6 +652,8 @@ async def upload_photo(
         thumbnail_url=new_photo.thumbnail_url,
         display_order=new_photo.display_order,
         is_profile_picture=new_photo.is_profile_picture,
+        moderation_status=new_photo.moderation_status,
+        rejection_reason=new_photo.rejection_reason,
         created_at=new_photo.created_at,
     )
 

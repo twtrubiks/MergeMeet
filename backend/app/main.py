@@ -22,7 +22,7 @@ from app.services.redis_client import redis_client, get_redis
 from app.services.token_blacklist import token_blacklist
 from app.services.content_moderation import ContentModerationService
 from app.api.auth import verification_codes
-from app.api import auth, profile, discovery, safety, websocket, messages, admin, moderation, notifications
+from app.api import auth, profile, discovery, safety, websocket, messages, admin, moderation, notifications, photo_moderation
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +171,7 @@ app.include_router(safety.router, prefix=f"{settings.API_V1_PREFIX}/safety", tag
 app.include_router(admin.router, prefix=f"{settings.API_V1_PREFIX}/admin", tags=["管理後台"])
 app.include_router(moderation.router, prefix=f"{settings.API_V1_PREFIX}/moderation", tags=["內容審核"])
 app.include_router(notifications.router, tags=["通知"])
+app.include_router(photo_moderation.router, prefix=f"{settings.API_V1_PREFIX}/admin/photos", tags=["照片審核"])
 
 # 未來將加入的路由
 # app.include_router(matches.router, prefix=f"{settings.API_V1_PREFIX}/matches", tags=["配對管理"])

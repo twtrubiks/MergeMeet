@@ -10,6 +10,10 @@
         v-for="photo in profileStore.profilePhotos"
         :key="photo.id"
         class="photo-card"
+        :class="{
+          'photo-pending': photo.moderation_status === 'PENDING',
+          'photo-rejected': photo.moderation_status === 'REJECTED'
+        }"
       >
         <img :src="photo.url" :alt="'Photo ' + photo.display_order" />
         <div class="photo-overlay">
@@ -17,6 +21,24 @@
             🗑️
           </button>
           <div v-if="photo.is_profile_picture" class="photo-badge">主頭像</div>
+        </div>
+        <!-- 審核狀態標籤 -->
+        <div
+          v-if="photo.moderation_status"
+          class="moderation-badge"
+          :class="getModerationStatusClass(photo.moderation_status)"
+          :title="photo.moderation_status === 'REJECTED' ? photo.rejection_reason : ''"
+        >
+          {{ getModerationStatusText(photo.moderation_status) }}
+        </div>
+        <!-- 待審核遮罩 -->
+        <div v-if="photo.moderation_status === 'PENDING'" class="pending-mask">
+          <span>⏳ 審核中</span>
+        </div>
+        <!-- 被拒絕提示 -->
+        <div v-if="photo.moderation_status === 'REJECTED'" class="rejected-mask">
+          <span>❌ 未通過</span>
+          <small v-if="photo.rejection_reason">{{ photo.rejection_reason }}</small>
         </div>
       </div>
 
@@ -102,6 +124,29 @@ const handleFileSelect = async (event) => {
     error.value = err.response?.data?.detail || '上傳失敗'
   } finally {
     uploading.value = false
+  }
+}
+
+/**
+ * 取得審核狀態文字
+ */
+const getModerationStatusText = (status) => {
+  const statusText = {
+    PENDING: '審核中',
+    APPROVED: '已通過',
+    REJECTED: '未通過'
+  }
+  return statusText[status] || status
+}
+
+/**
+ * 取得審核狀態樣式類別
+ */
+const getModerationStatusClass = (status) => {
+  return {
+    'status-pending': status === 'PENDING',
+    'status-approved': status === 'APPROVED',
+    'status-rejected': status === 'REJECTED'
   }
 }
 
@@ -254,6 +299,91 @@ const handleDelete = async (photoId) => {
   border-radius: 8px;
   color: #c33;
   font-size: 0.9rem;
+}
+
+/* 審核狀態相關樣式 */
+.photo-pending {
+  opacity: 0.7;
+}
+
+.photo-rejected {
+  border: 2px solid #ff4d4f;
+}
+
+.moderation-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: white;
+  z-index: 10;
+}
+
+.moderation-badge.status-pending {
+  background: rgba(250, 173, 20, 0.9);
+}
+
+.moderation-badge.status-approved {
+  background: rgba(82, 196, 26, 0.9);
+}
+
+.moderation-badge.status-rejected {
+  background: rgba(255, 77, 79, 0.9);
+}
+
+.pending-mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(250, 173, 20, 0.3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.pending-mask span {
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.rejected-mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 77, 79, 0.3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  gap: 4px;
+}
+
+.rejected-mask span {
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.rejected-mask small {
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  max-width: 80%;
+  text-align: center;
+  word-break: break-word;
 }
 
 @media (max-width: 768px) {
