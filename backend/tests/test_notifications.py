@@ -44,6 +44,9 @@ async def notification_test_users(client: AsyncClient, test_db: AsyncSession):
     assert response_b.status_code == 201
     token_b = response_b.json()["access_token"]
 
+    # 清除 cookies，讓測試使用純 Bearer Token 認證
+    client.cookies.clear()
+
     # 取得用戶 ID
     result = await test_db.execute(select(User).where(User.email == "alice.notify@example.com"))
     alice = result.scalar_one()

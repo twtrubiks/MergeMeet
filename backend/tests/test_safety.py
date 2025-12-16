@@ -39,6 +39,9 @@ async def test_users_for_safety(client: AsyncClient):
     assert response_c.status_code == 201
     token_c = response_c.json()["access_token"]
 
+    # 清除 cookies，讓測試使用純 Bearer Token 認證
+    client.cookies.clear()
+
     # 從 token 解析出 user_id（簡化版，實際應該解碼 JWT）
     # 這裡假設我們可以從資料庫查詢
     return {

@@ -31,8 +31,11 @@ async def matched_users(client: AsyncClient, test_db: AsyncSession):
     assert response_b.status_code == 201
     bob_token = response_b.json()["access_token"]
 
-    # 創建 Alice 的檔案
-    await client.post("/api/profile/",
+    # 清除 cookies，讓測試使用純 Bearer Token 認證
+    client.cookies.clear()
+
+    # 創建 Alice 的檔案（注意：URL 無尾隨斜線）
+    await client.post("/api/profile",
         headers={"Authorization": f"Bearer {alice_token}"},
         json={
             "display_name": "Alice",
@@ -46,8 +49,8 @@ async def matched_users(client: AsyncClient, test_db: AsyncSession):
         }
     )
 
-    # 創建 Bob 的檔案
-    await client.post("/api/profile/",
+    # 創建 Bob 的檔案（注意：URL 無尾隨斜線）
+    await client.post("/api/profile",
         headers={"Authorization": f"Bearer {bob_token}"},
         json={
             "display_name": "Bob",
@@ -268,6 +271,8 @@ async def test_get_chat_history_unauthorized(client: AsyncClient, matched_users:
         "date_of_birth": "1992-01-01"
     })
     charlie_token = response.json()["access_token"]
+    # 清除 cookies，讓測試使用純 Bearer Token 認證
+    client.cookies.clear()
 
     match_id = matched_users["match_id"]
 

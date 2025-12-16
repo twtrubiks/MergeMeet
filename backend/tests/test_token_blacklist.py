@@ -123,6 +123,8 @@ class TestLogoutAPI:
         })
         assert response.status_code == 201
         token = response.json()["access_token"]
+        # 清除 cookies，讓測試使用純 Bearer Token 認證
+        client.cookies.clear()
 
         # 登出
         response = await client.post(
@@ -143,6 +145,8 @@ class TestLogoutAPI:
         })
         assert response.status_code == 201
         token = response.json()["access_token"]
+        # 清除 cookies，讓測試使用純 Bearer Token 認證
+        client.cookies.clear()
 
         # 登出
         response = await client.post(
@@ -179,6 +183,8 @@ class TestLogoutAPI:
         })
         assert response.status_code == 201
         old_token = response.json()["access_token"]
+        # 清除 cookies，讓測試使用純 Bearer Token 認證
+        client.cookies.clear()
 
         # 登出
         response = await client.post(
@@ -201,6 +207,8 @@ class TestLogoutAPI:
         })
         assert response.status_code == 200
         new_token = response.json()["access_token"]
+        # 清除 cookies，讓測試使用純 Bearer Token 認證
+        client.cookies.clear()
 
         # 新 Token 應該可以使用（即使內容相同，只有舊的在黑名單中）
         # 注意：如果在同一秒內登入，JWT 內容可能相同
@@ -224,6 +232,8 @@ class TestLogoutAPI:
         })
         assert response.status_code == 201
         token = response.json()["access_token"]
+        # 清除 cookies，讓測試使用純 Bearer Token 認證
+        client.cookies.clear()
 
         # 第一次登出
         response = await client.post(

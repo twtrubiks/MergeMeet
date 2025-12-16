@@ -59,6 +59,8 @@ async def admin_headers(client: AsyncClient, admin_user: User) -> dict:
         "password": "Admin123"
     })
     token = response.json()["access_token"]
+    # 清除 cookies，讓測試使用純 Bearer Token 認證
+    client.cookies.clear()
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -70,6 +72,8 @@ async def normal_headers(client: AsyncClient, normal_user: User) -> dict:
         "password": "Normal123"
     })
     token = response.json()["access_token"]
+    # 清除 cookies，讓測試使用純 Bearer Token 認證
+    client.cookies.clear()
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -135,10 +139,10 @@ class TestGetSensitiveWords:
             uuid.UUID(word["id"])  # 如果格式錯誤會拋出異常
 
     async def test_get_sensitive_words_unauthorized(self, client: AsyncClient):
-        """測試：無 Token 返回 403（HTTPBearer 預設行為）"""
+        """測試：無 Token 返回 401 Unauthorized"""
         response = await client.get("/api/moderation/sensitive-words")
 
-        assert response.status_code == 403
+        assert response.status_code == 401
 
     async def test_get_sensitive_words_forbidden(
         self,

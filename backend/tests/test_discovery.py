@@ -34,6 +34,9 @@ async def test_users(client: AsyncClient):
     assert response_b.status_code == 201
     token_b = response_b.json()["access_token"]
 
+    # 清除 cookies，讓測試使用純 Bearer Token 認證
+    client.cookies.clear()
+
     return {
         "alice": {"token": token_a, "email": "alice@example.com"},
         "bob": {"token": token_b, "email": "bob@example.com"}

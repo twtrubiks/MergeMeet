@@ -43,6 +43,9 @@ async def authenticated_user(client: AsyncClient):
     })
     assert response.status_code == 201
     token = response.json()["access_token"]
+    # 清除 cookies，讓測試使用純 Bearer Token 認證
+    # 避免 Cookie + CSRF 認證模式導致 403
+    client.cookies.clear()
     return {"token": token, "email": "test@example.com"}
 
 
@@ -471,6 +474,8 @@ async def test_cannot_delete_other_users_photo(client: AsyncClient, user_with_pr
         "date_of_birth": "1990-01-01"
     })
     other_token = response.json()["access_token"]
+    # 清除 cookies，讓測試使用純 Bearer Token 認證
+    client.cookies.clear()
 
     # 為另一個用戶創建檔案和照片
     await client.post("/api/profile",
@@ -597,6 +602,8 @@ async def test_get_profile_by_user_id(client: AsyncClient, user_with_profile: di
         "date_of_birth": "1992-01-01"
     })
     viewer_token = response.json()["access_token"]
+    # 清除 cookies，讓測試使用純 Bearer Token 認證
+    client.cookies.clear()
 
     # 獲取第一個用戶的 ID
     result = await test_db.execute(

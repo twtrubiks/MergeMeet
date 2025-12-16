@@ -33,6 +33,8 @@ async def test_user_with_token(client: AsyncClient, test_db: AsyncSession):
     })
     assert response.status_code == 201
     token = response.json()["access_token"]
+    # 清除 cookies，讓測試使用純 Bearer Token 認證
+    client.cookies.clear()
 
     result = await test_db.execute(
         select(User).where(User.email == "notify_test@example.com")
@@ -69,6 +71,9 @@ async def notification_users(client: AsyncClient, test_db: AsyncSession):
     })
     assert response_b.status_code == 201
     token_b = response_b.json()["access_token"]
+
+    # 清除 cookies，讓測試使用純 Bearer Token 認證
+    client.cookies.clear()
 
     # 取得用戶 ID
     result = await test_db.execute(
