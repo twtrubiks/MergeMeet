@@ -132,7 +132,7 @@ const props = defineProps({
 
 const emit = defineEmits(['delete', 'preview-image'])
 
-const defaultAvatar = 'https://via.placeholder.com/40'
+const defaultAvatar = '/default-avatar.svg'
 const showDropdown = ref(false)
 
 // 判斷訊息類型

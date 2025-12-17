@@ -181,7 +181,7 @@ const matchedUser = ref(null)
 const messageInput = ref('')
 const messageListRef = ref(null)
 const typingTimer = ref(null)
-const defaultAvatar = 'https://via.placeholder.com/40'
+const defaultAvatar = '/default-avatar.svg'
 
 // Cursor-based 分頁載入狀態
 const nextCursor = ref(null) // 下一頁的 cursor（最舊訊息 ID）

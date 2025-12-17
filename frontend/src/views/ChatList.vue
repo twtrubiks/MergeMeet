@@ -112,7 +112,7 @@ const chatStore = useChatStore()
 const userStore = useUserStore()
 const wsStore = useWebSocketStore()
 
-const defaultAvatar = 'https://via.placeholder.com/50'
+const defaultAvatar = '/default-avatar.svg'
 
 // 前往探索頁面
 const goToDiscovery = () => {

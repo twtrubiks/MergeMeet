@@ -167,7 +167,7 @@ import { logger } from '@/utils/logger'
 const discoveryStore = useDiscoveryStore()
 
 // 預設頭像（圖片加載失敗時使用）
-const defaultAvatar = '/default-avatar.png'
+const defaultAvatar = '/default-avatar.svg'
 
 // 卡片拖拽狀態
 const dragStartX = ref(0)
