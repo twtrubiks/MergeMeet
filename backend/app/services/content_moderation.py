@@ -10,7 +10,7 @@ from typing import Tuple, List, Optional, Dict
 from collections import OrderedDict
 import re
 from datetime import datetime
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy import select
 import uuid
 import json
@@ -45,6 +45,9 @@ class ContentModerationService:
     _max_cache_size: int = 500  # 最大快取項數
     _cache_lock: Optional[asyncio.Lock] = None  # 快取鎖（延遲初始化）
 
+    # Session factory（供測試注入）
+    _session_factory: Optional[async_sessionmaker] = None
+
     # 可疑模式（正則表達式）- 保留靜態模式
     SUSPICIOUS_PATTERNS = [
         r'\b\d{10,16}\b',  # 可能的信用卡號或手機號碼
@@ -60,6 +63,32 @@ class ContentModerationService:
         if cls._cache_lock is None:
             cls._cache_lock = asyncio.Lock()
         return cls._cache_lock
+
+    @classmethod
+    def set_session_factory(cls, factory: async_sessionmaker) -> None:
+        """設定 session factory（供測試注入）
+
+        Args:
+            factory: SQLAlchemy async session maker
+        """
+        cls._session_factory = factory
+
+    @classmethod
+    def reset_session_factory(cls) -> None:
+        """重設 session factory 為預設（正式環境）"""
+        cls._session_factory = None
+
+    @classmethod
+    def _get_session_factory(cls) -> async_sessionmaker:
+        """取得要使用的 session factory
+
+        Returns:
+            注入的 factory（如果有設定），否則預設的 AsyncSessionLocal
+        """
+        if cls._session_factory is not None:
+            return cls._session_factory
+        from app.core.database import AsyncSessionLocal
+        return AsyncSessionLocal
 
     @classmethod
     async def set_redis(cls, redis_client: aioredis.Redis) -> None:
@@ -441,11 +470,11 @@ class ContentModerationService:
             triggered_word_ids: 觸發的敏感詞 ID
             action_taken: 採取的動作
         """
-        from app.core.database import AsyncSessionLocal
+        SessionFactory = cls._get_session_factory()
 
         # 使用獨立的資料庫 session 確保審核日誌永久保存
         # 即使主事務回滾，審核記錄也會保留（審計需求）
-        async with AsyncSessionLocal() as log_db:
+        async with SessionFactory() as log_db:
             try:
                 log = ModerationLog(
                     user_id=user_id,

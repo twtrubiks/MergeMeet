@@ -10,10 +10,9 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
-from app.core.database import AsyncSessionLocal
 from app.models.moderation import ModerationLog
 from app.models.profile import Photo, Profile
 from app.models.user import User
@@ -39,6 +38,35 @@ class PhotoModerationService:
         "SPAM": "垃圾內容",
         "OTHER": "其他違規",
     }
+
+    # Session factory（供測試注入）
+    _session_factory: Optional[async_sessionmaker] = None
+
+    @classmethod
+    def set_session_factory(cls, factory: async_sessionmaker) -> None:
+        """設定 session factory（供測試注入）
+
+        Args:
+            factory: SQLAlchemy async session maker
+        """
+        cls._session_factory = factory
+
+    @classmethod
+    def reset_session_factory(cls) -> None:
+        """重設 session factory 為預設（正式環境）"""
+        cls._session_factory = None
+
+    @classmethod
+    def _get_session_factory(cls) -> async_sessionmaker:
+        """取得要使用的 session factory
+
+        Returns:
+            注入的 factory（如果有設定），否則預設的 AsyncSessionLocal
+        """
+        if cls._session_factory is not None:
+            return cls._session_factory
+        from app.core.database import AsyncSessionLocal
+        return AsyncSessionLocal
 
     @classmethod
     async def get_pending_photos(
@@ -301,7 +329,8 @@ class PhotoModerationService:
         rejection_reason: Optional[str],
     ) -> None:
         """記錄審核日誌（使用獨立事務確保日誌不遺失）"""
-        async with AsyncSessionLocal() as log_db:
+        SessionFactory = cls._get_session_factory()
+        async with SessionFactory() as log_db:
             try:
                 log = ModerationLog(
                     user_id=user_id,

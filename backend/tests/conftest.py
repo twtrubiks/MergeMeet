@@ -11,6 +11,8 @@ from sqlalchemy import text
 
 from app.main import app
 from app.core.database import Base, get_db
+from app.services.content_moderation import ContentModerationService
+from app.services.photo_moderation import PhotoModerationService
 
 # 測試資料庫 URL（使用獨立的 PostgreSQL 測試資料庫）
 TEST_DATABASE_URL = os.getenv(
@@ -50,9 +52,18 @@ async def test_db() -> AsyncGenerator[AsyncSession, None]:
         expire_on_commit=False,
     )
 
+    # 注入測試 session factory 到審核服務
+    # 確保 _log_moderation() 使用測試資料庫而非正式資料庫
+    ContentModerationService.set_session_factory(TestSessionLocal)
+    PhotoModerationService.set_session_factory(TestSessionLocal)
+
     async with TestSessionLocal() as session:
         yield session
         await session.rollback()
+
+    # 重設 session factory
+    ContentModerationService.reset_session_factory()
+    PhotoModerationService.reset_session_factory()
 
     # 清理（刪除所有表格）
     async with engine.begin() as conn:
