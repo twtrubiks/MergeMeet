@@ -191,6 +191,9 @@ const isLoadingMore = ref(false)
 // WebSocket 初始化狀態（避免初始化期間顯示斷線警告）
 const isInitializing = ref(true)
 
+// WebSocket 錯誤處理器取消訂閱函數
+let unsubscribeError = null
+
 // 圖片預覽燈箱
 const showImagePreview = ref(false)
 const previewImageUrl = ref('')
@@ -345,6 +348,25 @@ const handlePreviewImage = (imageUrl) => {
   showImagePreview.value = true
 }
 
+/**
+ * 處理 WebSocket 錯誤訊息（包含內容審核失敗提示）
+ */
+const handleWebSocketError = (data) => {
+  const errorMessage = data.message || '操作失敗'
+
+  // 檢查是否為內容審核相關錯誤
+  if (errorMessage.includes('不當內容') ||
+      errorMessage.includes('已被系統拒絕') ||
+      errorMessage.includes('內容違規') ||
+      errorMessage.includes('審核')) {
+    message.warning(errorMessage, { duration: 5000 })
+    logger.warn('[Chat.vue] Content moderation error:', errorMessage)
+  } else {
+    message.error(errorMessage)
+    logger.error('[Chat.vue] WebSocket error:', errorMessage)
+  }
+}
+
 // 處理圖片發送完成
 const handleImageSent = () => {
   // 滾動到底部
@@ -476,6 +498,9 @@ onMounted(async () => {
   hasMore.value = true
   isLoadingMore.value = false
 
+  // 註冊 WebSocket 錯誤處理器（用於內容審核失敗提示）
+  unsubscribeError = wsStore.onMessage('error', handleWebSocketError)
+
   // 初始化 WebSocket 並等待連接成功
   // 全域 WebSocket 已在 App.vue 中自動連接，這裡只需確認連接狀態
   if (!wsStore.isConnected) {
@@ -517,6 +542,12 @@ onUnmounted(() => {
   // 清除打字計時器
   if (typingTimer.value) {
     clearTimeout(typingTimer.value)
+  }
+
+  // 取消 WebSocket 錯誤處理器訂閱
+  if (unsubscribeError) {
+    unsubscribeError()
+    unsubscribeError = null
   }
 })
 </script>
