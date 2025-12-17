@@ -57,16 +57,28 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def _generate_auth_tokens(user_id: str) -> Tuple[str, str]:
+def _generate_auth_tokens(
+    user_id: str,
+    email: Optional[str] = None,
+    email_verified: Optional[bool] = None
+) -> Tuple[str, str]:
     """生成認證 token (access + refresh)
 
     Args:
         user_id: 用戶 ID (字串格式)
+        email: 用戶 Email (可選)
+        email_verified: Email 是否已驗證 (可選)
 
     Returns:
         Tuple[str, str]: (access_token, refresh_token)
     """
-    access_token = create_access_token(data={"sub": user_id})
+    token_data = {"sub": user_id}
+    if email is not None:
+        token_data["email"] = email
+    if email_verified is not None:
+        token_data["email_verified"] = email_verified
+
+    access_token = create_access_token(data=token_data)
     refresh_token = create_refresh_token(data={"sub": user_id})
     return access_token, refresh_token
 
@@ -381,8 +393,12 @@ async def register(
     else:
         logger.error(f"Failed to send verification email to {mask_email(request.email)}")
 
-    # 生成 JWT Token
-    access_token, refresh_token = _generate_auth_tokens(str(new_user.id))
+    # 生成 JWT Token（包含 email 資訊供前端使用）
+    access_token, refresh_token = _generate_auth_tokens(
+        str(new_user.id),
+        email=new_user.email,
+        email_verified=new_user.email_verified
+    )
 
     # 生成 CSRF Token 並設置 Cookie（HttpOnly Cookie 模式）
     csrf_token = generate_csrf_token()
@@ -485,8 +501,12 @@ async def login(
     # 登入成功，清除失敗記錄
     await limiter.clear_attempts(request.email)
 
-    # 生成 JWT Token
-    access_token, refresh_token = _generate_auth_tokens(str(user.id))
+    # 生成 JWT Token（包含 email 資訊供前端使用）
+    access_token, refresh_token = _generate_auth_tokens(
+        str(user.id),
+        email=user.email,
+        email_verified=user.email_verified
+    )
 
     # 生成 CSRF Token 並設置 Cookie（HttpOnly Cookie 模式）
     csrf_token = generate_csrf_token()
@@ -590,8 +610,12 @@ async def admin_login(
     # 登入成功，清除失敗記錄
     await limiter.clear_attempts(request.email)
 
-    # 生成 JWT Token
-    access_token, refresh_token = _generate_auth_tokens(str(user.id))
+    # 生成 JWT Token（包含 email 資訊供前端使用）
+    access_token, refresh_token = _generate_auth_tokens(
+        str(user.id),
+        email=user.email,
+        email_verified=user.email_verified
+    )
 
     # 生成 CSRF Token 並設置 Cookie（HttpOnly Cookie 模式）
     csrf_token = generate_csrf_token()
@@ -679,8 +703,12 @@ async def refresh_token_endpoint(
         )
     await token_blacklist.add(token, old_expires_at)
 
-    # 生成新的 Token
-    new_access_token, new_refresh_token = _generate_auth_tokens(str(user.id))
+    # 生成新的 Token（包含 email 資訊供前端使用）
+    new_access_token, new_refresh_token = _generate_auth_tokens(
+        str(user.id),
+        email=user.email,
+        email_verified=user.email_verified
+    )
 
     # 生成 CSRF Token 並設置新 Cookie
     csrf_token = generate_csrf_token()

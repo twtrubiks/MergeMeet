@@ -205,8 +205,8 @@ const handleRegister = async () => {
   })
 
   if (success) {
-    // 註冊成功，導向首頁或驗證頁面
-    router.push('/')
+    // 註冊成功，導向 Email 驗證頁面
+    router.push('/verify-email')
   } else {
     // 顯示錯誤訊息
     error.value = userStore.error

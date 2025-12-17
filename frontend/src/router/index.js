@@ -5,6 +5,7 @@ import Login from '@/views/Login.vue'
 import Register from '@/views/Register.vue'
 import ForgotPassword from '@/views/ForgotPassword.vue'
 import ResetPassword from '@/views/ResetPassword.vue'
+import VerifyEmail from '@/views/VerifyEmail.vue'
 import Profile from '@/views/Profile.vue'
 import Discovery from '@/views/Discovery.vue'
 import Matches from '@/views/Matches.vue'
@@ -46,6 +47,12 @@ const router = createRouter({
       name: 'reset-password',
       component: ResetPassword,
       meta: { requiresAuth: false }
+    },
+    {
+      path: '/verify-email',
+      name: 'verify-email',
+      component: VerifyEmail,
+      meta: { requiresAuth: true }
     },
     {
       path: '/profile',
@@ -112,6 +119,16 @@ router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth && !userStore.isAuthenticated) {
     // 需要認證但未登入，導向登入頁
     next('/login')
+    return
+  }
+
+  // 檢查是否需要 Email 驗證（已登入但未驗證）
+  if (to.meta.requiresAuth &&
+      userStore.isAuthenticated &&
+      !userStore.user?.email_verified &&
+      to.path !== '/verify-email') {
+    // 已登入但未驗證 Email，導向驗證頁面
+    next('/verify-email')
     return
   }
 
