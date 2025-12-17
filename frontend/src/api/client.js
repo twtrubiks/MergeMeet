@@ -60,8 +60,12 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config
 
-    // 如果是 401 且還沒重試過，嘗試刷新 Token
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // 登入相關 API 不需要 Token 刷新（這些 API 本身就是獲取 Token 的）
+    const authEndpoints = ['/auth/login', '/auth/register', '/auth/admin-login']
+    const isAuthEndpoint = authEndpoints.some(endpoint => originalRequest.url?.includes(endpoint))
+
+    // 如果是 401 且還沒重試過，且不是登入相關 API，嘗試刷新 Token
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true
 
       try {
