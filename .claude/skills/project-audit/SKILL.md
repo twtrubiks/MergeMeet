@@ -35,29 +35,29 @@ description: MergeMeet 專案健康度審查 Skill。全面檢查交友軟體核
 
 ### 1. 交友軟體核心功能
 
-| 功能 | 狀態 | 說明 |
-|-----|------|-----|
-| 用戶註冊/登入 | 查看 [核心功能狀態](resources/feature-status.md) | 包含 Email 驗證、密碼重設 |
-| 個人檔案管理 | 查看 [核心功能狀態](resources/feature-status.md) | 照片、興趣標籤、自我介紹 |
-| 探索/瀏覽用戶 | 查看 [核心功能狀態](resources/feature-status.md) | 配對分數、篩選條件 |
-| 喜歡/跳過機制 | 查看 [核心功能狀態](resources/feature-status.md) | 滑動卡片交互 |
-| 配對系統 | 查看 [核心功能狀態](resources/feature-status.md) | 互相喜歡即配對 |
-| 即時聊天 | 查看 [核心功能狀態](resources/feature-status.md) | WebSocket 訊息 |
-| 封鎖/舉報 | 查看 [核心功能狀態](resources/feature-status.md) | 安全防護機制 |
-| 通知系統 | 查看 [核心功能狀態](resources/feature-status.md) | 即時 + 持久化 |
-| 管理後台 | 查看 [核心功能狀態](resources/feature-status.md) | 舉報處理、內容審核 |
+使用 [功能檢查清單](resources/feature-status.md) 逐項確認：
+
+| 類別 | 檢查重點 |
+|-----|---------|
+| 認證系統 | 註冊、登入、Email 驗證、密碼重設 |
+| 個人檔案 | 編輯、照片上傳、審核、申訴、興趣標籤 |
+| 探索配對 | 候選人瀏覽、詳情查看、喜歡/跳過、偏好設定 |
+| 聊天系統 | 即時訊息、已讀狀態、內容審核提示 |
+| 安全功能 | 封鎖、舉報、舉報記錄 |
+| 通知系統 | 即時通知、持久化、通知中心 |
+| 管理後台 | 儀表板、舉報處理、內容審核、用戶管理 |
 
 ### 2. 前後端功能對應檢查
 
-查看 [前後端差異分析](resources/frontend-backend-gap.md)
+使用 [前後端對應檢查指南](resources/frontend-backend-gap.md) 進行差異分析
 
-### 3. 已知問題和潛在 Bug
+### 3. 常見問題類型
 
-查看 [已知問題清單](resources/known-issues.md)
+參考 [常見問題類型與檢查方法](resources/known-issues.md) 識別潛在 Bug
 
 ### 4. 改進建議
 
-查看 [改進建議](resources/improvement-suggestions.md)
+參考 [改進建議與優化指南](resources/improvement-suggestions.md) 進行優化
 
 ---
 
@@ -118,11 +118,12 @@ cd frontend && npm run test
 
 | 檔案 | 說明 |
 |-----|------|
-| [feature-status.md](resources/feature-status.md) | 核心功能實現狀態 |
-| [frontend-backend-gap.md](resources/frontend-backend-gap.md) | 前後端功能差異分析 |
-| [known-issues.md](resources/known-issues.md) | 已知問題和潛在 Bug |
-| [improvement-suggestions.md](resources/improvement-suggestions.md) | 改進建議和優先級 |
+| [feature-status.md](resources/feature-status.md) | 功能檢查清單（靜態參考） |
+| [frontend-backend-gap.md](resources/frontend-backend-gap.md) | 前後端對應檢查指南 |
+| [known-issues.md](resources/known-issues.md) | 常見問題類型與檢查方法 |
+| [improvement-suggestions.md](resources/improvement-suggestions.md) | 改進建議與優化指南 |
 | [e2e-testing-guide.md](resources/e2e-testing-guide.md) | E2E 測試指南 |
+| [CHANGELOG.md](CHANGELOG.md) | 審查歷史記錄（分離存放） |
 
 ---
 

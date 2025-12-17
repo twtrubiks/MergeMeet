@@ -1,154 +1,171 @@
-# 前後端功能差異分析
+# 前後端功能對應檢查指南
 
-> 最後更新: 2025-12-16
-
-## 後端有實現，前端未完全使用的功能
-
-### 1. 用戶管理 API (管理後台)
-
-**後端 API** (`backend/app/api/admin.py`):
-```python
-@router.get("/users")           # 獲取用戶列表（含搜尋、篩選）
-@router.post("/users/ban")      # 封禁用戶
-@router.post("/users/unban")    # 解封用戶
-```
-
-**前端狀態**: AdminDashboard.vue 缺少「用戶管理」Tab
-
-**影響**: 管理員無法直接在後台搜尋和管理用戶
-
-**建議**: 在 AdminDashboard 新增用戶管理功能
+本文件說明如何檢查前後端功能是否對應，以及常見的差異類型。
 
 ---
 
-### 2. 通知中心
+## 檢查流程
 
-**後端 API** (`backend/app/api/notifications.py`):
-```python
-@router.get("")                           # 獲取通知列表
-@router.put("/{notification_id}/read")    # 標記已讀
-@router.put("/read-all")                  # 全部標記已讀
-@router.delete("/{notification_id}")       # 刪除通知
-```
-
-**前端狀態**:
-- `stores/notification.js` 有基本實現
-- 缺少專門的 `/notifications` 頁面
-
-**影響**: 用戶無法查看和管理歷史通知
-
-**建議**: 新增通知中心頁面，顯示所有通知歷史
-
----
-
-### 3. 用戶申訴介面
-
-**後端 API** (`backend/app/api/moderation.py`):
-```python
-@router.post("/appeals")         # 提交申訴
-@router.get("/appeals/my")       # 查看我的申訴
-```
-
-**前端狀態**: 僅管理後台有申訴「處理」功能，一般用戶無法「提交」申訴
-
-**影響**: 用戶內容被審核拒絕後無法申訴
-
-**建議**: 在照片或訊息被拒絕時，提供申訴入口
-
----
-
-### 4. 我的舉報記錄
-
-**後端 API** (`backend/app/api/safety.py`):
-```python
-@router.get("/reports")          # 獲取我提交的舉報記錄
-```
-
-**前端狀態**: `stores/safety.js` 沒有 `fetchMyReports` 方法
-
-**影響**: 用戶無法追蹤舉報處理進度
-
-**建議**: 在設定頁或專門頁面顯示舉報記錄
-
----
-
-### 5. 配對偏好設定
-
-**後端 API** (`backend/app/api/profile.py`):
-```python
-# ProfileUpdateRequest 支援以下偏好設定:
-min_age_preference: int
-max_age_preference: int
-max_distance_km: int
-gender_preference: str
-```
-
-**前端狀態**: Profile.vue 和 Settings.vue 沒有偏好設定 UI
-
-**影響**: 用戶無法調整配對篩選條件
-
-**建議**: 在設定頁新增「配對偏好」區塊
-
----
-
-## 檢查腳本
-
-### 列出後端所有 API 端點
+### 步驟 1：列出後端 API 端點
 
 ```bash
-# 在專案根目錄執行
+# 列出所有路由定義
 grep -rh "@router\.\(get\|post\|put\|patch\|delete\)" backend/app/api/ \
   | grep -oE '@router\.[a-z]+\("[^"]*"' \
   | sort | uniq
 ```
 
-### 列出前端所有 API 呼叫
+### 步驟 2：列出前端 API 呼叫
 
 ```bash
+# 列出所有 apiClient 呼叫
 grep -rh "apiClient\.\(get\|post\|put\|patch\|delete\)" frontend/src/ \
   | grep -oE "apiClient\.[a-z]+\('[^']*'" \
   | sort | uniq
 ```
 
-### 對比差異
+### 步驟 3：交叉比對
 
+比較兩份清單，找出：
+- 後端有但前端未使用的 API
+- 前端呼叫但後端不存在的 API
+
+---
+
+## API 對應關係參考表
+
+| 後端模組 | API 前綴 | 前端 Store/Component |
+|---------|---------|---------------------|
+| `auth.py` | `/api/auth/*` | `stores/user.js` |
+| `profile.py` | `/api/profile/*` | `stores/profile.js` |
+| `discovery.py` | `/api/discovery/*` | `stores/discovery.js` |
+| `matches.py` | `/api/matches/*` | `stores/match.js` |
+| `messages.py` | `/api/messages/*` | `stores/message.js` |
+| `safety.py` | `/api/safety/*` | `stores/safety.js` |
+| `notifications.py` | `/api/notifications/*` | `stores/notification.js` |
+| `moderation.py` | `/api/moderation/*` | 相關組件（如 PhotoUploader） |
+| `admin.py` | `/api/admin/*` | `views/admin/AdminDashboard.vue` |
+
+---
+
+## 常見差異類型
+
+### 類型 1：後端有，前端未實現
+
+**特徵**：後端 API 存在但前端沒有對應的 UI 或呼叫
+
+**檢查方法**：
 ```bash
-# 產生後端端點清單
-grep -rh "@router" backend/app/api/*.py | grep -oE '"[^"]*"' | sort | uniq > /tmp/backend_endpoints.txt
+# 搜尋特定 API 是否被前端使用
+grep -r "/api/some-endpoint" frontend/src/
+```
 
-# 產生前端呼叫清單
-grep -rh "apiClient" frontend/src/**/*.{js,vue} 2>/dev/null | grep -oE "'/[^']*'" | sort | uniq > /tmp/frontend_calls.txt
+**常見原因**：
+- 功能尚未開發前端部分
+- API 為內部使用（如管理功能）
+- 預留給未來版本
 
-# 手動比較
+### 類型 2：前端有，後端未實現
+
+**特徵**：前端有 UI 但 API 呼叫會 404
+
+**檢查方法**：
+```bash
+# 確認後端是否有對應路由
+grep -r "some-endpoint" backend/app/api/
+```
+
+**常見原因**：
+- 前端先行開發，後端未跟上
+- API 路徑拼寫錯誤
+- 路由註冊遺漏
+
+### 類型 3：參數不一致
+
+**特徵**：API 存在但請求/回應格式不匹配
+
+**檢查方法**：
+1. 查看後端 Pydantic schema
+2. 對比前端發送的資料結構
+
+**常見問題**：
+- 欄位名稱大小寫不同（snake_case vs camelCase）
+- 必填欄位遺漏
+- 資料類型不匹配
+
+---
+
+## 重點檢查區域
+
+### 用戶功能 API
+
+| API | 用途 | 前端位置 |
+|-----|------|---------|
+| `GET /api/profile` | 獲取個人檔案 | stores/profile.js |
+| `PATCH /api/profile` | 更新檔案（含偏好） | Settings.vue |
+| `GET /api/notifications` | 通知列表 | Notifications.vue |
+| `GET /api/safety/reports` | 我的舉報記錄 | MyReports.vue |
+| `POST /api/moderation/appeals` | 提交申訴 | PhotoUploader.vue |
+
+### 管理功能 API
+
+| API | 用途 | 前端位置 |
+|-----|------|---------|
+| `GET /api/admin/users` | 用戶列表 | AdminDashboard 用戶管理 Tab |
+| `POST /api/admin/users/ban` | 封禁用戶 | AdminDashboard 封禁按鈕 |
+| `POST /api/admin/users/unban` | 解封用戶 | AdminDashboard 解封按鈕 |
+| `GET /api/admin/stats` | 統計資料 | AdminDashboard 儀表板 |
+
+---
+
+## 自動化檢查腳本
+
+可建立腳本自動比對：
+
+```python
+# scripts/check_api_coverage.py
+import subprocess
+import re
+
+def get_backend_endpoints():
+    """從後端程式碼提取所有 API 端點"""
+    result = subprocess.run(
+        ['grep', '-rh', '@router', 'backend/app/api/'],
+        capture_output=True, text=True
+    )
+    endpoints = re.findall(r'@router\.\w+\("([^"]+)"', result.stdout)
+    return set(endpoints)
+
+def get_frontend_calls():
+    """從前端程式碼提取所有 API 呼叫"""
+    result = subprocess.run(
+        ['grep', '-rh', 'apiClient', 'frontend/src/'],
+        capture_output=True, text=True
+    )
+    calls = re.findall(r"apiClient\.\w+\('([^']+)'", result.stdout)
+    return set(calls)
+
+def compare():
+    backend = get_backend_endpoints()
+    frontend = get_frontend_calls()
+
+    print("後端有但前端未使用:")
+    for ep in backend - frontend:
+        print(f"  - {ep}")
+
+    print("\n前端呼叫但後端不存在:")
+    for ep in frontend - backend:
+        print(f"  - {ep}")
 ```
 
 ---
 
-## 對應關係表
+## 檢查清單
 
-| 後端 API | 前端 Store/Component | 狀態 |
-|---------|---------------------|------|
-| `/api/auth/*` | `stores/user.js` | COMPLETE |
-| `/api/profile/*` | `stores/profile.js` | COMPLETE |
-| `/api/discovery/*` | `stores/discovery.js` | COMPLETE |
-| `/api/matches/*` | `stores/match.js` | COMPLETE |
-| `/api/messages/*` | `stores/message.js` | COMPLETE |
-| `/api/safety/*` | `stores/safety.js` | PARTIAL |
-| `/api/notifications/*` | `stores/notification.js` | PARTIAL |
-| `/api/moderation/*` (用戶) | - | MISSING |
-| `/api/admin/*` | `AdminDashboard.vue` | PARTIAL |
+審查時確認以下項目：
 
----
-
-## 優先修復建議
-
-### P0 (高優先級)
-1. **配對偏好設定 UI** - 影響用戶體驗
-2. **管理員用戶管理** - 管理員核心功能
-
-### P1 (中優先級)
-3. **通知中心頁面** - 完善通知系統
-4. **用戶申訴介面** - 公平性保障
-
-### P2 (低優先級)
-5. **我的舉報記錄** - 增強透明度
+- [ ] 所有後端 API 都有對應的前端呼叫或明確標記為「僅內部使用」
+- [ ] 所有前端 API 呼叫都能正常回應（無 404）
+- [ ] 請求/回應的資料結構一致
+- [ ] 錯誤處理有對應的前端顯示
+- [ ] WebSocket 事件有對應的前端處理器
