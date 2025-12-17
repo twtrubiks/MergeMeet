@@ -79,6 +79,13 @@
           <div v-if="!notification.read" class="unread-dot"></div>
         </div>
       </div>
+
+      <!-- 查看全部連結 -->
+      <div class="view-all">
+        <router-link to="/notifications" class="view-all-link" @click="showDropdown = false">
+          查看全部通知
+        </router-link>
+      </div>
     </div>
   </n-popover>
 </template>
@@ -377,5 +384,25 @@ const formatTime = (timestamp) => {
   flex-shrink: 0;
   margin-left: 8px;
   margin-top: 4px;
+}
+
+/* 查看全部連結 */
+.view-all {
+  padding: 12px 16px;
+  border-top: 1px solid #f0f0f0;
+  text-align: center;
+}
+
+.view-all-link {
+  color: #ff6b6b;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.view-all-link:hover {
+  color: #ff5252;
+  text-decoration: underline;
 }
 </style>

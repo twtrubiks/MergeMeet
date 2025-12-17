@@ -67,6 +67,12 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/notifications',
+      name: 'notifications',
+      component: () => import('@/views/Notifications.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/discovery',
       name: 'discovery',
       component: Discovery,
