@@ -6,7 +6,7 @@
           <span class="logo-icon">&#x2699;</span>
         </div>
         <h1>帳號設定</h1>
-        <p>管理您的帳號安全設定</p>
+        <p>管理您的帳號與配對偏好</p>
       </div>
 
       <!-- 密碼修改區塊 -->
@@ -95,6 +95,111 @@
         </form>
       </div>
 
+      <!-- 配對偏好設定區塊 -->
+      <div class="settings-section">
+        <h2 class="section-title">
+          <span class="section-icon">&#x1F495;</span>
+          配對偏好
+        </h2>
+
+        <!-- 載入中 -->
+        <div v-if="preferenceLoading" class="loading-state">
+          <div class="spinner"></div>
+          <p>載入中...</p>
+        </div>
+
+        <!-- 偏好設定表單 -->
+        <form v-else @submit.prevent="handleSavePreferences" class="preference-form">
+          <!-- 年齡範圍 -->
+          <div class="form-group">
+            <label class="form-label">年齡範圍</label>
+            <div class="age-range">
+              <div class="age-input">
+                <label>最小</label>
+                <input
+                  type="number"
+                  v-model.number="preferences.minAge"
+                  min="18"
+                  max="99"
+                  :disabled="preferenceSaving"
+                />
+              </div>
+              <span class="range-separator">～</span>
+              <div class="age-input">
+                <label>最大</label>
+                <input
+                  type="number"
+                  v-model.number="preferences.maxAge"
+                  min="18"
+                  max="99"
+                  :disabled="preferenceSaving"
+                />
+              </div>
+            </div>
+            <p v-if="ageRangeError" class="field-error">{{ ageRangeError }}</p>
+          </div>
+
+          <!-- 最大距離 -->
+          <div class="form-group">
+            <label class="form-label">最大距離</label>
+            <div class="distance-input">
+              <input
+                type="range"
+                v-model.number="preferences.maxDistance"
+                min="1"
+                max="500"
+                :disabled="preferenceSaving"
+              />
+              <span class="distance-value">{{ preferences.maxDistance }} 公里</span>
+            </div>
+            <div class="distance-marks">
+              <span>1km</span>
+              <span>100km</span>
+              <span>250km</span>
+              <span>500km</span>
+            </div>
+          </div>
+
+          <!-- 性別偏好 -->
+          <div class="form-group">
+            <label class="form-label">性別偏好</label>
+            <div class="gender-options">
+              <label
+                v-for="option in genderOptions"
+                :key="option.value"
+                class="gender-option"
+                :class="{ active: preferences.genderPreference === option.value }"
+              >
+                <input
+                  type="radio"
+                  v-model="preferences.genderPreference"
+                  :value="option.value"
+                  :disabled="preferenceSaving"
+                />
+                <span class="option-icon">{{ option.icon }}</span>
+                <span class="option-label">{{ option.label }}</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- 錯誤訊息 -->
+          <p v-if="preferenceError" class="error-message">{{ preferenceError }}</p>
+
+          <!-- 成功訊息 -->
+          <p v-if="preferenceSaveSuccess" class="success-message">&#x2705; 偏好設定已儲存</p>
+
+          <!-- 儲存按鈕 -->
+          <AnimatedButton
+            type="submit"
+            variant="primary"
+            :disabled="!isPreferenceValid || preferenceSaving"
+            :loading="preferenceSaving"
+          >
+            <span v-if="!preferenceSaving">&#x1F4BE; 儲存偏好</span>
+          </AnimatedButton>
+        </form>
+      </div>
+
       <!-- 返回首頁連結 -->
       <div class="settings-footer">
         <router-link to="/" class="back-link">&#x2190; 返回首頁</router-link>
@@ -111,15 +216,17 @@
 </template>
 
 <script setup>
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useProfileStore } from '@/stores/profile'
 import { authAPI } from '@/api/auth'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 import FloatingInput from '@/components/ui/FloatingInput.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
+const profileStore = useProfileStore()
 
 // 表單資料
 const formData = ref({
@@ -223,6 +330,104 @@ const goToLogin = () => {
   userStore.logout()
   router.push('/login')
 }
+
+// ==================== 配對偏好設定 ====================
+
+// 偏好設定狀態
+const preferences = ref({
+  minAge: 18,
+  maxAge: 50,
+  maxDistance: 50,
+  genderPreference: 'all'
+})
+
+const preferenceLoading = ref(false)
+const preferenceSaving = ref(false)
+const preferenceError = ref('')
+const preferenceSaveSuccess = ref(false)
+
+// 性別選項
+const genderOptions = [
+  { value: 'male', label: '男性', icon: '👨' },
+  { value: 'female', label: '女性', icon: '👩' },
+  { value: 'both', label: '男女皆可', icon: '👫' },
+  { value: 'all', label: '不限', icon: '🌈' }
+]
+
+// 年齡範圍驗證
+const ageRangeError = computed(() => {
+  if (preferences.value.minAge > preferences.value.maxAge) {
+    return '最小年齡不能大於最大年齡'
+  }
+  if (preferences.value.minAge < 18 || preferences.value.maxAge > 99) {
+    return '年齡範圍必須在 18-99 歲之間'
+  }
+  return ''
+})
+
+// 偏好設定驗證
+const isPreferenceValid = computed(() => {
+  return !ageRangeError.value &&
+    preferences.value.minAge >= 18 &&
+    preferences.value.maxAge <= 99 &&
+    preferences.value.maxDistance >= 1 &&
+    preferences.value.maxDistance <= 500
+})
+
+// 載入偏好設定
+const loadPreferences = async () => {
+  preferenceLoading.value = true
+  try {
+    await profileStore.fetchProfile()
+    if (profileStore.profile) {
+      preferences.value = {
+        minAge: profileStore.profile.min_age_preference || 18,
+        maxAge: profileStore.profile.max_age_preference || 50,
+        maxDistance: profileStore.profile.max_distance_km || 50,
+        genderPreference: profileStore.profile.gender_preference || 'all'
+      }
+    }
+  } catch (err) {
+    preferenceError.value = '載入偏好設定失敗'
+    console.error('載入偏好設定錯誤:', err)
+  } finally {
+    preferenceLoading.value = false
+  }
+}
+
+// 儲存偏好設定
+const handleSavePreferences = async () => {
+  if (!isPreferenceValid.value) return
+
+  preferenceError.value = ''
+  preferenceSaveSuccess.value = false
+  preferenceSaving.value = true
+
+  try {
+    await profileStore.updateProfile({
+      min_age_preference: preferences.value.minAge,
+      max_age_preference: preferences.value.maxAge,
+      max_distance_km: preferences.value.maxDistance,
+      gender_preference: preferences.value.genderPreference
+    })
+
+    preferenceSaveSuccess.value = true
+    // 3 秒後隱藏成功訊息
+    setTimeout(() => {
+      preferenceSaveSuccess.value = false
+    }, 3000)
+  } catch (err) {
+    preferenceError.value = err.response?.data?.detail || '儲存失敗，請稍後再試'
+    console.error('儲存偏好設定錯誤:', err)
+  } finally {
+    preferenceSaving.value = false
+  }
+}
+
+// 頁面載入時取得偏好設定
+onMounted(() => {
+  loadPreferences()
+})
 
 // 清理定時器
 onUnmounted(() => {
@@ -495,6 +700,215 @@ onUnmounted(() => {
   color: #764ba2;
 }
 
+/* 配對偏好設定 */
+.preference-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-label {
+  font-weight: 600;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+/* 年齡範圍 */
+.age-range {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.age-input {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.age-input label {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.age-input input {
+  padding: 12px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  font-size: 1rem;
+  text-align: center;
+  transition: border-color 0.3s ease;
+}
+
+.age-input input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.age-input input:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.range-separator {
+  font-size: 1.5rem;
+  color: #999;
+  padding-top: 20px;
+}
+
+.field-error {
+  color: #e53935;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+/* 距離滑桿 */
+.distance-input {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.distance-input input[type="range"] {
+  flex: 1;
+  height: 8px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: linear-gradient(to right, #667eea, #764ba2);
+  border-radius: 4px;
+  outline: none;
+}
+
+.distance-input input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  background: white;
+  border: 3px solid #667eea;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease;
+}
+
+.distance-input input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+.distance-input input[type="range"]::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  background: white;
+  border: 3px solid #667eea;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.distance-value {
+  min-width: 80px;
+  text-align: right;
+  font-weight: 600;
+  color: #667eea;
+}
+
+.distance-marks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #999;
+  padding: 0 4px;
+}
+
+/* 性別選項 */
+.gender-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.gender-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.gender-option:hover {
+  border-color: #667eea;
+  background: #f8f8ff;
+}
+
+.gender-option.active {
+  border-color: #667eea;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+}
+
+.gender-option input {
+  display: none;
+}
+
+.option-icon {
+  font-size: 2rem;
+}
+
+.option-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #333;
+}
+
+/* 成功訊息 */
+.success-message {
+  color: #4caf50;
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 12px;
+  background: #e8f5e9;
+  border-radius: 8px;
+  margin: 0;
+}
+
+/* 載入狀態 */
+.loading-state {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 16px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-state p {
+  color: #666;
+  font-size: 0.95rem;
+}
+
 /* 響應式設計 */
 @media (max-width: 480px) {
   .settings-card {
@@ -508,6 +922,19 @@ onUnmounted(() => {
   .logo-icon,
   .success-icon {
     font-size: 3rem;
+  }
+
+  .gender-options {
+    grid-template-columns: 1fr;
+  }
+
+  .age-range {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .range-separator {
+    display: none;
   }
 }
 </style>
