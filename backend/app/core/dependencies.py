@@ -14,6 +14,74 @@ from app.services.token_blacklist import token_blacklist
 security = HTTPBearer(auto_error=False)
 
 
+def _extract_token_from_cookie(
+    access_token_cookie: Optional[str],
+    csrf_token_header: Optional[str],
+    csrf_token_cookie: Optional[str]
+) -> str:
+    """從 Cookie 提取並驗證 Token
+
+    Args:
+        access_token_cookie: Cookie 中的 Access Token
+        csrf_token_header: Header 中的 CSRF Token
+        csrf_token_cookie: Cookie 中的 CSRF Token
+
+    Returns:
+        str: 驗證後的 Token
+
+    Raises:
+        HTTPException: CSRF 驗證失敗
+    """
+    if not csrf_token_header or not csrf_token_cookie:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="CSRF 驗證失敗：缺少 CSRF Token"
+        )
+    if csrf_token_header != csrf_token_cookie:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="CSRF 驗證失敗：Token 不匹配"
+        )
+    return access_token_cookie
+
+
+def _validate_token_payload(payload: Optional[dict]) -> str:
+    """驗證 Token payload 並返回 user_id
+
+    Args:
+        payload: 解碼後的 Token payload
+
+    Returns:
+        str: 用戶 ID
+
+    Raises:
+        HTTPException: Token 無效
+    """
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="無效的認證憑證",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if payload.get("type") != "access":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="無效的 Token 類型",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="無效的 Token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return user_id
+
+
 async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     access_token_cookie: Optional[str] = Cookie(None, alias="access_token"),
@@ -38,28 +106,13 @@ async def get_current_user(
     Raises:
         HTTPException: 如果認證失敗
     """
-    token = None
-    auth_method = None
-
-    # 優先使用 Cookie 認證
+    # 優先使用 Cookie 認證，回退到 Bearer Token
     if access_token_cookie:
-        # Cookie 認證需要驗證 CSRF Token（Double Submit Cookie Pattern）
-        if not csrf_token_header or not csrf_token_cookie:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="CSRF 驗證失敗：缺少 CSRF Token"
-            )
-        if csrf_token_header != csrf_token_cookie:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="CSRF 驗證失敗：Token 不匹配"
-            )
-        token = access_token_cookie
-        auth_method = "cookie"
+        token = _extract_token_from_cookie(
+            access_token_cookie, csrf_token_header, csrf_token_cookie
+        )
     elif credentials:
-        # 回退到 Bearer Token 認證
         token = credentials.credentials
-        auth_method = "bearer"
     else:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -75,31 +128,9 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # 解碼 Token
+    # 解碼並驗證 Token
     payload = decode_token(token)
-    if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="無效的認證憑證",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # 檢查 Token 類型
-    if payload.get("type") != "access":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="無效的 Token 類型",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # 取得用戶 ID
-    user_id = payload.get("sub")
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="無效的 Token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    user_id = _validate_token_payload(payload)
 
     # 從資料庫查詢用戶
     result = await db.execute(
@@ -114,7 +145,6 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # 檢查用戶是否啟用
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

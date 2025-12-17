@@ -14,6 +14,7 @@
     )
 """
 import aiosmtplib
+from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Optional
@@ -272,8 +273,6 @@ Hi {username},
         Returns:
             bool: 是否成功發送
         """
-        from datetime import datetime
-
         change_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         html_content = f"""  # noqa: E501
