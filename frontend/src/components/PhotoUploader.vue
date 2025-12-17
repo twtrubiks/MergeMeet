@@ -103,9 +103,9 @@ const handleFileSelect = async (event) => {
     return
   }
 
-  // 驗證檔案大小 (10MB)
-  if (file.size > 10 * 1024 * 1024) {
-    error.value = '圖片大小不能超過 10MB'
+  // 驗證檔案大小 (5MB，與後端 MAX_UPLOAD_SIZE 一致)
+  if (file.size > 5 * 1024 * 1024) {
+    error.value = '圖片大小不能超過 5MB'
     return
   }
 
