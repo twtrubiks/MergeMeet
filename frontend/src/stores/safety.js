@@ -9,6 +9,7 @@ import apiClient from '@/api/client'
 export const useSafetyStore = defineStore('safety', () => {
   // State
   const blockedUsers = ref([])
+  const myReports = ref([])
   const loading = ref(false)
   const error = ref(null)
 
@@ -112,6 +113,24 @@ export const useSafetyStore = defineStore('safety', () => {
   }
 
   /**
+   * 取得我的舉報記錄
+   */
+  const fetchMyReports = async () => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await apiClient.get('/safety/reports')
+      myReports.value = response.data
+      return response.data
+    } catch (err) {
+      error.value = err.response?.data?.detail || '無法取得舉報記錄'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
    * 清除錯誤訊息
    */
   const clearError = () => {
@@ -123,6 +142,7 @@ export const useSafetyStore = defineStore('safety', () => {
    */
   const $reset = () => {
     blockedUsers.value = []
+    myReports.value = []
     loading.value = false
     error.value = null
   }
@@ -130,6 +150,7 @@ export const useSafetyStore = defineStore('safety', () => {
   return {
     // State
     blockedUsers,
+    myReports,
     loading,
     error,
 
@@ -143,6 +164,7 @@ export const useSafetyStore = defineStore('safety', () => {
     fetchBlockedUsers,
     isBlocked,
     reportUser,
+    fetchMyReports,
     clearError,
     $reset
   }

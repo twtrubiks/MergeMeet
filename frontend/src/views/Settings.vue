@@ -200,6 +200,26 @@
         </form>
       </div>
 
+      <!-- 其他功能連結 -->
+      <div class="settings-section quick-links">
+        <h2 class="section-title">
+          <span class="section-icon">&#x1F4DD;</span>
+          其他功能
+        </h2>
+        <div class="link-list">
+          <router-link to="/my-reports" class="link-item">
+            <span class="link-icon">&#x1F4CB;</span>
+            <span class="link-text">我的舉報記錄</span>
+            <span class="link-arrow">&#x203A;</span>
+          </router-link>
+          <router-link to="/blocked" class="link-item">
+            <span class="link-icon">&#x1F6AB;</span>
+            <span class="link-text">封鎖名單</span>
+            <span class="link-arrow">&#x203A;</span>
+          </router-link>
+        </div>
+      </div>
+
       <!-- 返回首頁連結 -->
       <div class="settings-footer">
         <router-link to="/" class="back-link">&#x2190; 返回首頁</router-link>
@@ -907,6 +927,55 @@ onUnmounted(() => {
 .loading-state p {
   color: #666;
   font-size: 0.95rem;
+}
+
+/* 快捷連結 */
+.quick-links {
+  margin-top: 24px;
+}
+
+.link-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.link-item {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  text-decoration: none;
+  color: #333;
+  transition: all 0.3s ease;
+}
+
+.link-item:hover {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+  transform: translateX(4px);
+}
+
+.link-icon {
+  font-size: 1.5rem;
+  margin-right: 16px;
+}
+
+.link-text {
+  flex: 1;
+  font-weight: 500;
+  font-size: 1rem;
+}
+
+.link-arrow {
+  font-size: 1.5rem;
+  color: #999;
+  transition: transform 0.3s ease;
+}
+
+.link-item:hover .link-arrow {
+  transform: translateX(4px);
+  color: #667eea;
 }
 
 /* 響應式設計 */
