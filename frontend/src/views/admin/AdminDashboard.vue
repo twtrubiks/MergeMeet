@@ -258,6 +258,77 @@
           </div>
         </n-tab-pane>
 
+        <n-tab-pane name="users" tab="👥 用戶管理">
+          <div class="tab-content">
+            <!-- 用戶管理統計 -->
+            <div class="users-stats-section">
+              <h2>用戶統計</h2>
+              <div class="stats-grid">
+                <div class="stat-card">
+                  <div class="stat-icon">👥</div>
+                  <div class="stat-info">
+                    <div class="stat-value">{{ stats.total_users }}</div>
+                    <div class="stat-label">總用戶數</div>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon">✅</div>
+                  <div class="stat-info">
+                    <div class="stat-value">{{ stats.active_users }}</div>
+                    <div class="stat-label">活躍用戶</div>
+                  </div>
+                </div>
+                <div class="stat-card danger">
+                  <div class="stat-icon">🚫</div>
+                  <div class="stat-info">
+                    <div class="stat-value">{{ stats.banned_users }}</div>
+                    <div class="stat-label">被封禁用戶</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 用戶搜尋和篩選 -->
+            <div class="users-management-section">
+              <div class="section-header">
+                <h2>用戶列表</h2>
+                <n-button @click="loadUsers">刷新</n-button>
+              </div>
+
+              <div class="filter-bar">
+                <n-input
+                  v-model:value="userFilters.search"
+                  placeholder="搜尋 Email..."
+                  style="width: 300px"
+                  clearable
+                  @keyup.enter="() => loadUsers(true)"
+                >
+                  <template #prefix>🔍</template>
+                </n-input>
+                <n-select
+                  v-model:value="userFilters.is_active"
+                  placeholder="選擇狀態"
+                  :options="userStatusOptions"
+                  style="width: 150px"
+                  clearable
+                  @update:value="() => loadUsers(true)"
+                />
+                <n-button type="primary" @click="() => loadUsers(true)">搜尋</n-button>
+              </div>
+
+              <n-spin :show="loadingUsers">
+                <n-data-table
+                  :columns="userColumns"
+                  :data="users"
+                  :pagination="userPagination"
+                  :bordered="false"
+                  @update:page="handleUserPageChange"
+                />
+              </n-spin>
+            </div>
+          </div>
+        </n-tab-pane>
+
         <n-tab-pane name="photo-moderation" tab="📷 照片審核">
           <div class="tab-content">
             <!-- 照片審核統計 -->
@@ -354,6 +425,39 @@
         </n-tab-pane>
       </n-tabs>
     </div>
+
+    <!-- 封禁用戶 Modal -->
+    <n-modal v-model:show="showBanUserModal" preset="dialog" title="封禁用戶">
+      <div v-if="banningUser" style="margin-bottom: 16px;">
+        <p><strong>用戶:</strong> {{ banningUser.email }}</p>
+        <p><strong>信任分數:</strong> {{ banningUser.trust_score }}</p>
+      </div>
+      <n-form>
+        <n-form-item label="封禁原因">
+          <n-input
+            v-model:value="banReason"
+            type="textarea"
+            placeholder="請輸入封禁原因"
+            :rows="3"
+          />
+        </n-form-item>
+        <n-form-item label="封禁天數">
+          <n-input-number
+            v-model:value="banDurationDays"
+            :min="0"
+            placeholder="留空或 0 表示永久封禁"
+            style="width: 100%"
+          />
+          <template #feedback>
+            <span style="color: #999; font-size: 12px;">留空或設為 0 表示永久封禁</span>
+          </template>
+        </n-form-item>
+      </n-form>
+      <template #action>
+        <n-button @click="showBanUserModal = false">取消</n-button>
+        <n-button type="error" @click="confirmBanUser">確認封禁</n-button>
+      </template>
+    </n-modal>
 
     <!-- 拒絕照片理由 Modal -->
     <n-modal v-model:show="showRejectReasonModal" preset="dialog" title="拒絕照片">
@@ -492,7 +596,7 @@ import { useRouter } from 'vue-router'
 import {
   NButton, NTag, NSpin, NTabs, NTabPane, NDataTable,
   NSelect, NModal, NForm, NFormItem, NInput, NCheckbox,
-  NPagination,
+  NPagination, NInputNumber,
   useMessage, useDialog
 } from 'naive-ui'
 import apiClient from '@/api/client'
@@ -568,6 +672,32 @@ const rejectReasonOptions = [
   { label: '其他', value: 'OTHER' }
 ]
 
+// User management related states
+const users = ref([])
+const loadingUsers = ref(false)
+const userFilters = ref({
+  search: '',
+  is_active: null
+})
+const userPagination = ref({
+  page: 1,
+  pageSize: 20,
+  itemCount: 0,
+  onChange: (page) => {
+    userPagination.value.page = page
+    loadUsers()
+  }
+})
+const showBanUserModal = ref(false)
+const banningUser = ref(null)
+const banReason = ref('')
+const banDurationDays = ref(null)
+
+const userStatusOptions = [
+  { label: '活躍', value: true },
+  { label: '已封禁', value: false }
+]
+
 const showAddWordModal = ref(false)
 const showEditWordModal = ref(false)
 const newWord = ref({
@@ -630,6 +760,91 @@ const actionOptions = [
 const activeOptions = [
   { label: '啟用', value: true },
   { label: '停用', value: false }
+]
+
+// User columns for data table
+const userColumns = [
+  {
+    title: 'Email',
+    key: 'email',
+    width: 250,
+    ellipsis: { tooltip: true }
+  },
+  {
+    title: '狀態',
+    key: 'is_active',
+    width: 100,
+    render: (row) => {
+      return h(NTag, {
+        type: row.is_active ? 'success' : 'error'
+      }, { default: () => row.is_active ? '活躍' : '已封禁' })
+    }
+  },
+  {
+    title: '信任分數',
+    key: 'trust_score',
+    width: 100,
+    render: (row) => {
+      const score = row.trust_score || 0
+      let type = 'success'
+      if (score < 50) type = 'error'
+      else if (score < 80) type = 'warning'
+      return h(NTag, { type }, { default: () => score })
+    }
+  },
+  {
+    title: '警告次數',
+    key: 'warning_count',
+    width: 100
+  },
+  {
+    title: 'Email 驗證',
+    key: 'email_verified',
+    width: 100,
+    render: (row) => row.email_verified ? '✅' : '❌'
+  },
+  {
+    title: '管理員',
+    key: 'is_admin',
+    width: 80,
+    render: (row) => row.is_admin ? '👑' : '-'
+  },
+  {
+    title: '封禁原因',
+    key: 'ban_reason',
+    width: 150,
+    ellipsis: { tooltip: true },
+    render: (row) => row.ban_reason || '-'
+  },
+  {
+    title: '註冊時間',
+    key: 'created_at',
+    width: 180,
+    render: (row) => formatDate(row.created_at)
+  },
+  {
+    title: '操作',
+    key: 'actions',
+    width: 150,
+    render: (row) => {
+      if (row.is_admin) {
+        return h('span', { style: 'color: #999;' }, '管理員')
+      }
+      if (row.is_active) {
+        return h(NButton, {
+          size: 'small',
+          type: 'error',
+          onClick: () => showBanModal(row)
+        }, { default: () => '封禁' })
+      } else {
+        return h(NButton, {
+          size: 'small',
+          type: 'success',
+          onClick: () => handleUnbanUser(row)
+        }, { default: () => '解封' })
+      }
+    }
+  }
 ]
 
 // Word columns for data table
@@ -900,6 +1115,100 @@ const reviewAppeal = async (appealId, status) => {
   }
 }
 
+// ==================== User Management Functions ====================
+
+// 載入用戶列表
+const loadUsers = async (resetPage = false) => {
+  if (resetPage) {
+    userPagination.value.page = 1
+  }
+
+  loadingUsers.value = true
+  try {
+    const params = {
+      page: userPagination.value.page,
+      page_size: userPagination.value.pageSize
+    }
+    if (userFilters.value.search) {
+      params.search = userFilters.value.search
+    }
+    if (userFilters.value.is_active !== null) {
+      params.is_active = userFilters.value.is_active
+    }
+
+    const response = await apiClient.get('/admin/users', { params })
+    users.value = response.data
+    // 假設後端返回的是完整列表，這裡簡單處理分頁
+    userPagination.value.itemCount = response.data.length
+  } catch (error) {
+    logger.error('載入用戶列表失敗:', error)
+    message.error('載入用戶列表失敗')
+  } finally {
+    loadingUsers.value = false
+  }
+}
+
+// 顯示封禁 Modal
+const showBanModal = (user) => {
+  banningUser.value = user
+  banReason.value = ''
+  banDurationDays.value = null
+  showBanUserModal.value = true
+}
+
+// 確認封禁用戶
+const confirmBanUser = async () => {
+  if (!banReason.value.trim()) {
+    message.error('請輸入封禁原因')
+    return
+  }
+
+  try {
+    await apiClient.post('/admin/users/ban', {
+      user_id: banningUser.value.id,
+      reason: banReason.value.trim(),
+      duration_days: banDurationDays.value || null
+    })
+    message.success('用戶已被封禁')
+    showBanUserModal.value = false
+    banningUser.value = null
+    await loadUsers()
+    await loadStats()
+  } catch (error) {
+    logger.error('封禁用戶失敗:', error)
+    message.error(error.response?.data?.detail || '封禁失敗')
+  }
+}
+
+// 解封用戶
+const handleUnbanUser = (user) => {
+  dialog.warning({
+    title: '確認解封',
+    content: `確定要解封用戶 ${user.email} 嗎？`,
+    positiveText: '確認解封',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        await apiClient.post('/admin/users/unban', {
+          user_id: user.id
+        })
+        message.success('用戶已解封')
+        await loadUsers()
+        await loadStats()
+      } catch (error) {
+        logger.error('解封用戶失敗:', error)
+        message.error(error.response?.data?.detail || '解封失敗')
+      }
+    }
+  })
+}
+
+// 用戶分頁改變
+const handleUserPageChange = (page) => {
+  userPagination.value.page = page
+  loadUsers()
+}
+
 // ==================== Photo Moderation Functions ====================
 
 // 載入照片審核統計
@@ -1137,6 +1446,8 @@ const handleTabChange = (value) => {
     loadModerationStats()
     loadSensitiveWords()
     loadAppeals()
+  } else if (value === 'users') {
+    loadUsers()
   } else if (value === 'photo-moderation') {
     loadPhotoStats()
     loadPendingPhotos()
@@ -1404,6 +1715,19 @@ onMounted(() => {
 .response-time {
   font-size: 12px;
   color: #999;
+}
+
+/* User management styles */
+.users-stats-section,
+.users-management-section {
+  margin-bottom: 40px;
+}
+
+.users-stats-section h2,
+.users-management-section h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
 }
 
 /* Photo moderation styles */
