@@ -24,65 +24,37 @@ from app.websocket.manager import manager
 # ==================== Fixtures ====================
 
 @pytest.fixture
-async def test_user_with_token(client: AsyncClient, test_db: AsyncSession):
+async def test_user_with_token(client: AsyncClient, auth_user: dict, test_db: AsyncSession):
     """創建測試用戶並返回 token"""
-    response = await client.post("/api/auth/register", json={
-        "email": "notify_test@example.com",
-        "password": "Test1234!",
-        "date_of_birth": "1995-01-01"
-    })
-    assert response.status_code == 201
-    token = response.json()["access_token"]
-    # 清除 cookies，讓測試使用純 Bearer Token 認證
-    client.cookies.clear()
-
     result = await test_db.execute(
-        select(User).where(User.email == "notify_test@example.com")
+        select(User).where(User.email == auth_user["email"])
     )
     user = result.scalar_one()
 
     return {
-        "token": token,
+        "token": auth_user["token"],
         "user_id": str(user.id),
         "user": user
     }
 
 
 @pytest.fixture
-async def notification_users(client: AsyncClient, test_db: AsyncSession):
+async def notification_users(client: AsyncClient, auth_user_pair: dict, test_db: AsyncSession):
     """創建用於通知測試的用戶（Alice 和 Bob）含完整檔案"""
     from io import BytesIO
     from PIL import Image
 
-    # 註冊 Alice
-    response_a = await client.post("/api/auth/register", json={
-        "email": "alice.persist@example.com",
-        "password": "Alice1234!",
-        "date_of_birth": "1995-06-15"
-    })
-    assert response_a.status_code == 201
-    token_a = response_a.json()["access_token"]
+    token_a = auth_user_pair["alice"]["token"]
+    token_b = auth_user_pair["bob"]["token"]
 
-    # 註冊 Bob
-    response_b = await client.post("/api/auth/register", json={
-        "email": "bob.persist@example.com",
-        "password": "Bob12345!",
-        "date_of_birth": "1990-03-20"
-    })
-    assert response_b.status_code == 201
-    token_b = response_b.json()["access_token"]
-
-    # 清除 cookies，讓測試使用純 Bearer Token 認證
-    client.cookies.clear()
-
-    # 取得用戶 ID
+    # 取得用戶 ID（使用 auth_user_pair 的 email）
     result = await test_db.execute(
-        select(User).where(User.email == "alice.persist@example.com")
+        select(User).where(User.email == auth_user_pair["alice"]["email"])
     )
     alice = result.scalar_one()
 
     result = await test_db.execute(
-        select(User).where(User.email == "bob.persist@example.com")
+        select(User).where(User.email == auth_user_pair["bob"]["email"])
     )
     bob = result.scalar_one()
 

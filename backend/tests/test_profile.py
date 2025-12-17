@@ -34,25 +34,9 @@ def sample_image_bytes():
 
 
 @pytest.fixture
-async def authenticated_user(client: AsyncClient):
-    """創建已認證的測試用戶"""
-    response = await client.post("/api/auth/register", json={
-        "email": "test@example.com",
-        "password": "Test1234",
-        "date_of_birth": "1995-06-15"
-    })
-    assert response.status_code == 201
-    token = response.json()["access_token"]
-    # 清除 cookies，讓測試使用純 Bearer Token 認證
-    # 避免 Cookie + CSRF 認證模式導致 403
-    client.cookies.clear()
-    return {"token": token, "email": "test@example.com"}
-
-
-@pytest.fixture
-async def user_with_profile(client: AsyncClient, authenticated_user: dict):
+async def user_with_profile(client: AsyncClient, auth_user: dict):
     """創建擁有個人檔案的用戶"""
-    token = authenticated_user["token"]
+    token = auth_user["token"]
 
     response = await client.post("/api/profile",
         headers={"Authorization": f"Bearer {token}"},
@@ -68,13 +52,13 @@ async def user_with_profile(client: AsyncClient, authenticated_user: dict):
         }
     )
     assert response.status_code == 201
-    return {**authenticated_user, "profile": response.json()}
+    return {**auth_user, "profile": response.json()}
 
 
 @pytest.mark.asyncio
-async def test_create_profile_success(client: AsyncClient, authenticated_user: dict):
+async def test_create_profile_success(client: AsyncClient, auth_user: dict):
     """測試成功創建個人檔案"""
-    token = authenticated_user["token"]
+    token = auth_user["token"]
 
     response = await client.post("/api/profile",
         headers={"Authorization": f"Bearer {token}"},
@@ -140,9 +124,9 @@ async def test_get_profile_success(client: AsyncClient, user_with_profile: dict)
 
 
 @pytest.mark.asyncio
-async def test_get_profile_not_exists(client: AsyncClient, authenticated_user: dict):
+async def test_get_profile_not_exists(client: AsyncClient, auth_user: dict):
     """測試取得不存在的個人檔案"""
-    token = authenticated_user["token"]
+    token = auth_user["token"]
 
     response = await client.get("/api/profile",
         headers={"Authorization": f"Bearer {token}"}
@@ -195,7 +179,7 @@ async def test_update_profile_invalid_age_range(client: AsyncClient, user_with_p
 
 
 @pytest.mark.asyncio
-async def test_get_interest_tags(client: AsyncClient, authenticated_user: dict, test_db: AsyncSession):
+async def test_get_interest_tags(client: AsyncClient, auth_user: dict, test_db: AsyncSession):
     """測試取得興趣標籤列表"""
     # 創建測試興趣標籤
     tags = [
@@ -207,7 +191,7 @@ async def test_get_interest_tags(client: AsyncClient, authenticated_user: dict, 
         test_db.add(tag)
     await test_db.commit()
 
-    token = authenticated_user["token"]
+    token = auth_user["token"]
     response = await client.get("/api/profile/interest-tags",
         headers={"Authorization": f"Bearer {token}"}
     )
@@ -219,9 +203,9 @@ async def test_get_interest_tags(client: AsyncClient, authenticated_user: dict, 
 
 
 @pytest.mark.asyncio
-async def test_create_interest_tag_admin_only(client: AsyncClient, authenticated_user: dict):
+async def test_create_interest_tag_admin_only(client: AsyncClient, auth_user: dict):
     """測試只有管理員可以創建興趣標籤"""
-    token = authenticated_user["token"]
+    token = auth_user["token"]
 
     response = await client.post("/api/profile/interest-tags",
         headers={"Authorization": f"Bearer {token}"},
@@ -523,9 +507,9 @@ async def test_cannot_delete_other_users_photo(client: AsyncClient, user_with_pr
 
 
 @pytest.mark.asyncio
-async def test_profile_completeness_check(client: AsyncClient, authenticated_user: dict, test_db: AsyncSession):
+async def test_profile_completeness_check(client: AsyncClient, auth_user: dict, test_db: AsyncSession):
     """測試個人檔案完整度檢查"""
-    token = authenticated_user["token"]
+    token = auth_user["token"]
 
     # 1. 創建基本檔案（不完整）
     await client.post("/api/profile",
@@ -565,7 +549,7 @@ async def test_profile_completeness_check(client: AsyncClient, authenticated_use
 
     # 3. 添加照片
     result = await test_db.execute(
-        select(User).where(User.email == authenticated_user["email"])
+        select(User).where(User.email == auth_user["email"])
     )
     user = result.scalar_one()
 

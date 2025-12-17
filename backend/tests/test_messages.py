@@ -11,28 +11,10 @@ from app.models.match import Match, Message
 
 
 @pytest.fixture
-async def matched_users(client: AsyncClient, test_db: AsyncSession):
+async def matched_users(client: AsyncClient, auth_user_pair: dict, test_db: AsyncSession):
     """創建已配對的測試用戶"""
-    # 註冊 Alice
-    response_a = await client.post("/api/auth/register", json={
-        "email": "alice@example.com",
-        "password": "Alice1234",
-        "date_of_birth": "1995-06-15"
-    })
-    assert response_a.status_code == 201
-    alice_token = response_a.json()["access_token"]
-
-    # 註冊 Bob
-    response_b = await client.post("/api/auth/register", json={
-        "email": "bob@example.com",
-        "password": "Bob12345",
-        "date_of_birth": "1990-03-20"
-    })
-    assert response_b.status_code == 201
-    bob_token = response_b.json()["access_token"]
-
-    # 清除 cookies，讓測試使用純 Bearer Token 認證
-    client.cookies.clear()
+    alice_token = auth_user_pair["alice"]["token"]
+    bob_token = auth_user_pair["bob"]["token"]
 
     # 創建 Alice 的檔案（注意：URL 無尾隨斜線）
     await client.post("/api/profile",
@@ -64,11 +46,11 @@ async def matched_users(client: AsyncClient, test_db: AsyncSession):
         }
     )
 
-    # 獲取用戶 ID
-    result = await test_db.execute(select(User).where(User.email == "alice@example.com"))
+    # 獲取用戶 ID（使用 auth_user_pair 的 email）
+    result = await test_db.execute(select(User).where(User.email == auth_user_pair["alice"]["email"]))
     alice = result.scalar_one()
 
-    result = await test_db.execute(select(User).where(User.email == "bob@example.com"))
+    result = await test_db.execute(select(User).where(User.email == auth_user_pair["bob"]["email"]))
     bob = result.scalar_one()
 
     # 直接創建配對（確保 user1_id < user2_id）

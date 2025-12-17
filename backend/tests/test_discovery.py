@@ -14,41 +14,11 @@ from app.models.match import Like, Match, Pass
 
 
 @pytest.fixture
-async def test_users(client: AsyncClient):
-    """創建測試用戶（Alice 和 Bob）"""
-    # 註冊 Alice
-    response_a = await client.post("/api/auth/register", json={
-        "email": "alice@example.com",
-        "password": "Alice1234",
-        "date_of_birth": "1995-06-15"
-    })
-    assert response_a.status_code == 201
-    token_a = response_a.json()["access_token"]
-
-    # 註冊 Bob
-    response_b = await client.post("/api/auth/register", json={
-        "email": "bob@example.com",
-        "password": "Bob12345",
-        "date_of_birth": "1990-03-20"
-    })
-    assert response_b.status_code == 201
-    token_b = response_b.json()["access_token"]
-
-    # 清除 cookies，讓測試使用純 Bearer Token 認證
-    client.cookies.clear()
-
-    return {
-        "alice": {"token": token_a, "email": "alice@example.com"},
-        "bob": {"token": token_b, "email": "bob@example.com"}
-    }
-
-
-@pytest.fixture
-async def completed_profiles(client: AsyncClient, test_users: dict, test_db: AsyncSession):
+async def completed_profiles(client: AsyncClient, auth_user_pair: dict, test_db: AsyncSession):
     """創建完整的個人檔案（包含照片和興趣）"""
     # Alice 的檔案
     response = await client.post("/api/profile",
-        headers={"Authorization": f"Bearer {test_users['alice']['token']}"},
+        headers={"Authorization": f"Bearer {auth_user_pair['alice']['token']}"},
         json={
             "display_name": "Alice",
             "gender": "female",
@@ -64,7 +34,7 @@ async def completed_profiles(client: AsyncClient, test_users: dict, test_db: Asy
 
     # 更新 Alice 的偏好設定
     response = await client.patch("/api/profile",
-        headers={"Authorization": f"Bearer {test_users['alice']['token']}"},
+        headers={"Authorization": f"Bearer {auth_user_pair['alice']['token']}"},
         json={
             "min_age_preference": 25,
             "max_age_preference": 40,
@@ -76,7 +46,7 @@ async def completed_profiles(client: AsyncClient, test_users: dict, test_db: Asy
 
     # Bob 的檔案
     response = await client.post("/api/profile",
-        headers={"Authorization": f"Bearer {test_users['bob']['token']}"},
+        headers={"Authorization": f"Bearer {auth_user_pair['bob']['token']}"},
         json={
             "display_name": "Bob",
             "gender": "male",
@@ -92,7 +62,7 @@ async def completed_profiles(client: AsyncClient, test_users: dict, test_db: Asy
 
     # 更新 Bob 的偏好設定
     response = await client.patch("/api/profile",
-        headers={"Authorization": f"Bearer {test_users['bob']['token']}"},
+        headers={"Authorization": f"Bearer {auth_user_pair['bob']['token']}"},
         json={
             "min_age_preference": 22,
             "max_age_preference": 35,
@@ -128,13 +98,13 @@ async def completed_profiles(client: AsyncClient, test_users: dict, test_db: Asy
 
     # 為 Alice 和 Bob 設定興趣標籤
     response = await client.put("/api/profile/interests",
-        headers={"Authorization": f"Bearer {test_users['alice']['token']}"},
+        headers={"Authorization": f"Bearer {auth_user_pair['alice']['token']}"},
         json={"interest_ids": tag_ids[:4]}  # 使用前 4 個標籤
     )
     assert response.status_code == 200, f"Failed to set Alice interests: status={response.status_code}, body={response.text}"
 
     response = await client.put("/api/profile/interests",
-        headers={"Authorization": f"Bearer {test_users['bob']['token']}"},
+        headers={"Authorization": f"Bearer {auth_user_pair['bob']['token']}"},
         json={"interest_ids": tag_ids[1:5]}  # 使用後 4 個標籤（有共同興趣）
     )
     assert response.status_code == 200, f"Failed to set Bob interests: status={response.status_code}, body={response.text}"
@@ -151,7 +121,7 @@ async def completed_profiles(client: AsyncClient, test_users: dict, test_db: Asy
     # Alice 上傳照片
     test_image = create_test_image()
     response = await client.post("/api/profile/photos",
-        headers={"Authorization": f"Bearer {test_users['alice']['token']}"},
+        headers={"Authorization": f"Bearer {auth_user_pair['alice']['token']}"},
         files={"file": ("photo.jpg", test_image, "image/jpeg")}
     )
     assert response.status_code == 201, f"Failed to upload Alice photo: status={response.status_code}, body={response.text}"
@@ -159,32 +129,32 @@ async def completed_profiles(client: AsyncClient, test_users: dict, test_db: Asy
     # Bob 上傳照片
     test_image = create_test_image()
     response = await client.post("/api/profile/photos",
-        headers={"Authorization": f"Bearer {test_users['bob']['token']}"},
+        headers={"Authorization": f"Bearer {auth_user_pair['bob']['token']}"},
         files={"file": ("photo.jpg", test_image, "image/jpeg")}
     )
     assert response.status_code == 201, f"Failed to upload Bob photo: status={response.status_code}, body={response.text}"
 
     # 驗證檔案完整度
     response = await client.get("/api/profile",
-        headers={"Authorization": f"Bearer {test_users['alice']['token']}"}
+        headers={"Authorization": f"Bearer {auth_user_pair['alice']['token']}"}
     )
     alice_profile = response.json()
     assert alice_profile.get('is_complete') == True, f"Alice profile not complete: {alice_profile}"
 
     response = await client.get("/api/profile",
-        headers={"Authorization": f"Bearer {test_users['bob']['token']}"}
+        headers={"Authorization": f"Bearer {auth_user_pair['bob']['token']}"}
     )
     bob_profile = response.json()
     assert bob_profile.get('is_complete') == True, f"Bob profile not complete: {bob_profile}"
 
-    return test_users
+    return auth_user_pair
 
 
 @pytest.mark.asyncio
-async def test_browse_users_without_profile(client: AsyncClient, test_users: dict):
+async def test_browse_users_without_profile(client: AsyncClient, auth_user_pair: dict):
     """測試：未完成檔案無法瀏覽"""
     response = await client.get("/api/discovery/browse",
-        headers={"Authorization": f"Bearer {test_users['alice']['token']}"}
+        headers={"Authorization": f"Bearer {auth_user_pair['alice']['token']}"}
     )
 
     assert response.status_code == 400

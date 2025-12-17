@@ -10,44 +10,12 @@ from app.models.match import Match
 
 
 @pytest.fixture
-async def test_users_for_safety(client: AsyncClient):
+async def test_users_for_safety(auth_user_trio: dict):
     """創建測試用戶（Alice, Bob, Charlie）"""
-    # 註冊 Alice
-    response_a = await client.post("/api/auth/register", json={
-        "email": "alice_safety@example.com",
-        "password": "Alice1234",
-        "date_of_birth": "1995-06-15"
-    })
-    assert response_a.status_code == 201
-    token_a = response_a.json()["access_token"]
-
-    # 註冊 Bob
-    response_b = await client.post("/api/auth/register", json={
-        "email": "bob_safety@example.com",
-        "password": "Bob12345",
-        "date_of_birth": "1990-03-20"
-    })
-    assert response_b.status_code == 201
-    token_b = response_b.json()["access_token"]
-
-    # 註冊 Charlie
-    response_c = await client.post("/api/auth/register", json={
-        "email": "charlie_safety@example.com",
-        "password": "Charlie123",
-        "date_of_birth": "1992-08-10"
-    })
-    assert response_c.status_code == 201
-    token_c = response_c.json()["access_token"]
-
-    # 清除 cookies，讓測試使用純 Bearer Token 認證
-    client.cookies.clear()
-
-    # 從 token 解析出 user_id（簡化版，實際應該解碼 JWT）
-    # 這裡假設我們可以從資料庫查詢
     return {
-        "alice": {"token": token_a, "email": "alice_safety@example.com"},
-        "bob": {"token": token_b, "email": "bob_safety@example.com"},
-        "charlie": {"token": token_c, "email": "charlie_safety@example.com"}
+        "alice": {"token": auth_user_trio["alice"]["token"], "email": auth_user_trio["alice"]["email"]},
+        "bob": {"token": auth_user_trio["bob"]["token"], "email": auth_user_trio["bob"]["email"]},
+        "charlie": {"token": auth_user_trio["charlie"]["token"], "email": auth_user_trio["charlie"]["email"]}
     }
 
 

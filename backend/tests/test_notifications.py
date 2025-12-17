@@ -24,46 +24,25 @@ from app.websocket.manager import manager
 
 
 @pytest.fixture
-async def notification_test_users(client: AsyncClient, test_db: AsyncSession):
+async def notification_test_users(client: AsyncClient, auth_user_pair: dict, test_db: AsyncSession):
     """創建用於通知測試的用戶（Alice 和 Bob）"""
-    # 註冊 Alice
-    response_a = await client.post("/api/auth/register", json={
-        "email": "alice.notify@example.com",
-        "password": "Alice1234",
-        "date_of_birth": "1995-06-15"
-    })
-    assert response_a.status_code == 201
-    token_a = response_a.json()["access_token"]
-
-    # 註冊 Bob
-    response_b = await client.post("/api/auth/register", json={
-        "email": "bob.notify@example.com",
-        "password": "Bob12345",
-        "date_of_birth": "1990-03-20"
-    })
-    assert response_b.status_code == 201
-    token_b = response_b.json()["access_token"]
-
-    # 清除 cookies，讓測試使用純 Bearer Token 認證
-    client.cookies.clear()
-
-    # 取得用戶 ID
-    result = await test_db.execute(select(User).where(User.email == "alice.notify@example.com"))
+    # 取得用戶 ID（使用 auth_user_pair 的 email）
+    result = await test_db.execute(select(User).where(User.email == auth_user_pair["alice"]["email"]))
     alice = result.scalar_one()
 
-    result = await test_db.execute(select(User).where(User.email == "bob.notify@example.com"))
+    result = await test_db.execute(select(User).where(User.email == auth_user_pair["bob"]["email"]))
     bob = result.scalar_one()
 
     return {
         "alice": {
-            "token": token_a,
+            "token": auth_user_pair["alice"]["token"],
             "user_id": str(alice.id),
-            "email": "alice.notify@example.com"
+            "email": auth_user_pair["alice"]["email"]
         },
         "bob": {
-            "token": token_b,
+            "token": auth_user_pair["bob"]["token"],
             "user_id": str(bob.id),
-            "email": "bob.notify@example.com"
+            "email": auth_user_pair["bob"]["email"]
         }
     }
 

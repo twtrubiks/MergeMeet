@@ -1,5 +1,6 @@
 """測試配置與 Fixtures"""
 import pytest
+import pytest_asyncio
 import asyncio
 import os
 from typing import AsyncGenerator
@@ -153,3 +154,127 @@ def mock_redis_error():
     redis.delete = AsyncMock(side_effect=aioredis.RedisError("Connection refused"))
 
     return redis
+
+
+# ==================== 認證 Fixtures ====================
+
+
+@pytest_asyncio.fixture
+async def auth_token(client: AsyncClient, sample_user_data: dict) -> str:
+    """取得認證 Token（純 Bearer Token 模式）
+
+    自動處理 Cookie 清除，確保測試使用 Bearer Token 認證。
+    用於測試業務邏輯，不測試認證機制本身。
+
+    Note:
+        Cookie + CSRF 認證的測試請參考 test_cookie_auth.py
+    """
+    response = await client.post("/api/auth/register", json=sample_user_data)
+    assert response.status_code == 201
+    token = response.json()["access_token"]
+    client.cookies.clear()
+    return token
+
+
+@pytest_asyncio.fixture
+async def auth_headers(auth_token: str) -> dict:
+    """認證 Headers（便捷用法）
+
+    Example:
+        async def test_get_profile(client, auth_headers):
+            response = await client.get("/api/profile", headers=auth_headers)
+            assert response.status_code == 200
+    """
+    return {"Authorization": f"Bearer {auth_token}"}
+
+
+@pytest_asyncio.fixture
+async def auth_user(client: AsyncClient, sample_user_data: dict) -> dict:
+    """取得認證用戶完整資訊
+
+    Returns:
+        dict: {"token": str, "email": str, "headers": dict}
+    """
+    response = await client.post("/api/auth/register", json=sample_user_data)
+    assert response.status_code == 201
+    token = response.json()["access_token"]
+    client.cookies.clear()
+    return {
+        "token": token,
+        "email": sample_user_data["email"],
+        "headers": {"Authorization": f"Bearer {token}"}
+    }
+
+
+@pytest_asyncio.fixture
+async def auth_user_pair(client: AsyncClient) -> dict:
+    """建立兩個已認證用戶（Alice & Bob）
+
+    Returns:
+        dict: {"alice": {...}, "bob": {...}}
+    """
+    alice_data = {
+        "email": "alice@example.com",
+        "password": "Alice1234!",
+        "date_of_birth": "1995-01-01"
+    }
+    bob_data = {
+        "email": "bob@example.com",
+        "password": "Bob12345!",
+        "date_of_birth": "1996-06-15"
+    }
+
+    # 註冊 Alice
+    resp_a = await client.post("/api/auth/register", json=alice_data)
+    assert resp_a.status_code == 201
+    token_a = resp_a.json()["access_token"]
+    client.cookies.clear()
+
+    # 註冊 Bob
+    resp_b = await client.post("/api/auth/register", json=bob_data)
+    assert resp_b.status_code == 201
+    token_b = resp_b.json()["access_token"]
+    client.cookies.clear()
+
+    return {
+        "alice": {
+            "token": token_a,
+            "email": alice_data["email"],
+            "headers": {"Authorization": f"Bearer {token_a}"}
+        },
+        "bob": {
+            "token": token_b,
+            "email": bob_data["email"],
+            "headers": {"Authorization": f"Bearer {token_b}"}
+        }
+    }
+
+
+@pytest_asyncio.fixture
+async def auth_user_trio(client: AsyncClient) -> dict:
+    """建立三個已認證用戶（Alice, Bob, Charlie）
+
+    用於需要三方互動的測試場景（如封鎖功能）
+
+    Returns:
+        dict: {"alice": {...}, "bob": {...}, "charlie": {...}}
+    """
+    users_data = [
+        {"email": "alice@example.com", "password": "Alice1234!", "date_of_birth": "1995-01-01"},
+        {"email": "bob@example.com", "password": "Bob12345!", "date_of_birth": "1996-06-15"},
+        {"email": "charlie@example.com", "password": "Charlie1!", "date_of_birth": "1994-03-20"},
+    ]
+
+    result = {}
+    for user_data, name in zip(users_data, ["alice", "bob", "charlie"]):
+        resp = await client.post("/api/auth/register", json=user_data)
+        assert resp.status_code == 201
+        token = resp.json()["access_token"]
+        client.cookies.clear()
+        result[name] = {
+            "token": token,
+            "email": user_data["email"],
+            "headers": {"Authorization": f"Bearer {token}"}
+        }
+
+    return result

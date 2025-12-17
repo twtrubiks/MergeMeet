@@ -15,28 +15,10 @@ from app.services.content_moderation import ContentModerationService
 
 
 @pytest.fixture
-async def matched_users_for_ws(client: AsyncClient, test_db: AsyncSession):
+async def matched_users_for_ws(client: AsyncClient, auth_user_pair: dict, test_db: AsyncSession):
     """創建已配對的測試用戶用於 WebSocket 測試"""
-    # 註冊 Alice
-    response_a = await client.post("/api/auth/register", json={
-        "email": "alice.ws@example.com",
-        "password": "Alice1234",
-        "date_of_birth": "1995-06-15"
-    })
-    assert response_a.status_code == 201
-    alice_token = response_a.json()["access_token"]
-
-    # 註冊 Bob
-    response_b = await client.post("/api/auth/register", json={
-        "email": "bob.ws@example.com",
-        "password": "Bob12345",
-        "date_of_birth": "1990-03-20"
-    })
-    assert response_b.status_code == 201
-    bob_token = response_b.json()["access_token"]
-
-    # 清除 cookies，讓測試使用純 Bearer Token 認證
-    client.cookies.clear()
+    alice_token = auth_user_pair["alice"]["token"]
+    bob_token = auth_user_pair["bob"]["token"]
 
     # 創建 Alice 的檔案（注意：URL 無尾隨斜線）
     await client.post("/api/profile",
@@ -68,11 +50,11 @@ async def matched_users_for_ws(client: AsyncClient, test_db: AsyncSession):
         }
     )
 
-    # 獲取用戶 ID
-    result = await test_db.execute(select(User).where(User.email == "alice.ws@example.com"))
+    # 獲取用戶 ID（使用 auth_user_pair 的 email）
+    result = await test_db.execute(select(User).where(User.email == auth_user_pair["alice"]["email"]))
     alice = result.scalar_one()
 
-    result = await test_db.execute(select(User).where(User.email == "bob.ws@example.com"))
+    result = await test_db.execute(select(User).where(User.email == auth_user_pair["bob"]["email"]))
     bob = result.scalar_one()
 
     # 直接創建配對（確保 user1_id < user2_id）
@@ -90,12 +72,12 @@ async def matched_users_for_ws(client: AsyncClient, test_db: AsyncSession):
         "alice": {
             "token": alice_token,
             "user_id": str(alice.id),
-            "email": "alice.ws@example.com"
+            "email": auth_user_pair["alice"]["email"]
         },
         "bob": {
             "token": bob_token,
             "user_id": str(bob.id),
-            "email": "bob.ws@example.com"
+            "email": auth_user_pair["bob"]["email"]
         },
         "match_id": str(match.id)
     }
@@ -266,9 +248,9 @@ async def test_warning_count_increases_on_violation(
     test_db: AsyncSession
 ):
     """測試違規時警告次數增加"""
-    # 獲取 Alice 的初始警告次數
+    # 獲取 Alice 的初始警告次數（使用 fixture 的 email）
     result = await test_db.execute(
-        select(User).where(User.email == "alice.ws@example.com")
+        select(User).where(User.email == matched_users_for_ws["alice"]["email"])
     )
     alice = result.scalar_one()
     initial_warning_count = alice.warning_count
