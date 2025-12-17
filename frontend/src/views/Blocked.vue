@@ -90,6 +90,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useSafetyStore } from '@/stores/safety'
+import { logger } from '@/utils/logger'
 
 const safetyStore = useSafetyStore()
 
