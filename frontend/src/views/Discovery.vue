@@ -68,7 +68,10 @@
           </div>
 
           <!-- 卡片資訊 -->
-          <div class="card-info">
+          <div
+            class="card-info"
+            @click.stop="index === 0 ? openUserDetail(candidate) : null"
+          >
             <div class="card-header">
               <h2 class="card-name">{{ candidate.display_name }}</h2>
               <span class="card-age">{{ candidate.age }}</span>
@@ -92,6 +95,11 @@
 
             <!-- 自我介紹 -->
             <p v-if="candidate.bio" class="card-bio">{{ candidate.bio }}</p>
+
+            <!-- 點擊查看詳情提示 -->
+            <div v-if="index === 0" class="view-detail-hint">
+              <span>👆 點擊查看完整資料</span>
+            </div>
           </div>
 
           <!-- 滑動提示覆蓋層 -->
@@ -152,6 +160,13 @@
       @close="handleCloseReportModal"
       @reported="handleReported"
     />
+
+    <!-- 用戶詳情彈窗 -->
+    <UserDetailModal
+      :show="showUserDetail"
+      :user="selectedUser || {}"
+      @close="closeUserDetail"
+    />
   </div>
 </template>
 
@@ -160,6 +175,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useDiscoveryStore } from '@/stores/discovery'
 import MatchModal from '@/components/MatchModal.vue'
 import ReportModal from '@/components/ReportModal.vue'
+import UserDetailModal from '@/components/UserDetailModal.vue'
 import HeartLoader from '@/components/ui/HeartLoader.vue'
 import { throttle } from '@/utils/helpers'
 import { logger } from '@/utils/logger'
@@ -183,6 +199,10 @@ const showMatchModal = ref(false)
 // 舉報彈窗
 const showReportModal = ref(false)
 const reportTarget = ref(null)
+
+// 用戶詳情彈窗
+const showUserDetail = ref(false)
+const selectedUser = ref(null)
 
 // 顯示的候選人（最多顯示 3 張卡片）
 const visibleCandidates = computed(() => {
@@ -350,6 +370,24 @@ const handleReported = () => {
   if (discoveryStore.currentCandidate) {
     handlePass()
   }
+}
+
+/**
+ * 開啟用戶詳情彈窗
+ */
+const openUserDetail = (candidate) => {
+  // 只有在非拖拽狀態下才開啟
+  if (isDragging.value) return
+  selectedUser.value = candidate
+  showUserDetail.value = true
+}
+
+/**
+ * 關閉用戶詳情彈窗
+ */
+const closeUserDetail = () => {
+  showUserDetail.value = false
+  selectedUser.value = null
 }
 
 /**
@@ -669,6 +707,12 @@ onUnmounted(() => {
 /* 卡片資訊 */
 .card-info {
   padding: 20px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.top-card .card-info:hover {
+  background-color: #FFFAF0;
 }
 
 .card-header {
@@ -718,6 +762,21 @@ onUnmounted(() => {
   color: #666;
   line-height: 1.5;
   margin: 0;
+}
+
+/* 點擊查看詳情提示 */
+.view-detail-hint {
+  margin-top: 12px;
+  text-align: center;
+  font-size: 13px;
+  color: #999;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.top-card .card-info:hover .view-detail-hint {
+  opacity: 1;
+  color: #FF6B6B;
 }
 
 /* 滑動提示覆蓋層 */
