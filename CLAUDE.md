@@ -1,138 +1,136 @@
-# MergeMeet 開發指南
+# MergeMeet Development Guide
 
-> **🎯 快速參考**: 本文件為快速啟動指南。詳細開發流程請使用 **Skill: mergemeet-quickstart**
-
----
-
-## 📋 專案資訊
-
-- **專案**: MergeMeet 交友平台
-- **技術棧**: FastAPI + Vue 3 + PostgreSQL + PostGIS + Redis
-- **階段**: MVP (Week 1-5)
-- **測試覆蓋率**: >80%
+> For detailed development workflow, use **Skill: mergemeet-quickstart**
 
 ---
 
-## 🚀 快速啟動（3 步驟）
+## Project Info
+
+- **Project**: MergeMeet Dating Platform
+- **Tech Stack**: FastAPI + Vue 3 + PostgreSQL + PostGIS + Redis
+- **Stage**: MVP (Week 1-6)
+- **Test Coverage**: >80%
+
+---
+
+## Quick Start (3 Steps)
 
 ```bash
-# 1. 啟動基礎服務
+# 1. Start infrastructure
 docker compose up -d
 
-# 2. 啟動後端 (http://localhost:8000/docs)
+# 2. Start backend (http://localhost:8000/docs)
 cd backend && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-# 3. 啟動前端 (http://localhost:5173)
+# 3. Start frontend (http://localhost:5173)
 cd frontend && npm run dev
 ```
 
 ---
 
-## 🎓 Claude Code Skills 系統
+## Available Skills
 
-### 核心 Skills
+| Skill | Purpose |
+|-------|---------|
+| **api-routing-standards** | API routing rules - enforces "no trailing slash" to prevent 404 errors |
+| **backend-dev-fastapi** | FastAPI + SQLAlchemy 2.0 Async development patterns |
+| **frontend-dev-vue3** | Vue 3 Composition API + Pinia development patterns |
+| **mergemeet-quickstart** | Complete development workflow, commands, and troubleshooting |
+| **project-audit** | Project health check - feature completeness and consistency |
 
-| Skill | 用途 | 觸發方式 |
-|-------|------|----------|
-| 🚨 **api-routing-standards** | API 路由規範（防止 404） | 編輯 API 路由時強制觸發 |
-| 🔧 **backend-dev-fastapi** | FastAPI 後端開發指南 | 編輯後端程式碼時 |
-| 🎨 **frontend-dev-vue3** | Vue 3 前端開發指南 | 編輯前端組件時 |
-| 🗄️ **database-planning** | 資料庫設計標準 | 編輯資料模型時 |
-| 🧪 **testing-guide** | 測試策略與 TDD | 編寫測試時 |
-| 📊 **product-management** | 產品需求管理 | 規劃功能時 |
-| 📚 **mergemeet-quickstart** | 完整開發流程指南 | 需要詳細指南時 |
+### Skills Structure
 
-### 手動使用
-
-```bash
-# 查看詳細開發流程
-使用 Skill: mergemeet-quickstart
-
-# 查看 API 路由規範
-使用 Skill: api-routing-standards
-
-# 查看後端開發指南
-使用 Skill: backend-dev-fastapi
+```
+.claude/skills/
+├── api-routing-standards/
+│   ├── SKILL.md
+│   └── references/           # Trailing slash rules, RESTful principles
+├── backend-dev-fastapi/
+│   └── SKILL.md
+├── frontend-dev-vue3/
+│   └── SKILL.md
+├── mergemeet-quickstart/
+│   ├── SKILL.md
+│   └── references/           # Commands, tools, troubleshooting
+└── project-audit/
+    ├── SKILL.md
+    └── references/           # Feature status, known issues
 ```
 
 ---
 
-## 🚨 最重要的規則
+## Critical Rule: No Trailing Slash
 
-**API URL 無尾隨斜線** - 所有端點不使用 `/` 結尾
+All API endpoints must NOT use trailing slashes. This is enforced by `redirect_slashes=False`.
 
 ```python
-# ✅ 正確
+# Correct
 @router.get("")                  # GET /api/profile
 @router.put("/interests")        # PUT /api/profile/interests
 
-# ❌ 錯誤（會導致 404）
-@router.get("/")                 # ❌ 404
-@router.put("/interests/")       # ❌ 404
+# Wrong (causes 404)
+@router.get("/")                 # 404
+@router.put("/interests/")       # 404
 ```
 
 ```javascript
-// 前端也必須無尾隨斜線
-await axios.get('/api/profile')          // ✅
-await axios.get('/api/profile/')         // ❌ 404
+// Frontend must also have no trailing slash
+await axios.get('/api/profile')          // Correct
+await axios.get('/api/profile/')         // 404
 ```
 
-**詳細規範**: 使用 `Skill: api-routing-standards`
+For details, use **Skill: api-routing-standards**
 
 ---
 
-## 📂 專案結構
+## Project Structure
 
 ```
 mergemeet/
-├── backend/              # FastAPI (9 模組, 9 模型, 265+ 測試)
-│   ├── app/api/         # API 路由
-│   ├── app/models/      # SQLAlchemy 模型
-│   └── tests/           # pytest 測試
-├── frontend/            # Vue 3 (16 組件, 13 頁面, 7 stores)
+├── backend/              # FastAPI
+│   ├── app/api/         # API routes
+│   ├── app/models/      # SQLAlchemy models
+│   └── tests/           # pytest tests
+├── frontend/            # Vue 3
 │   └── src/
-└── .claude/skills/      # Skills 配置
+│       ├── views/       # Page components
+│       ├── components/  # Reusable components
+│       └── stores/      # Pinia stores
+└── .claude/skills/      # Claude Code skills
 ```
 
 ---
 
-## 🔧 常用指令速查
+## Common Commands
 
 ```bash
-# 資料庫
+# Database
 docker exec -it mergemeet-db psql -U mergemeet -d mergemeet
 
-# 測試
+# Testing
 cd backend && pytest -v --cov=app
 
-# 重置
+# Reset
 docker compose down -v && docker compose up -d
 ```
 
-**完整指令清單**: 使用 `Skill: mergemeet-quickstart`
+For complete command list, use **Skill: mergemeet-quickstart**
 
 ---
 
-## 📚 相關文件
+## Related Documentation
 
-- **README.md** - 專案總覽
-- **ARCHITECTURE.md** - 技術架構
-- **QUICKSTART.md** - 快速開始指南
-- **docs/INDEX.md** - 文檔索引
-- **Skill: mergemeet-quickstart** - 完整開發指南 ⭐
-
----
-
-## 🎯 核心原則
-
-1. 🚨 **API URL 無尾隨斜線** - 違反會導致 404
-2. 🎓 **使用 Skills 系統** - 開發時參考指南
-3. ⚡ **Async 優先** - 後端使用 async/await
-4. 🧩 **Composition API** - 前端使用 `<script setup>`
-5. 🧪 **測試驅動** - TDD 開發流程
+- **README.md** - Project overview
+- **ARCHITECTURE.md** - Technical architecture
+- **QUICKSTART.md** - Quick start guide
+- **docs/INDEX.md** - Documentation index
 
 ---
 
-**開發愉快！** 🚀
+## Core Principles
 
-💡 **需要詳細指南？** 使用 `Skill: mergemeet-quickstart`
+1. **No trailing slash** - All API endpoints without `/` suffix
+2. **Async first** - Backend uses async/await
+3. **Composition API** - Frontend uses `<script setup>`
+4. **Test driven** - TDD development workflow
+5. **Use Skills** - Reference skills during development
