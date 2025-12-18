@@ -236,6 +236,31 @@ export const useNotificationStore = defineStore('notification', () => {
   }
 
   /**
+   * 標記指定配對的訊息通知為已讀
+   * 當用戶進入聊天室時調用，同步清除對應的通知
+   * @param {string} matchId - 配對 ID
+   */
+  const markMessageNotificationsAsReadByMatchId = (matchId) => {
+    let count = 0
+    notifications.value.forEach(n => {
+      // 只處理訊息類型的通知，且 matchId 匹配
+      // 注意：WebSocket 通知用 camelCase (matchId)，API 通知用 snake_case (match_id)
+      const notificationMatchId = n.data?.matchId || n.data?.match_id
+      if (
+        n.type === NotificationType.NEW_MESSAGE &&
+        !n.read &&
+        notificationMatchId === matchId
+      ) {
+        n.read = true
+        count++
+      }
+    })
+    if (count > 0) {
+      logger.debug('[Notification] Marked message notifications as read for match:', matchId, 'count:', count)
+    }
+  }
+
+  /**
    * 清空所有通知
    */
   const clearAll = () => {
@@ -380,6 +405,7 @@ export const useNotificationStore = defineStore('notification', () => {
     initNotificationListeners,
     markAsRead,
     markAllAsRead,
+    markMessageNotificationsAsReadByMatchId,
     removeNotification,
     clearAll,
     $reset,

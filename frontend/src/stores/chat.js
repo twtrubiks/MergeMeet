@@ -12,6 +12,7 @@ import { ref, computed } from 'vue'
 import apiClient from '@/api/client'
 import { useWebSocketStore } from './websocket'
 import { useUserStore } from './user'
+import { useNotificationStore } from './notification'
 import { logger } from '@/utils/logger'
 
 export const useChatStore = defineStore('chat', () => {
@@ -95,14 +96,39 @@ export const useChatStore = defineStore('chat', () => {
 
   /**
    * 獲取對話列表
+   *
+   * 優化：保留本地已讀狀態，避免時序競爭問題
+   * - 當用戶進入聊天室後，本地 unread_count 會被設為 0
+   * - 但 WebSocket read_receipt 可能還沒處理完成
+   * - 如果此時重新載入，後端返回的 unread_count 可能還是舊值
+   * - 因此需要保留本地已設為 0 的狀態
    */
   const fetchConversations = async () => {
     loading.value = true
     error.value = null
     try {
+      // 記錄本地已標記為已讀的對話（unread_count = 0）
+      const localReadConversations = new Set(
+        conversations.value
+          .filter(c => c.unread_count === 0)
+          .map(c => c.match_id)
+      )
+
       const response = await apiClient.get('/messages/conversations')
-      conversations.value = response.data
-      return response.data
+      const newConversations = response.data
+
+      // 合併：保留本地已讀狀態
+      // 如果本地 unread_count 是 0，但後端返回非 0，保留本地的 0
+      // （因為用戶已經看過了，只是 WebSocket 還沒同步完成）
+      newConversations.forEach(conv => {
+        if (localReadConversations.has(conv.match_id) && conv.unread_count > 0) {
+          logger.debug('[Chat] Preserving local read state for:', conv.match_id)
+          conv.unread_count = 0
+        }
+      })
+
+      conversations.value = newConversations
+      return newConversations
     } catch (err) {
       error.value = err.response?.data?.detail || '無法取得對話列表'
       throw err
@@ -214,8 +240,20 @@ export const useChatStore = defineStore('chat', () => {
 
   /**
    * 標記對話中所有未讀訊息為已讀
+   *
+   * 優化：無論有沒有未讀訊息，都將本地 unread_count 設為 0
+   * 因為用戶進入聊天室就表示已經看到所有訊息
    */
   const markConversationAsRead = async (matchId) => {
+    // 先更新本地對話列表的未讀數（無論如何都設為 0）
+    // 這確保用戶離開聊天室後看到的是已讀狀態
+    const conv = conversations.value.find(c => c.match_id === matchId)
+    if (conv && conv.unread_count > 0) {
+      conv.unread_count = 0
+      logger.debug('[Chat] Set conversation unread_count to 0:', matchId)
+    }
+
+    // 如果有訊息，發送已讀回條
     if (!messages.value[matchId]) return
 
     const unreadMessages = messages.value[matchId]
@@ -224,12 +262,6 @@ export const useChatStore = defineStore('chat', () => {
 
     if (unreadMessages.length > 0) {
       await markAsRead(unreadMessages)
-
-      // 更新對話列表中的未讀數
-      const conv = conversations.value.find(c => c.match_id === matchId)
-      if (conv) {
-        conv.unread_count = 0
-      }
     }
   }
 
@@ -326,6 +358,10 @@ export const useChatStore = defineStore('chat', () => {
 
     // 標記已讀（確保訊息已載入後再執行）
     await markConversationAsRead(matchId)
+
+    // 同步清除對應的訊息通知（讓通知鈴鐺數字也減少）
+    const notificationStore = useNotificationStore()
+    notificationStore.markMessageNotificationsAsReadByMatchId(matchId)
 
     // 返回結果供前端使用 cursor 資訊
     return result
