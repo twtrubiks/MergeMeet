@@ -1,74 +1,74 @@
 ---
 name: mergemeet-quickstart
-description: This skill should be used when setting up the MergeMeet development environment, running services, troubleshooting issues, or learning the development workflow. It covers Docker, FastAPI, Vue 3, PostgreSQL, Redis, testing, and common commands.
+description: 設定 MergeMeet 開發環境、執行服務、排除故障或學習開發流程時使用此 skill。涵蓋 Docker、FastAPI、Vue 3、PostgreSQL、Redis、測試和常用指令。
 ---
 
-# MergeMeet Quick Start Guide
+# MergeMeet 快速入門指南
 
-## Purpose
+## 目的
 
-To provide a complete development workflow guide for the MergeMeet project, including environment setup, common commands, and troubleshooting.
+提供 MergeMeet 專案的完整開發流程指南，包含環境設定、常用指令和故障排除。
 
 ---
 
-## Quick Start (3 Steps)
+## 快速開始（3 步驟）
 
-### Step 1: Start Infrastructure
+### 步驟 1：啟動基礎設施
 
 ```bash
-# Start PostgreSQL and Redis
+# 啟動 PostgreSQL 和 Redis
 docker compose up -d
 
-# Verify services
+# 驗證服務
 docker compose ps
-# Expected: mergemeet-db (Up), mergemeet-redis (Up)
+# 預期結果: mergemeet-db (Up), mergemeet-redis (Up)
 ```
 
-### Step 2: Start Backend
+### 步驟 2：啟動後端
 
 ```bash
 cd backend
 
-# Install dependencies (first time)
+# 安裝依賴（首次）
 pip install -r requirements.txt
 
-# Start FastAPI
+# 啟動 FastAPI
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-API documentation: http://localhost:8000/docs
+API 文件: http://localhost:8000/docs
 
-### Step 3: Start Frontend
+### 步驟 3：啟動前端
 
 ```bash
 cd frontend
 
-# Install dependencies (first time)
+# 安裝依賴（首次）
 npm install
 
-# Start dev server
+# 啟動開發伺服器
 npm run dev
 ```
 
-Application: http://localhost:5173/
+應用程式: http://localhost:5173/
 
 ---
 
-## Common Commands
+## 常用指令
 
-### Database
+### 資料庫
 
 ```bash
-# Connect to PostgreSQL
+# 連接到 PostgreSQL
 docker exec -it mergemeet-db psql -U mergemeet -d mergemeet
 
-# Common SQL commands
-\dt                    # List tables
-\d+ users              # Describe table
-\q                     # Quit
+# 常用 SQL 指令
+\dt                    # 列出資料表
+\d+ users              # 描述資料表
+\q                     # 退出
 ```
 
-### Database Migrations (Alembic)
+### 資料庫遷移（Alembic）
 
 ```bash
 cd backend
@@ -79,97 +79,97 @@ alembic downgrade -1
 alembic history
 ```
 
-### Testing
+### 測試
 
 ```bash
 cd backend
 
-pytest                           # Run all tests
-pytest -v                        # Verbose output
-pytest --cov=app                 # With coverage
-pytest tests/test_profile.py    # Specific file
+pytest                           # 執行所有測試
+pytest -v                        # 詳細輸出
+pytest --cov=app                 # 含覆蓋率
+pytest tests/test_profile.py    # 特定檔案
 ```
 
 ### Docker
 
 ```bash
-docker compose ps                # Status
-docker compose logs -f postgres  # Follow logs
-docker compose down              # Stop
-docker compose down -v           # Stop and remove volumes
+docker compose ps                # 狀態
+docker compose logs -f postgres  # 追蹤日誌
+docker compose down              # 停止
+docker compose down -v           # 停止並移除資料卷
 ```
 
 ---
 
-## Troubleshooting
+## 故障排除
 
-### Backend Cannot Start
+### 後端無法啟動
 
-**Error**: `sqlalchemy.exc.OperationalError: could not connect to server`
+**錯誤**: `sqlalchemy.exc.OperationalError: could not connect to server`
 
 ```bash
-# Check if database is running
+# 檢查資料庫是否運行
 docker compose ps
 
-# Restart database
+# 重啟資料庫
 docker compose restart postgres
 
-# Test connection
+# 測試連接
 docker exec -it mergemeet-db psql -U mergemeet -d mergemeet -c "SELECT 1;"
 ```
 
-### Frontend Cannot Connect to Backend
+### 前端無法連接後端
 
-**Error**: `Network Error` or `CORS Error`
+**錯誤**: `Network Error` 或 `CORS Error`
 
 ```bash
-# Verify backend is running
+# 驗證後端是否運行
 curl http://localhost:8000/health
 
-# Check CORS settings in backend/app/core/config.py
-# Ensure CORS_ORIGINS includes "http://localhost:5173"
+# 檢查 backend/app/core/config.py 中的 CORS 設定
+# 確保 CORS_ORIGINS 包含 "http://localhost:5173"
 ```
 
-### API Returns 404
+### API 返回 404
 
-**Most common cause**: URL has trailing slash
+**最常見原因**: URL 有尾隨斜線
 
 ```python
-# Wrong
+# 錯誤
 @router.get("/")           # 404
 
-# Correct
+# 正確
 @router.get("")
 ```
 
 ```javascript
-// Wrong
+// 錯誤
 await axios.get('/api/profile/')   // 404
 
-// Correct
+// 正確
 await axios.get('/api/profile')
 ```
 
-See **api-routing-standards** skill for details.
+詳細資訊請參考 **api-routing-standards** skill。
 
 ---
 
-## References
+## 參考資料
 
-For detailed information:
+詳細資訊請參考：
 
-| Topic | File |
-|-------|------|
-| All commands | [commands.md](references/commands.md) |
-| Troubleshooting | [troubleshooting.md](references/troubleshooting.md) |
-| Development tools | [tools.md](references/tools.md) |
-| Git workflow | [workflows.md](references/workflows.md) |
+| 主題 | 檔案 |
+|------|------|
+| 所有指令 | [commands.md](references/commands.md) |
+| 故障排除 | [troubleshooting.md](references/troubleshooting.md) |
+| 開發工具 | [tools.md](references/tools.md) |
+| Git 工作流程 | [workflows.md](references/workflows.md) |
 
 ---
 
-## Related Skills
+## 相關 Skills
 
-- **api-routing-standards** - API routing rules
-- **backend-dev-fastapi** - Backend development
-- **frontend-dev-vue3** - Frontend development
-- **project-audit** - Project health check
+- **api-routing-standards** - API 路由規則
+- **backend-dev-fastapi** - 後端開發
+- **frontend-dev-vue3** - 前端開發
+- **project-audit** - 專案健康檢查

@@ -1,61 +1,61 @@
 ---
 name: backend-dev-fastapi
-description: This skill should be used when developing backend features for MergeMeet. It provides guidance on FastAPI + SQLAlchemy 2.0 Async + PostgreSQL/PostGIS patterns including routing, models, Pydantic validation, JWT authentication, WebSocket, and error handling.
+description: 在 MergeMeet 開發後端功能時使用此 skill。提供 FastAPI + SQLAlchemy 2.0 Async + PostgreSQL/PostGIS 的開發模式指南，包含路由、模型、Pydantic 驗證、JWT 認證、WebSocket 和錯誤處理。
 ---
 
-# FastAPI Backend Development Guide
+# FastAPI 後端開發指南
 
-## Purpose
+## 目的
 
-To establish consistent patterns for FastAPI + SQLAlchemy 2.0 Async development in the MergeMeet project.
+建立 MergeMeet 專案中 FastAPI + SQLAlchemy 2.0 Async 開發的一致模式。
 
 ---
 
-## Project Structure
+## 專案結構
 
 ```
 backend/
 ├── app/
-│   ├── api/              # API routes
-│   │   ├── auth.py       # Authentication
-│   │   ├── profile.py    # User profiles
-│   │   ├── discovery.py  # Discovery/matching
-│   │   ├── messages.py   # Chat messages
-│   │   ├── websocket.py  # Real-time chat
-│   │   ├── safety.py     # Safety features
-│   │   └── admin.py      # Admin dashboard
-│   ├── core/             # Core configuration
-│   │   ├── config.py     # Environment config
-│   │   ├── security.py   # JWT/password handling
-│   │   └── deps.py       # Dependency injection
-│   ├── models/           # SQLAlchemy models
+│   ├── api/              # API 路由
+│   │   ├── auth.py       # 認證
+│   │   ├── profile.py    # 用戶檔案
+│   │   ├── discovery.py  # 探索/配對
+│   │   ├── messages.py   # 聊天訊息
+│   │   ├── websocket.py  # 即時聊天
+│   │   ├── safety.py     # 安全功能
+│   │   └── admin.py      # 管理後台
+│   ├── core/             # 核心配置
+│   │   ├── config.py     # 環境設定
+│   │   ├── security.py   # JWT/密碼處理
+│   │   └── deps.py       # 依賴注入
+│   ├── models/           # SQLAlchemy 模型
 │   ├── schemas/          # Pydantic schemas
-│   ├── services/         # Business logic
-│   └── main.py           # FastAPI application
-├── tests/                # pytest tests
-└── alembic/              # Database migrations
+│   ├── services/         # 業務邏輯
+│   └── main.py           # FastAPI 應用程式
+├── tests/                # pytest 測試
+└── alembic/              # 資料庫遷移
 ```
 
 ---
 
-## Quick Checklist
+## 快速檢查清單
 
-When creating new features:
+建立新功能時：
 
-- [ ] Route has no trailing slash (see api-routing-standards skill)
-- [ ] Use `async def` for all route handlers
-- [ ] Use `AsyncSession` for database operations
-- [ ] Define Pydantic `response_model`
-- [ ] Add `Depends(get_current_user)` for protected routes
-- [ ] Use `HTTPException` for error handling
-- [ ] Add docstring for API documentation
-- [ ] Keep function complexity <= 10 (C901)
+- [ ] 路由無尾隨斜線（參考 api-routing-standards skill）
+- [ ] 所有路由處理器使用 `async def`
+- [ ] 資料庫操作使用 `AsyncSession`
+- [ ] 定義 Pydantic `response_model`
+- [ ] 受保護路由加上 `Depends(get_current_user)`
+- [ ] 錯誤處理使用 `HTTPException`
+- [ ] 為 API 文件加上 docstring
+- [ ] 保持函數複雜度 <= 10 (C901)
 
 ---
 
-## Core Patterns
+## 核心模式
 
-### Route Definition
+### 路由定義
 
 ```python
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -68,7 +68,7 @@ async def get_profile(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get user profile."""
+    """獲取用戶檔案。"""
     if not current_user.profile:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -77,7 +77,7 @@ async def get_profile(
     return current_user.profile
 ```
 
-### SQLAlchemy 2.0 Async Query
+### SQLAlchemy 2.0 非同步查詢
 
 ```python
 from sqlalchemy import select
@@ -107,7 +107,7 @@ class ProfileResponse(BaseModel):
         from_attributes = True  # Pydantic v2
 ```
 
-### JWT Authentication
+### JWT 認證
 
 ```python
 from fastapi import Depends, HTTPException, status
@@ -120,7 +120,7 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db)
 ) -> User:
-    """Extract user from JWT token."""
+    """從 JWT token 提取用戶。"""
     token = credentials.credentials
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -149,41 +149,41 @@ async def get_current_user(
 
 ---
 
-## Common Mistakes
+## 常見錯誤
 
-### Missing async/await
+### 缺少 async/await
 
 ```python
-# Wrong
+# 錯誤
 @router.get("")
 def get_profile(db: AsyncSession = Depends(get_db)):
-    profile = db.execute(select(Profile))  # Missing await
+    profile = db.execute(select(Profile))  # 缺少 await
 
-# Correct
+# 正確
 @router.get("")
 async def get_profile(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Profile))
     profile = result.scalar_one_or_none()
 ```
 
-### Trailing slash (causes 404)
+### 尾隨斜線（導致 404）
 
 ```python
-# Wrong
-@router.get("/")  # Will cause 404
+# 錯誤
+@router.get("/")  # 會導致 404
 
-# Correct
+# 正確
 @router.get("")
 ```
 
-### Missing commit
+### 缺少 commit
 
 ```python
-# Wrong - data won't persist
+# 錯誤 - 資料不會持久化
 profile.bio = "New bio"
 return profile
 
-# Correct
+# 正確
 profile.bio = "New bio"
 await db.commit()
 await db.refresh(profile)
@@ -192,7 +192,7 @@ return profile
 
 ---
 
-## Testing
+## 測試
 
 ```python
 import pytest
@@ -212,7 +212,7 @@ async def test_unauthorized_access(client: AsyncClient):
 
 ---
 
-## Related Skills
+## 相關 Skills
 
-- **api-routing-standards** - API routing rules (required reading)
-- **frontend-dev-vue3** - Frontend integration
+- **api-routing-standards** - API 路由規則（必讀）
+- **frontend-dev-vue3** - 前端整合

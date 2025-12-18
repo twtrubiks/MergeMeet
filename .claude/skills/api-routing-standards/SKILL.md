@@ -1,24 +1,24 @@
 ---
 name: api-routing-standards
-description: This skill should be used when creating or modifying API routes in the MergeMeet project. It enforces the "no trailing slash" standard to prevent 404 errors. Use this skill when working with FastAPI routers, fixing 404 errors, or reviewing API endpoint definitions.
+description: 在 MergeMeet 專案中建立或修改 API 路由時使用此 skill。它強制執行「禁止尾隨斜線」標準以防止 404 錯誤。適用於處理 FastAPI 路由、修復 404 錯誤或審查 API 端點定義時。
 ---
 
-# API Routing Standards
+# API 路由標準
 
-## Purpose
+## 目的
 
-To prevent common 404 errors by ensuring all FastAPI routes follow the project's "no trailing slash" convention.
+透過確保所有 FastAPI 路由遵循專案的「無尾隨斜線」慣例，防止常見的 404 錯誤。
 
 ---
 
-## Critical Rule: No Trailing Slash
+## 重要規則：禁止尾隨斜線
 
-All API endpoints in this project must NOT use trailing slashes. This is enforced by the FastAPI configuration.
+本專案中所有 API 端點必須不使用尾隨斜線。這是由 FastAPI 配置強制執行的。
 
-### Correct Examples
+### 正確範例
 
 ```python
-# Backend routes - no trailing slash
+# 後端路由 - 無尾隨斜線
 @router.get("")                      # GET /api/profile
 @router.post("")                     # POST /api/profile
 @router.put("/interests")            # PUT /api/profile/interests
@@ -27,76 +27,76 @@ All API endpoints in this project must NOT use trailing slashes. This is enforce
 ```
 
 ```javascript
-// Frontend axios calls - no trailing slash
+// 前端 axios 呼叫 - 無尾隨斜線
 await axios.get('/api/profile')
 await axios.put('/api/profile/interests', data)
 await axios.post('/api/profile/photos', formData)
 ```
 
-### Incorrect Examples (Will Cause 404)
+### 錯誤範例（會導致 404）
 
 ```python
-# These will cause 404 errors
+# 這些會導致 404 錯誤
 @router.post("/")                    # 404
 @router.put("/interests/")           # 404
 @router.post("/like/{user_id}/")     # 404
 ```
 
 ```javascript
-// These will cause 404 errors
+// 這些會導致 404 錯誤
 await axios.get('/api/profile/')     // 404
 await axios.put('/api/profile/interests/', data)  // 404
 ```
 
 ---
 
-## Why This Matters
+## 為什麼這很重要
 
-The FastAPI application is configured with `redirect_slashes=False`:
+FastAPI 應用程式配置了 `redirect_slashes=False`：
 
 ```python
 # backend/app/main.py
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    redirect_slashes=False,  # No automatic redirect
+    redirect_slashes=False,  # 不自動重定向
 )
 ```
 
-This means:
-- `/api/profile` returns HTTP 200 (correct)
-- `/api/profile/` returns HTTP 404 (incorrect)
-- Authorization headers are lost during redirects
+這意味著：
+- `/api/profile` 返回 HTTP 200（正確）
+- `/api/profile/` 返回 HTTP 404（錯誤）
+- Authorization headers 在重定向時會丟失
 
 ---
 
-## Quick Checklist
+## 快速檢查清單
 
-When creating or modifying API routes:
+創建或修改 API 路由時：
 
-- [ ] Route definition has no trailing slash
-- [ ] HTTP method is correct (GET/POST/PUT/PATCH/DELETE)
-- [ ] Path parameters use `{param}` format
-- [ ] Response model is defined with `response_model`
-- [ ] Error handling uses `HTTPException`
-- [ ] Frontend axios calls match backend routes exactly
-
----
-
-## References
-
-For detailed information, refer to these reference files:
-
-| Topic | File |
-|-------|------|
-| Trailing slash rules | [trailing-slash-rules.md](references/trailing-slash-rules.md) |
-| RESTful principles | [restful-principles.md](references/restful-principles.md) |
-| HTTP status codes | [status-codes.md](references/status-codes.md) |
-| Complete examples | [complete-examples.md](references/complete-examples.md) |
+- [ ] 路由定義無尾隨斜線
+- [ ] HTTP 方法正確（GET/POST/PUT/PATCH/DELETE）
+- [ ] 路徑參數使用 `{param}` 格式
+- [ ] 回應模型使用 `response_model` 定義
+- [ ] 錯誤處理使用 `HTTPException`
+- [ ] 前端 axios 呼叫與後端路由完全匹配
 
 ---
 
-## Related Skills
+## 參考資料
 
-- **backend-dev-fastapi** - FastAPI development guide
-- **frontend-dev-vue3** - Vue 3 development guide
+詳細資訊請參考以下參考文件：
+
+| 主題 | 檔案 |
+|------|------|
+| 尾隨斜線規則 | [trailing-slash-rules.md](references/trailing-slash-rules.md) |
+| RESTful 原則 | [restful-principles.md](references/restful-principles.md) |
+| HTTP 狀態碼 | [status-codes.md](references/status-codes.md) |
+| 完整範例 | [complete-examples.md](references/complete-examples.md) |
+
+---
+
+## 相關 Skills
+
+- **backend-dev-fastapi** - FastAPI 開發指南
+- **frontend-dev-vue3** - Vue 3 開發指南

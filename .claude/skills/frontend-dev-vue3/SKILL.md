@@ -1,29 +1,29 @@
 ---
 name: frontend-dev-vue3
-description: This skill should be used when developing frontend features for MergeMeet. It provides guidance on Vue 3 Composition API + Pinia + Vue Router patterns including component design, state management, routing, API integration, and WebSocket handling.
+description: 在 MergeMeet 開發前端功能時使用此 skill。提供 Vue 3 Composition API + Pinia + Vue Router 的開發模式指南，包含組件設計、狀態管理、路由、API 整合和 WebSocket 處理。
 ---
 
-# Vue 3 Frontend Development Guide
+# Vue 3 前端開發指南
 
-## Purpose
+## 目的
 
-To establish consistent patterns for Vue 3 + Pinia + Vue Router development in the MergeMeet project.
+建立 MergeMeet 專案中 Vue 3 + Pinia + Vue Router 開發的一致模式。
 
 ---
 
-## Project Structure
+## 專案結構
 
 ```
 frontend/
 ├── src/
-│   ├── components/       # Reusable Vue components
+│   ├── components/       # 可重用 Vue 組件
 │   │   ├── InterestSelector.vue
 │   │   ├── MatchModal.vue
 │   │   ├── PhotoUploader.vue
 │   │   ├── ReportModal.vue
 │   │   └── chat/
 │   │       └── MessageBubble.vue
-│   ├── views/            # Page views
+│   ├── views/            # 頁面視圖
 │   │   ├── Home.vue
 │   │   ├── Register.vue
 │   │   ├── Login.vue
@@ -44,31 +44,31 @@ frontend/
 │   │   └── useWebSocket.js
 │   ├── router/           # Vue Router
 │   │   └── index.js
-│   └── api/              # API client
+│   └── api/              # API 客戶端
 │       └── axios.js
 └── vite.config.js
 ```
 
 ---
 
-## Quick Checklist
+## 快速檢查清單
 
-When creating new components:
+建立新組件時：
 
-- [ ] Use `<script setup>` syntax
-- [ ] Define props with `defineProps`
-- [ ] Define emits with `defineEmits`
-- [ ] Use `ref` or `reactive` for reactive state
-- [ ] Use `computed` for derived state
-- [ ] API URLs have no trailing slash
-- [ ] Add error handling with try/catch
-- [ ] Add loading state for async operations
+- [ ] 使用 `<script setup>` 語法
+- [ ] 使用 `defineProps` 定義 props
+- [ ] 使用 `defineEmits` 定義 emits
+- [ ] 使用 `ref` 或 `reactive` 定義響應式狀態
+- [ ] 使用 `computed` 定義衍生狀態
+- [ ] API URL 無尾隨斜線
+- [ ] 使用 try/catch 進行錯誤處理
+- [ ] 為非同步操作加上載入狀態
 
 ---
 
-## Core Patterns
+## 核心模式
 
-### Component with Composition API
+### 使用 Composition API 的組件
 
 ```vue
 <script setup>
@@ -89,7 +89,7 @@ const emit = defineEmits(['update', 'delete'])
 // Store
 const profileStore = useProfileStore()
 
-// Reactive state
+// 響應式狀態
 const loading = ref(false)
 const error = ref(null)
 
@@ -98,7 +98,7 @@ const hasPhotos = computed(() => {
   return profileStore.profile?.photos?.length > 0
 })
 
-// Methods
+// 方法
 const handleUpdate = async () => {
   loading.value = true
   try {
@@ -111,7 +111,7 @@ const handleUpdate = async () => {
   }
 }
 
-// Lifecycle
+// 生命週期
 onMounted(async () => {
   await profileStore.fetchProfile(props.userId)
 })
@@ -119,10 +119,10 @@ onMounted(async () => {
 
 <template>
   <div class="profile-component">
-    <div v-if="loading">Loading...</div>
+    <div v-if="loading">載入中...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <div v-else>
-      <!-- Content -->
+      <!-- 內容 -->
     </div>
   </div>
 </template>
@@ -154,7 +154,7 @@ export const useProfileStore = defineStore('profile', {
     async fetchProfile() {
       this.loading = true
       try {
-        // No trailing slash
+        // 無尾隨斜線
         const response = await axios.get('/api/profile')
         this.profile = response.data
       } catch (error) {
@@ -166,7 +166,7 @@ export const useProfileStore = defineStore('profile', {
     },
 
     async updateProfile(profileData) {
-      // No trailing slash
+      // 無尾隨斜線
       const response = await axios.put('/api/profile', profileData)
       this.profile = response.data
       return response.data
@@ -175,7 +175,7 @@ export const useProfileStore = defineStore('profile', {
 })
 ```
 
-### Vue Router with Auth Guard
+### 帶有認證守衛的 Vue Router
 
 ```javascript
 // router/index.js
@@ -216,69 +216,69 @@ export default router
 
 ---
 
-## Common Mistakes
+## 常見錯誤
 
-### API URL with trailing slash (causes 404)
+### API URL 帶尾隨斜線（導致 404）
 
 ```javascript
-// Wrong
+// 錯誤
 await axios.get('/api/profile/')     // 404
 await axios.post('/api/photos/')     // 404
 
-// Correct
+// 正確
 await axios.get('/api/profile')
 await axios.post('/api/photos', formData)
 ```
 
-### Non-reactive variable
+### 非響應式變數
 
 ```javascript
-// Wrong
-let loading = false  // Not reactive
+// 錯誤
+let loading = false  // 不是響應式的
 
-// Correct
+// 正確
 const loading = ref(false)
 ```
 
-### Modifying props directly
+### 直接修改 props
 
 ```vue
 <script setup>
 const props = defineProps(['value'])
 
-// Wrong - props are readonly
+// 錯誤 - props 是唯讀的
 props.value = 'new'
 
-// Correct - use emit
+// 正確 - 使用 emit
 const emit = defineEmits(['update:value'])
 emit('update:value', 'new')
 </script>
 ```
 
-### Missing error handling
+### 缺少錯誤處理
 
 ```javascript
-// Wrong
+// 錯誤
 async function fetchData() {
   const response = await axios.get('/api/profile')
   profile.value = response.data
 }
 
-// Correct
+// 正確
 async function fetchData() {
   try {
     const response = await axios.get('/api/profile')
     profile.value = response.data
   } catch (error) {
-    console.error('Failed to fetch:', error)
-    // Show user-friendly error message
+    console.error('獲取失敗:', error)
+    // 顯示用戶友善的錯誤訊息
   }
 }
 ```
 
 ---
 
-## Related Skills
+## 相關 Skills
 
-- **api-routing-standards** - API URL rules (required reading)
-- **backend-dev-fastapi** - Backend API integration
+- **api-routing-standards** - API URL 規則（必讀）
+- **backend-dev-fastapi** - 後端 API 整合
