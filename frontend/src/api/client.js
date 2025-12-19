@@ -6,6 +6,7 @@
  * 2. Bearer Token（回退）- 向後兼容，API 客戶端 / 移動端使用
  */
 import axios from 'axios'
+import { showSessionExpiredMessage } from '@/utils/discreteApi'
 
 /**
  * 從 Cookie 中獲取指定的值
@@ -86,10 +87,14 @@ apiClient.interceptors.response.use(
         // 重新發送原本的請求
         return apiClient(originalRequest)
       } catch (refreshError) {
-        // 刷新失敗，清除本地 Token 並跳轉到登入頁
+        // 刷新失敗，清除本地 Token
         localStorage.removeItem('access_token')
         localStorage.removeItem('refresh_token')
+
+        // 顯示提示後再跳轉
+        await showSessionExpiredMessage()
         window.location.href = '/login'
+
         return Promise.reject(refreshError)
       }
     }

@@ -5,3 +5,4 @@
 export * from './helpers'
 export * from './logger'
 export * from './dateFormat'
+export * from './discreteApi'
