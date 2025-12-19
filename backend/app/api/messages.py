@@ -313,6 +313,61 @@ async def mark_messages_as_read(
     return None
 
 
+@router.post("/matches/{match_id}/read-all", status_code=status.HTTP_204_NO_CONTENT)
+async def mark_all_messages_as_read(
+    match_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    標記該對話中所有未讀訊息為已讀
+
+    當用戶進入聊天室時調用此 API，確保所有未讀訊息（包括因分頁未載入的舊訊息）
+    都被正確標記為已讀。
+
+    - 只標記對方發送給自己的訊息
+    - 冪等操作：重複調用不會有副作用
+    """
+    # 驗證用戶屬於該配對
+    match_result = await db.execute(
+        select(Match)
+        .where(
+            and_(
+                Match.id == match_id,
+                Match.status == "ACTIVE",
+                or_(
+                    Match.user1_id == current_user.id,
+                    Match.user2_id == current_user.id
+                )
+            )
+        )
+    )
+    match = match_result.scalar_one_or_none()
+
+    if not match:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="配對不存在或您無權操作"
+        )
+
+    # 批量更新所有未讀訊息（只更新對方發送的訊息）
+    await db.execute(
+        Message.__table__.update()
+        .where(
+            and_(
+                Message.match_id == match_id,
+                Message.sender_id != current_user.id,  # 對方發送的
+                Message.is_read.is_(None),  # 未讀
+                Message.deleted_at.is_(None)  # 未刪除
+            )
+        )
+        .values(is_read=func.now())
+    )
+    await db.commit()
+
+    return None
+
+
 @router.delete("/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_message(
     message_id: str,

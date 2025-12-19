@@ -356,7 +356,22 @@ export const useChatStore = defineStore('chat', () => {
     // 這確保用戶能看到離開期間的新訊息
     const result = await fetchChatHistory(matchId)
 
-    // 標記已讀（確保訊息已載入後再執行）
+    // 調用後端 API 標記所有未讀訊息為已讀（包括因分頁未載入的舊訊息）
+    // 這是關鍵修正：確保資料庫中的 is_read 被正確更新
+    try {
+      await apiClient.post(`/messages/matches/${matchId}/read-all`)
+      logger.debug('[Chat] Marked all messages as read via API:', matchId)
+    } catch (err) {
+      logger.error('[Chat] Failed to mark all messages as read:', err)
+    }
+
+    // 更新本地對話列表的未讀數
+    const conv = conversations.value.find(c => c.match_id === matchId)
+    if (conv && conv.unread_count > 0) {
+      conv.unread_count = 0
+    }
+
+    // 發送 WebSocket 已讀回條（通知對方）
     await markConversationAsRead(matchId)
 
     // 同步清除對應的訊息通知（讓通知鈴鐺數字也減少）

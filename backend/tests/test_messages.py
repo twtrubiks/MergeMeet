@@ -661,3 +661,195 @@ async def test_delete_message_websocket_event_format(client: AsyncClient, matche
         assert uuid.UUID(broadcast_data["message_id"])
         assert uuid.UUID(broadcast_data["match_id"])
         assert uuid.UUID(broadcast_data["deleted_by"])
+
+
+# ==================== 標記所有訊息為已讀 API 測試 ====================
+
+
+@pytest.mark.asyncio
+async def test_mark_all_messages_as_read_success(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+    """測試成功標記所有未讀訊息為已讀"""
+    match_id = matched_users["match_id"]
+    alice_token = matched_users["alice"]["token"]
+    bob_user_id = matched_users["bob"]["user_id"]
+
+    # Bob 發送 5 條訊息給 Alice
+    for i in range(5):
+        message = Message(
+            match_id=match_id,
+            sender_id=bob_user_id,
+            content=f"Message {i+1}",
+            message_type="TEXT"
+        )
+        test_db.add(message)
+    await test_db.commit()
+
+    # 確認有 5 條未讀訊息
+    result = await test_db.execute(
+        select(Message).where(
+            Message.match_id == match_id,
+            Message.is_read.is_(None)
+        )
+    )
+    unread_before = len(result.scalars().all())
+    assert unread_before == 5
+
+    # Alice 調用 read-all API
+    response = await client.post(
+        f"/api/messages/matches/{match_id}/read-all",
+        headers={"Authorization": f"Bearer {alice_token}"}
+    )
+
+    assert response.status_code == 204
+
+    # 驗證所有訊息已標記為已讀
+    result = await test_db.execute(
+        select(Message).where(
+            Message.match_id == match_id,
+            Message.is_read.is_(None)
+        )
+    )
+    unread_after = len(result.scalars().all())
+    assert unread_after == 0
+
+
+@pytest.mark.asyncio
+async def test_mark_all_messages_as_read_unauthorized(client: AsyncClient, matched_users: dict):
+    """測試未授權用戶無法標記訊息"""
+    # 創建第三個用戶
+    response = await client.post("/api/auth/register", json={
+        "email": "eve@example.com",
+        "password": "Eve12345",
+        "date_of_birth": "1993-01-01"
+    })
+    eve_token = response.json()["access_token"]
+    client.cookies.clear()
+
+    match_id = matched_users["match_id"]
+
+    # Eve 嘗試標記 Alice 和 Bob 的對話
+    response = await client.post(
+        f"/api/messages/matches/{match_id}/read-all",
+        headers={"Authorization": f"Bearer {eve_token}"}
+    )
+
+    assert response.status_code == 404
+    assert "配對不存在或您無權操作" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_mark_all_messages_as_read_no_unread(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+    """測試沒有未讀訊息時也能正常調用（冪等）"""
+    from datetime import datetime, timezone
+
+    match_id = matched_users["match_id"]
+    alice_token = matched_users["alice"]["token"]
+    bob_user_id = matched_users["bob"]["user_id"]
+
+    # Bob 發送已讀訊息
+    message = Message(
+        match_id=match_id,
+        sender_id=bob_user_id,
+        content="Already read message",
+        message_type="TEXT",
+        is_read=datetime.now(timezone.utc)  # 已讀
+    )
+    test_db.add(message)
+    await test_db.commit()
+
+    # Alice 調用 read-all API（應該成功但不做任何更新）
+    response = await client.post(
+        f"/api/messages/matches/{match_id}/read-all",
+        headers={"Authorization": f"Bearer {alice_token}"}
+    )
+
+    assert response.status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_mark_all_only_marks_others_messages(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+    """測試只標記對方的訊息，不標記自己的訊息"""
+    match_id = matched_users["match_id"]
+    alice_token = matched_users["alice"]["token"]
+    alice_user_id = matched_users["alice"]["user_id"]
+    bob_user_id = matched_users["bob"]["user_id"]
+
+    # Alice 發送訊息
+    alice_msg = Message(
+        match_id=match_id,
+        sender_id=alice_user_id,
+        content="Alice's message",
+        message_type="TEXT"
+    )
+    # Bob 發送訊息
+    bob_msg = Message(
+        match_id=match_id,
+        sender_id=bob_user_id,
+        content="Bob's message",
+        message_type="TEXT"
+    )
+    test_db.add(alice_msg)
+    test_db.add(bob_msg)
+    await test_db.commit()
+    await test_db.refresh(alice_msg)
+    await test_db.refresh(bob_msg)
+
+    # Alice 調用 read-all API
+    response = await client.post(
+        f"/api/messages/matches/{match_id}/read-all",
+        headers={"Authorization": f"Bearer {alice_token}"}
+    )
+
+    assert response.status_code == 204
+
+    # 驗證：Bob 的訊息已讀，Alice 的訊息仍未讀
+    await test_db.refresh(alice_msg)
+    await test_db.refresh(bob_msg)
+
+    assert alice_msg.is_read is None  # Alice 自己的訊息不應被標記
+    assert bob_msg.is_read is not None  # Bob 的訊息應被標記為已讀
+
+
+@pytest.mark.asyncio
+async def test_mark_all_clears_unread_count(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+    """測試標記後 unread_count 歸零"""
+    match_id = matched_users["match_id"]
+    alice_token = matched_users["alice"]["token"]
+    bob_user_id = matched_users["bob"]["user_id"]
+
+    # Bob 發送 3 條訊息
+    for i in range(3):
+        message = Message(
+            match_id=match_id,
+            sender_id=bob_user_id,
+            content=f"Message {i+1}",
+            message_type="TEXT"
+        )
+        test_db.add(message)
+    await test_db.commit()
+
+    # 確認 unread_count = 3
+    response = await client.get(
+        "/api/messages/conversations",
+        headers={"Authorization": f"Bearer {alice_token}"}
+    )
+    assert response.status_code == 200
+    conversations = response.json()
+    conv = next((c for c in conversations if c["match_id"] == match_id), None)
+    assert conv is not None
+    assert conv["unread_count"] == 3
+
+    # Alice 調用 read-all API
+    await client.post(
+        f"/api/messages/matches/{match_id}/read-all",
+        headers={"Authorization": f"Bearer {alice_token}"}
+    )
+
+    # 確認 unread_count = 0
+    response = await client.get(
+        "/api/messages/conversations",
+        headers={"Authorization": f"Bearer {alice_token}"}
+    )
+    conversations = response.json()
+    conv = next((c for c in conversations if c["match_id"] == match_id), None)
+    assert conv["unread_count"] == 0
