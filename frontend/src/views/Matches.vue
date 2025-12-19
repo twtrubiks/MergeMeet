@@ -545,7 +545,7 @@ onUnmounted(() => {
 .new-match-badge {
   position: absolute;
   top: 12px;
-  right: 12px;
+  left: 12px;
   background: linear-gradient(135deg, #FFD700, #FFA500);
   color: white;
   padding: 6px 12px;
@@ -555,6 +555,7 @@ onUnmounted(() => {
   letter-spacing: 0.5px;
   box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
   animation: glow 2s ease-in-out infinite;
+  z-index: 1;
 }
 
 @keyframes glow {
@@ -975,7 +976,7 @@ onUnmounted(() => {
 
   .new-match-badge {
     top: 8px;
-    right: 8px;
+    left: 8px;
     font-size: 0.65rem;
     padding: 4px 10px;
   }
