@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useProfileStore } from '@/stores/profile'
+import { discreteMessage } from '@/utils/discreteApi'
 import Home from '@/views/Home.vue'
 import Login from '@/views/Login.vue'
 import Register from '@/views/Register.vue'
@@ -82,7 +84,7 @@ const router = createRouter({
       path: '/discovery',
       name: 'discovery',
       component: Discovery,
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true, requiresCompleteProfile: true }
     },
     {
       path: '/matches',
@@ -123,8 +125,8 @@ const router = createRouter({
   ]
 })
 
-// 路由守衛：檢查認證狀態和管理員權限
-router.beforeEach((to, from, next) => {
+// 路由守衛：檢查認證狀態、Profile 完整性和管理員權限
+router.beforeEach(async (to, from, next) => {
   const userStore = useUserStore()
 
   // 檢查是否需要認證
@@ -142,6 +144,30 @@ router.beforeEach((to, from, next) => {
     // 已登入但未驗證 Email，導向驗證頁面
     next('/verify-email')
     return
+  }
+
+  // 檢查是否需要完整 Profile
+  if (to.meta.requiresCompleteProfile && userStore.isAuthenticated) {
+    const profileStore = useProfileStore()
+
+    // 確保 Profile 數據已載入
+    if (!profileStore.hasProfile) {
+      try {
+        await profileStore.fetchProfile()
+      } catch (error) {
+        console.warn('Failed to fetch profile for route guard:', error)
+      }
+    }
+
+    // 檢查 Profile 是否完整
+    if (!profileStore.isProfileComplete) {
+      discreteMessage.warning('請先完成個人檔案設定（需要至少一張照片）', {
+        duration: 4000,
+        closable: true
+      })
+      next('/profile')
+      return
+    }
   }
 
   // 檢查是否需要管理員權限
