@@ -19,6 +19,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useWebSocketStore } from './websocket'
+import { useChatStore } from './chat'
 import { logger } from '@/utils/logger'
 import apiClient from '@/api/client'
 
@@ -112,25 +113,23 @@ export const useNotificationStore = defineStore('notification', () => {
       timestamp: data.timestamp
     })
 
-    // 同時更新 ChatList 的未讀計數（延遲 import 避免循環依賴）
-    import('./chat').then(({ useChatStore }) => {
-      const chatStore = useChatStore()
-      const conv = chatStore.conversations.find(c => c.match_id === data.match_id)
-      if (conv) {
-        conv.unread_count = (conv.unread_count || 0) + 1
-        conv.last_message = {
-          content: data.preview,
-          sent_at: data.timestamp,
-          sender_id: data.sender_id
-        }
-        // 將對話移到列表頂部
-        chatStore.conversations = [
-          conv,
-          ...chatStore.conversations.filter(c => c.match_id !== data.match_id)
-        ]
-        logger.debug('[Notification] Updated conversation unread_count:', conv.unread_count)
+    // 同時更新 ChatList 的未讀計數
+    const chatStore = useChatStore()
+    const conv = chatStore.conversations.find(c => c.match_id === data.match_id)
+    if (conv) {
+      conv.unread_count = (conv.unread_count || 0) + 1
+      conv.last_message = {
+        content: data.preview,
+        sent_at: data.timestamp,
+        sender_id: data.sender_id
       }
-    })
+      // 將對話移到列表頂部
+      chatStore.conversations = [
+        conv,
+        ...chatStore.conversations.filter(c => c.match_id !== data.match_id)
+      ]
+      logger.debug('[Notification] Updated conversation unread_count:', conv.unread_count)
+    }
   }
 
   /**
