@@ -626,9 +626,8 @@ if created_at:
 
 ## 📖 相關文檔
 
-- [技術架構](ARCHITECTURE.md) - 系統整體架構
-- [後端實作指南](MergeMeet_Development_Docs/05_後端實作指南_完整版.md) - API 詳細說明
-- [架構審查報告](ARCHITECTURE_REVIEW_2025-12-09.md) - RD + PM 雙視角審查
+- [技術架構](../ARCHITECTURE.md) - 系統整體架構
+- [API 文檔](http://localhost:8000/docs) - FastAPI Swagger UI
 
 ---
 

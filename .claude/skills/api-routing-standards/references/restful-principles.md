@@ -165,6 +165,5 @@ context7: get-library-docs "/fastapi" topic="REST API design" mode="info"
 
 ## 參考資源
 
-- [HTTP 方法使用](http-methods.md)
 - [狀態碼指南](status-codes.md)
 - [完整範例](complete-examples.md)

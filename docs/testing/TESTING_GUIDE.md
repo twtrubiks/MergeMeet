@@ -5,7 +5,7 @@
 ### 方法 1: 使用自動化腳本 ⚡（推薦）
 
 ```bash
-cd /home/twtrubiks/下載/merge_meet/mergemeet
+cd /home/twtrubiks/下載/mergemeet
 ./test_matching_chat.sh
 ```
 

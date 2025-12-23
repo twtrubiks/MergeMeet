@@ -335,7 +335,6 @@ grep -r "axios\.\w*('/api/.*/')" src/
 ## 📚 相關資源
 
 - [RESTful 設計原則](restful-principles.md)
-- [HTTP 方法使用](http-methods.md)
 - [完整範例](complete-examples.md)
 - FastAPI 官方文檔 (使用 context7 查詢)
 

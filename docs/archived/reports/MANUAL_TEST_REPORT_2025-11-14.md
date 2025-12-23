@@ -10,8 +10,8 @@
 > - ✅ 所有功能現已正常運作
 >
 > **最新測試請參考**：
-> - ✅ [TRAILING_SLASH_FIX_REPORT_2025-11-14.md](./TRAILING_SLASH_FIX_REPORT_2025-11-14.md) - 修復後的測試報告
-> - ✅ [MANUAL_TESTING_GUIDE.md](./MANUAL_TESTING_GUIDE.md) - 完整測試指南
+> - ✅ [TRAILING_SLASH_FIX_REPORT_2025-11-14.md](../bug-fixes/TRAILING_SLASH_FIX_REPORT_2025-11-14.md) - 修復後的測試報告
+> - ✅ [MANUAL_TESTING_GUIDE.md](../../testing/MANUAL_TESTING_GUIDE.md) - 完整測試指南
 >
 > ---
 >
