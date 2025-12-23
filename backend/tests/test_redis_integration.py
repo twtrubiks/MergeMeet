@@ -167,6 +167,8 @@ class TestLogoutEndToEnd:
                 pytest.skip(f"註冊失敗: {response.json()}")
 
             token = response.json()["access_token"]
+            # 清除 Cookie，確保使用 Bearer Token 認證（避免 CSRF 驗證）
+            client.cookies.clear()
 
             # 登出
             response = await client.post(
