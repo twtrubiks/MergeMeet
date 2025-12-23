@@ -10,6 +10,8 @@ export const useSafetyStore = defineStore('safety', () => {
   // State
   const blockedUsers = ref([])
   const myReports = ref([])
+  const myAppeals = ref([])
+  const appealsTotal = ref(0)
   const loading = ref(false)
   const error = ref(null)
 
@@ -131,6 +133,25 @@ export const useSafetyStore = defineStore('safety', () => {
   }
 
   /**
+   * 取得我的照片申訴記錄
+   */
+  const fetchMyAppeals = async () => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await apiClient.get('/moderation/appeals/my')
+      myAppeals.value = response.data.appeals
+      appealsTotal.value = response.data.total
+      return response.data
+    } catch (err) {
+      error.value = err.response?.data?.detail || '無法取得申訴記錄'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
    * 清除錯誤訊息
    */
   const clearError = () => {
@@ -143,6 +164,8 @@ export const useSafetyStore = defineStore('safety', () => {
   const $reset = () => {
     blockedUsers.value = []
     myReports.value = []
+    myAppeals.value = []
+    appealsTotal.value = 0
     loading.value = false
     error.value = null
   }
@@ -151,6 +174,8 @@ export const useSafetyStore = defineStore('safety', () => {
     // State
     blockedUsers,
     myReports,
+    myAppeals,
+    appealsTotal,
     loading,
     error,
 
@@ -165,6 +190,7 @@ export const useSafetyStore = defineStore('safety', () => {
     isBlocked,
     reportUser,
     fetchMyReports,
+    fetchMyAppeals,
     clearError,
     $reset
   }

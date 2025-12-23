@@ -7,7 +7,25 @@
         <span class="btn-text">返回設定</span>
       </router-link>
 
-      <h1 class="page-title">我的舉報記錄</h1>
+      <h1 class="page-title">我的記錄</h1>
+
+      <!-- Tab 切換 -->
+      <div class="tabs">
+        <button
+          class="tab-btn"
+          :class="{ active: activeTab === 'reports' }"
+          @click="activeTab = 'reports'"
+        >
+          舉報記錄
+        </button>
+        <button
+          class="tab-btn"
+          :class="{ active: activeTab === 'appeals' }"
+          @click="activeTab = 'appeals'"
+        >
+          照片申訴
+        </button>
+      </div>
 
       <!-- 載入中 -->
       <div v-if="safetyStore.loading" class="loading-state">
@@ -15,51 +33,106 @@
         <p>載入中...</p>
       </div>
 
-      <!-- 空狀態 -->
-      <div v-else-if="safetyStore.myReports.length === 0" class="empty-state">
-        <div class="empty-icon">📋</div>
-        <h2>暫無舉報記錄</h2>
-        <p>您尚未提交任何舉報</p>
-      </div>
+      <!-- 舉報記錄 Tab -->
+      <template v-else-if="activeTab === 'reports'">
+        <!-- 空狀態 -->
+        <div v-if="safetyStore.myReports.length === 0" class="empty-state">
+          <div class="empty-icon">📋</div>
+          <h2>暫無舉報記錄</h2>
+          <p>您尚未提交任何舉報</p>
+        </div>
 
-      <!-- 舉報列表 -->
-      <div v-else class="reports-list">
-        <div
-          v-for="report in safetyStore.myReports"
-          :key="report.id"
-          class="report-item"
-        >
-          <!-- 舉報頭部 -->
-          <div class="report-header">
-            <span class="report-type" :class="getTypeClass(report.report_type)">
-              {{ getTypeText(report.report_type) }}
-            </span>
-            <span class="report-status" :class="getStatusClass(report.status)">
-              {{ getStatusText(report.status) }}
-            </span>
-          </div>
+        <!-- 舉報列表 -->
+        <div v-else class="reports-list">
+          <div
+            v-for="report in safetyStore.myReports"
+            :key="report.id"
+            class="report-item"
+          >
+            <!-- 舉報頭部 -->
+            <div class="report-header">
+              <span class="report-type" :class="getTypeClass(report.report_type)">
+                {{ getTypeText(report.report_type) }}
+              </span>
+              <span class="report-status" :class="getStatusClass(report.status)">
+                {{ getStatusText(report.status) }}
+              </span>
+            </div>
 
-          <!-- 舉報內容 -->
-          <div class="report-content">
-            <p class="report-reason">{{ report.reason }}</p>
-          </div>
+            <!-- 舉報內容 -->
+            <div class="report-content">
+              <p class="report-reason">{{ report.reason }}</p>
+            </div>
 
-          <!-- 舉報時間 -->
-          <div class="report-footer">
-            <span class="report-time">{{ formatTime(report.created_at) }}</span>
+            <!-- 舉報時間 -->
+            <div class="report-footer">
+              <span class="report-time">{{ formatTime(report.created_at) }}</span>
+            </div>
           </div>
         </div>
-      </div>
+      </template>
+
+      <!-- 照片申訴 Tab -->
+      <template v-else-if="activeTab === 'appeals'">
+        <!-- 空狀態 -->
+        <div v-if="safetyStore.myAppeals.length === 0" class="empty-state">
+          <div class="empty-icon">📷</div>
+          <h2>暫無申訴記錄</h2>
+          <p>您尚未提交任何照片申訴</p>
+        </div>
+
+        <!-- 申訴列表 -->
+        <div v-else class="reports-list">
+          <div
+            v-for="appeal in safetyStore.myAppeals"
+            :key="appeal.id"
+            class="report-item"
+          >
+            <!-- 申訴頭部 -->
+            <div class="report-header">
+              <span class="report-type type-photo">
+                {{ getAppealTypeText(appeal.appeal_type) }}
+              </span>
+              <span class="report-status" :class="getAppealStatusClass(appeal.status)">
+                {{ getAppealStatusText(appeal.status) }}
+              </span>
+            </div>
+
+            <!-- 申訴內容 -->
+            <div class="report-content">
+              <p class="appeal-label">申訴理由：</p>
+              <p class="report-reason">{{ appeal.reason }}</p>
+            </div>
+
+            <!-- 管理員回覆 -->
+            <div v-if="appeal.admin_response" class="admin-response">
+              <p class="response-label">管理員回覆：</p>
+              <p class="response-content">{{ appeal.admin_response }}</p>
+            </div>
+
+            <!-- 申訴時間 -->
+            <div class="report-footer">
+              <span class="report-time">{{ formatTime(appeal.created_at) }}</span>
+              <span v-if="appeal.reviewed_at" class="reviewed-time">
+                審核於 {{ formatTime(appeal.reviewed_at) }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </template>
     </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useSafetyStore } from '@/stores/safety'
 import { logger } from '@/utils/logger'
 
 const safetyStore = useSafetyStore()
+
+// Tab 狀態
+const activeTab = ref('reports')
 
 /**
  * 舉報類型文字
@@ -89,6 +162,30 @@ const getStatusText = (status) => {
 }
 
 /**
+ * 申訴類型文字
+ */
+const getAppealTypeText = (type) => {
+  const types = {
+    PHOTO: '照片申訴',
+    MESSAGE: '訊息申訴',
+    PROFILE: '個人檔案申訴'
+  }
+  return types[type] || type
+}
+
+/**
+ * 申訴狀態文字
+ */
+const getAppealStatusText = (status) => {
+  const statuses = {
+    PENDING: '處理中',
+    APPROVED: '已通過',
+    REJECTED: '已駁回'
+  }
+  return statuses[status] || status
+}
+
+/**
  * 類型樣式
  */
 const getTypeClass = (type) => {
@@ -100,6 +197,18 @@ const getTypeClass = (type) => {
  */
 const getStatusClass = (status) => {
   return `status-${(status || 'pending').toLowerCase()}`
+}
+
+/**
+ * 申訴狀態樣式
+ */
+const getAppealStatusClass = (status) => {
+  const classMap = {
+    PENDING: 'status-pending',
+    APPROVED: 'status-approved',
+    REJECTED: 'status-rejected'
+  }
+  return classMap[status] || 'status-pending'
 }
 
 /**
@@ -117,13 +226,29 @@ const formatTime = (timestamp) => {
   })
 }
 
-// Lifecycle
-onMounted(async () => {
+/**
+ * 載入資料
+ */
+const loadData = async () => {
   try {
-    await safetyStore.fetchMyReports()
+    if (activeTab.value === 'reports') {
+      await safetyStore.fetchMyReports()
+    } else {
+      await safetyStore.fetchMyAppeals()
+    }
   } catch (error) {
-    logger.error('[MyReports] Failed to fetch reports:', error)
+    logger.error('[MyReports] Failed to fetch data:', error)
   }
+}
+
+// 監聽 Tab 切換
+watch(activeTab, () => {
+  loadData()
+})
+
+// Lifecycle
+onMounted(() => {
+  loadData()
 })
 </script>
 
@@ -172,6 +297,37 @@ onMounted(async () => {
   font-weight: 700;
   color: #333;
   margin-bottom: 20px;
+}
+
+/* Tab 切換 */
+.tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  justify-content: center;
+}
+
+.tab-btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 25px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.8);
+  color: #666;
+}
+
+.tab-btn:hover {
+  background: white;
+  color: #FF6B6B;
+}
+
+.tab-btn.active {
+  background: #FF6B6B;
+  color: white;
+  box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
 }
 
 /* 載入狀態 */
@@ -275,6 +431,11 @@ onMounted(async () => {
   color: #666;
 }
 
+.type-photo {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
 .report-status {
   padding: 6px 12px;
   border-radius: 20px;
@@ -288,12 +449,14 @@ onMounted(async () => {
   color: #f9a825;
 }
 
-.status-resolved {
+.status-resolved,
+.status-approved {
   background: #e8f5e9;
   color: #4caf50;
 }
 
-.status-dismissed {
+.status-dismissed,
+.status-rejected {
   background: #f5f5f5;
   color: #999;
 }
@@ -310,13 +473,44 @@ onMounted(async () => {
   line-height: 1.5;
 }
 
+/* 申訴標籤 */
+.appeal-label,
+.response-label {
+  font-size: 13px;
+  color: #666;
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+
+/* 管理員回覆 */
+.admin-response {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  border-left: 3px solid #FF6B6B;
+}
+
+.response-content {
+  margin: 0;
+  font-size: 14px;
+  color: #333;
+  line-height: 1.5;
+}
+
 /* 舉報時間 */
 .report-footer {
   border-top: 1px solid #f0f0f0;
   padding-top: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.report-time {
+.report-time,
+.reviewed-time {
   font-size: 13px;
   color: #999;
 }
