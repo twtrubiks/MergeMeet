@@ -25,6 +25,7 @@ from app.schemas.profile import (
     InterestTagResponse,
     InterestTagCreateRequest,
     UpdateInterestsRequest,
+    PhotoOrderRequest,
 )
 from app.services.content_moderation import ContentModerationService
 from app.services.file_storage import file_storage
@@ -732,6 +733,157 @@ async def delete_photo(
         # 檢查檔案完整度
         profile.is_complete = check_profile_completeness(profile)
         await db.commit()
+
+
+@router.put("/photos/order", response_model=List[PhotoResponse])
+async def reorder_photos(
+    request: PhotoOrderRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """調整照片順序
+
+    根據傳入的照片 ID 陣列重新排序所有照片。
+    陣列中的順序即為新的 display_order。
+
+    驗證規則：
+    - photo_ids 數量必須與用戶現有照片數量一致
+    - 所有 photo_ids 必須屬於該用戶
+    """
+    # 取得用戶的 Profile 及其照片
+    result = await db.execute(
+        select(Profile)
+        .options(selectinload(Profile.photos))
+        .where(Profile.user_id == current_user.id)
+    )
+    profile = result.scalar_one_or_none()
+
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="個人檔案不存在"
+        )
+
+    existing_photos = {str(photo.id): photo for photo in profile.photos}
+    existing_count = len(existing_photos)
+
+    # 驗證 photo_ids 數量
+    if len(request.photo_ids) != existing_count:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"照片數量不符：預期 {existing_count} 張，收到 {len(request.photo_ids)} 張"
+        )
+
+    # 驗證所有 photo_ids 都屬於該用戶，且無重複
+    seen_ids = set()
+    for photo_id in request.photo_ids:
+        if photo_id in seen_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"重複的照片 ID：{photo_id}"
+            )
+        seen_ids.add(photo_id)
+
+        if photo_id not in existing_photos:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"照片 ID 不存在或不屬於此用戶：{photo_id}"
+            )
+
+    # 更新 display_order
+    for new_order, photo_id in enumerate(request.photo_ids):
+        existing_photos[photo_id].display_order = new_order
+
+    await db.commit()
+
+    # 返回排序後的照片列表
+    sorted_photos = sorted(profile.photos, key=lambda p: p.display_order)
+    return [
+        PhotoResponse(
+            id=str(photo.id),
+            url=photo.url,
+            thumbnail_url=photo.thumbnail_url,
+            display_order=photo.display_order,
+            is_profile_picture=photo.is_profile_picture,
+            moderation_status=photo.moderation_status,
+            rejection_reason=photo.rejection_reason,
+            created_at=photo.created_at,
+        )
+        for photo in sorted_photos
+    ]
+
+
+@router.put("/photos/{photo_id}/primary", response_model=PhotoResponse)
+async def set_profile_picture(
+    photo_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """設定主頭像
+
+    將指定照片設為主頭像，並自動移到第一位。
+    只有已通過審核 (APPROVED) 的照片可以設為主頭像。
+    """
+    # 取得用戶的 Profile 及其照片
+    result = await db.execute(
+        select(Profile)
+        .options(selectinload(Profile.photos))
+        .where(Profile.user_id == current_user.id)
+    )
+    profile = result.scalar_one_or_none()
+
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="個人檔案不存在"
+        )
+
+    # 找到目標照片
+    target_photo = None
+    for photo in profile.photos:
+        if str(photo.id) == photo_id:
+            target_photo = photo
+            break
+
+    if not target_photo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="照片不存在或不屬於此用戶"
+        )
+
+    # 檢查審核狀態
+    if target_photo.moderation_status != "APPROVED":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="只有已通過審核的照片可以設為主頭像"
+        )
+
+    # 更新主頭像標記並重新排序
+    old_order = target_photo.display_order
+
+    for photo in profile.photos:
+        if str(photo.id) == photo_id:
+            photo.is_profile_picture = True
+            photo.display_order = 0  # 移到第一位
+        else:
+            photo.is_profile_picture = False
+            # 原本在目標照片前面的照片，順序 +1
+            if photo.display_order < old_order:
+                photo.display_order += 1
+
+    await db.commit()
+    await db.refresh(target_photo)
+
+    return PhotoResponse(
+        id=str(target_photo.id),
+        url=target_photo.url,
+        thumbnail_url=target_photo.thumbnail_url,
+        display_order=target_photo.display_order,
+        is_profile_picture=target_photo.is_profile_picture,
+        moderation_status=target_photo.moderation_status,
+        rejection_reason=target_photo.rejection_reason,
+        created_at=target_photo.created_at,
+    )
 
 
 @router.get("/interest-tags", response_model=List[InterestTagResponse])

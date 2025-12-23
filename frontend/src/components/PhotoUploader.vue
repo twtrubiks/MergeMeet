@@ -1,56 +1,75 @@
 <template>
   <div class="photo-uploader">
     <h3>照片 ({{ profileStore.profilePhotos.length }}/6)</h3>
-    <p class="hint">上傳最多 6 張照片，第一張將作為主頭像</p>
+    <p class="hint">上傳最多 6 張照片，拖拽可調整順序，點擊⭐設為主頭像</p>
 
     <!-- 照片網格 -->
-    <div class="photo-grid">
-      <!-- 現有照片 -->
-      <div
-        v-for="photo in profileStore.profilePhotos"
-        :key="photo.id"
-        class="photo-card"
-        :class="{
-          'photo-pending': photo.moderation_status === 'PENDING',
-          'photo-rejected': photo.moderation_status === 'REJECTED'
-        }"
-      >
-        <img :src="photo.url" :alt="'Photo ' + photo.display_order" />
-        <div class="photo-overlay">
-          <button @click="handleDelete(photo.id)" class="btn-delete" title="刪除">
-            🗑️
-          </button>
-          <div v-if="photo.is_profile_picture" class="photo-badge">主頭像</div>
-        </div>
-        <!-- 審核狀態標籤 -->
+    <draggable
+      v-model="localPhotos"
+      item-key="id"
+      class="photo-grid"
+      :animation="200"
+      ghost-class="photo-ghost"
+      drag-class="photo-dragging"
+      :disabled="reordering"
+      @end="handleDragEnd"
+    >
+      <template #item="{ element: photo }">
         <div
-          v-if="photo.moderation_status"
-          class="moderation-badge"
-          :class="getModerationStatusClass(photo.moderation_status)"
-          :title="photo.moderation_status === 'REJECTED' ? photo.rejection_reason : ''"
+          class="photo-card"
+          :class="{
+            'photo-pending': photo.moderation_status === 'PENDING',
+            'photo-rejected': photo.moderation_status === 'REJECTED'
+          }"
         >
-          {{ getModerationStatusText(photo.moderation_status) }}
-        </div>
-        <!-- 待審核遮罩 -->
-        <div v-if="photo.moderation_status === 'PENDING'" class="pending-mask">
-          <span>⏳ 審核中</span>
-        </div>
-        <!-- 被拒絕提示 -->
-        <div v-if="photo.moderation_status === 'REJECTED'" class="rejected-mask">
-          <span>❌ 未通過</span>
-          <small v-if="photo.rejection_reason">{{ photo.rejection_reason }}</small>
-          <button
-            class="appeal-btn"
-            @click.stop="openAppealModal(photo)"
+          <img :src="photo.url" :alt="'Photo ' + photo.display_order" />
+          <div class="photo-overlay">
+            <button @click="handleDelete(photo.id)" class="btn-delete" title="刪除">
+              🗑️
+            </button>
+            <button
+              v-if="!photo.is_profile_picture"
+              @click="handleSetPrimary(photo.id)"
+              class="btn-set-primary"
+              title="設為主頭像"
+            >
+              ⭐
+            </button>
+            <div v-if="photo.is_profile_picture" class="photo-badge">主頭像</div>
+          </div>
+          <!-- 審核狀態標籤 -->
+          <div
+            v-if="photo.moderation_status"
+            class="moderation-badge"
+            :class="getModerationStatusClass(photo.moderation_status)"
+            :title="photo.moderation_status === 'REJECTED' ? photo.rejection_reason : ''"
           >
-            提出申訴
-          </button>
+            {{ getModerationStatusText(photo.moderation_status) }}
+          </div>
+          <!-- 待審核遮罩 -->
+          <div v-if="photo.moderation_status === 'PENDING'" class="pending-mask">
+            <span>⏳ 審核中</span>
+          </div>
+          <!-- 被拒絕提示 -->
+          <div v-if="photo.moderation_status === 'REJECTED'" class="rejected-mask">
+            <span>❌ 未通過</span>
+            <small v-if="photo.rejection_reason">{{ photo.rejection_reason }}</small>
+            <button
+              class="appeal-btn"
+              @click.stop="openAppealModal(photo)"
+            >
+              提出申訴
+            </button>
+          </div>
+          <!-- 拖拽提示 -->
+          <div class="drag-hint">⋮⋮</div>
         </div>
-      </div>
+      </template>
+    </draggable>
 
-      <!-- 上傳按鈕 -->
+    <!-- 上傳按鈕（獨立於 draggable 外部） -->
+    <div class="upload-section" v-if="localPhotos.length < 6">
       <div
-        v-if="profileStore.profilePhotos.length < 6"
         class="photo-card upload-card"
         @click="triggerFileInput"
       >
@@ -124,7 +143,8 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import draggable from 'vuedraggable'
 import { useProfileStore } from '@/stores/profile'
 import apiClient from '@/api/client'
 import { logger } from '@/utils/logger'
@@ -135,6 +155,19 @@ const profileStore = useProfileStore()
 const fileInput = ref(null)
 const uploading = ref(false)
 const error = ref(null)
+const reordering = ref(false)
+
+// 本地照片順序狀態（用於拖拽）
+const localPhotos = ref([])
+
+// 同步 store 照片到本地
+watch(
+  () => profileStore.profilePhotos,
+  (newPhotos) => {
+    localPhotos.value = [...newPhotos]
+  },
+  { immediate: true, deep: true }
+)
 
 // 申訴相關狀態
 const showAppealModal = ref(false)
@@ -212,6 +245,36 @@ const getModerationStatusClass = (status) => {
 }
 
 /**
+ * 處理拖拽結束
+ */
+const handleDragEnd = async () => {
+  // 檢查順序是否有變化
+  const currentOrder = profileStore.profilePhotos.map(p => p.id)
+  const newOrder = localPhotos.value.map(p => p.id)
+
+  // 如果順序相同，不需要更新
+  if (JSON.stringify(currentOrder) === JSON.stringify(newOrder)) {
+    return
+  }
+
+  reordering.value = true
+  error.value = null
+
+  try {
+    await profileStore.reorderPhotos(newOrder)
+    emit('photos-changed')
+    logger.debug('[PhotoUploader] Photos reordered successfully')
+  } catch (err) {
+    // 失敗時恢復原順序
+    localPhotos.value = [...profileStore.profilePhotos]
+    error.value = err.response?.data?.detail || '調整順序失敗'
+    logger.error('[PhotoUploader] Reorder failed:', err)
+  } finally {
+    reordering.value = false
+  }
+}
+
+/**
  * 處理刪除照片
  */
 const handleDelete = async (photoId) => {
@@ -226,6 +289,22 @@ const handleDelete = async (photoId) => {
     emit('photos-changed')
   } catch (err) {
     error.value = err.response?.data?.detail || '刪除失敗'
+  }
+}
+
+/**
+ * 處理設定主頭像
+ */
+const handleSetPrimary = async (photoId) => {
+  error.value = null
+
+  try {
+    await profileStore.setProfilePicture(photoId)
+    emit('photos-changed')
+    logger.debug('[PhotoUploader] Profile picture set successfully')
+  } catch (err) {
+    error.value = err.response?.data?.detail || '設定主頭像失敗'
+    logger.error('[PhotoUploader] Set profile picture failed:', err)
   }
 }
 
@@ -307,7 +386,45 @@ const submitAppeal = async () => {
   border-radius: 12px;
   overflow: hidden;
   background: #f5f5f5;
-  cursor: pointer;
+  cursor: grab;
+  user-select: none;
+}
+
+.photo-card:active {
+  cursor: grabbing;
+}
+
+/* 拖拽時的幽靈效果 */
+.photo-ghost {
+  opacity: 0.5;
+  background: #c8ebfb !important;
+  border: 2px dashed #667eea;
+}
+
+/* 正在拖拽的元素 */
+.photo-dragging {
+  opacity: 0.9;
+  transform: scale(1.02);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+/* 拖拽提示圖標 */
+.drag-hint {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
+.photo-card:hover .drag-hint {
+  opacity: 1;
 }
 
 .photo-card img {
@@ -330,7 +447,8 @@ const submitAppeal = async () => {
   background: rgba(0, 0, 0, 0.5);
 }
 
-.btn-delete {
+.btn-delete,
+.btn-set-primary {
   background: white;
   border: none;
   border-radius: 50%;
@@ -340,14 +458,33 @@ const submitAppeal = async () => {
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.3s, transform 0.2s;
+  position: absolute;
 }
 
-.photo-card:hover .btn-delete {
+.btn-delete {
+  top: 50%;
+  left: calc(50% - 25px);
+  transform: translateY(-50%);
+}
+
+.btn-set-primary {
+  top: 50%;
+  left: calc(50% + 25px);
+  transform: translateY(-50%);
+}
+
+.photo-card:hover .btn-delete,
+.photo-card:hover .btn-set-primary {
   opacity: 1;
 }
 
-.btn-delete:hover {
-  transform: scale(1.1);
+.btn-delete:hover,
+.btn-set-primary:hover {
+  transform: translateY(-50%) scale(1.1);
+}
+
+.btn-set-primary:hover {
+  background: #fff3cd;
 }
 
 .photo-badge {
@@ -362,6 +499,14 @@ const submitAppeal = async () => {
   font-weight: 600;
 }
 
+/* 上傳區域 */
+.upload-section {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
 .upload-card {
   display: flex;
   flex-direction: column;
@@ -370,6 +515,7 @@ const submitAppeal = async () => {
   border: 2px dashed #ccc;
   background: #fafafa;
   transition: border-color 0.3s, background 0.3s;
+  cursor: pointer;
 }
 
 .upload-card:hover {

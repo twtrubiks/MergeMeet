@@ -197,3 +197,23 @@ class UpdateInterestsRequest(BaseModel):
     })
 
     interest_ids: List[str] = Field(..., min_length=3, max_length=10, description="興趣標籤 ID 列表（3-10個）")
+
+
+class PhotoOrderRequest(BaseModel):
+    """照片順序調整請求"""
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "photo_ids": [
+                "550e8400-e29b-41d4-a716-446655440000",
+                "550e8400-e29b-41d4-a716-446655440001",
+                "550e8400-e29b-41d4-a716-446655440002"
+            ]
+        }
+    })
+
+    photo_ids: List[str] = Field(
+        ...,
+        min_length=1,
+        max_length=6,
+        description="照片 ID 陣列，按新順序排列"
+    )

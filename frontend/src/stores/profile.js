@@ -158,6 +158,46 @@ export const useProfileStore = defineStore('profile', () => {
   }
 
   /**
+   * 調整照片順序
+   * @param {Array<string>} photoIds - 照片 ID 陣列，按新順序排列
+   */
+  const reorderPhotos = async (photoIds) => {
+    loading.value = true
+    error.value = null
+    try {
+      await apiClient.put('/profile/photos/order', {
+        photo_ids: photoIds
+      })
+      // 重新取得完整檔案以更新照片列表
+      await fetchProfile()
+    } catch (err) {
+      error.value = err.response?.data?.detail || '調整順序失敗'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * 設定主頭像
+   * @param {string} photoId - 照片 ID
+   */
+  const setProfilePicture = async (photoId) => {
+    loading.value = true
+    error.value = null
+    try {
+      await apiClient.put(`/profile/photos/${photoId}/primary`)
+      // 重新取得完整檔案以更新照片列表
+      await fetchProfile()
+    } catch (err) {
+      error.value = err.response?.data?.detail || '設定主頭像失敗'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
    * 取得所有興趣標籤
    * @param {string} category - 可選的分類篩選
    */
@@ -230,6 +270,8 @@ export const useProfileStore = defineStore('profile', () => {
     updateInterests,
     uploadPhoto,
     deletePhoto,
+    reorderPhotos,
+    setProfilePicture,
     fetchInterestTags,
     clearError,
     $reset
