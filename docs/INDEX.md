@@ -2,139 +2,88 @@
 
 文檔已整理至結構化目錄，方便查找和維護。
 
-## 📂 文檔結構總覽
+## 文檔結構總覽
 
 ```
 mergemeet/
-├── README.md                  # 項目總覽
-├── QUICKSTART.md              # 快速啟動指南
+├── README.md                  # 項目總覽（含快速開始）
 ├── CLAUDE.md                  # 開發指南（API routing、Git 規範等）
-├── ARCHITECTURE.md            # 系統架構文檔
-├── backend/SECURITY.md        # 安全策略
 └── docs/
+    ├── INDEX.md               # 本索引
+    ├── ARCHITECTURE.md        # 系統架構文檔
+    ├── SECURITY.md            # 安全策略與防護機制
+    ├── KNOWN_ISSUES.md        # 已知問題與技術債務
+    ├── ROADMAP.md             # 技術路線圖
     ├── testing/               # 測試相關指南
-    └── archived/              # 歷史文檔歸檔
-        ├── bug-fixes/         # Bug 修復記錄
-        ├── reviews/           # 代碼審查報告
-        └── reports/           # 測試報告（已歸檔）
+    └── 管理員設置指南.md       # 管理員帳號設置
 ```
 
 ---
 
-## 🚀 快速導航
+## 快速導航
 
 ### 新手入門（必讀）
-1. [README.md](../README.md) - 了解項目概況
-2. [QUICKSTART.md](../QUICKSTART.md) - 5 分鐘快速啟動
-3. [CLAUDE.md](../CLAUDE.md) - 開發規範與注意事項
-4. [ARCHITECTURE.md](../ARCHITECTURE.md) - 系統架構深入解析
+1. [README.md](../README.md) - 了解項目概況與快速開始
+2. [CLAUDE.md](../CLAUDE.md) - 開發規範與注意事項
+3. [ARCHITECTURE.md](ARCHITECTURE.md) - 系統架構深入解析
 
 ---
 
-## 🧪 測試文檔
+## 專案管理
 
-### 測試指南
+- [KNOWN_ISSUES.md](KNOWN_ISSUES.md) - 已知問題與技術債務
+- [ROADMAP.md](ROADMAP.md) - 技術路線圖
+
+---
+
+## 測試文檔
+
 - [TESTING_GUIDE.md](testing/TESTING_GUIDE.md) - 自動化測試指南
 - [MANUAL_TESTING_GUIDE.md](testing/MANUAL_TESTING_GUIDE.md) - 手動測試指南
 - [README_TEST_SETUP.md](testing/README_TEST_SETUP.md) - 測試環境設置
-- [COVERAGE_SUMMARY.md](testing/COVERAGE_SUMMARY.md) - 測試覆蓋率總結
 
-### 技術參考文檔
-- [TRUST_SCORE_SYSTEM.md](TRUST_SCORE_SYSTEM.md) - 信任分數系統 ✅ 已完成（2025-12-14）
+---
+
+## 技術參考文檔
+
+- [TRUST_SCORE_SYSTEM.md](TRUST_SCORE_SYSTEM.md) - 信任分數系統
 - [CURSOR_PAGINATION.md](CURSOR_PAGINATION.md) - Cursor 分頁技術說明
 - [MATCHING_ALGORITHM.md](MATCHING_ALGORITHM.md) - 配對算法說明
 
 ---
 
-## 🗄️ 歷史文檔歸檔
+## 安全與管理文檔
 
-### Bug 修復記錄（12 份）
-存放於 [archived/bug-fixes/](archived/bug-fixes/)
-
-主要內容：
-- Trailing Slash 修復系列
-- WebSocket 修復驗證
-- Vitest 升級與修復
-- 訊息刪除同步修復
-- SQLAlchemy DetachedInstance 修復
-- 配對功能調試指南
-
-### 代碼審查報告（4 份）
-存放於 [archived/reviews/](archived/reviews/)
-
-- Code Review Report 2025-11-16
-- Deep Analysis Report 2025-11-16
-- Git Commit Analysis 2025-11-16
-- Git Pull Review Report 2025-11-16
-
-### 測試報告（7 份）
-存放於 [archived/reports/](archived/reports/)
-
-- 手動測試報告 (2025-11-14)
-- 前端手動測試報告 (2025-11-14)
-- Week 4 聊天功能測試
-- Week 4 高級功能測試 (2025-11-14)
-- Week 5 安全功能測試
-- Week 5 瀏覽器測試 (2025-11-16)
-- 前端代碼審查修復 (2025-11-16)
-
-### 已完成功能計劃（2 份）
-存放於 [archived/](archived/)
-
-- NOTIFICATION_PERSISTENCE_PLAN.md - 通知持久化功能計劃
-- FRONTEND_UNIT_TEST_PLAN.md - 前端單元測試計劃
+- [SECURITY.md](SECURITY.md) - 安全策略與防護機制
+- [管理員設置指南.md](管理員設置指南.md) - 管理員帳號創建與密碼設置
 
 ---
 
-## 🔒 安全文檔
+## 文檔統計
 
-- [backend/SECURITY.md](../backend/SECURITY.md) - CSRF 保護策略
-
----
-
-## 📊 文檔統計
-
-### 活躍文檔
-- **核心文檔**: 4 份（根目錄）
-- **技術參考文檔**: 3 份
-- **測試指南**: 4 份
-- **總計**: 11 份
-
-### 歸檔文檔
-- **Bug 修復記錄**: 12 份
-- **審查報告**: 4 份
-- **測試報告**: 7 份
-- **功能計劃**: 2 份
-- **總計**: 25 份
+- **核心文檔**: 2 份（根目錄：README、CLAUDE）
+- **架構與安全**: 2 份（ARCHITECTURE、SECURITY）
+- **專案管理**: 2 份（KNOWN_ISSUES、ROADMAP）
+- **技術參考**: 3 份
+- **測試指南**: 3 份
+- **管理文檔**: 1 份
+- **總計**: 13 份
 
 ---
 
-## 💡 文檔使用建議
+## 文檔使用建議
 
 ### 對於新加入的開發者
-1. 閱讀 README.md 了解項目
-2. 按照 QUICKSTART.md 啟動項目
-3. 查看 CLAUDE.md 學習開發規範
-4. 需要深入了解架構時參考 ARCHITECTURE.md
+1. 閱讀 README.md 了解項目並啟動開發環境
+2. 查看 CLAUDE.md 學習開發規範
+3. 需要深入了解架構時參考 ARCHITECTURE.md
 
 ### 對於測試人員
 1. 查看 `docs/testing/` 下的測試指南
-2. 參考 `docs/archived/reports/` 下的歷史測試報告
 
-### 對於維護人員
-1. 歷史 Bug 修復記錄在 `docs/archived/bug-fixes/`
-2. 代碼審查報告在 `docs/archived/reviews/`
+### 對於系統管理員
+1. 查看 [管理員設置指南.md](管理員設置指南.md) 設置管理員帳號
 
 ---
 
-## 📝 文檔維護原則
-
-1. **核心文檔保持簡潔**：根目錄只保留必要的核心文檔
-2. **測試文檔分類存放**：指南與報告分開
-3. **歷史文檔及時歸檔**：Bug 修復和審查報告歸檔保存
-4. **命名規範統一**：使用 `PURPOSE_YYYY-MM-DD.md` 格式
-5. **及時更新索引**：新增文檔後更新本索引
-
----
-
-最後更新：2025-12-15
+最後更新：2025-12-23

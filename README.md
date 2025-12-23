@@ -5,7 +5,7 @@
 ## 📋 專案資訊
 
 - **版本**: 1.0.0 MVP
-- **開發進度**: ✅ Week 1-5 已完成
+- **開發進度**: ✅ Week 1-6 已完成
 - **技術棧**:
   - 後端: Python 3.11+ / FastAPI / SQLAlchemy 2.0 Async
   - 前端: Vue 3 / Vite / Pinia
@@ -87,7 +87,7 @@ cd backend
 pytest -v --cov=app
 
 # 測試統計
-# - 總測試數: 265+ 個
+# - 總測試數: 287+ 個
 # - 覆蓋率: >80%
 ```
 
@@ -394,8 +394,7 @@ open http://localhost:5050
 完整開發文檔請參考專案內文件：
 
 - [README.md](./README.md) - 專案總覽
-- [ARCHITECTURE.md](./ARCHITECTURE.md) - 技術架構
-- [QUICKSTART.md](./QUICKSTART.md) - 快速開始指南
+- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) - 技術架構
 - [docs/INDEX.md](./docs/INDEX.md) - 文檔索引
 
 ## 🐛 故障排除

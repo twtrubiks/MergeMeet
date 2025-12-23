@@ -120,9 +120,8 @@ docker compose down -v && docker compose up -d
 
 ## 相關文件
 
-- **README.md** - 專案概述
-- **ARCHITECTURE.md** - 技術架構
-- **QUICKSTART.md** - 快速入門指南
+- **README.md** - 專案概述（含快速開始）
+- **docs/ARCHITECTURE.md** - 技術架構
 - **docs/INDEX.md** - 文件索引
 
 ---

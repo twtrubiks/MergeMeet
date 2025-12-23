@@ -896,7 +896,6 @@ console.log('Refresh Token:', localStorage.getItem('refresh_token'))
 
 **遇到問題？**
 - 查看 [CLAUDE.md](../../CLAUDE.md) - 開發指南
-- 查看 [MATCHES_DEBUG_GUIDE.md](../archived/bug-fixes/MATCHES_DEBUG_GUIDE.md) - 配對問題診斷
 - 查看 [TESTING_GUIDE.md](./TESTING_GUIDE.md) - 自動化測試指南
 
 **技術支援：**

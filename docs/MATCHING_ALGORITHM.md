@@ -626,7 +626,7 @@ if created_at:
 
 ## 📖 相關文檔
 
-- [技術架構](../ARCHITECTURE.md) - 系統整體架構
+- [技術架構](./ARCHITECTURE.md) - 系統整體架構
 - [API 文檔](http://localhost:8000/docs) - FastAPI Swagger UI
 
 ---

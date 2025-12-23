@@ -422,4 +422,4 @@ pytest --cov=app --cov-report=html
 
 **祝測試順利！** 🚀
 
-如有問題請參考 `README.md` 或 `QUICKSTART.md`
+如有問題請參考 `README.md`
