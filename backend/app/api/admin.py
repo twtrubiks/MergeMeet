@@ -307,8 +307,8 @@ async def get_all_users(
             email=user.email,
             is_active=user.is_active,
             is_admin=user.is_admin,
-            trust_score=user.trust_score,
-            warning_count=user.warning_count,
+            trust_score=user.trust_score,  # Pydantic validator 處理 NULL
+            warning_count=user.warning_count,  # Pydantic validator 處理 NULL
             ban_reason=user.ban_reason,
             banned_until=user.banned_until,
             created_at=user.created_at,

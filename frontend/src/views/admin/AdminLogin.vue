@@ -100,13 +100,7 @@ const handleLogin = async () => {
       refresh_token: response.data.refresh_token
     })
 
-    // 設置用戶資訊（標記為管理員）
-    userStore.user = {
-      email: formData.value.email,
-      is_admin: true
-    }
-
-    // 初始化用戶狀態
+    // 初始化用戶狀態（is_admin 會從 token 解析）
     userStore.initializeFromToken()
 
     message.success('登入成功')

@@ -1,5 +1,5 @@
 """管理後台相關 Schemas"""
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from datetime import datetime
 from typing import Optional
 
@@ -59,6 +59,18 @@ class UserManagementResponse(BaseModel):
     banned_until: Optional[datetime]
     created_at: datetime
     email_verified: bool
+
+    @field_validator('trust_score', mode='before')
+    @classmethod
+    def default_trust_score(cls, v):
+        """處理資料庫中的 NULL，使用模型定義的默認值 50"""
+        return v if v is not None else 50
+
+    @field_validator('warning_count', mode='before')
+    @classmethod
+    def default_warning_count(cls, v):
+        """處理資料庫中的 NULL，使用模型定義的默認值 0"""
+        return v if v is not None else 0
 
 
 class BanUserRequest(BaseModel):

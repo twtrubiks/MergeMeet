@@ -23,6 +23,18 @@ MergeMeet 支援兩種認證方式，優先使用 HttpOnly Cookie 提供更高�
 - CSRF 驗證: `backend/app/core/csrf.py`
 - 前端整合: `frontend/src/stores/user.js`
 
+**JWT Token Payload：**
+| 欄位 | 說明 | 範例 |
+|------|------|------|
+| `sub` | 用戶 ID | `"958dfaec-93a2-4988-a45a-aea93f9d2df6"` |
+| `email` | 用戶 Email | `"user@example.com"` |
+| `email_verified` | Email 驗證狀態 | `true` |
+| `is_admin` | 管理員權限（僅管理員登入時包含） | `true` |
+| `exp` | Token 過期時間 | `1766576028` |
+| `type` | Token 類型 | `"access"` |
+
+> **安全設計**：`is_admin` 直接從 JWT Token 解析，而非存儲在 localStorage，防止用戶偽造管理員權限。
+
 ---
 
 ## CSRF (Cross-Site Request Forgery) 防護
@@ -325,5 +337,5 @@ MergeMeet 使用信任分數系統自動追蹤用戶行為，維護平台安全�
 
 ---
 
-**最後更新**: 2025-12-23
-**版本**: 2.0.0（更新為 HttpOnly Cookie + CSRF 認證機制）
+**最後更新**: 2025-12-24
+**版本**: 2.1.0（新增 JWT Token Payload 說明，is_admin 欄位安全設計）

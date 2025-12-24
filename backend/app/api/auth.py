@@ -60,7 +60,8 @@ logger = logging.getLogger(__name__)
 def _generate_auth_tokens(
     user_id: str,
     email: Optional[str] = None,
-    email_verified: Optional[bool] = None
+    email_verified: Optional[bool] = None,
+    is_admin: Optional[bool] = None
 ) -> Tuple[str, str]:
     """生成認證 token (access + refresh)
 
@@ -68,6 +69,7 @@ def _generate_auth_tokens(
         user_id: 用戶 ID (字串格式)
         email: 用戶 Email (可選)
         email_verified: Email 是否已驗證 (可選)
+        is_admin: 是否為管理員 (可選)
 
     Returns:
         Tuple[str, str]: (access_token, refresh_token)
@@ -77,6 +79,8 @@ def _generate_auth_tokens(
         token_data["email"] = email
     if email_verified is not None:
         token_data["email_verified"] = email_verified
+    if is_admin is not None:
+        token_data["is_admin"] = is_admin
 
     access_token = create_access_token(data=token_data)
     refresh_token = create_refresh_token(data={"sub": user_id})
@@ -610,11 +614,12 @@ async def admin_login(
     # 登入成功，清除失敗記錄
     await limiter.clear_attempts(request.email)
 
-    # 生成 JWT Token（包含 email 資訊供前端使用）
+    # 生成 JWT Token（包含 email 和 is_admin 資訊供前端使用）
     access_token, refresh_token = _generate_auth_tokens(
         str(user.id),
         email=user.email,
-        email_verified=user.email_verified
+        email_verified=user.email_verified,
+        is_admin=True
     )
 
     # 生成 CSRF Token 並設置 Cookie（HttpOnly Cookie 模式）
