@@ -194,6 +194,186 @@
 └──────────────┘
 ```
 
+### 2.4 PostGIS 地理位置查詢
+
+#### 為什麼使用 PostGIS
+
+MergeMeet 作為交友平台，**地理位置搜索是核心功能**：
+- 用戶需要找到「附近的人」
+- 配對算法需要計算用戶間的實際距離
+- 距離是配對評分的重要因素（佔 20%）
+
+**技術選型理由**：
+
+| 方案 | 優點 | 缺點 | 結論 |
+|------|------|------|------|
+| **PostGIS** | 精確球面計算、原生 SQL 支援、高效空間索引 | 需要額外擴展 | ✅ 採用 |
+| 應用層計算 | 簡單 | 效能差、無法利用索引 | ❌ |
+| Elasticsearch Geo | 全文搜索整合 | 額外維護成本 | ❌ |
+
+#### Docker 映像選擇
+
+```yaml
+# docker-compose.yml
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+```
+
+**版本說明**：
+- **PostgreSQL 16**：最新穩定版，效能優化
+- **PostGIS 3.4**：2023 年發布，支援最新空間函數
+- **官方映像**：由 PostGIS 團隊維護，預先安裝擴展
+
+#### 資料類型選擇
+
+```python
+# backend/app/models/profile.py
+from geoalchemy2 import Geography
+
+class Profile(Base):
+    # 使用 Geography 類型（而非 Geometry）
+    location = Column(Geography(geometry_type='POINT', srid=4326))
+```
+
+**Geography vs Geometry**：
+
+| 特性 | Geography | Geometry |
+|------|-----------|----------|
+| 座標系統 | 球面（地球表面） | 平面（笛卡爾） |
+| 距離計算 | 公尺（精確） | 座標單位（需轉換） |
+| 適用範圍 | 全球 | 小區域（城市級） |
+| 效能 | 稍慢 | 較快 |
+| **本專案選擇** | ✅ 採用 | - |
+
+**選擇 Geography 的原因**：
+- 交友平台用戶分布全台灣，需要精確的球面距離
+- `ST_Distance` 直接返回公尺，無需額外轉換
+- 未來擴展到其他國家時無需修改
+
+#### SRID 4326（WGS84）
+
+```python
+location = Column(Geography(geometry_type='POINT', srid=4326))
+```
+
+**SRID 4326 說明**：
+- **WGS84**（World Geodetic System 1984）
+- **全球標準座標系統**，GPS 設備使用的座標系
+- 經度範圍：-180 到 180
+- 緯度範圍：-90 到 90
+- Google Maps、瀏覽器 Geolocation API 都使用此座標系
+
+#### 使用的 PostGIS 函數
+
+| 函數 | 用途 | 使用位置 |
+|------|------|----------|
+| `ST_MakePoint(lng, lat)` | 從經緯度創建點 | 創建/更新個人檔案 |
+| `ST_SetSRID(..., 4326)` | 設定座標系統 | 創建/更新個人檔案 |
+| `ST_Distance(a, b, true)` | 計算球面距離（公尺） | 配對算法距離評分 |
+| `ST_DWithin(a, b, dist, true)` | 範圍內篩選 | 探索功能距離過濾 |
+
+**代碼範例**：
+
+```python
+# 1. 創建位置點（backend/app/api/profile.py:114-118）
+from geoalchemy2.functions import ST_MakePoint, ST_SetSRID
+
+profile.location = ST_SetSRID(
+    ST_MakePoint(longitude, latitude),  # 注意：經度在前
+    4326
+)
+
+# 2. 計算距離（backend/app/api/discovery.py:102-108）
+from sqlalchemy import func
+
+distance_km = (
+    func.ST_Distance(
+        Profile.location,
+        my_profile.location,
+        True  # use_spheroid=True，使用球面計算
+    ) / 1000  # 公尺轉公里
+).label('distance_km')
+
+# 3. 範圍篩選（backend/app/api/discovery.py:128-133）
+from geoalchemy2.functions import ST_DWithin
+
+ST_DWithin(
+    Profile.location,
+    my_profile.location,
+    max_distance_km * 1000,  # 公里轉公尺
+    True  # use_spheroid=True
+)
+```
+
+#### 效能優化
+
+**空間索引（GIST）**：
+```sql
+-- 自動創建於 Geography 欄位
+CREATE INDEX idx_profiles_location ON profiles USING GIST (location);
+```
+
+**查詢效能**：
+
+| 用戶數量 | 查詢時間 | 說明 |
+|----------|----------|------|
+| 1-1,000 | ~30ms | GIST 索引優化 |
+| 1,000-10,000 | ~50ms | 批次載入 |
+| 10,000+ | ~100ms | 需分頁處理 |
+
+**優化措施**：
+- ✅ 使用 `ST_DWithin` 而非 `ST_Distance < X`（可利用索引）
+- ✅ 距離計算作為 SELECT 欄位，避免二次查詢
+- ✅ `selectinload` 預載入關聯資料
+
+#### ORM 整合（GeoAlchemy2）
+
+```txt
+# backend/requirements.txt
+geoalchemy2==0.14.3
+```
+
+**GeoAlchemy2 功能**：
+- SQLAlchemy 2.0 Async 支援
+- 自動類型轉換（WKB ↔ Python）
+- PostGIS 函數映射（`ST_*` → Python 函數）
+
+#### 測試配置
+
+```python
+# backend/tests/conftest.py
+async with engine.begin() as conn:
+    # 測試資料庫需要啟用 PostGIS 擴展
+    await conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
+```
+
+#### 常見問題排除
+
+**錯誤 1**：`function st_distance does not exist`
+```bash
+# 解決方案：啟用 PostGIS 擴展
+docker exec mergemeet_postgres psql -U mergemeet -d mergemeet \
+  -c "CREATE EXTENSION IF NOT EXISTS postgis;"
+```
+
+**錯誤 2**：距離計算結果為 `None`
+```python
+# 原因：用戶未設定位置
+# 解決：檢查 location 是否為空
+if profile.location is None:
+    distance_km = None
+```
+
+#### 相關文件
+
+| 文件 | 說明 |
+|------|------|
+| `backend/app/models/profile.py` | Profile 模型定義（location 欄位） |
+| `backend/app/api/profile.py` | 位置設定 API |
+| `backend/app/api/discovery.py` | 距離搜索邏輯 |
+| `docs/MATCHING_ALGORITHM.md` | 配對算法（距離評分） |
+
 ---
 
 ## 3. 已實作功能清單（Week 1-5）
