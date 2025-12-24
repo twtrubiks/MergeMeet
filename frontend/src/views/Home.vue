@@ -66,103 +66,6 @@
           </div>
         </div>
       </GlassCard>
-
-      <!-- API 狀態卡片 -->
-      <GlassCard
-        :hoverable="true"
-        :variant="apiStatus ? 'success' : loading ? 'default' : 'danger'"
-      >
-        <template #icon>
-          <span v-if="loading">⏳</span>
-          <span v-else-if="apiStatus">🚀</span>
-          <span v-else>⚠️</span>
-        </template>
-        <div class="api-section">
-          <h2>後端 API 狀態</h2>
-          <div v-if="loading" class="status-loading">
-            <HeartLoader text="連接中..." />
-          </div>
-          <div v-else-if="apiStatus" class="status-success">
-            <p class="status-message">{{ apiStatus.message }}</p>
-            <p class="status-version">版本: <strong>{{ apiStatus.version }}</strong></p>
-          </div>
-          <div v-else class="status-error">
-            <p>無法連接到後端 API</p>
-            <small>請確認後端服務已啟動</small>
-          </div>
-        </div>
-      </GlassCard>
-
-      <!-- 功能展示區 -->
-      <div class="features-section">
-        <h3>已完成功能</h3>
-        <div class="features-grid">
-          <FeatureCard
-            title="Week 1: 認證系統"
-            badge="Core"
-            :items="[
-              '用戶註冊 API',
-              '用戶登入 API',
-              'JWT 認證機制',
-              'Token 刷新功能',
-              'Email 驗證',
-              '密碼強度驗證',
-              '年齡驗證（18+）'
-            ]"
-          />
-          <FeatureCard
-            title="Week 2: 個人檔案"
-            badge="Profile"
-            :items="[
-              '個人檔案建立與編輯',
-              '照片上傳管理（最多 6 張）',
-              '興趣標籤選擇（47 種標籤）',
-              '地理位置（PostGIS）',
-              '配對偏好設定',
-              '檔案完整度檢查'
-            ]"
-          />
-          <FeatureCard
-            title="Week 3: 探索與配對"
-            badge="Matching"
-            :items="[
-              '智能配對演算法（多因素評分）',
-              '卡片滑動介面',
-              '喜歡/跳過操作',
-              '互相喜歡自動配對',
-              '配對列表管理',
-              '配對成功彈窗',
-              '取消配對功能'
-            ]"
-          />
-          <FeatureCard
-            title="Week 4: 訊息系統"
-            badge="Chat"
-            :items="[
-              '聊天室功能',
-              '訊息發送與接收',
-              'WebSocket 即時通訊',
-              '訊息已讀狀態',
-              '對話列表',
-              '訊息分頁載入',
-              '訊息刪除功能'
-            ]"
-          />
-          <FeatureCard
-            title="Week 5: 安全功能"
-            badge="Safety"
-            :items="[
-              '用戶封鎖系統',
-              '用戶舉報功能',
-              '內容審核（敏感詞過濾）',
-              '管理員後台',
-              '舉報審核處理',
-              '用戶封禁管理',
-              '敏感詞管理'
-            ]"
-          />
-        </div>
-      </div>
     </div>
 
     <!-- 裝飾性背景元素 -->
@@ -176,32 +79,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
 import { useUserStore } from '@/stores/user'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 import GlassCard from '@/components/ui/GlassCard.vue'
-import FeatureCard from '@/components/ui/FeatureCard.vue'
-import HeartLoader from '@/components/ui/HeartLoader.vue'
-import { logger } from '@/utils/logger'
 
 const router = useRouter()
 const userStore = useUserStore()
-
-const loading = ref(true)
-const apiStatus = ref(null)
-
-onMounted(async () => {
-  try {
-    const response = await axios.get('/api/hello')
-    apiStatus.value = response.data
-  } catch (error) {
-    logger.error('API 連接失敗:', error)
-  } finally {
-    loading.value = false
-  }
-})
 
 /**
  * 處理登出
@@ -416,89 +300,6 @@ h1 {
   flex-wrap: wrap;
 }
 
-/* API Section */
-.api-section h2 {
-  color: #333;
-  font-size: 1.8rem;
-  font-weight: 700;
-  margin-bottom: 20px;
-  text-align: center;
-}
-
-.status-loading {
-  display: flex;
-  justify-content: center;
-  padding: 20px 0;
-}
-
-.status-success {
-  text-align: center;
-}
-
-.status-message {
-  color: #10b981;
-  font-weight: 600;
-  font-size: 1.2rem;
-  margin-bottom: 12px;
-}
-
-.status-version {
-  color: #666;
-  font-size: 1rem;
-}
-
-.status-version strong {
-  color: #333;
-}
-
-.status-error {
-  text-align: center;
-  color: #ef4444;
-}
-
-.status-error p {
-  font-weight: 600;
-  font-size: 1.1rem;
-  margin-bottom: 8px;
-}
-
-.status-error small {
-  color: #999;
-  font-size: 0.9rem;
-}
-
-/* Features Section */
-.features-section {
-  margin-top: 48px;
-  animation: slideUp 0.8s ease-out 0.3s both;
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(40px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.features-section h3 {
-  color: white;
-  font-size: 2rem;
-  font-weight: 700;
-  text-align: center;
-  margin-bottom: 32px;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.features-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 24px;
-}
-
 /* 響應式設計 */
 @media (max-width: 768px) {
   h1 {
@@ -514,10 +315,6 @@ h1 {
   }
 
   .button-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .features-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -539,8 +336,7 @@ h1 {
     font-size: 3.5rem;
   }
 
-  .auth-section h2,
-  .api-section h2 {
+  .auth-section h2 {
     font-size: 1.5rem;
   }
 }
