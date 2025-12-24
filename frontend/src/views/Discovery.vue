@@ -108,7 +108,7 @@
               class="swipe-indicator like"
               :style="{ opacity: likeOpacity }"
             >
-              <span class="indicator-icon">💚</span>
+              <span class="indicator-icon">❤️</span>
               <span class="indicator-text">喜歡</span>
             </div>
             <div
@@ -139,7 +139,7 @@
           class="action-btn like-btn"
           :disabled="isAnimating"
         >
-          <span class="btn-icon">💚</span>
+          <span class="btn-icon">❤️</span>
           <span class="btn-text">喜歡</span>
           <div class="btn-ripple"></div>
         </button>
@@ -628,7 +628,7 @@ onUnmounted(() => {
 .card-image {
   position: relative;
   width: 100%;
-  height: 400px;
+  height: 360px; /* 減少高度以確保 card-info 完全顯示 */
   overflow: hidden;
 }
 
@@ -768,15 +768,15 @@ onUnmounted(() => {
 .view-detail-hint {
   margin-top: 12px;
   text-align: center;
-  font-size: 13px;
-  color: #999;
-  opacity: 0.8;
-  transition: opacity 0.2s ease;
+  font-size: 14px;
+  color: #FF6B6B;
+  font-weight: 500;
+  transition: all 0.2s ease;
 }
 
 .top-card .card-info:hover .view-detail-hint {
-  opacity: 1;
-  color: #FF6B6B;
+  color: #FF5252;
+  transform: scale(1.05);
 }
 
 /* 滑動提示覆蓋層 */
@@ -785,7 +785,7 @@ onUnmounted(() => {
   top: 0;
   left: 0;
   width: 100%;
-  height: 100%;
+  height: 360px; /* 只覆蓋圖片區域，不覆蓋 card-info */
   pointer-events: none;
 }
 
@@ -835,8 +835,8 @@ onUnmounted(() => {
 
 .action-btn {
   position: relative;
-  width: 75px;
-  height: 75px;
+  width: 90px;
+  height: 90px;
   border: none;
   border-radius: 50%;
   display: flex;
@@ -845,7 +845,7 @@ onUnmounted(() => {
   justify-content: center;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.18);
   overflow: hidden;
 }
 
@@ -882,46 +882,46 @@ onUnmounted(() => {
 }
 
 .pass-btn {
-  background: white;
-  color: #F44336;
-  border: 3px solid #F44336;
+  background: #f5f5f5;
+  color: #666;
+  border: 3px solid #ddd;
 }
 
 .pass-btn:hover:not(:disabled) {
-  background: #F44336;
-  color: white;
-  box-shadow: 0 8px 25px rgba(244, 67, 54, 0.4);
+  background: #e0e0e0;
+  color: #333;
+  border-color: #bbb;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
 }
 
 .like-btn {
-  background: linear-gradient(135deg, #4CAF50, #66BB6A);
+  background: linear-gradient(135deg, #FF6B6B, #FF8E8E);
   color: white;
   border: 3px solid transparent;
 }
 
 .like-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #66BB6A, #4CAF50);
-  box-shadow: 0 8px 25px rgba(76, 175, 80, 0.5);
+  background: linear-gradient(135deg, #FF5252, #FF6B6B);
+  box-shadow: 0 10px 30px rgba(255, 107, 107, 0.5);
 }
 
 .btn-icon {
-  font-size: 34px;
+  font-size: 38px;
   position: relative;
   z-index: 1;
   transition: transform 0.3s ease;
 }
 
 .action-btn:hover:not(:disabled) .btn-icon {
-  transform: scale(1.1);
+  transform: scale(1.15);
 }
 
 .btn-text {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
-  margin-top: 4px;
+  margin-top: 5px;
   position: relative;
   z-index: 1;
-  text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
@@ -949,12 +949,12 @@ onUnmounted(() => {
   }
 
   .action-btn {
-    width: 60px;
-    height: 60px;
+    width: 75px;
+    height: 75px;
   }
 
   .btn-icon {
-    font-size: 28px;
+    font-size: 32px;
   }
 }
 </style>
