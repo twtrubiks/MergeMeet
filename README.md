@@ -60,6 +60,12 @@ pip install -r requirements-test.txt
 # 複製環境變數
 cp .env.example .env
 
+# 執行資料庫遷移（建立表結構）
+alembic upgrade head
+
+# 初始化興趣標籤（新環境首次設置時執行）
+python scripts/init_interest_tags.py
+
 # 啟動後端
 uvicorn app.main:app --reload
 ```
@@ -430,6 +436,10 @@ open http://localhost:5050
 - 確認後端 WebSocket 端點運行中
 - 檢查瀏覽器 Console 錯誤
 - 確認用戶已登入（需要 JWT Token）
+
+### 註冊時無法選擇興趣標籤
+- 原因：資料庫未初始化興趣標籤資料
+- 解決：執行 `cd backend && python scripts/init_interest_tags.py`
 
 ## 🔐 預設管理員帳號
 
