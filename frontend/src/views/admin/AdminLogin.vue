@@ -42,12 +42,6 @@
           登入管理後台
         </n-button>
       </n-form>
-
-      <div class="login-footer">
-        <n-button text @click="() => $router.push('/login')">
-          一般用戶登入
-        </n-button>
-      </div>
     </div>
   </div>
 </template>
@@ -148,10 +142,5 @@ const handleLogin = async () => {
 .login-header p {
   font-size: 16px;
   color: #666;
-}
-
-.login-footer {
-  text-align: center;
-  margin-top: 24px;
 }
 </style>
