@@ -10,7 +10,7 @@
   - 後端: Python 3.11+ / FastAPI / SQLAlchemy 2.0 Async
   - 前端: Vue 3 / Vite / Pinia
   - 資料庫: PostgreSQL 17 + PostGIS
-  - 快取: Redis 7.x
+  - 快取: Redis 8.x
   - 即時通訊: WebSocket
 
 ## 🚀 快速開始

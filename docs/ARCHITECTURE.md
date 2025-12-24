@@ -95,7 +95,7 @@
 | **SQLAlchemy** | 2.0 | ORM（Async） | ✅ |
 | **PostgreSQL** | 17 | 主資料庫 | ✅ |
 | **PostGIS** | 3.5+ | 地理位置查詢 | ✅ |
-| **Redis** | 7.x | 快取/Session/登入限制 | 🔄 部分使用 |
+| **Redis** | 8.x | 快取/Session/登入限制 | 🔄 部分使用 |
 | **Pydantic** | 2.5+ | 資料驗證 | ✅ |
 | **JWT** | python-jose | 認證機制 | ✅ |
 | **aiosmtplib** | 3.0+ | Email 發送服務 | ✅ |
@@ -1068,7 +1068,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     volumes:
       - redis_data:/data
 ```
