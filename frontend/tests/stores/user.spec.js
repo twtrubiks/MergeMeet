@@ -11,6 +11,7 @@ vi.mock('@/api/auth', () => ({
   authAPI: {
     register: vi.fn(),
     login: vi.fn(),
+    logout: vi.fn(),
     verifyEmail: vi.fn(),
     resendVerification: vi.fn(),
     refreshToken: vi.fn()
@@ -127,9 +128,13 @@ describe('User Store', () => {
   describe('登入功能', () => {
     it('應該成功登入用戶', async () => {
       const store = useUserStore()
+      // authAPI.login 返回 { success, data } 格式
       const mockResponse = {
-        access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIiwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIn0.test',
-        refresh_token: 'mock_refresh_token'
+        success: true,
+        data: {
+          access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIiwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIn0.test',
+          refresh_token: 'mock_refresh_token'
+        }
       }
 
       authAPI.login.mockResolvedValue(mockResponse)
@@ -150,15 +155,16 @@ describe('User Store', () => {
 
     it('應該處理登入失敗（密碼錯誤）', async () => {
       const store = useUserStore()
-      const mockError = {
-        response: {
-          data: {
-            detail: '電子郵件或密碼錯誤'
-          }
-        }
+      // authAPI.login 失敗時返回 { success: false, error, ... } 格式
+      const mockResponse = {
+        success: false,
+        error: '電子郵件或密碼錯誤',
+        remainingAttempts: 4,
+        lockoutSeconds: 0,
+        isLocked: false
       }
 
-      authAPI.login.mockRejectedValue(mockError)
+      authAPI.login.mockResolvedValue(mockResponse)
 
       const result = await store.login({
         email: 'test@example.com',
@@ -172,7 +178,7 @@ describe('User Store', () => {
   })
 
   describe('登出功能', () => {
-    it('應該正確登出並清除狀態', () => {
+    it('應該正確登出並清除狀態', async () => {
       const store = useUserStore()
 
       // 設置已登入狀態
@@ -180,7 +186,10 @@ describe('User Store', () => {
       store.refreshToken = 'test_refresh'
       store.user = { id: '123', email: 'test@example.com' }
 
-      store.logout()
+      // Mock logout API
+      authAPI.logout.mockResolvedValue({ message: '登出成功' })
+
+      await store.logout()
 
       expect(store.user).toBeNull()
       expect(store.accessToken).toBeNull()

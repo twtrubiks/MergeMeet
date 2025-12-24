@@ -378,9 +378,30 @@ npm run test:watch
 # 覆蓋率
 npm run test:coverage
 
-# UI 模式（若使用 Vitest）
+# UI 模式
 npm run test:ui
 ```
+
+#### 測試概況
+
+- **測試框架**: Vitest + Vue Test Utils
+- **測試數量**: 86 個
+- **測試文件**:
+
+| 文件 | 測試數量 | 說明 |
+|------|----------|------|
+| `tests/stores/discovery.spec.js` | 23 | 探索配對 Store（瀏覽、喜歡、跳過、配對） |
+| `tests/stores/user.spec.js` | 20 | 用戶認證 Store（註冊、登入、登出、Token） |
+| `tests/composables/useWebSocket.spec.js` | 14 | WebSocket Composable（連接狀態、API） |
+| `tests/components/chat/MessageBubble.spec.js` | 29 | 訊息氣泡組件（文字、圖片、已讀狀態） |
+
+#### 測試重點
+
+- **Stores**: 狀態管理邏輯、API 呼叫、錯誤處理
+- **Composables**: WebSocket 連接管理、訊息處理
+- **Components**: UI 渲染、事件處理、Props 驗證
+
+> **注意**: 前端測試著重於核心業務邏輯（Stores），後端有完整的 API 測試覆蓋（287+ 個測試）。
 
 ---
 
