@@ -7,7 +7,7 @@
 - **版本**: 1.0.0 MVP
 - **開發進度**: ✅ Week 1-6 已完成
 - **技術棧**:
-  - 後端: Python 3.11+ / FastAPI / SQLAlchemy 2.0 Async
+  - 後端: Python 3.12+ / FastAPI / SQLAlchemy 2.0 Async
   - 前端: Vue 3 / Vite / Pinia
   - 資料庫: PostgreSQL 17 + PostGIS
   - 快取: Redis 8.x
@@ -18,7 +18,7 @@
 ### 前置需求
 
 - Docker & Docker Compose
-- Python 3.11+
+- Python 3.12+
 - Node.js 20+
 
 ### 一鍵設置
