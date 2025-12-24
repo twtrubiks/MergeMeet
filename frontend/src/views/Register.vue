@@ -347,8 +347,9 @@ const handleRegister = async () => {
 }
 
 .auth-header p {
-  color: #666;
-  font-size: 0.95rem;
+  color: #555;
+  font-size: 1rem;
+  font-weight: 500;
 }
 
 .auth-form {
@@ -393,8 +394,9 @@ const handleRegister = async () => {
 }
 
 .hint {
-  color: #999;
-  font-size: 0.75rem;
+  color: #666;
+  font-size: 0.8rem;
+  font-weight: 500;
   margin-top: -8px;
   display: block;
 }
@@ -465,8 +467,8 @@ const handleRegister = async () => {
 }
 
 .auth-footer p {
-  color: #666;
-  font-size: 0.9rem;
+  color: #555;
+  font-size: 0.95rem;
 }
 
 .login-link {

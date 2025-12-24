@@ -263,8 +263,9 @@ const goToLogin = () => {
 }
 
 .auth-header p {
-  color: #666;
+  color: #555;
   font-size: 1rem;
+  font-weight: 500;
 }
 
 .auth-form {
@@ -311,7 +312,7 @@ const goToLogin = () => {
 }
 
 .success-text {
-  color: #666;
+  color: #555;
   margin-bottom: 8px;
   font-size: 1rem;
 }
@@ -325,8 +326,9 @@ const goToLogin = () => {
 }
 
 .hint-text {
-  color: #999;
+  color: #666;
   font-size: 0.9rem;
+  font-weight: 500;
   line-height: 1.6;
   margin-bottom: 24px;
 }
@@ -343,7 +345,7 @@ const goToLogin = () => {
 }
 
 .auth-footer p {
-  color: #666;
+  color: #555;
   font-size: 0.95rem;
 }
 

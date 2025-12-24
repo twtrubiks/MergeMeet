@@ -264,11 +264,11 @@ h1 {
 }
 
 .user-email {
-  color: #667eea;
+  color: #333;
   font-weight: 600;
   font-size: 1.1rem;
   padding: 12px 24px;
-  background: rgba(102, 126, 234, 0.1);
+  background: rgba(0, 0, 0, 0.06);
   border-radius: 12px;
 }
 
@@ -288,8 +288,9 @@ h1 {
 }
 
 .info-text {
-  color: #666;
-  font-size: 1.05rem;
+  color: #444;
+  font-size: 1.1rem;
+  font-weight: 500;
   text-align: center;
 }
 

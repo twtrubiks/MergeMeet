@@ -159,15 +159,17 @@ defineEmits(['click'])
 
 .animated-btn.ghost {
   background: transparent;
-  border: 2px solid #667eea;
-  color: #667eea;
+  border: 3px solid #5a5a9a;
+  color: #4a4a8a;
+  font-weight: 700;
   box-shadow: none;
 }
 
 .animated-btn.ghost:hover:not(:disabled) {
-  background: #667eea;
+  background: #5a5a9a;
+  border-color: #5a5a9a;
   color: white;
-  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 8px 25px rgba(90, 90, 154, 0.3);
 }
 
 /* Disabled state */

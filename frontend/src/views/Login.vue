@@ -309,8 +309,9 @@ const handleLogin = async () => {
 }
 
 .auth-header p {
-  color: #666;
+  color: #555;
   font-size: 1rem;
+  font-weight: 500;
 }
 
 .auth-form {
@@ -385,7 +386,7 @@ const handleLogin = async () => {
 }
 
 .auth-footer p {
-  color: #666;
+  color: #555;
   font-size: 0.95rem;
 }
 
