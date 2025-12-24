@@ -93,8 +93,8 @@
 | **Python** | 3.11+ | 主要開發語言 | ✅ |
 | **FastAPI** | 0.109+ | Web 框架 | ✅ |
 | **SQLAlchemy** | 2.0 | ORM（Async） | ✅ |
-| **PostgreSQL** | 16 | 主資料庫 | ✅ |
-| **PostGIS** | 3.4+ | 地理位置查詢 | ✅ |
+| **PostgreSQL** | 17 | 主資料庫 | ✅ |
+| **PostGIS** | 3.5+ | 地理位置查詢 | ✅ |
 | **Redis** | 7.x | 快取/Session/登入限制 | 🔄 部分使用 |
 | **Pydantic** | 2.5+ | 資料驗證 | ✅ |
 | **JWT** | python-jose | 認證機制 | ✅ |
@@ -217,12 +217,12 @@ MergeMeet 作為交友平台，**地理位置搜索是核心功能**：
 # docker-compose.yml
 services:
   postgres:
-    image: postgis/postgis:16-3.4
+    image: postgis/postgis:17-3.5
 ```
 
 **版本說明**：
-- **PostgreSQL 16**：最新穩定版，效能優化
-- **PostGIS 3.4**：2023 年發布，支援最新空間函數
+- **PostgreSQL 17**：2024-09 發布，效能優化、JSON_TABLE 支援
+- **PostGIS 3.5**：2024 年發布，支援最新空間函數
 - **官方映像**：由 PostGIS 團隊維護，預先安裝擴展
 
 #### 資料類型選擇
@@ -1063,7 +1063,7 @@ services:
       - "80:80"
 
   postgres:
-    image: postgis/postgis:16-3.4
+    image: postgis/postgis:17-3.5
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
