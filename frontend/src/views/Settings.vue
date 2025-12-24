@@ -9,215 +9,222 @@
         <p>管理您的帳號與配對偏好</p>
       </div>
 
-      <!-- 密碼修改區塊 -->
-      <div class="settings-section">
-        <h2 class="section-title">
-          <span class="section-icon">&#x1F512;</span>
-          修改密碼
-        </h2>
-
-        <!-- 成功狀態 -->
-        <div v-if="changeSuccess" class="success-state">
-          <div class="success-icon">&#x2705;</div>
-          <h3>密碼修改成功！</h3>
-          <p class="success-text">已發送通知郵件到您的信箱</p>
-          <p class="redirect-text">{{ redirectCountdown }} 秒後自動跳轉至登入頁...</p>
-          <AnimatedButton variant="primary" @click="goToLogin" class="action-btn">
-            立即登入
-          </AnimatedButton>
-        </div>
-
-        <!-- 密碼修改表單 -->
-        <form v-else @submit.prevent="handleChangePassword" class="password-form">
-          <!-- 當前密碼 -->
-          <FloatingInput
-            id="current-password"
-            v-model="formData.currentPassword"
-            label="當前密碼"
-            type="password"
-            autocomplete="current-password"
-            :disabled="isLoading"
-            :required="true"
-            :error="currentPasswordError"
-          />
-
-          <!-- 新密碼 -->
-          <FloatingInput
-            id="new-password"
-            v-model="formData.newPassword"
-            label="新密碼"
-            type="password"
-            autocomplete="new-password"
-            :disabled="isLoading"
-            :required="true"
-          />
-
-          <!-- 密碼強度指示器 -->
-          <div v-if="formData.newPassword" class="password-strength">
-            <span :class="{ valid: passwordStrength.length }">
-              {{ passwordStrength.length ? '&#x2713;' : '&#x2717;' }} 至少 8 個字元
-            </span>
-            <span :class="{ valid: passwordStrength.uppercase }">
-              {{ passwordStrength.uppercase ? '&#x2713;' : '&#x2717;' }} 包含大寫字母
-            </span>
-            <span :class="{ valid: passwordStrength.lowercase }">
-              {{ passwordStrength.lowercase ? '&#x2713;' : '&#x2717;' }} 包含小寫字母
-            </span>
-            <span :class="{ valid: passwordStrength.number }">
-              {{ passwordStrength.number ? '&#x2713;' : '&#x2717;' }} 包含數字
-            </span>
-          </div>
-
-          <!-- 確認新密碼 -->
-          <FloatingInput
-            id="confirm-password"
-            v-model="formData.confirmPassword"
-            label="確認新密碼"
-            type="password"
-            autocomplete="new-password"
-            :disabled="isLoading"
-            :required="true"
-            :error="passwordMismatchError"
-          />
-
-          <!-- 一般錯誤訊息 -->
-          <p v-if="generalError" class="error-message">{{ generalError }}</p>
-
-          <!-- 送出按鈕 -->
-          <AnimatedButton
-            type="submit"
-            variant="primary"
-            :disabled="!isFormValid || isLoading"
-            :loading="isLoading"
-          >
-            <span v-if="!isLoading">&#x1F510; 修改密碼</span>
-          </AnimatedButton>
-        </form>
-      </div>
-
-      <!-- 配對偏好設定區塊 -->
-      <div class="settings-section">
-        <h2 class="section-title">
-          <span class="section-icon">&#x1F495;</span>
-          配對偏好
-        </h2>
-
-        <!-- 載入中 -->
-        <div v-if="preferenceLoading" class="loading-state">
-          <div class="spinner"></div>
-          <p>載入中...</p>
-        </div>
-
-        <!-- 偏好設定表單 -->
-        <form v-else @submit.prevent="handleSavePreferences" class="preference-form">
-          <!-- 年齡範圍 -->
-          <div class="form-group">
-            <label class="form-label">年齡範圍</label>
-            <div class="age-range">
-              <div class="age-input">
-                <label>最小</label>
-                <input
-                  type="number"
-                  v-model.number="preferences.minAge"
-                  min="18"
-                  max="99"
-                  :disabled="preferenceSaving"
-                />
+      <!-- Tab 導航 -->
+      <div class="settings-tabs">
+        <n-tabs v-model:value="activeTab" type="line" animated>
+          <!-- Tab 1: 配對設定（預設） -->
+          <n-tab-pane name="matching" tab="💕 配對設定">
+            <div class="tab-content">
+              <!-- 載入中 -->
+              <div v-if="preferenceLoading" class="loading-state">
+                <div class="spinner"></div>
+                <p>載入中...</p>
               </div>
-              <span class="range-separator">～</span>
-              <div class="age-input">
-                <label>最大</label>
-                <input
-                  type="number"
-                  v-model.number="preferences.maxAge"
-                  min="18"
-                  max="99"
-                  :disabled="preferenceSaving"
-                />
+
+              <!-- 偏好設定表單 -->
+              <form v-else @submit.prevent="handleSavePreferences" class="preference-form">
+                <!-- 年齡範圍 -->
+                <div class="form-group">
+                  <label class="form-label">年齡範圍</label>
+                  <div class="age-range">
+                    <div class="age-input">
+                      <label>最小</label>
+                      <input
+                        type="number"
+                        v-model.number="preferences.minAge"
+                        min="18"
+                        max="99"
+                        :disabled="preferenceSaving"
+                      />
+                    </div>
+                    <span class="range-separator">～</span>
+                    <div class="age-input">
+                      <label>最大</label>
+                      <input
+                        type="number"
+                        v-model.number="preferences.maxAge"
+                        min="18"
+                        max="99"
+                        :disabled="preferenceSaving"
+                      />
+                    </div>
+                  </div>
+                  <p v-if="ageRangeError" class="field-error">{{ ageRangeError }}</p>
+                </div>
+
+                <!-- 最大距離 -->
+                <div class="form-group">
+                  <label class="form-label">最大距離</label>
+                  <div class="distance-input">
+                    <input
+                      type="range"
+                      v-model.number="preferences.maxDistance"
+                      min="1"
+                      max="500"
+                      :disabled="preferenceSaving"
+                    />
+                    <span class="distance-value">{{ preferences.maxDistance }} 公里</span>
+                  </div>
+                  <div class="distance-marks">
+                    <span>1km</span>
+                    <span>100km</span>
+                    <span>250km</span>
+                    <span>500km</span>
+                  </div>
+                </div>
+
+                <!-- 性別偏好 -->
+                <div class="form-group">
+                  <label class="form-label">性別偏好</label>
+                  <div class="gender-options">
+                    <label
+                      v-for="option in genderOptions"
+                      :key="option.value"
+                      class="gender-option"
+                      :class="{ active: preferences.genderPreference === option.value }"
+                    >
+                      <input
+                        type="radio"
+                        v-model="preferences.genderPreference"
+                        :value="option.value"
+                        :disabled="preferenceSaving"
+                      />
+                      <span class="option-icon">{{ option.icon }}</span>
+                      <span class="option-label">{{ option.label }}</span>
+                    </label>
+                  </div>
+                </div>
+
+                <!-- 錯誤訊息 -->
+                <p v-if="preferenceError" class="error-message">{{ preferenceError }}</p>
+
+                <!-- 成功訊息 -->
+                <p v-if="preferenceSaveSuccess" class="success-message">&#x2705; 偏好設定已儲存</p>
+
+                <!-- 儲存按鈕 -->
+                <AnimatedButton
+                  type="submit"
+                  variant="primary"
+                  :disabled="!isPreferenceValid || preferenceSaving"
+                  :loading="preferenceSaving"
+                >
+                  <span v-if="!preferenceSaving">&#x1F4BE; 儲存偏好</span>
+                </AnimatedButton>
+              </form>
+            </div>
+          </n-tab-pane>
+
+          <!-- Tab 2: 帳號安全 -->
+          <n-tab-pane name="security" tab="🔐 帳號安全">
+            <div class="tab-content">
+              <!-- 密碼修改區塊 -->
+              <div class="settings-section">
+                <h3 class="subsection-title">
+                  <span class="section-icon">&#x1F512;</span>
+                  修改密碼
+                </h3>
+
+                <!-- 成功狀態 -->
+                <div v-if="changeSuccess" class="success-state">
+                  <div class="success-icon">&#x2705;</div>
+                  <h3>密碼修改成功！</h3>
+                  <p class="success-text">已發送通知郵件到您的信箱</p>
+                  <p class="redirect-text">{{ redirectCountdown }} 秒後自動跳轉至登入頁...</p>
+                  <AnimatedButton variant="primary" @click="goToLogin" class="action-btn">
+                    立即登入
+                  </AnimatedButton>
+                </div>
+
+                <!-- 密碼修改表單 -->
+                <form v-else @submit.prevent="handleChangePassword" class="password-form">
+                  <!-- 當前密碼 -->
+                  <FloatingInput
+                    id="current-password"
+                    v-model="formData.currentPassword"
+                    label="當前密碼"
+                    type="password"
+                    autocomplete="current-password"
+                    :disabled="isLoading"
+                    :required="true"
+                    :error="currentPasswordError"
+                  />
+
+                  <!-- 新密碼 -->
+                  <FloatingInput
+                    id="new-password"
+                    v-model="formData.newPassword"
+                    label="新密碼"
+                    type="password"
+                    autocomplete="new-password"
+                    :disabled="isLoading"
+                    :required="true"
+                  />
+
+                  <!-- 密碼強度指示器 -->
+                  <div v-if="formData.newPassword" class="password-strength">
+                    <span :class="{ valid: passwordStrength.length }">
+                      {{ passwordStrength.length ? '&#x2713;' : '&#x2717;' }} 至少 8 個字元
+                    </span>
+                    <span :class="{ valid: passwordStrength.uppercase }">
+                      {{ passwordStrength.uppercase ? '&#x2713;' : '&#x2717;' }} 包含大寫字母
+                    </span>
+                    <span :class="{ valid: passwordStrength.lowercase }">
+                      {{ passwordStrength.lowercase ? '&#x2713;' : '&#x2717;' }} 包含小寫字母
+                    </span>
+                    <span :class="{ valid: passwordStrength.number }">
+                      {{ passwordStrength.number ? '&#x2713;' : '&#x2717;' }} 包含數字
+                    </span>
+                  </div>
+
+                  <!-- 確認新密碼 -->
+                  <FloatingInput
+                    id="confirm-password"
+                    v-model="formData.confirmPassword"
+                    label="確認新密碼"
+                    type="password"
+                    autocomplete="new-password"
+                    :disabled="isLoading"
+                    :required="true"
+                    :error="passwordMismatchError"
+                  />
+
+                  <!-- 一般錯誤訊息 -->
+                  <p v-if="generalError" class="error-message">{{ generalError }}</p>
+
+                  <!-- 送出按鈕 -->
+                  <AnimatedButton
+                    type="submit"
+                    variant="primary"
+                    :disabled="!isFormValid || isLoading"
+                    :loading="isLoading"
+                  >
+                    <span v-if="!isLoading">&#x1F510; 修改密碼</span>
+                  </AnimatedButton>
+                </form>
+              </div>
+
+              <!-- 其他功能連結 -->
+              <div class="settings-section quick-links">
+                <h3 class="subsection-title">
+                  <span class="section-icon">&#x1F4DD;</span>
+                  其他功能
+                </h3>
+                <div class="link-list">
+                  <router-link to="/my-reports" class="link-item">
+                    <span class="link-icon">&#x1F4CB;</span>
+                    <span class="link-text">我的舉報記錄</span>
+                    <span class="link-arrow">&#x203A;</span>
+                  </router-link>
+                  <router-link to="/blocked" class="link-item">
+                    <span class="link-icon">&#x1F6AB;</span>
+                    <span class="link-text">封鎖名單</span>
+                    <span class="link-arrow">&#x203A;</span>
+                  </router-link>
+                </div>
               </div>
             </div>
-            <p v-if="ageRangeError" class="field-error">{{ ageRangeError }}</p>
-          </div>
-
-          <!-- 最大距離 -->
-          <div class="form-group">
-            <label class="form-label">最大距離</label>
-            <div class="distance-input">
-              <input
-                type="range"
-                v-model.number="preferences.maxDistance"
-                min="1"
-                max="500"
-                :disabled="preferenceSaving"
-              />
-              <span class="distance-value">{{ preferences.maxDistance }} 公里</span>
-            </div>
-            <div class="distance-marks">
-              <span>1km</span>
-              <span>100km</span>
-              <span>250km</span>
-              <span>500km</span>
-            </div>
-          </div>
-
-          <!-- 性別偏好 -->
-          <div class="form-group">
-            <label class="form-label">性別偏好</label>
-            <div class="gender-options">
-              <label
-                v-for="option in genderOptions"
-                :key="option.value"
-                class="gender-option"
-                :class="{ active: preferences.genderPreference === option.value }"
-              >
-                <input
-                  type="radio"
-                  v-model="preferences.genderPreference"
-                  :value="option.value"
-                  :disabled="preferenceSaving"
-                />
-                <span class="option-icon">{{ option.icon }}</span>
-                <span class="option-label">{{ option.label }}</span>
-              </label>
-            </div>
-          </div>
-
-          <!-- 錯誤訊息 -->
-          <p v-if="preferenceError" class="error-message">{{ preferenceError }}</p>
-
-          <!-- 成功訊息 -->
-          <p v-if="preferenceSaveSuccess" class="success-message">&#x2705; 偏好設定已儲存</p>
-
-          <!-- 儲存按鈕 -->
-          <AnimatedButton
-            type="submit"
-            variant="primary"
-            :disabled="!isPreferenceValid || preferenceSaving"
-            :loading="preferenceSaving"
-          >
-            <span v-if="!preferenceSaving">&#x1F4BE; 儲存偏好</span>
-          </AnimatedButton>
-        </form>
-      </div>
-
-      <!-- 其他功能連結 -->
-      <div class="settings-section quick-links">
-        <h2 class="section-title">
-          <span class="section-icon">&#x1F4DD;</span>
-          其他功能
-        </h2>
-        <div class="link-list">
-          <router-link to="/my-reports" class="link-item">
-            <span class="link-icon">&#x1F4CB;</span>
-            <span class="link-text">我的舉報記錄</span>
-            <span class="link-arrow">&#x203A;</span>
-          </router-link>
-          <router-link to="/blocked" class="link-item">
-            <span class="link-icon">&#x1F6AB;</span>
-            <span class="link-text">封鎖名單</span>
-            <span class="link-arrow">&#x203A;</span>
-          </router-link>
-        </div>
+          </n-tab-pane>
+        </n-tabs>
       </div>
 
       <!-- 返回首頁連結 -->
@@ -238,11 +245,15 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { NTabs, NTabPane } from 'naive-ui'
 import { useUserStore } from '@/stores/user'
 import { useProfileStore } from '@/stores/profile'
 import { authAPI } from '@/api/auth'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 import FloatingInput from '@/components/ui/FloatingInput.vue'
+
+// Tab 狀態
+const activeTab = ref('matching')
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -587,6 +598,51 @@ onUnmounted(() => {
 .settings-header p {
   color: #666;
   font-size: 1rem;
+}
+
+/* Tab 樣式 */
+.settings-tabs {
+  margin-top: 24px;
+}
+
+.settings-tabs :deep(.n-tabs-nav) {
+  padding: 0 8px;
+}
+
+.settings-tabs :deep(.n-tabs-tab) {
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 12px 20px;
+  transition: all 0.3s ease;
+}
+
+.settings-tabs :deep(.n-tabs-tab:hover) {
+  color: #667eea;
+}
+
+.settings-tabs :deep(.n-tabs-tab--active) {
+  color: #667eea;
+}
+
+.settings-tabs :deep(.n-tabs-bar) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.tab-content {
+  padding: 24px 0;
+}
+
+/* 子區塊標題 */
+.subsection-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #f0f0f0;
 }
 
 /* 區塊標題 */
