@@ -71,7 +71,8 @@ import {
   ChatbubbleEllipses,
   PersonOutline,
   SettingsOutline,
-  LogOutOutline
+  LogOutOutline,
+  ShieldOutline
 } from '@vicons/ionicons5'
 import { useUserStore } from '@/stores/user'
 import { useProfileStore } from '@/stores/profile'
@@ -109,29 +110,47 @@ const renderIcon = (icon) => {
 }
 
 /**
- * 用戶選單選項
+ * 用戶選單選項（根據用戶角色動態生成）
  */
-const userMenuOptions = [
-  {
-    label: '個人檔案',
-    key: 'profile',
-    icon: renderIcon(PersonOutline)
-  },
-  {
-    label: '設定',
-    key: 'settings',
-    icon: renderIcon(SettingsOutline)
-  },
-  {
+const userMenuOptions = computed(() => {
+  const options = [
+    {
+      label: '個人檔案',
+      key: 'profile',
+      icon: renderIcon(PersonOutline)
+    },
+    {
+      label: '設定',
+      key: 'settings',
+      icon: renderIcon(SettingsOutline)
+    }
+  ]
+
+  // 管理員用戶顯示管理後台入口
+  if (userStore.isAdmin) {
+    options.push({
+      type: 'divider',
+      key: 'd1'
+    })
+    options.push({
+      label: '管理後台',
+      key: 'admin',
+      icon: renderIcon(ShieldOutline)
+    })
+  }
+
+  options.push({
     type: 'divider',
-    key: 'd1'
-  },
-  {
+    key: 'd2'
+  })
+  options.push({
     label: '登出',
     key: 'logout',
     icon: renderIcon(LogOutOutline)
-  }
-]
+  })
+
+  return options
+})
 
 /**
  * 處理用戶選單選擇
@@ -143,6 +162,9 @@ const handleUserMenuSelect = (key) => {
       break
     case 'settings':
       router.push('/settings')
+      break
+    case 'admin':
+      router.push('/admin')
       break
     case 'logout':
       userStore.logout()
