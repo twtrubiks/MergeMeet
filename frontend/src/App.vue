@@ -26,18 +26,20 @@ import { useUserStore } from '@/stores/user'
 import { useWebSocketStore } from '@/stores/websocket'
 import { useNotificationStore } from '@/stores/notification'
 import { useChatStore } from '@/stores/chat'
+import { useProfileStore } from '@/stores/profile'
 import NavBar from '@/components/layout/NavBar.vue'
 
 const userStore = useUserStore()
 const wsStore = useWebSocketStore()
 const notificationStore = useNotificationStore()
 const chatStore = useChatStore()
+const profileStore = useProfileStore()
 
 // 初始化：從 token 恢復用戶資料
-onMounted(async () => {
+onMounted(() => {
   userStore.initializeFromToken()
 
-  // 初始化通知監聯器（註冊三種通知類型的處理器）
+  // 初始化通知監聽器（註冊三種通知類型的處理器）
   notificationStore.initNotificationListeners()
 
   // 初始化聊天訊息處理器
@@ -45,34 +47,30 @@ onMounted(async () => {
 
   // 啟動全域 WebSocket 自動連接監聽
   wsStore.initAutoConnect()
-
-  // 若已登入，載入持久化通知
-  if (userStore.isAuthenticated) {
-    try {
-      await notificationStore.fetchNotifications()
-    } catch (error) {
-      console.error('Failed to fetch notifications:', error)
-    }
-  }
 })
 
-// 監聽登入/登出狀態變化
+// 統一處理登入/登出狀態變化（包含頁面刷新時的初始載入）
 watch(
   () => userStore.isAuthenticated,
   async (isAuth) => {
     if (isAuth) {
-      // 用戶登入時，載入持久化通知
-      try {
-        await notificationStore.fetchNotifications()
-      } catch (error) {
-        console.error('Failed to fetch notifications on login:', error)
-      }
+      // 用戶登入時，並行載入 profile 和通知
+      await Promise.all([
+        profileStore.fetchProfile().catch(() => {
+          // Profile 不存在是正常情況（新用戶）
+        }),
+        notificationStore.fetchNotifications().catch(err => {
+          console.error('Failed to fetch notifications:', err)
+        })
+      ])
     } else {
-      // 用戶登出時，重置通知和聊天狀態
+      // 用戶登出時，重置狀態
+      profileStore.$reset()
       notificationStore.$reset()
       chatStore.$reset()
     }
-  }
+  },
+  { immediate: true }  // 頁面載入時立即執行，處理刷新情況
 )
 </script>
 
