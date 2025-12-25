@@ -1,30 +1,24 @@
-# MergeMeet 探索配對與即時聊天測試指南
+# MergeMeet 測試指南
 
-## 快速開始
-
-### 方法 1: 使用自動化腳本 ⚡（推薦）
-
-```bash
-cd /home/twtrubiks/下載/mergemeet
-./test_matching_chat.sh
-```
-
-這個腳本會自動：
-- ✅ 創建 2 個測試用戶（Alice & Bob）
-- ✅ 完成個人檔案設置
-- ✅ 設定興趣標籤
-- ✅ 完成互相喜歡（配對）
-- ✅ 準備好聊天環境
-
-**執行時間**: ~5 秒
+**測試範圍**: Week 1-5 功能
+**最後更新**: 2025-12-25
 
 ---
 
-### 方法 2: 手動測試流程 🖱️
+## 目錄
 
-## 步驟 1: 準備環境
+1. [環境準備](#1-環境準備)
+2. [測試帳號資訊](#2-測試帳號資訊)
+3. [功能測試流程](#3-功能測試流程)
+4. [測試檢查清單](#4-測試檢查清單)
+5. [API 測試命令](#5-api-測試命令)
+6. [常見問題排查](#6-常見問題排查)
 
-### 1.1 啟動所有服務
+---
+
+## 1. 環境準備
+
+### 1.1 啟動開發環境
 
 ```bash
 # 1. 啟動資料庫和 Redis
@@ -39,370 +33,380 @@ cd frontend
 npm run dev
 ```
 
-### 1.2 確認服務運行
+### 1.2 驗證服務狀態
 
-```bash
-# 檢查後端
-curl http://localhost:8000/api/hello
+| 服務 | 網址 | 預期結果 |
+|------|------|----------|
+| 後端 API | http://localhost:8000/api/hello | JSON 回應 |
+| API 文檔 | http://localhost:8000/docs | Swagger UI |
+| 前端應用 | http://localhost:5173 | Vue 應用 |
 
-# 檢查前端
-curl http://localhost:5173
-```
+### 1.3 瀏覽器要求
+
+- Chrome 100+ / Edge 100+ / Firefox 100+ / Safari 15+
+- 需啟用：JavaScript、Cookies、LocalStorage、WebSocket
+
+### 1.4 測試前準備
+
+開啟瀏覽器開發者工具（`F12`）：
+
+- **Console**：查看錯誤訊息
+- **Network**：監控 API 請求
+- **Application**：查看 LocalStorage
 
 ---
 
-## 步驟 2: 創建測試用戶
+## 2. 測試帳號資訊
 
-### 2.1 註冊用戶 Alice
+### 預設測試帳號
 
-1. 訪問: http://localhost:5173/register
-2. 填寫資料：
-   - **Email**: `alice.test@example.com`
-   - **密碼**: `Alice1234`
-   - **生日**: `1995-06-15`
+| 帳號 | Email | 密碼 | 性別 |
+|------|-------|------|------|
+| Alice | alice@example.com | Password123 | 女性 |
+| Bob | bob@example.com | Password123 | 男性 |
+| Carol | carol@example.com | Password123 | 女性 |
+| David | david@example.com | Password123 | 男性 |
+
+> **注意**: 密碼必須包含至少一個大寫字母。如果帳號不存在，需要先自行註冊。
+
+### 測試資料範例
+
+**個人檔案：**
+
+- 顯示名稱：Alice / Bob
+- 性別：女性 / 男性
+- 生日：1995-06-15 / 1990-03-20
+- 位置：台北市信義區 (25.0330, 121.5654)
+
+**興趣標籤：** 選擇 3-10 個（旅遊、美食、運動、音樂等）
+
+---
+
+## 3. 功能測試流程
+
+### 3.1 用戶註冊與登入
+
+#### 測試案例：新用戶註冊
+
+1. 訪問 http://localhost:5173/register
+2. 填寫表單：
+
+   ```text
+   Email: test_user@example.com
+   密碼: TestPass123!
+   姓名: 測試用戶
+   性別: 男性
+   生日: 1995-06-15
+   ```
+
 3. 點擊「註冊」
-4. 註冊成功後會自動登入
 
-### 2.2 完成 Alice 的個人檔案
+**預期結果：**
 
-1. 自動導向個人檔案頁面
-2. 填寫基本資訊：
-   - **暱稱**: Alice
-   - **性別**: 女性
-   - **自我介紹**: "喜歡旅遊和美食，熱愛生活！"
-3. 設定位置：
-   - **位置名稱**: 台北市信義區
-   - **緯度**: 25.0330
-   - **經度**: 121.5654
-4. 配對偏好：
-   - **年齡範圍**: 25-35 歲
-   - **最大距離**: 50 公里
-   - **性別偏好**: 男性
-5. 選擇興趣標籤（至少 3 個）：
-   - 旅遊、美食、攝影等
-6. 點擊「儲存」
+- 註冊成功，自動跳轉
+- Network: `POST /api/auth/register` 返回 `201`
 
-### 2.3 註冊用戶 Bob
+#### 測試案例：用戶登入
 
-1. **登出 Alice 帳號**（右上角）
-2. 訪問: http://localhost:5173/register
-3. 填寫資料：
-   - **Email**: `bob.test@example.com`
-   - **密碼**: `Bob12345`
-   - **生日**: `1990-03-20`
-4. 點擊「註冊」
+1. 訪問 http://localhost:5173/login
+2. 填寫 Email 和密碼
+3. 點擊「登入」
 
-### 2.4 完成 Bob 的個人檔案
+**預期結果：**
 
-1. 填寫基本資訊：
-   - **暱稱**: Bob
-   - **性別**: 男性
-   - **自我介紹**: "熱愛運動和旅遊，喜歡交朋友！"
-2. 設定位置：
-   - **位置名稱**: 台北市大安區
-   - **緯度**: 25.0500
-   - **經度**: 121.5500
-3. 配對偏好：
-   - **年齡範圍**: 22-32 歲
-   - **最大距離**: 30 公里
-   - **性別偏好**: 女性
-4. 選擇興趣標籤（至少 3 個，與 Alice 有共同興趣）
-5. 點擊「儲存」
+- 登入成功，跳轉到首頁
+- LocalStorage 儲存 `access_token`
+- Network: `POST /api/auth/login` 返回 `200`
 
 ---
 
-## 步驟 3: 測試探索與配對功能
+### 3.2 個人檔案管理
 
-### 3.1 Alice 瀏覽候選人
+#### 測試案例：建立/編輯個人檔案
 
-1. 以 Alice 帳號登入
-2. 點擊導航欄的「探索」
-3. 應該會看到 Bob 的個人資料卡片：
-   - 顯示 Bob 的照片、暱稱、年齡
-   - 顯示距離（約 3 公里）
-   - 顯示共同興趣
-   - 顯示配對分數
+1. 訪問 http://localhost:5173/profile
+2. 填寫：顯示名稱、性別、個人簡介、地理位置
+3. 點擊「儲存」
 
-### 3.2 Alice 喜歡 Bob
+**預期結果：**
 
-1. 在 Bob 的卡片上點擊「❤️ 喜歡」按鈕
-2. 卡片會消失，顯示下一位候選人
-3. 此時配對狀態：
-   - ✅ Alice → Bob: 已喜歡
-   - ❌ Bob → Alice: 未喜歡
-   - ❌ 尚未配對
+- Network: `POST /api/profile` 返回 `201` 或 `PATCH /api/profile` 返回 `200`
 
-### 3.3 Bob 喜歡 Alice（觸發配對）
+#### 測試案例：上傳照片
 
-1. 登出 Alice，以 Bob 帳號登入
-2. 點擊「探索」
-3. 應該會看到 Alice 的個人資料卡片
-4. 點擊「❤️ 喜歡」按鈕
-5. **配對成功彈窗出現！** 🎉
-   - 顯示「配對成功」訊息
-   - 顯示 Alice 的資訊
-   - 提供「開始聊天」按鈕
+1. 在個人檔案頁面點擊「上傳照片」
+2. 選擇 1-6 張照片（JPG/PNG，< 5MB）
+3. 上傳
 
-### 3.4 查看配對列表
+**預期結果：**
 
-1. 點擊導航欄的「配對」
-2. 應該會看到：
-   - Alice 和 Bob 的配對卡片
-   - 配對時間
-   - 最後訊息預覽（如果有）
-   - 未讀訊息數量（如果有）
+- 照片顯示在個人檔案中
+- 第一張自動設為主頭像
+- Network: `POST /api/profile/photos` 返回 `201`
+
+#### 測試案例：設定興趣標籤
+
+1. 點擊「編輯興趣」
+2. 選擇 3-10 個標籤
+3. 儲存
+
+**預期結果：**
+
+- Network: `PUT /api/profile/interests` 返回 `200`
 
 ---
 
-## 步驟 4: 測試即時聊天功能
+### 3.3 探索與配對
 
-### 4.1 開啟聊天室
+#### 測試案例：瀏覽候選人
 
-**方法 1: 從配對列表**
-1. 在「配對」頁面
-2. 點擊對方的頭像或名稱
-3. 自動導向聊天頁面
+1. 訪問 http://localhost:5173/discovery
+2. 觀察顯示的候選人卡片
 
-**方法 2: 從配對成功彈窗**
-1. 配對成功後點擊「開始聊天」按鈕
-2. 直接進入聊天頁面
+**預期結果：**
 
-### 4.2 測試即時訊息（WebSocket）
+- 顯示：照片、姓名、年齡、距離、共同興趣、配對分數
+- 候選人符合偏好設定
+- Network: `GET /api/discovery/browse` 返回 `200`
 
-1. **Alice 發送訊息**：
-   - 以 Alice 帳號開啟聊天室
-   - 在輸入框輸入: "Hi Bob! 很高興認識你"
-   - 點擊「發送」或按 Enter
-   - 訊息立即顯示在聊天記錄
+#### 測試案例：喜歡候選人
 
-2. **Bob 接收訊息（即時）**：
-   - 開啟另一個瀏覽器視窗（或無痕模式）
-   - 以 Bob 帳號登入
-   - 進入與 Alice 的聊天室
-   - **無需刷新**，應該立即看到 Alice 的訊息
+1. 點擊「❤️」按鈕或向右滑動
 
-3. **Bob 回覆訊息**：
-   - Bob 輸入: "Hi Alice! 我也很高興認識妳"
-   - 點擊「發送」
-   - Alice 的視窗應該**即時**收到訊息
+**預期結果：**
 
-4. **驗證 WebSocket 連接**：
-   - 打開瀏覽器開發者工具（F12）
-   - 切換到「Network」標籤
-   - 篩選「WS」（WebSocket）
-   - 應該看到 `ws://localhost:8000/ws` 連接
-   - 狀態應該是「101 Switching Protocols」
+- 卡片滑出，顯示下一位
+- Network: `POST /api/discovery/like/{user_id}` 返回 `200`
+- 若雙方互相喜歡：顯示「配對成功」彈窗
 
-### 4.3 測試訊息功能
+#### 測試案例：跳過候選人
 
-#### 4.3.1 已讀狀態
-- 當 Bob 查看訊息時
-- Alice 的訊息應該顯示「已讀」標記
-- 未讀訊息數量更新
+1. 點擊「✖️」按鈕或向左滑動
 
-#### 4.3.2 刪除訊息
-1. 長按或右鍵點擊自己的訊息
+**預期結果：**
+
+- 卡片滑出，該用戶 24 小時內不再出現
+- Network: `POST /api/discovery/pass/{user_id}` 返回 `200`
+
+---
+
+### 3.4 即時聊天
+
+#### 測試案例：進入聊天室
+
+1. 從配對列表點擊一個配對
+
+**預期結果：**
+
+- 跳轉到 `/messages/{match_id}`
+- WebSocket 連接成功（Console 顯示 "WebSocket connected"）
+- Network: WebSocket 連接到 `ws://localhost:8000/ws`
+
+#### 測試案例：即時訊息（需兩個瀏覽器）
+
+1. **視窗 A**：Alice 登入，進入與 Bob 的聊天室
+2. **視窗 B**：Bob 登入（無痕模式），進入與 Alice 的聊天室
+3. Alice 發送訊息
+
+**預期結果：**
+
+- Alice 視窗：訊息立即顯示在右側
+- Bob 視窗：**即時**收到訊息（不需刷新），顯示在左側
+
+#### 測試案例：已讀狀態
+
+1. Bob 查看 Alice 發送的訊息
+
+**預期結果：**
+
+- Alice 視窗顯示訊息為「已讀」（✓✓）
+- Network: `POST /api/messages/messages/read` 返回 `204`
+
+#### 測試案例：刪除訊息
+
+1. 右鍵點擊自己的訊息
 2. 選擇「刪除」
-3. 確認刪除
-4. 訊息從聊天記錄中移除
 
-#### 4.3.3 訊息通知
-- 當收到新訊息時
-- 配對列表的未讀數字應該增加
-- 聊天列表顯示最新訊息預覽
+**預期結果：**
+
+- 訊息消失
+- Network: `DELETE /api/messages/messages/{message_id}` 返回 `204`
 
 ---
 
-## 步驟 5: 測試其他功能
+### 3.5 安全功能
 
-### 5.1 跳過用戶
+#### 測試案例：封鎖用戶
 
-1. 在「探索」頁面
-2. 對不感興趣的用戶點擊「❌ 跳過」
-3. 該用戶不會再出現在候選列表
+1. 在聊天室點擊「⋮」按鈕
+2. 選擇「封鎖」並確認
 
-### 5.2 取消配對
+**預期結果：**
 
-1. 在「配對」頁面
-2. 點擊配對卡片的「...」選單
-3. 選擇「取消配對」
-4. 確認後：
-   - 配對關係解除
-   - 聊天記錄保留（但無法繼續聊天）
-   - 可以重新喜歡並配對
+- 該用戶從探索列表消失
+- 配對狀態變為 BLOCKED
+- Network: `POST /api/safety/block/{user_id}` 返回 `201`
 
-### 5.3 封鎖用戶
+#### 測試案例：查看/解除封鎖
 
-1. 在聊天頁面或個人資料頁面
-2. 點擊「封鎖」按鈕
-3. 確認封鎖後：
-   - 配對關係解除
-   - 不會再出現在探索列表
-   - 無法發送訊息
-   - 可在「設定」→「封鎖列表」查看
+1. 訪問 http://localhost:5173/blocked
+2. 點擊「解除封鎖」
 
-### 5.4 舉報用戶
+**預期結果：**
 
-1. 在個人資料頁面或聊天頁面
-2. 點擊「舉報」按鈕
-3. 選擇舉報原因：
-   - 騷擾
-   - 不當內容
-   - 詐騙
-   - 假帳號
-   - 其他
-4. 填寫詳細說明
-5. 提交舉報
-6. 管理員可在後台查看並處理
+- Network: `DELETE /api/safety/block/{user_id}` 返回 `200`
+
+#### 測試案例：舉報用戶
+
+1. 點擊「舉報」按鈕
+2. 選擇類型（INAPPROPRIATE / HARASSMENT / FAKE_PROFILE / SCAM / OTHER）
+3. 填寫原因並提交
+
+**預期結果：**
+
+- Network: `POST /api/safety/report` 返回 `201`
 
 ---
 
-## 測試檢查清單
+## 4. 測試檢查清單
 
-### 探索與配對 ✅
-- [ ] 註冊並完成個人檔案
-- [ ] 瀏覽候選人列表
-- [ ] 配對分數正確顯示
-- [ ] 距離計算正確
-- [ ] 共同興趣顯示
-- [ ] 喜歡用戶功能
-- [ ] 跳過用戶功能
-- [ ] 互相喜歡觸發配對
-- [ ] 配對成功彈窗顯示
+### 用戶認證（Week 1）
+
+- [ ] 新用戶註冊成功
+- [ ] 用戶登入成功
+- [ ] Token 正確儲存
+- [ ] 登出功能正常
+
+### 個人檔案（Week 2）
+
+- [ ] 建立個人檔案
+- [ ] 上傳 1-6 張照片
+- [ ] 設定 3-10 個興趣標籤
+- [ ] 編輯/刪除功能正常
+- [ ] 檔案完整度檢查正確
+
+### 探索與配對（Week 3）
+
+- [ ] 瀏覽候選人（符合偏好）
+- [ ] Like / Pass 功能正常
+- [ ] 配對成功提示
 - [ ] 配對列表正確顯示
 
-### 即時聊天 ✅
+### 即時聊天（Week 4）
+
 - [ ] WebSocket 連接成功
-- [ ] 發送文字訊息
-- [ ] 即時接收訊息（無需刷新）
-- [ ] 訊息時間戳正確
+- [ ] 發送/接收訊息即時
 - [ ] 已讀狀態更新
-- [ ] 未讀訊息數量
-- [ ] 訊息刪除功能
+- [ ] 刪除訊息功能
 - [ ] 聊天記錄載入
-- [ ] 多個聊天室切換
 
-### 安全功能 ✅
-- [ ] 取消配對
-- [ ] 封鎖用戶
-- [ ] 解除封鎖
-- [ ] 舉報用戶
-- [ ] 查看封鎖列表
-- [ ] 查看舉報記錄
+### 安全功能（Week 5）
 
----
+- [ ] 封鎖/解除封鎖用戶
+- [ ] 舉報用戶（5 種類型）
+- [ ] 封鎖列表查看
 
-## 常見問題
+### 效能與穩定性
 
-### Q1: 找不到候選人？
-**原因**:
-- 偏好設定不符合（年齡、距離、性別）
-- 沒有其他已完成檔案的用戶
-- 已經喜歡或跳過所有用戶
-
-**解決**:
-- 調整偏好設定（增加年齡範圍、距離）
-- 創建更多測試用戶
-- 使用自動化腳本創建用戶
-
-### Q2: WebSocket 連接失敗？
-**原因**:
-- 後端未啟動
-- JWT Token 過期
-- CORS 配置問題
-
-**解決**:
-```bash
-# 檢查後端運行
-curl http://localhost:8000/api/hello
-
-# 查看後端日誌
-# 應該看到 WebSocket 連接日誌
-
-# 重新登入獲取新 Token
-```
-
-### Q3: 訊息沒有即時更新？
-**原因**:
-- WebSocket 連接中斷
-- 瀏覽器標籤頁在背景
-
-**解決**:
-- F12 開發者工具 → Network → WS，檢查連接狀態
-- 刷新頁面重新建立 WebSocket 連接
-- 查看 Console 是否有錯誤訊息
-
-### Q4: 配對後無法聊天？
-**原因**:
-- 配對狀態不正確
-- WebSocket 權限問題
-
-**解決**:
-```bash
-# 檢查配對狀態
-curl -H "Authorization: Bearer YOUR_TOKEN" \
-  http://localhost:8000/api/discovery/matches/
-
-# 檢查對話列表
-curl -H "Authorization: Bearer YOUR_TOKEN" \
-  http://localhost:8000/api/messages/conversations/
-```
+- [ ] 頁面載入 < 2 秒
+- [ ] API 回應 < 500ms
+- [ ] Console 無紅色錯誤
+- [ ] WebSocket 穩定連接
 
 ---
 
-## API 測試命令
+## 5. API 測試命令
 
-### 瀏覽候選人
 ```bash
-curl -H "Authorization: Bearer YOUR_TOKEN" \
+# 取得 Token
+TOKEN=$(curl -s -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"alice@example.com","password":"Password123"}' | jq -r '.access_token')
+
+# 瀏覽候選人
+curl -H "Authorization: Bearer $TOKEN" \
   "http://localhost:8000/api/discovery/browse?limit=10"
-```
 
-### 喜歡用戶
-```bash
-curl -X POST -H "Authorization: Bearer YOUR_TOKEN" \
-  "http://localhost:8000/api/discovery/like/USER_ID"
-```
+# 喜歡用戶
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8000/api/discovery/like/{USER_ID}"
 
-### 查看配對
-```bash
-curl -H "Authorization: Bearer YOUR_TOKEN" \
+# 查看配對
+curl -H "Authorization: Bearer $TOKEN" \
   "http://localhost:8000/api/discovery/matches"
-```
 
-### 查看對話列表
-```bash
-curl -H "Authorization: Bearer YOUR_TOKEN" \
+# 查看對話列表
+curl -H "Authorization: Bearer $TOKEN" \
   "http://localhost:8000/api/messages/conversations"
-```
 
-### 查看聊天記錄
-```bash
-curl -H "Authorization: Bearer YOUR_TOKEN" \
-  "http://localhost:8000/api/messages/matches/MATCH_ID/messages"
+# 查看聊天記錄
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8000/api/messages/matches/{MATCH_ID}/messages"
 ```
 
 ---
 
-## 進階測試場景
+## 6. 常見問題排查
 
-### 場景 1: 多人配對
-1. 創建 4 個用戶（Alice, Bob, Carol, Dave）
-2. Alice 喜歡 Bob 和 Dave
-3. Bob 喜歡 Alice 和 Carol
-4. 測試多個配對同時聊天
+### 問題 1：配對列表一直轉圈圈
 
-### 場景 2: 配對後封鎖
-1. Alice 和 Bob 配對成功
-2. 開始聊天
-3. Alice 封鎖 Bob
-4. 驗證配對解除、無法發送訊息
+**排查：**
 
-### 場景 3: 壓力測試
-1. 創建 10+ 個用戶
-2. 完成多個配對
-3. 同時在多個聊天室發送訊息
-4. 測試 WebSocket 穩定性
+1. Console 查看錯誤訊息
+2. Network 檢查 `/api/discovery/matches` 狀態碼：
+   - `200` ✅ 正常
+   - `401` ❌ Token 失效
+   - `307` ❌ URL 格式錯誤（檢查尾隨斜線）
+
+**解決：** 重新登入或 `localStorage.clear()`
+
+---
+
+### 問題 2：WebSocket 無法連接
+
+**排查：**
+
+1. Console 檢查 WebSocket 狀態
+2. Network > WS 標籤，確認 `101 Switching Protocols`
+3. 確認後端運行：`curl http://localhost:8000/health`
+
+**解決：** 重新整理頁面或重啟後端
+
+---
+
+### 問題 3：訊息沒有即時更新
+
+**排查：**
+
+1. 確認 WebSocket 連接狀態
+2. 確認在正確的聊天室（URL 包含正確的 match_id）
+
+**解決：** 重新整理頁面
+
+---
+
+### 問題 4：307 重定向錯誤
+
+**原因：** API URL 尾隨斜線格式錯誤
+
+**確認：**
+
+- ✅ 正確: `/api/profile`
+- ❌ 錯誤: `/api/profile/`
+
+**解決：** 清除瀏覽器快取
+
+---
+
+### 問題 5：圖片無法上傳
+
+**可能原因：**
+
+- 檔案過大（> 5MB）
+- 格式不支援（只支援 JPG/PNG）
+- 已達 6 張上限
+
+**解決：** 壓縮圖片或刪除舊照片
 
 ---
 
@@ -411,8 +415,7 @@ curl -H "Authorization: Bearer YOUR_TOKEN" \
 ```bash
 # 運行 pytest 測試
 cd backend
-pytest tests/test_discovery.py -v
-pytest tests/test_safety.py -v
+pytest tests/ -v
 
 # 查看測試覆蓋率
 pytest --cov=app --cov-report=html
@@ -420,6 +423,22 @@ pytest --cov=app --cov-report=html
 
 ---
 
-**祝測試順利！** 🚀
+## 進階測試場景
 
-如有問題請參考 `README.md`
+### 場景 1：多人配對
+
+1. 創建 4 個用戶（Alice, Bob, Carol, Dave）
+2. Alice 喜歡 Bob 和 Dave
+3. 測試多個配對同時聊天
+
+### 場景 2：配對後封鎖
+
+1. Alice 和 Bob 配對成功並開始聊天
+2. Alice 封鎖 Bob
+3. 驗證配對解除、無法發送訊息
+
+### 場景 3：壓力測試
+
+1. 創建 10+ 個用戶
+2. 同時在多個聊天室發送訊息
+3. 測試 WebSocket 穩定性

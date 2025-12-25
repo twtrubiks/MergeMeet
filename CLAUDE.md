@@ -85,18 +85,35 @@ await axios.get('/api/profile/')         // 404
 
 ## 專案結構
 
-```
+```text
 mergemeet/
-├── backend/              # FastAPI
-│   ├── app/api/         # API 路由
-│   ├── app/models/      # SQLAlchemy 模型
-│   └── tests/           # pytest 測試
-├── frontend/            # Vue 3
+├── backend/                  # 後端 FastAPI 應用
+│   ├── app/
+│   │   ├── api/              # API 路由 (10 個模組)
+│   │   ├── core/             # 核心配置 (config, security, database)
+│   │   ├── models/           # SQLAlchemy 模型 (6 個)
+│   │   ├── schemas/          # Pydantic Schemas
+│   │   ├── services/         # 業務邏輯 (9 個服務)
+│   │   ├── websocket/        # WebSocket 管理
+│   │   └── main.py           # 主應用
+│   ├── alembic/              # 資料庫遷移
+│   ├── tests/                # pytest 測試
+│   ├── uploads/              # 檔案上傳
+│   └── scripts/              # 初始化腳本
+│
+├── frontend/                 # 前端 Vue 3 應用
 │   └── src/
-│       ├── views/       # 頁面組件
-│       ├── components/  # 可重用組件
-│       └── stores/      # Pinia stores
-└── .claude/skills/      # Claude Code skills
+│       ├── views/            # 頁面 (17 個)
+│       ├── components/       # Vue 組件 (16 個)
+│       ├── stores/           # Pinia Stores (7 個)
+│       ├── composables/      # Vue Composables
+│       ├── api/              # API 客戶端
+│       ├── utils/            # 工具函數
+│       └── router/           # Vue Router
+│
+├── docs/                     # 專案文檔
+├── .claude/skills/           # Claude Code skills
+└── docker-compose.yml        # Docker 配置
 ```
 
 ---
@@ -122,7 +139,6 @@ docker compose down -v && docker compose up -d
 
 - **README.md** - 專案概述（含快速開始）
 - **docs/ARCHITECTURE.md** - 技術架構
-- **docs/INDEX.md** - 文件索引
 
 ---
 

@@ -87,9 +87,10 @@ ls frontend/src/stores/
 
 | 主題 | 檔案 |
 |------|------|
+| 專案狀態 | [project-status.md](references/project-status.md) |
 | 功能狀態 | [feature-status.md](references/feature-status.md) |
 | 前後端差異 | [frontend-backend-gap.md](references/frontend-backend-gap.md) |
-| 已知問題 | [known-issues.md](references/known-issues.md) |
+| 問題檢查指南 | [known-issues.md](references/known-issues.md) |
 | 改進建議 | [improvement-suggestions.md](references/improvement-suggestions.md) |
 | E2E 測試指南 | [e2e-testing-guide.md](references/e2e-testing-guide.md) |
 

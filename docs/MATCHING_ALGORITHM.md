@@ -54,7 +54,7 @@ score = min(2 * 10, 50) = 20 分
 
 **實現代碼**:
 ```python
-# backend/app/services/matching_service.py:33-39
+# backend/app/services/matching_service.py:129-133
 user_interests = set(user_profile.get("interests", []))
 candidate_interests = set(candidate.get("interests", []))
 common_interests = user_interests & candidate_interests
@@ -88,22 +88,22 @@ else:                   score = 0 分   # 太遠（不會出現）
 
 **實現代碼**:
 ```python
-# backend/app/services/matching_service.py:41-51
-distance_km = candidate.get("distance_km", 999)
-
-if distance_km < 5:
-    score += 20
-elif distance_km < 10:
-    score += 15
-elif distance_km < 25:
-    score += 10
-elif distance_km < 50:
-    score += 5
+# backend/app/services/matching_service.py:6-23 (_calculate_distance_score 函數)
+def _calculate_distance_score(distance_km: float) -> float:
+    if distance_km < 5:
+        return 20
+    if distance_km < 10:
+        return 15
+    if distance_km < 25:
+        return 10
+    if distance_km < 50:
+        return 5
+    return 0
 ```
 
 **PostGIS 計算**（在查詢時完成）:
 ```python
-# backend/app/api/discovery.py:71-77
+# backend/app/api/discovery.py:105-111
 distance_label = (
     func.ST_Distance(
         Profile.location,
@@ -141,19 +141,21 @@ else:                   score = 0 分   # 不活躍
 
 **實現代碼**:
 ```python
-# backend/app/services/matching_service.py:53-69
-last_active = candidate.get("last_active")
-if last_active:
+# backend/app/services/matching_service.py:26-51 (_calculate_activity_score 函數)
+def _calculate_activity_score(last_active) -> float:
+    if not last_active:
+        return 0
     hours_ago = (datetime.now(timezone.utc) - last_active).total_seconds() / 3600
 
     if hours_ago < 1:
-        score += 20
-    elif hours_ago < 24:
-        score += 15
-    elif hours_ago < 72:
-        score += 10
-    elif hours_ago < 168:
-        score += 5
+        return 20
+    if hours_ago < 24:
+        return 15
+    if hours_ago < 72:
+        return 10
+    if hours_ago < 168:  # 7天
+        return 5
+    return 0
 ```
 
 ---
@@ -239,7 +241,7 @@ score += _calculate_trust_score_weight(trust_score)
 ### 基本篩選
 
 ```python
-# backend/app/api/discovery.py:87-104
+# backend/app/api/discovery.py:121-146
 1. ✅ 排除自己
 2. ✅ 檔案可見且完整
 3. ✅ 帳號啟用中
@@ -251,7 +253,7 @@ score += _calculate_trust_score_weight(trust_score)
 ### 排除已互動用戶
 
 ```python
-# backend/app/api/discovery.py:114-153
+# backend/app/api/discovery.py:148-187
 7. ✅ 排除已喜歡的用戶（likes 表）
 8. ✅ 排除已配對的用戶（matches 表）
 9. ✅ 排除已封鎖的用戶（blocked_users 表）
@@ -394,7 +396,7 @@ ST_Distance(
 
 **批次載入優化**:
 ```python
-# backend/app/api/discovery.py:39-86
+# backend/app/api/discovery.py:113-120
 query = (
     select(Profile, distance_label)
     .options(
@@ -408,7 +410,7 @@ query = (
 ### 排序策略
 
 ```python
-# backend/app/services/matching_service.py:108-109
+# backend/app/services/matching_service.py:176
 # 依分數由高到低排序
 scored_candidates.sort(key=lambda x: x["match_score"], reverse=True)
 ```

@@ -16,24 +16,33 @@ description: 在 MergeMeet 開發後端功能時使用此 skill。提供 FastAPI
 ```
 backend/
 ├── app/
-│   ├── api/              # API 路由
-│   │   ├── auth.py       # 認證
-│   │   ├── profile.py    # 用戶檔案
-│   │   ├── discovery.py  # 探索/配對
-│   │   ├── messages.py   # 聊天訊息
-│   │   ├── websocket.py  # 即時聊天
-│   │   ├── safety.py     # 安全功能
-│   │   └── admin.py      # 管理後台
-│   ├── core/             # 核心配置
-│   │   ├── config.py     # 環境設定
-│   │   ├── security.py   # JWT/密碼處理
-│   │   └── deps.py       # 依賴注入
-│   ├── models/           # SQLAlchemy 模型
-│   ├── schemas/          # Pydantic schemas
-│   ├── services/         # 業務邏輯
-│   └── main.py           # FastAPI 應用程式
-├── tests/                # pytest 測試
-└── alembic/              # 資料庫遷移
+│   ├── api/                    # API 路由
+│   │   ├── auth.py             # 認證
+│   │   ├── profile.py          # 用戶檔案
+│   │   ├── discovery.py        # 探索/配對
+│   │   ├── messages.py         # 聊天訊息
+│   │   ├── websocket.py        # 即時聊天
+│   │   ├── safety.py           # 安全功能
+│   │   ├── admin.py            # 管理後台
+│   │   ├── moderation.py       # 內容審核
+│   │   ├── photo_moderation.py # 照片審核
+│   │   └── notifications.py    # 通知
+│   ├── core/                   # 核心配置
+│   │   ├── config.py           # 環境設定
+│   │   ├── security.py         # JWT/密碼處理
+│   │   ├── dependencies.py     # 依賴注入
+│   │   ├── database.py         # 資料庫連線
+│   │   ├── utils.py            # 工具函數
+│   │   ├── csrf.py             # CSRF 保護
+│   │   └── cookie_utils.py     # Cookie 處理
+│   ├── models/                 # SQLAlchemy 模型
+│   ├── schemas/                # Pydantic schemas
+│   ├── services/               # 業務邏輯
+│   ├── websocket/              # WebSocket 管理
+│   │   └── manager.py          # 連線管理器
+│   └── main.py                 # FastAPI 應用程式
+├── tests/                      # pytest 測試
+└── alembic/                    # 資料庫遷移
 ```
 
 ---

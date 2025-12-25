@@ -16,14 +16,27 @@ description: 在 MergeMeet 開發前端功能時使用此 skill。提供 Vue 3 C
 ```
 frontend/
 ├── src/
-│   ├── components/       # 可重用 Vue 組件
+│   ├── components/             # 可重用 Vue 組件
 │   │   ├── InterestSelector.vue
 │   │   ├── MatchModal.vue
 │   │   ├── PhotoUploader.vue
 │   │   ├── ReportModal.vue
-│   │   └── chat/
-│   │       └── MessageBubble.vue
-│   ├── views/            # 頁面視圖
+│   │   ├── NotificationBell.vue
+│   │   ├── UserDetailModal.vue
+│   │   ├── chat/               # 聊天相關組件
+│   │   │   ├── MessageBubble.vue
+│   │   │   ├── ChatImagePicker.vue
+│   │   │   └── ImagePreviewModal.vue
+│   │   ├── layout/             # 佈局組件
+│   │   │   └── NavBar.vue
+│   │   └── ui/                 # UI 基礎組件
+│   │       ├── AnimatedButton.vue
+│   │       ├── Badge.vue
+│   │       ├── FeatureCard.vue
+│   │       ├── FloatingInput.vue
+│   │       ├── GlassCard.vue
+│   │       └── HeartLoader.vue
+│   ├── views/                  # 頁面視圖
 │   │   ├── Home.vue
 │   │   ├── Register.vue
 │   │   ├── Login.vue
@@ -32,20 +45,31 @@ frontend/
 │   │   ├── Matches.vue
 │   │   ├── ChatList.vue
 │   │   ├── Chat.vue
-│   │   └── admin/
-│   ├── stores/           # Pinia stores
-│   │   ├── auth.js
-│   │   ├── profile.js
-│   │   ├── discovery.js
-│   │   ├── match.js
-│   │   ├── chat.js
-│   │   └── safety.js
-│   ├── composables/      # Vue composables
+│   │   ├── Blocked.vue
+│   │   ├── ForgotPassword.vue
+│   │   ├── MyReports.vue
+│   │   ├── Notifications.vue
+│   │   ├── ResetPassword.vue
+│   │   ├── Settings.vue
+│   │   ├── VerifyEmail.vue
+│   │   └── admin/              # 管理後台
+│   │       ├── AdminDashboard.vue
+│   │       └── AdminLogin.vue
+│   ├── stores/                 # Pinia stores
+│   │   ├── user.js             # 用戶認證狀態
+│   │   ├── profile.js          # 用戶檔案
+│   │   ├── discovery.js        # 探索/配對
+│   │   ├── chat.js             # 聊天
+│   │   ├── safety.js           # 安全功能
+│   │   ├── notification.js     # 通知
+│   │   └── websocket.js        # WebSocket 狀態
+│   ├── composables/            # Vue composables
 │   │   └── useWebSocket.js
-│   ├── router/           # Vue Router
+│   ├── router/                 # Vue Router
 │   │   └── index.js
-│   └── api/              # API 客戶端
-│       └── axios.js
+│   └── api/                    # API 客戶端
+│       ├── client.js           # Axios 實例
+│       └── auth.js             # 認證 API
 └── vite.config.js
 ```
 
