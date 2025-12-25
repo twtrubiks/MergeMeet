@@ -85,7 +85,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 pip install -r requirements-test.txt
 
-# 複製環境變數
+# 複製環境變數（已預設開發環境密碼 mergemeet123）
 cp .env.example .env
 
 # 執行資料庫遷移（建立表結構）

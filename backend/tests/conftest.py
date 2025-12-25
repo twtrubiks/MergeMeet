@@ -9,6 +9,10 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool
 from sqlalchemy import text
+from dotenv import load_dotenv
+
+# 載入 .env 檔案（讓 os.getenv 可以讀取）
+load_dotenv()
 
 from app.main import app
 from app.core.database import Base, get_db
@@ -16,6 +20,7 @@ from app.services.content_moderation import ContentModerationService
 from app.services.photo_moderation import PhotoModerationService
 
 # 測試資料庫 URL（使用獨立的 PostgreSQL 測試資料庫）
+# 優先從環境變數讀取，預設值僅作為提醒
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
     "postgresql+asyncpg://mergemeet:YOUR_DB_PASSWORD_HERE@localhost:5432/mergemeet_test"

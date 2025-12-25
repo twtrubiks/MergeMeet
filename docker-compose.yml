@@ -5,7 +5,7 @@ services:
     container_name: mergemeet_postgres
     environment:
       POSTGRES_USER: mergemeet
-      POSTGRES_PASSWORD: YOUR_DB_PASSWORD_HERE
+      POSTGRES_PASSWORD: mergemeet123  # TODO: 正式環境請更換為安全密碼
       POSTGRES_DB: mergemeet
     ports:
       - "5432:5432"

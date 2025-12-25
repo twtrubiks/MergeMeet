@@ -5,7 +5,7 @@ import os
 
 class Settings(BaseSettings):
     """應用程式設定"""
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
     # 專案資訊
     PROJECT_NAME: str = "MergeMeet"
@@ -18,8 +18,7 @@ class Settings(BaseSettings):
         "postgresql+asyncpg://mergemeet:YOUR_DB_PASSWORD_HERE@localhost:5432/mergemeet"
     )
 
-    # Redis（目前未使用，保留供未來多伺服器部署時整合）
-    # TODO: 未來可用於 Token 黑名單持久化、Session 共享、快取等
+    # Redis（用於 Token 黑名單、登入限制、信任分數、內容審核快取）
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
     # 環境設定
