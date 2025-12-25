@@ -1,6 +1,6 @@
 # 🎉 MergeMeet 交友平台
 
-基於 FastAPI + Vue 3 的現代化交友平台 MVP
+交友平台 MVP - FastAPI + Vue 3 + PostgreSQL + PostGIS
 
 **特色**：智能配對推薦 ｜ 信任分數機制 ｜ 即時聊天 ｜ Claude Code 整合開發
 
