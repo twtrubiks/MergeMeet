@@ -1619,6 +1619,7 @@ onMounted(() => {
 /* Tab styles */
 .admin-tabs {
   background: white;
+  padding: 0 40px;
 }
 
 .tab-content {
