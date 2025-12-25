@@ -49,6 +49,9 @@ from app.services.trust_score import TrustScoreService
 
 logger = logging.getLogger(__name__)
 
+# 配對分數最低門檻（低於此分數的用戶不會出現在探索列表）
+MIN_MATCH_SCORE = 15.0
+
 router = APIRouter(prefix="/api/discovery", tags=["discovery"])
 
 
@@ -242,7 +245,9 @@ async def browse_users(
             match_score=round(match_score, 1)
         )
 
-        profile_cards.append(profile_card)
+        # 過濾低於門檻的用戶
+        if match_score >= MIN_MATCH_SCORE:
+            profile_cards.append(profile_card)
 
     # 依配對分數排序（高到低）
     profile_cards.sort(key=lambda x: x.match_score or 0, reverse=True)
