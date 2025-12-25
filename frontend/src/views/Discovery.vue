@@ -41,8 +41,8 @@
           <!-- 照片 -->
           <div class="card-image">
             <img
-              v-if="candidate.profile_picture"
-              :src="candidate.profile_picture"
+              v-if="candidate.photos?.length"
+              :src="candidate.photos[0]"
               :alt="candidate.display_name"
               @error="(e) => e.target.src = defaultAvatar"
             >

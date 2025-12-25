@@ -18,8 +18,8 @@
           <div v-if="matchedUser" class="user-info">
             <div class="user-avatar">
               <img
-                v-if="matchedUser.profile_picture"
-                :src="matchedUser.profile_picture"
+                v-if="matchedUser.photos?.length"
+                :src="matchedUser.photos[0]"
                 :alt="matchedUser.display_name"
               >
               <div v-else class="avatar-placeholder">
