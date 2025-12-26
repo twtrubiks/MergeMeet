@@ -81,14 +81,19 @@ class TokenResponse(BaseModel):
 
 
 class RefreshTokenRequest(BaseModel):
-    """刷新 Token 請求"""
+    """刷新 Token 請求
+
+    refresh_token 為可選：
+    - Web 前端：從 HttpOnly Cookie 讀取（發送空 body 或不發送 body）
+    - API 客戶端/移動端：從 request body 提供
+    """
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
         }
     })
 
-    refresh_token: str = Field(..., description="刷新 Token")
+    refresh_token: Optional[str] = Field(None, description="刷新 Token（可選，Web 前端從 Cookie 讀取）")
 
 
 class UserResponse(BaseModel):

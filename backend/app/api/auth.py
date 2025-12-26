@@ -708,11 +708,12 @@ async def refresh_token_endpoint(
         )
     await token_blacklist.add(token, old_expires_at)
 
-    # 生成新的 Token（包含 email 資訊供前端使用）
+    # 生成新的 Token（包含 email 和 is_admin 資訊供前端使用）
     new_access_token, new_refresh_token = _generate_auth_tokens(
         str(user.id),
         email=user.email,
-        email_verified=user.email_verified
+        email_verified=user.email_verified,
+        is_admin=user.is_admin if user.is_admin else None
     )
 
     # 生成 CSRF Token 並設置新 Cookie

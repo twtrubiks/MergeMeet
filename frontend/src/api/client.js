@@ -20,6 +20,19 @@ function getCookie(name) {
   return null
 }
 
+/**
+ * Token 刷新 Mutex
+ *
+ * 防止多個請求同時刷新 Token 導致 Race Condition：
+ * - 當多個請求同時收到 401 時，只有第一個會執行刷新
+ * - 其他請求等待刷新完成後重試
+ * - 避免 Token Rotation 機制導致舊 Token 被 blacklist 後第二個刷新失敗
+ *
+ * 修復：commit 598c2d0 之後發現的 Race Condition bug
+ */
+let refreshPromise = null
+let isRedirectingToLogin = false
+
 // 建立 axios 實例
 const apiClient = axios.create({
   baseURL: '/api',
@@ -70,10 +83,18 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true
 
       try {
-        // 嘗試刷新 Token（Cookie 模式會自動帶 refresh_token Cookie）
-        const response = await axios.post('/api/auth/refresh', {}, {
-          withCredentials: true,
-        })
+        // Mutex：如果已經有刷新請求在進行，等待它完成
+        // 這樣可以避免多個請求同時刷新導致 Token Rotation 失敗
+        if (!refreshPromise) {
+          refreshPromise = axios.post('/api/auth/refresh', {}, {
+            withCredentials: true,
+          }).finally(() => {
+            // 刷新完成後清除 Promise，允許下次刷新
+            refreshPromise = null
+          })
+        }
+
+        const response = await refreshPromise
 
         // 刷新成功後，Cookie 已自動更新
         // 如果響應包含 Token（向後兼容），也存到 localStorage
@@ -84,6 +105,14 @@ apiClient.interceptors.response.use(
           localStorage.setItem('refresh_token', response.data.refresh_token)
         }
 
+        // 通知 Pinia Store 更新狀態（避免循環依賴，使用 CustomEvent）
+        window.dispatchEvent(new CustomEvent('token-refreshed', {
+          detail: {
+            access_token: response.data.access_token,
+            refresh_token: response.data.refresh_token
+          }
+        }))
+
         // 重新發送原本的請求
         return apiClient(originalRequest)
       } catch (refreshError) {
@@ -91,9 +120,13 @@ apiClient.interceptors.response.use(
         localStorage.removeItem('access_token')
         localStorage.removeItem('refresh_token')
 
-        // 顯示提示後再跳轉
-        await showSessionExpiredMessage()
-        window.location.href = '/login'
+        // 只有第一個失敗的請求顯示提示並跳轉
+        // 避免多個請求同時跳轉造成多次提示
+        if (!isRedirectingToLogin) {
+          isRedirectingToLogin = true
+          await showSessionExpiredMessage()
+          window.location.href = '/login'
+        }
 
         return Promise.reject(refreshError)
       }

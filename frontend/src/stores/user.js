@@ -225,6 +225,30 @@ export const useUserStore = defineStore('user', () => {
   }
 
   /**
+   * Base64URL 解碼（JWT 使用 base64url 編碼，非標準 base64）
+   *
+   * JWT 的 base64url 編碼：
+   * - 使用 '-' 代替 '+'
+   * - 使用 '_' 代替 '/'
+   * - 不使用 padding '='
+   *
+   * @param {string} str - Base64URL 編碼的字串
+   * @returns {string} 解碼後的字串
+   */
+  const base64UrlDecode = (str) => {
+    // 將 base64url 轉換為標準 base64
+    let base64 = str.replace(/-/g, '+').replace(/_/g, '/')
+
+    // 補齊 padding
+    const pad = base64.length % 4
+    if (pad) {
+      base64 += '='.repeat(4 - pad)
+    }
+
+    return atob(base64)
+  }
+
+  /**
    * 從 JWT Token 解析用戶資料並初始化
    * is_admin 直接從 token 解析，更安全（無法被用戶偽造）
    */
@@ -236,7 +260,7 @@ export const useUserStore = defineStore('user', () => {
     try {
       // 解析 JWT token (格式: header.payload.signature)
       const payload = accessToken.value.split('.')[1]
-      const decodedPayload = JSON.parse(atob(payload))
+      const decodedPayload = JSON.parse(base64UrlDecode(payload))
 
       // 從 token 提取用戶資訊（包含 is_admin）
       if (decodedPayload.sub) {
@@ -252,6 +276,25 @@ export const useUserStore = defineStore('user', () => {
       // Token 無效，清除
       clearTokens()
     }
+  }
+
+  /**
+   * 監聽 Token 刷新事件
+   *
+   * 當 client.js 自動刷新 Token 成功後，會觸發 'token-refreshed' 事件，
+   * 這裡監聽並更新 Pinia Store 狀態，確保前端狀態與實際 Token 同步。
+   *
+   * 解決問題：Token 刷新後 Pinia Store 不同步
+   */
+  if (typeof window !== 'undefined') {
+    window.addEventListener('token-refreshed', (event) => {
+      const { access_token, refresh_token } = event.detail
+      if (access_token && refresh_token) {
+        saveTokens({ access_token, refresh_token })
+        initializeFromToken()
+        logger.debug('Token refreshed, store updated')
+      }
+    })
   }
 
   return {

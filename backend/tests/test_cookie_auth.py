@@ -5,6 +5,8 @@
 - Bearer Token 向後兼容
 - 登出後 Token 黑名單化
 """
+import base64
+import json
 import pytest
 from datetime import date
 from httpx import AsyncClient
@@ -280,6 +282,35 @@ async def test_refresh_from_cookie(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_refresh_with_empty_body(client: AsyncClient):
+    """測試前端發送空 body 時也能刷新 Token（Cookie 模式）
+
+    前端 axios 發送 {} 而非完全沒有 body，
+    確保 RefreshTokenRequest.refresh_token 為 Optional 時能正常處理。
+
+    回歸測試：修復 commit 598c2d0
+    """
+    # 註冊（Cookie 會自動設置）
+    await client.post("/api/auth/register", json={
+        "email": "empty_body_refresh@example.com",
+        "password": "Password123",
+        "date_of_birth": "1995-01-01"
+    })
+
+    # 發送空 body {}（模擬前端 axios 行為）
+    response = await client.post("/api/auth/refresh", json={})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "access_token" in data
+    assert "refresh_token" in data
+
+    # 新的 Cookie 應該被設置
+    assert "access_token" in response.cookies
+    assert "csrf_token" in response.cookies
+
+
+@pytest.mark.asyncio
 async def test_refresh_rotates_token(client: AsyncClient):
     """測試 Refresh Token 輪換（舊 Token 失效）"""
     # 註冊
@@ -332,6 +363,48 @@ async def test_admin_login_sets_cookies(client: AsyncClient, test_db):
     # 檢查 Cookie 設置
     assert "access_token" in response.cookies
     assert "csrf_token" in response.cookies
+
+
+@pytest.mark.asyncio
+async def test_admin_refresh_preserves_is_admin(client: AsyncClient, test_db):
+    """測試管理員刷新 Token 後保留 is_admin 權限
+
+    回歸測試：修復 commit 3502da8 漏掉在 refresh endpoint 傳遞 is_admin
+    """
+    # 建立管理員用戶
+    admin_user = User(
+        email="admin_refresh@example.com",
+        password_hash=get_password_hash("AdminPass123"),
+        date_of_birth=date(1990, 1, 1),
+        is_admin=True,
+        is_active=True,
+        email_verified=True
+    )
+    test_db.add(admin_user)
+    await test_db.commit()
+
+    # 管理員登入
+    login_response = await client.post("/api/auth/admin-login", json={
+        "email": "admin_refresh@example.com",
+        "password": "AdminPass123"
+    })
+
+    assert login_response.status_code == 200
+    old_token = login_response.json()["access_token"]
+
+    # 解析舊 Token，確認有 is_admin
+    old_payload = json.loads(base64.urlsafe_b64decode(old_token.split('.')[1] + '=='))
+    assert old_payload.get("is_admin") is True
+
+    # 刷新 Token
+    refresh_response = await client.post("/api/auth/refresh")
+
+    assert refresh_response.status_code == 200
+    new_token = refresh_response.json()["access_token"]
+
+    # 解析新 Token，確認 is_admin 仍然存在
+    new_payload = json.loads(base64.urlsafe_b64decode(new_token.split('.')[1] + '=='))
+    assert new_payload.get("is_admin") is True, "刷新後的 Token 應該保留 is_admin=True"
 
 
 # ==================== 邊界情況測試 ====================
