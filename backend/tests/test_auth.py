@@ -243,7 +243,8 @@ async def test_resend_verification(client: AsyncClient):
     )
 
     assert response.status_code == 200
-    assert "重新發送" in response.json()["message"]
+    # 訊息格式已更新為防止用戶枚舉的模糊訊息
+    assert "已註冊" in response.json()["message"] or "已發送" in response.json()["message"]
 
 
 @pytest.mark.asyncio
@@ -256,6 +257,61 @@ async def test_resend_verification_invalid_email_format(client: AsyncClient):
 
     # Pydantic EmailStr 驗證應返回 422
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_resend_verification_nonexistent_email_no_leak(client: AsyncClient):
+    """測試重新發送驗證碼 - 不存在的 email 不洩露資訊（防止用戶枚舉）"""
+    response = await client.post(
+        "/api/auth/resend-verification",
+        json={"email": "nonexistent_user_12345@example.com"}
+    )
+
+    # 應返回 200 而非 404（防止攻擊者探測 email 是否存在）
+    assert response.status_code == 200
+    assert "已註冊" in response.json()["message"]
+
+
+@pytest.mark.asyncio
+async def test_resend_verification_already_verified_no_leak(client: AsyncClient, db_session: AsyncSession):
+    """測試重新發送驗證碼 - 已驗證的 email 不洩露資訊"""
+    # 註冊用戶
+    await client.post("/api/auth/register", json={
+        "email": "verified_user@example.com",
+        "password": "Password123",
+        "date_of_birth": "1995-01-01"
+    })
+
+    # 手動設置為已驗證
+    result = await db_session.execute(
+        select(User).where(User.email == "verified_user@example.com")
+    )
+    user = result.scalar_one()
+    user.email_verified = True
+    await db_session.commit()
+
+    # 重新發送驗證碼
+    response = await client.post(
+        "/api/auth/resend-verification",
+        json={"email": "verified_user@example.com"}
+    )
+
+    # 應返回 200 而非 400（防止攻擊者探測 email 驗證狀態）
+    assert response.status_code == 200
+    assert "已註冊" in response.json()["message"]
+
+
+@pytest.mark.asyncio
+async def test_verify_email_nonexistent_user_no_leak(client: AsyncClient):
+    """測試驗證 Email - 不存在的用戶不洩露資訊（防止用戶枚舉）"""
+    response = await client.post("/api/auth/verify-email", json={
+        "email": "nonexistent_verify_12345@example.com",
+        "verification_code": "123456"
+    })
+
+    # 應返回 400 而非 404，且訊息與驗證碼錯誤相同
+    assert response.status_code == 400
+    assert "驗證碼" in response.json()["detail"]
 
 
 # ==================== 密碼修改功能測試 ====================
@@ -769,15 +825,15 @@ async def test_reset_password_invalidates_tokens(client: AsyncClient, db_session
     user.password_reset_expires = datetime.now(timezone.utc) + timedelta(hours=1)
     await db_session.commit()
 
+    # 等待一秒確保 Token iat 早於失效時間戳（秒級精度）
+    await asyncio.sleep(1)
+
     # 執行密碼重置
     reset_response = await client.post("/api/auth/reset-password", json={
         "token": reset_token,
         "new_password": "NewPassword456"
     })
     assert reset_response.status_code == 200
-
-    # 等待一秒確保時間戳不同（Token iat 使用秒級精度）
-    await asyncio.sleep(1)
 
     # 使用舊 Token 嘗試登出應該失敗（Token 已失效）
     async with AsyncClient(app=app, base_url="http://test") as new_client:

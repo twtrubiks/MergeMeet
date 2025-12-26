@@ -851,9 +851,10 @@ async def verify_email(
     user = result.scalar_one_or_none()
 
     if not user:
+        # 安全考量：返回與驗證碼錯誤相同的訊息，防止用戶枚舉
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="用戶不存在"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="驗證碼錯誤或已過期"
         )
 
     user.email_verified = True
@@ -885,13 +886,18 @@ async def resend_verification(
     重新發送驗證碼
 
     - 檢查速率限制（60 秒冷卻 + 每日 5 次限制）
-    - 檢查用戶是否存在
     - 生成新的驗證碼
-    - 模擬發送 Email
+    - 發送 Email
+
+    安全設計：
+    - 無論用戶是否存在，都返回相同訊息（防止用戶枚舉）
     """
     email = request.email
     # 檢查速率限制（會自動拋出 HTTPException 如果超過限制）
     await check_email_rate_limit(email)
+
+    # 統一回應訊息（防止用戶枚舉）
+    success_message = {"message": "如果該信箱已註冊且未驗證，驗證碼已發送", "email": email}
 
     # 檢查用戶
     result = await db.execute(
@@ -899,17 +905,14 @@ async def resend_verification(
     )
     user = result.scalar_one_or_none()
 
+    # 用戶不存在或已驗證，直接返回成功訊息（不洩露資訊）
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="用戶不存在"
-        )
+        logger.info(f"Resend verification requested for non-existent email: {mask_email(email)}")
+        return success_message
 
     if user.email_verified:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email 已驗證"
-        )
+        logger.info(f"Resend verification requested for already verified email: {mask_email(email)}")
+        return success_message
 
     # 生成新的驗證碼並發送 Email
     verification_code = generate_verification_code()
@@ -928,10 +931,7 @@ async def resend_verification(
     else:
         logger.error(f"Failed to resend verification email to {mask_email(email)}")
 
-    return {
-        "message": "驗證碼已重新發送",
-        "email": email
-    }
+    return success_message
 
 
 @router.post("/forgot-password", response_model=dict)
