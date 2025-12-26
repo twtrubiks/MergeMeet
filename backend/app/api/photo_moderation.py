@@ -2,8 +2,8 @@
 
 管理員用於審核用戶上傳的照片。
 """
-import uuid
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -135,7 +135,7 @@ async def get_photo_stats(
 
 @router.get("/{photo_id}")
 async def get_photo_detail(
-    photo_id: str,
+    photo_id: UUID,
     current_admin: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -144,15 +144,8 @@ async def get_photo_detail(
 
     返回照片的完整資訊，包含審核歷史。
     """
-    try:
-        photo_uuid = uuid.UUID(photo_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="無效的照片 ID 格式"
-        )
-
-    photo_detail = await PhotoModerationService.get_photo_detail(db, photo_uuid)
+    # FastAPI 自動驗證 UUID 格式，無效的 UUID 會返回 422 錯誤
+    photo_detail = await PhotoModerationService.get_photo_detail(db, photo_id)
 
     if not photo_detail:
         raise HTTPException(
@@ -165,7 +158,7 @@ async def get_photo_detail(
 
 @router.post("/{photo_id}/review", response_model=PhotoReviewResponse)
 async def review_photo(
-    photo_id: str,
+    photo_id: UUID,
     request: PhotoReviewRequest,
     current_admin: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db)
@@ -176,13 +169,7 @@ async def review_photo(
     - APPROVED: 通過審核
     - REJECTED: 拒絕（需提供原因，會扣除用戶信任分數）
     """
-    try:
-        photo_uuid = uuid.UUID(photo_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="無效的照片 ID 格式"
-        )
+    # FastAPI 自動驗證 UUID 格式，無效的 UUID 會返回 422 錯誤
 
     # 驗證拒絕時必須提供原因
     if request.status == "REJECTED" and not request.rejection_reason:
@@ -193,7 +180,7 @@ async def review_photo(
 
     success, message = await PhotoModerationService.review_photo(
         db=db,
-        photo_id=photo_uuid,
+        photo_id=photo_id,
         admin_id=current_admin.id,
         status=request.status,
         rejection_reason=request.rejection_reason
@@ -208,6 +195,6 @@ async def review_photo(
     return PhotoReviewResponse(
         success=True,
         message=message,
-        photo_id=photo_id,
+        photo_id=str(photo_id),
         status=request.status
     )

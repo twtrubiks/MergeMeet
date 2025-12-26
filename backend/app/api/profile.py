@@ -357,14 +357,8 @@ async def update_interests(
             detail="個人檔案不存在，請先建立"
         )
 
-    # 轉換字串 ID 為 UUID 對象
-    try:
-        interest_uuids = [uuid.UUID(id_str) for id_str in request.interest_ids]
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="無效的標籤 ID 格式"
-        )
+    # UUID 格式已在 Schema 層驗證，這裡直接轉換
+    interest_uuids = [uuid.UUID(id_str) for id_str in request.interest_ids]
 
     # 驗證所有標籤都存在
     result = await db.execute(

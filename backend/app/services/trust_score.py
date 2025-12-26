@@ -168,8 +168,8 @@ class TrustScoreService:
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         key = f"trust:daily_messages:{user_id}:{today}"
 
-        count_bytes = await redis.get(key)
-        current_count = int(count_bytes) if count_bytes else 0
+        count_str = await redis.get(key)
+        current_count = int(count_str) if count_str else 0
 
         remaining = cls.LOW_TRUST_MESSAGE_LIMIT - current_count
         can_send = remaining > 0

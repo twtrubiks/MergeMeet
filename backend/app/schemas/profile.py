@@ -3,6 +3,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, ValidationIn
 from datetime import datetime
 from typing import Optional, List
 from enum import Enum
+import uuid as uuid_module
 
 
 class GenderEnum(str, Enum):
@@ -197,6 +198,19 @@ class UpdateInterestsRequest(BaseModel):
     })
 
     interest_ids: List[str] = Field(..., min_length=3, max_length=10, description="興趣標籤 ID 列表（3-10個）")
+
+    @field_validator('interest_ids')
+    @classmethod
+    def validate_uuid_list(cls, v: List[str]) -> List[str]:
+        """驗證每個 ID 都是有效的 UUID 格式"""
+        for id_str in v:
+            if id_str is None:
+                raise ValueError("標籤 ID 不能為空")
+            try:
+                uuid_module.UUID(id_str)
+            except (ValueError, TypeError):
+                raise ValueError(f"無效的標籤 ID 格式: {id_str}")
+        return v
 
 
 class PhotoOrderRequest(BaseModel):

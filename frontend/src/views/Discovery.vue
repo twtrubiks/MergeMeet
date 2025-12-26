@@ -172,6 +172,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useMessage } from 'naive-ui'
 import { useDiscoveryStore } from '@/stores/discovery'
 import MatchModal from '@/components/MatchModal.vue'
 import ReportModal from '@/components/ReportModal.vue'
@@ -180,6 +181,7 @@ import HeartLoader from '@/components/ui/HeartLoader.vue'
 import { throttle } from '@/utils/helpers'
 import { logger } from '@/utils/logger'
 
+const message = useMessage()
 const discoveryStore = useDiscoveryStore()
 
 // 預設頭像（圖片加載失敗時使用）
@@ -288,6 +290,8 @@ const _handleLike = async () => {
       }
     } catch (error) {
       logger.error('喜歡操作失敗:', error)
+      // 使用 store 已解析的錯誤訊息（避免重複解析）
+      message.error(discoveryStore.error || '操作失敗，請稍後再試')
     } finally {
       isAnimating.value = false
     }
@@ -316,6 +320,8 @@ const _handlePass = async () => {
       }
     } catch (error) {
       logger.error('跳過操作失敗:', error)
+      // 使用 store 已解析的錯誤訊息（避免重複解析）
+      message.error(discoveryStore.error || '操作失敗，請稍後再試')
     } finally {
       isAnimating.value = false
     }

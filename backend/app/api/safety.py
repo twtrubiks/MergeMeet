@@ -205,14 +205,8 @@ async def report_user(
     - 不能舉報自己
     - 需提供舉報原因（至少 10 字）
     """
-    # 在函數開頭統一轉換和驗證用戶 ID 格式
-    try:
-        reported_user_uuid = uuid.UUID(request.reported_user_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="無效的用戶 ID 格式"
-        )
+    # UUID 格式已在 Schema 層驗證，這裡直接轉換
+    reported_user_uuid = uuid.UUID(request.reported_user_id)
 
     # 驗證不能舉報自己（使用統一的 UUID 類型）
     if current_user.id == reported_user_uuid:

@@ -258,7 +258,8 @@ class TestGetPhotoDetailAPI:
             headers={"Authorization": f"Bearer {admin_token}"}
         )
 
-        assert response.status_code == 400
+        # FastAPI 使用 UUID 類型註解，無效 UUID 會返回 422 Validation Error
+        assert response.status_code == 422
 
 
 @pytest.mark.asyncio
