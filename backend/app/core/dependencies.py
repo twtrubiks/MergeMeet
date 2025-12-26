@@ -9,6 +9,7 @@ from app.core.database import get_db
 from app.core.security import decode_token
 from app.models.user import User
 from app.services.token_blacklist import token_blacklist
+from app.services.token_invalidator import TokenInvalidator
 
 # 可選的 Bearer Token（用於支援雙模式認證）
 security = HTTPBearer(auto_error=False)
@@ -131,6 +132,15 @@ async def get_current_user(
     # 解碼並驗證 Token
     payload = decode_token(token)
     user_id = _validate_token_payload(payload)
+
+    # 檢查 Token 是否被全局失效（密碼重置後）
+    token_iat = payload.get("iat", 0)
+    if not await TokenInvalidator.is_token_valid(user_id, token_iat):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token 已失效（密碼已變更），請重新登入",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     # 從資料庫查詢用戶
     result = await db.execute(

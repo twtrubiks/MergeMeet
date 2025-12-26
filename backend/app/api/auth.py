@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from datetime import date, datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta
-import random
+import secrets
 import string
 import asyncio
 import logging
@@ -39,6 +39,7 @@ from app.schemas.auth import (
     TokenResponse,
     RefreshTokenRequest,
     EmailVerificationRequest,
+    ResendVerificationRequest,
     ForgotPasswordRequest,
     ResetPasswordRequest,
     VerifyResetTokenResponse,
@@ -49,9 +50,10 @@ from app.services.token_blacklist import token_blacklist
 from app.services.email import EmailService
 from app.services.redis_client import get_redis
 from app.services.login_limiter import LoginLimiter
+from app.services.verification_limiter import VerificationLimiter
 from app.services.trust_score import TrustScoreService
+from app.services.token_invalidator import TokenInvalidator
 import redis.asyncio as aioredis
-import secrets
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -314,8 +316,8 @@ async def check_email_rate_limit(email: str) -> bool:
 
 
 def generate_verification_code() -> str:
-    """生成 6 位數驗證碼"""
-    return ''.join(random.choices(string.digits, k=6))
+    """生成 6 位數驗證碼（使用加密安全隨機數）"""
+    return ''.join(secrets.choice(string.digits) for _ in range(6))
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -787,14 +789,30 @@ async def logout(
 @router.post("/verify-email", response_model=dict)
 async def verify_email(
     request: EmailVerificationRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    redis_conn: aioredis.Redis = Depends(get_redis)
 ):
     """
     驗證 Email
 
+    - 檢查暴力破解防護（5 次失敗後鎖定 15 分鐘）
     - 檢查驗證碼是否正確
     - 更新用戶的 email_verified 狀態
     """
+    limiter = VerificationLimiter(redis_conn)
+
+    # 檢查是否被鎖定
+    limit_status = await limiter.check_status(request.email)
+    if limit_status.is_locked:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"驗證嘗試次數過多，請等待 {limit_status.lockout_seconds // 60} 分鐘後再試",
+            headers={
+                "X-RateLimit-Remaining": "0",
+                "X-Lockout-Seconds": str(limit_status.lockout_seconds)
+            }
+        )
+
     # 檢查驗證碼
     stored_code = await verification_codes.get(request.email)
 
@@ -805,10 +823,26 @@ async def verify_email(
         )
 
     if stored_code != request.verification_code:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="驗證碼錯誤"
-        )
+        # 記錄失敗並獲取更新狀態
+        attempt_result = await limiter.record_failure(request.email)
+
+        if attempt_result.is_locked:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="驗證嘗試次數過多，請等待 15 分鐘後再試",
+                headers={
+                    "X-RateLimit-Remaining": "0",
+                    "X-Lockout-Seconds": str(attempt_result.lockout_seconds)
+                }
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"驗證碼錯誤，剩餘 {attempt_result.remaining_attempts} 次嘗試機會",
+                headers={
+                    "X-RateLimit-Remaining": str(attempt_result.remaining_attempts)
+                }
+            )
 
     # 更新用戶狀態
     result = await db.execute(
@@ -824,6 +858,9 @@ async def verify_email(
 
     user.email_verified = True
     await db.commit()
+
+    # 驗證成功，清除嘗試記錄
+    await limiter.clear_attempts(request.email)
 
     # 信任分數加分：Email 驗證完成 +5
     await TrustScoreService.adjust_score(db, user.id, "email_verified")
@@ -841,7 +878,7 @@ async def verify_email(
 
 @router.post("/resend-verification", response_model=dict)
 async def resend_verification(
-    email: str,
+    request: ResendVerificationRequest,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -852,6 +889,7 @@ async def resend_verification(
     - 生成新的驗證碼
     - 模擬發送 Email
     """
+    email = request.email
     # 檢查速率限制（會自動拋出 HTTPException 如果超過限制）
     await check_email_rate_limit(email)
 
@@ -989,7 +1027,8 @@ async def verify_reset_token(
 
         return VerifyResetTokenResponse(valid=False, email=None)
 
-    return VerifyResetTokenResponse(valid=True, email=user.email)
+    # 返回遮罩 email 避免洩露完整地址
+    return VerifyResetTokenResponse(valid=True, email=mask_email(user.email))
 
 
 @router.post("/reset-password", response_model=dict)
@@ -1035,6 +1074,9 @@ async def reset_password(
     user.password_reset_expires = None
 
     await db.commit()
+
+    # 使該用戶所有現有 Token 失效（強制重新登入）
+    await TokenInvalidator.invalidate_all_tokens(str(user.id))
 
     logger.info(f"Password reset successful for user: {mask_email(user.email)}")
 

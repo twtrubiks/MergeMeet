@@ -84,7 +84,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
             + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         )
 
-    to_encode.update({"exp": expire, "type": "access"})
+    # iat (issued at) 用於 Token 全局失效檢查（密碼重置後）
+    iat = int(datetime.now(timezone.utc).timestamp())
+    to_encode.update({"exp": expire, "type": "access", "iat": iat})
 
     encoded_jwt = jwt.encode(
         to_encode,
@@ -108,7 +110,9 @@ def create_refresh_token(data: dict) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
-    to_encode.update({"exp": expire, "type": "refresh"})
+    # iat (issued at) 用於 Token 全局失效檢查（密碼重置後）
+    iat = int(datetime.now(timezone.utc).timestamp())
+    to_encode.update({"exp": expire, "type": "refresh", "iat": iat})
 
     encoded_jwt = jwt.encode(
         to_encode,

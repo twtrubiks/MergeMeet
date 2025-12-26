@@ -130,6 +130,17 @@ class EmailVerificationRequest(BaseModel):
     verification_code: str = Field(..., min_length=6, max_length=6, description="6 位數驗證碼")
 
 
+class ResendVerificationRequest(BaseModel):
+    """重新發送驗證碼請求"""
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "email": "user@example.com"
+        }
+    })
+
+    email: EmailStr = Field(..., description="Email 地址")
+
+
 class ForgotPasswordRequest(BaseModel):
     """忘記密碼請求"""
     model_config = ConfigDict(json_schema_extra={
@@ -180,12 +191,12 @@ class VerifyResetTokenResponse(BaseModel):
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "valid": True,
-            "email": "user@example.com"
+            "email": "us***r@example.com"
         }
     })
 
     valid: bool = Field(..., description="Token 是否有效")
-    email: Optional[str] = Field(None, description="關聯的 Email（僅當 valid=True 時返回）")
+    email: Optional[str] = Field(None, description="關聯的遮罩 Email（僅當 valid=True 時返回，格式: us***r@example.com）")
 
 
 class ChangePasswordRequest(BaseModel):

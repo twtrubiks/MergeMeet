@@ -36,30 +36,25 @@ def event_loop():
 
 
 @pytest.fixture(scope="function")
-async def test_db() -> AsyncGenerator[AsyncSession, None]:
-    """測試資料庫 Session"""
+async def db_session() -> AsyncGenerator[AsyncSession, None]:
+    """測試資料庫 Session（主要使用名稱）"""
     # 建立測試引擎
     engine = create_async_engine(
         TEST_DATABASE_URL,
         echo=False,
-        poolclass=NullPool,  # 測試環境不使用連接池
+        poolclass=NullPool,
     )
 
-    # 建立所有表格（包含 PostGIS 擴展）
     async with engine.begin() as conn:
-        # 確保 PostGIS 擴展已啟用
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
         await conn.run_sync(Base.metadata.create_all)
 
-    # 建立 Session
     TestSessionLocal = async_sessionmaker(
         engine,
         class_=AsyncSession,
         expire_on_commit=False,
     )
 
-    # 注入測試 session factory 到審核服務
-    # 確保 _log_moderation() 使用測試資料庫而非正式資料庫
     ContentModerationService.set_session_factory(TestSessionLocal)
     PhotoModerationService.set_session_factory(TestSessionLocal)
 
@@ -67,15 +62,19 @@ async def test_db() -> AsyncGenerator[AsyncSession, None]:
         yield session
         await session.rollback()
 
-    # 重設 session factory
     ContentModerationService.reset_session_factory()
     PhotoModerationService.reset_session_factory()
 
-    # 清理（刪除所有表格）
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
     await engine.dispose()
+
+
+@pytest.fixture(scope="function")
+async def test_db(db_session: AsyncSession) -> AsyncGenerator[AsyncSession, None]:
+    """測試資料庫 Session（別名，向後兼容）"""
+    yield db_session
 
 
 @pytest.fixture(scope="function")

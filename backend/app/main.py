@@ -21,6 +21,7 @@ from app.websocket.manager import manager
 from app.services.redis_client import redis_client, get_redis
 from app.services.token_blacklist import token_blacklist
 from app.services.content_moderation import ContentModerationService
+from app.services.token_invalidator import TokenInvalidator
 from app.api.auth import verification_codes
 from app.api import auth, profile, discovery, safety, websocket, messages, admin, moderation, notifications, photo_moderation
 
@@ -48,7 +49,10 @@ async def lifespan(app: FastAPI):
         # 設置內容審核服務 Redis 連線
         await ContentModerationService.set_redis(redis_conn)
 
-        logger.info("✅ Redis 已整合至 Token 黑名單、驗證碼存儲、內容審核快取")
+        # 設置 Token 全局失效服務 Redis 連線
+        TokenInvalidator.set_redis(redis_conn)
+
+        logger.info("✅ Redis 已整合至 Token 黑名單、驗證碼存儲、內容審核快取、Token 失效服務")
     except Exception as e:
         logger.warning(f"⚠️ Redis 連線失敗，服務將使用內存回退模式: {e}")
 

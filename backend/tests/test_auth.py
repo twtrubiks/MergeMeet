@@ -1,12 +1,19 @@
 """認證 API 測試"""
+import asyncio
 import pytest
+import secrets
+import uuid
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import date
+from sqlalchemy import select
+from datetime import date, datetime, timedelta, timezone
 
 from app.main import app
 from app.models.user import User
-from app.api.auth import verification_codes
+from app.core.security import get_password_hash, decode_token
+from app.api.auth import verification_codes, generate_verification_code
+from app.services.token_invalidator import TokenInvalidator
+from app.services.redis_client import get_redis
 
 
 @pytest.mark.asyncio
@@ -229,14 +236,26 @@ async def test_resend_verification(client: AsyncClient):
         "date_of_birth": "1995-01-01"
     })
 
-    # 重新發送驗證碼
+    # 重新發送驗證碼（使用 JSON body）
     response = await client.post(
         "/api/auth/resend-verification",
-        params={"email": "resend@example.com"}
+        json={"email": "resend@example.com"}
     )
 
     assert response.status_code == 200
     assert "重新發送" in response.json()["message"]
+
+
+@pytest.mark.asyncio
+async def test_resend_verification_invalid_email_format(client: AsyncClient):
+    """測試重新發送驗證碼 - 無效 email 格式被拒絕"""
+    response = await client.post(
+        "/api/auth/resend-verification",
+        json={"email": "not-a-valid-email"}
+    )
+
+    # Pydantic EmailStr 驗證應返回 422
+    assert response.status_code == 422
 
 
 # ==================== 密碼修改功能測試 ====================
@@ -582,3 +601,191 @@ async def test_change_password_invalid_token(client: AsyncClient):
         )
 
         assert response.status_code == 401
+
+
+# ==================== 密碼重置功能測試 ====================
+
+
+@pytest.mark.asyncio
+async def test_forgot_password(client: AsyncClient):
+    """測試忘記密碼 - 發送重置郵件"""
+    # 先註冊
+    await client.post("/api/auth/register", json={
+        "email": "forgot@example.com",
+        "password": "Password123",
+        "date_of_birth": "1995-01-01"
+    })
+
+    # 請求密碼重置
+    response = await client.post(
+        "/api/auth/forgot-password",
+        json={"email": "forgot@example.com"}
+    )
+
+    assert response.status_code == 200
+    # 不透露 email 是否存在
+    assert "如果" in response.json()["message"]
+
+
+@pytest.mark.asyncio
+async def test_forgot_password_nonexistent_email(client: AsyncClient):
+    """測試忘記密碼 - 不存在的 email 也返回相同訊息（防止枚舉）"""
+    response = await client.post(
+        "/api/auth/forgot-password",
+        json={"email": "nonexistent@example.com"}
+    )
+
+    # 應該返回成功（防止 email 枚舉）
+    assert response.status_code == 200
+    assert "如果" in response.json()["message"]
+
+
+@pytest.mark.asyncio
+async def test_verify_reset_token_returns_masked_email(client: AsyncClient, db_session: AsyncSession):
+    """測試驗證重置 Token 返回遮罩 email"""
+    # 直接創建用戶並設置重置 token
+    reset_token = secrets.token_urlsafe(32)
+    user = User(
+        email="resettest@example.com",
+        password_hash=get_password_hash("Password123"),
+        date_of_birth=date(1995, 1, 1),
+        password_reset_token=reset_token,
+        password_reset_expires=datetime.now(timezone.utc) + timedelta(hours=1)
+    )
+    db_session.add(user)
+    await db_session.commit()
+
+    # 驗證 token
+    response = await client.get(
+        "/api/auth/verify-reset-token",
+        params={"token": reset_token}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["valid"] is True
+    # 確認 email 已被遮罩（不是完整 email）
+    assert data["email"] is not None
+    assert "***" in data["email"]
+    assert data["email"] != "resettest@example.com"
+
+
+@pytest.mark.asyncio
+async def test_verify_reset_token_invalid(client: AsyncClient):
+    """測試驗證無效的重置 Token"""
+    response = await client.get(
+        "/api/auth/verify-reset-token",
+        params={"token": "invalid_token_here"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["valid"] is False
+    assert data["email"] is None
+
+
+# ==================== 驗證碼生成測試 ====================
+
+
+@pytest.mark.asyncio
+async def test_verification_code_format():
+    """測試驗證碼格式（6 位數字）"""
+    for _ in range(10):
+        code = generate_verification_code()
+        assert len(code) == 6
+        assert code.isdigit()
+
+
+# ==================== 驗證碼暴力破解防護測試 ====================
+
+
+@pytest.mark.asyncio
+async def test_verify_email_rate_limit(client: AsyncClient):
+    """測試驗證碼嘗試次數限制（5 次失敗後鎖定）"""
+    # 使用唯一 email 避免與其他測試衝突
+    unique_email = f"ratelimit_{uuid.uuid4().hex[:8]}@example.com"
+
+    # 先註冊
+    await client.post("/api/auth/register", json={
+        "email": unique_email,
+        "password": "Password123",
+        "date_of_birth": "1995-01-01"
+    })
+
+    # 嘗試 5 次錯誤驗證碼
+    for i in range(5):
+        response = await client.post("/api/auth/verify-email", json={
+            "email": unique_email,
+            "verification_code": "000000"
+        })
+        if i < 4:
+            assert response.status_code == 400, f"Attempt {i+1}: {response.json()}"
+            assert "剩餘" in response.json()["detail"]
+        else:
+            # 第 5 次應該觸發鎖定
+            assert response.status_code == 429, f"Attempt {i+1}: {response.json()}"
+            assert "嘗試次數過多" in response.json()["detail"]
+
+    # 被鎖定後再次嘗試應該返回 429
+    response = await client.post("/api/auth/verify-email", json={
+        "email": unique_email,
+        "verification_code": "123456"
+    })
+    assert response.status_code == 429
+
+
+# ==================== 密碼重置 Token 失效測試 ====================
+
+
+@pytest.mark.asyncio
+async def test_reset_password_invalidates_tokens(client: AsyncClient, db_session: AsyncSession):
+    """測試密碼重置後舊 Token 失效"""
+    # 使用唯一 email 避免與其他測試衝突
+    unique_email = f"resetinvalidate_{uuid.uuid4().hex[:8]}@example.com"
+
+    # 初始化 TokenInvalidator（測試環境）
+    try:
+        redis_conn = await get_redis()
+        TokenInvalidator.set_redis(redis_conn)
+    except Exception:
+        pytest.skip("Redis not available")
+
+    # 註冊並取得 Token
+    register_response = await client.post("/api/auth/register", json={
+        "email": unique_email,
+        "password": "Password123",
+        "date_of_birth": "1995-01-01"
+    })
+    assert register_response.status_code == 201
+    old_token = register_response.json()["access_token"]
+
+    # 設置密碼重置 Token
+    reset_token = secrets.token_urlsafe(32)
+    result = await db_session.execute(
+        select(User).where(User.email == unique_email)
+    )
+    user = result.scalar_one()
+    user.password_reset_token = reset_token
+    user.password_reset_expires = datetime.now(timezone.utc) + timedelta(hours=1)
+    await db_session.commit()
+
+    # 執行密碼重置
+    reset_response = await client.post("/api/auth/reset-password", json={
+        "token": reset_token,
+        "new_password": "NewPassword456"
+    })
+    assert reset_response.status_code == 200
+
+    # 等待一秒確保時間戳不同（Token iat 使用秒級精度）
+    await asyncio.sleep(1)
+
+    # 使用舊 Token 嘗試登出應該失敗（Token 已失效）
+    async with AsyncClient(app=app, base_url="http://test") as new_client:
+        logout_response = await new_client.post(
+            "/api/auth/logout",
+            headers={"Authorization": f"Bearer {old_token}"}
+        )
+        assert logout_response.status_code == 401, (
+            f"Expected 401, got {logout_response.status_code}: {logout_response.json()}"
+        )
+        assert "密碼已變更" in logout_response.json()["detail"]
