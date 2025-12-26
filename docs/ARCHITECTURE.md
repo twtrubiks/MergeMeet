@@ -446,7 +446,7 @@ if profile.location is None:
 ├── test_redis_integration.py - Redis 整合測試
 └── test_main.py - 主程式測試
 
-總計: 351 個測試案例
+總計: 364 個測試案例
 覆蓋率: >80%
 ```
 
@@ -528,8 +528,8 @@ pytest -m unit              # 特定標記
 
 ---
 
-**文檔版本：** 2.7.0
-**最後更新：** 2025-12-25
+**文檔版本：** 2.8.0
+**最後更新：** 2025-12-26
 **維護者：** MergeMeet Development Team
 
 ---

@@ -7,7 +7,7 @@
 MergeMeet 支援兩種認證方式，優先使用 HttpOnly Cookie 提供更高安全性。
 
 **主要認證方式：HttpOnly Cookie（推薦）**
-- Access Token: 180 分鐘（3 小時）有效期
+- Access Token: 30 分鐘有效期
 - Refresh Token: 30 天有效期
 - 存儲位置: HttpOnly Cookie（防止 XSS 攻擊）
 - 傳輸方式: 瀏覽器自動攜帶 Cookie + CSRF Token Header
@@ -30,6 +30,7 @@ MergeMeet 支援兩種認證方式，優先使用 HttpOnly Cookie 提供更高�
 | `email` | 用戶 Email | `"user@example.com"` |
 | `email_verified` | Email 驗證狀態 | `true` |
 | `is_admin` | 管理員權限（僅管理員登入時包含） | `true` |
+| `iat` | Token 簽發時間（用於全局失效檢查） | `1766576000` |
 | `exp` | Token 過期時間 | `1766576028` |
 | `type` | Token 類型 | `"access"` |
 
@@ -183,9 +184,22 @@ COOKIE_DOMAIN = ".mergemeet.com"  # 允許子域名
    - 函數定義: `backend/app/core/utils.py:4` (`mask_email`)
    - 使用位置: `backend/app/api/admin.py:155,157`
 
-2. **最小權限原則**
+2. **Email 枚舉防護**
+   - 驗證碼錯誤與用戶不存在返回相同錯誤訊息
+   - 重新發送驗證碼無論用戶是否存在都返回成功
+   - 已驗證的 Email 重新發送也返回成功（不洩露驗證狀態）
+   - 防止攻擊者透過錯誤訊息探測有效 Email
+
+3. **密碼重置後 Token 全局失效**
+   - 密碼變更後使該用戶所有現有 Token 失效
+   - 使用 Redis 記錄失效時間戳（TTL: 7 天）
+   - Token 驗證時檢查 `iat` 是否早於失效時間
+   - 文件: `backend/app/services/token_invalidator.py`
+
+4. **最小權限原則**
    - 普通用戶無法查看其他用戶的完整 email
    - 只有管理員可以查看（且經過脫敏）
+   - 密碼重置驗證返回遮罩 email（如 `us***@example.com`）
 
 ---
 
@@ -218,7 +232,13 @@ COOKIE_DOMAIN = ".mergemeet.com"  # 允許子域名
    - 5 次失敗後鎖定 15 分鐘
    - 文件: `backend/app/services/login_limiter.py`
 
-2. **低信任用戶訊息限制**
+2. **驗證碼暴力破解防護**
+   - 使用 Redis 追蹤驗證失敗次數
+   - 5 次失敗後鎖定 15 分鐘
+   - 成功驗證後自動清除計數
+   - 文件: `backend/app/services/verification_limiter.py`
+
+3. **低信任用戶訊息限制**
    - 信任分數 < 20 的用戶每日限 20 則訊息
    - 使用 Redis 追蹤發送次數
    - 文件: `backend/app/services/trust_score.py`
@@ -227,7 +247,6 @@ COOKIE_DOMAIN = ".mergemeet.com"  # 允許子域名
 
 - [ ] API 全域速率限制（需實作）
 - [ ] IP 黑名單機制
-- [ ] 防止暴力破解
 
 ---
 
@@ -303,6 +322,10 @@ MergeMeet 使用信任分數系統自動追蹤用戶行為，維護平台安全�
 - [x] 內容審核系統
 - [x] 輸入長度限制
 - [x] 登入失敗次數限制（Redis，5 次/15 分鐘）
+- [x] 驗證碼暴力破解防護（Redis，5 次/15 分鐘）
+- [x] 密碼重置後 Token 全局失效（Redis）
+- [x] Email 枚舉防護
+- [x] 驗證碼使用加密安全隨機數生成（secrets.choice）
 - [x] 信任分數系統（自動行為監控 + 功能限制）
 
 ### ⚠️ 建議改進
@@ -342,5 +365,5 @@ MergeMeet 使用信任分數系統自動追蹤用戶行為，維護平台安全�
 
 ---
 
-**最後更新**: 2025-12-25
-**版本**: 2.2.0（修正行號引用、更新心跳超時時間、補充密碼預處理說明）
+**最後更新**: 2025-12-26
+**版本**: 2.3.0（新增驗證碼暴力破解防護、Token 全局失效、Email 枚舉防護、更新 Access Token 有效期）

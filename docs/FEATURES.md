@@ -9,8 +9,12 @@
 - Email 驗證（Mailpit 真實郵件發送）
 - 密碼重置功能（忘記密碼 / 重設密碼）
 - 登入失敗次數限制（5 次失敗後鎖定 15 分鐘，使用 Redis）
-- Token 刷新機制
-- 管理員登入（is_admin 權限檢查）
+- 驗證碼暴力破解防護（5 次失敗後鎖定 15 分鐘）
+- 密碼重置後全局 Token 失效（使用 Redis 記錄失效時間戳）
+- Email 枚舉防護（統一錯誤訊息避免洩露用戶資訊）
+- 驗證碼使用加密安全隨機數生成（secrets.choice）
+- Token 刷新機制（支援 HttpOnly Cookie）
+- 管理員登入（is_admin 權限檢查，Token 刷新後保留權限）
 
 ## Week 2: 個人檔案
 
@@ -157,4 +161,4 @@
 - Docker Compose（PostgreSQL + Redis + Mailpit）
 - Mailpit Email 測試工具（開發環境）
 - 自動化測試
-- API 文檔自動生成（Swagger / ReDoc / GraphQL）
+- API 文檔自動生成（Swagger）
