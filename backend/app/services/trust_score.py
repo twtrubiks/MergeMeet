@@ -4,6 +4,9 @@
 
 Redis Key 設計:
 - trust:daily_messages:{user_id}:{YYYY-MM-DD} - 每日訊息計數 (TTL: 86400 秒)
+- chat:last_sender:{match_id} - 配對最後發送者 (TTL: 86400 秒)
+- trust:positive_interaction:{match_id}:{YYYY-MM-DD} - 配對每日正向互動狀態 (TTL: 86400 秒)
+- trust:positive_daily_total:{user_id}:{YYYY-MM-DD} - 用戶每日正向互動總獲得量 (TTL: 86400 秒)
 
 分數範圍: 0-100
 - 100: 高度信任用戶

@@ -399,3 +399,60 @@ class TestMultipleAdjustments:
         await test_db.refresh(test_user)
         expected_score = initial_score + 1 - 5
         assert test_user.trust_score == expected_score
+
+
+# =============================================================================
+# 測試：正向互動
+# =============================================================================
+@pytest.mark.asyncio
+class TestPositiveInteraction:
+    """測試正向互動獎勵"""
+
+    async def test_positive_interaction_increases_score(
+        self, test_db: AsyncSession, test_user: User
+    ):
+        """測試：正向互動增加 1 分"""
+        initial_score = test_user.trust_score
+
+        new_score = await TrustScoreService.adjust_score(
+            test_db, test_user.id, "positive_interaction"
+        )
+
+        await test_db.refresh(test_user)
+        assert new_score == initial_score + 1
+        assert test_user.trust_score == initial_score + 1
+
+    async def test_positive_interaction_multiple_times(
+        self, test_db: AsyncSession, test_user: User
+    ):
+        """測試：多次正向互動累積"""
+        initial_score = test_user.trust_score
+
+        # 模擬 3 次正向互動（每日上限）
+        await TrustScoreService.adjust_score(
+            test_db, test_user.id, "positive_interaction"
+        )
+        await TrustScoreService.adjust_score(
+            test_db, test_user.id, "positive_interaction"
+        )
+        await TrustScoreService.adjust_score(
+            test_db, test_user.id, "positive_interaction"
+        )
+
+        await test_db.refresh(test_user)
+        assert test_user.trust_score == initial_score + 3
+
+    async def test_positive_interaction_with_max_score(
+        self, test_db: AsyncSession, test_user: User
+    ):
+        """測試：正向互動不會超過最高分數"""
+        test_user.trust_score = 100
+        await test_db.commit()
+
+        new_score = await TrustScoreService.adjust_score(
+            test_db, test_user.id, "positive_interaction"
+        )
+
+        await test_db.refresh(test_user)
+        assert new_score == TrustScoreService.MAX_SCORE
+        assert test_user.trust_score == TrustScoreService.MAX_SCORE

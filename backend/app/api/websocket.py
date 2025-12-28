@@ -304,6 +304,95 @@ async def _save_and_broadcast_message(
     return message
 
 
+async def _check_and_reward_positive_interaction(
+    match: Match,
+    sender_id: uuid.UUID,
+    db
+) -> None:
+    """檢查並獎勵正向互動
+
+    當發送者與上一個發送者不同時，視為「回應」，
+    雙方各獲得 +1 信任分數。
+
+    限制機制：
+    - 每個配對每天最多獎勵一次
+    - 每個用戶每天最多獲得 +3 分（跨配對總限制）
+
+    Args:
+        match: 配對對象
+        sender_id: 當前發送者 ID
+        db: 資料庫 session
+    """
+    try:
+        redis = await redis_client.get_connection()
+        match_id_str = str(match.id)
+        sender_id_str = str(sender_id)
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+        # Redis Key 定義
+        last_sender_key = f"chat:last_sender:{match_id_str}"
+        match_reward_key = f"trust:positive_interaction:{match_id_str}:{today}"
+        sender_daily_key = f"trust:positive_daily_total:{sender_id_str}:{today}"
+
+        # 1. 取得上一個發送者
+        last_sender = await redis.get(last_sender_key)
+
+        # 2. 更新為當前發送者
+        await redis.setex(last_sender_key, 86400, sender_id_str)
+
+        # 3. 檢查是否為回應（發送者不同）
+        if last_sender is None or last_sender == sender_id_str:
+            return  # 首次訊息或連續發送，不獎勵
+
+        # 4. 檢查配對今天是否已獎勵
+        if await redis.exists(match_reward_key):
+            return  # 今天已獎勵過
+
+        # 5. 標記配對已獎勵
+        await redis.setex(match_reward_key, 86400, "1")
+
+        # 6. 獎勵雙方（檢查每日上限）
+        previous_sender_id = uuid.UUID(last_sender)
+        receiver_id = match.user2_id if match.user1_id == sender_id else match.user1_id
+        previous_daily_key = f"trust:positive_daily_total:{last_sender}:{today}"
+
+        # 檢查並獎勵被回應者（上一個發送者）
+        previous_daily_count = await redis.get(previous_daily_key)
+        previous_count = int(previous_daily_count) if previous_daily_count else 0
+        if previous_count < 3:
+            await TrustScoreService.adjust_score(
+                db,
+                previous_sender_id,
+                "positive_interaction",
+                reason=f"Received response in match {match_id_str}"
+            )
+            await redis.setex(previous_daily_key, 86400, str(previous_count + 1))
+            logger.debug(
+                f"Positive interaction: User {last_sender} rewarded +1 "
+                f"(match: {match_id_str}, daily: {previous_count + 1}/3)"
+            )
+
+        # 檢查並獎勵回應者（當前發送者）
+        sender_daily_count = await redis.get(sender_daily_key)
+        sender_count = int(sender_daily_count) if sender_daily_count else 0
+        if sender_count < 3:
+            await TrustScoreService.adjust_score(
+                db,
+                sender_id,
+                "positive_interaction",
+                reason=f"Responded in match {match_id_str}"
+            )
+            await redis.setex(sender_daily_key, 86400, str(sender_count + 1))
+            logger.debug(
+                f"Positive interaction: User {sender_id_str} rewarded +1 "
+                f"(match: {match_id_str}, daily: {sender_count + 1}/3)"
+            )
+
+    except Exception as e:
+        # 不影響訊息發送
+        logger.error(f"Error processing positive interaction: {e}")
+
+
 async def _send_message_notification(
     match: Match,
     sender_id: uuid.UUID,
@@ -626,6 +715,9 @@ async def handle_chat_message(data: dict, sender_id: uuid.UUID):
             message = await _save_and_broadcast_message(
                 match, sender_id, parsed, db
             )
+
+            # 5.5 正向互動檢查與獎勵
+            await _check_and_reward_positive_interaction(match, sender_id, db)
 
             # 6. 離線通知
             await _send_message_notification(match, sender_id, message, db)

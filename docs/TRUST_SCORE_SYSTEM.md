@@ -38,7 +38,7 @@
 | Email 驗證完成 | **+5** | 首次驗證 Email 成功 | `auth.py` verify_email |
 | 被喜歡 | **+1** | 其他用戶喜歡你 | `discovery.py` like_user |
 | 配對成功 | **+2** | 雙方互相喜歡 | `discovery.py` like_user |
-| 正向互動（預留） | **+1** | 未來正常互動使用 | 尚未整合 |
+| 正向互動 | **+1** | 訊息被回應時雙方各獲得（每配對每日一次，每人每日上限 +3） | `websocket.py` handle_chat_message |
 
 ### 負向行為（扣分）
 
