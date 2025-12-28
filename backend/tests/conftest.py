@@ -18,6 +18,7 @@ from app.main import app
 from app.core.database import Base, get_db
 from app.services.content_moderation import ContentModerationService
 from app.services.photo_moderation import PhotoModerationService
+from app.middleware.last_active import set_session_factory, reset_session_factory
 
 # 測試資料庫 URL（使用獨立的 PostgreSQL 測試資料庫）
 # 優先從環境變數讀取，預設值僅作為提醒
@@ -57,6 +58,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 
     ContentModerationService.set_session_factory(TestSessionLocal)
     PhotoModerationService.set_session_factory(TestSessionLocal)
+    set_session_factory(TestSessionLocal)
 
     async with TestSessionLocal() as session:
         yield session
@@ -64,6 +66,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 
     ContentModerationService.reset_session_factory()
     PhotoModerationService.reset_session_factory()
+    reset_session_factory()
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)

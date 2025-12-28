@@ -117,6 +117,8 @@ distance_label = (
 
 **計算方式**: 根據最後上線時間（last_active）
 
+> **實作狀態**: `last_active` 由 `LastActiveMiddleware` 自動更新，每次已認證請求成功後都會記錄活躍時間。
+
 ```python
 last_active = datetime.now() - timedelta(hours=5)  # 5 小時前上線
 hours_ago = 5

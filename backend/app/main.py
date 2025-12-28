@@ -17,6 +17,7 @@ import asyncio
 
 from app.core.config import settings
 from app.core.database import close_db
+from app.middleware.last_active import LastActiveMiddleware
 from app.websocket.manager import manager
 from app.services.redis_client import redis_client, get_redis
 from app.services.token_blacklist import token_blacklist
@@ -100,6 +101,10 @@ app.add_middleware(
         "X-Lockout-Seconds",      # 鎖定剩餘秒數
     ],
 )
+
+# 用戶活躍時間更新 Middleware
+# 在每個已認證請求成功後自動更新 Profile.last_active
+app.add_middleware(LastActiveMiddleware)
 
 # 靜態檔案（照片上傳）
 uploads_dir = Path(settings.UPLOAD_DIR)
