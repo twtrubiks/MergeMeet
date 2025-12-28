@@ -72,7 +72,7 @@
 docker compose up -d
 ```
 
-啟動 PostgreSQL、Redis 和 Mailpit（Email 測試工具，可在 http://localhost:8025 查看發送的郵件）
+啟動 PostgreSQL、Redis 和 Mailpit
 
 #### 2. 設置後端
 
@@ -174,11 +174,11 @@ mergemeet/
 
 | Skill | 用途 |
 |-------|------|
-| `mergemeet-quickstart` | 開發環境設置與故障排除 |
-| `backend-dev-fastapi` | 後端開發模式（FastAPI + SQLAlchemy） |
-| `frontend-dev-vue3` | 前端開發模式（Vue 3 + Pinia） |
-| `api-routing-standards` | API 路由規範（禁止尾隨斜線） |
-| `project-audit` | 專案健康檢查 |
+| [`mergemeet-quickstart`](.claude/skills/mergemeet-quickstart/) | 開發環境設置與故障排除 |
+| [`backend-dev-fastapi`](.claude/skills/backend-dev-fastapi/) | 後端開發模式（FastAPI + SQLAlchemy） |
+| [`frontend-dev-vue3`](.claude/skills/frontend-dev-vue3/) | 前端開發模式（Vue 3 + Pinia） |
+| [`api-routing-standards`](.claude/skills/api-routing-standards/) | API 路由規範（禁止尾隨斜線） |
+| [`project-audit`](.claude/skills/project-audit/) | 專案健康檢查 |
 
 > 詳見 [CLAUDE.md](./CLAUDE.md)
 
@@ -194,7 +194,7 @@ mergemeet/
 | **管理後台** | 統計儀表板、舉報管理、用戶管理 |
 | **通知系統** | 通知中心、未讀計數、即時推送 |
 
-> 詳細功能清單請參閱 [docs/FEATURES.md](./docs/FEATURES.md)
+→ [功能清單詳細文檔](./docs/FEATURES.md)
 
 ## 🧠 技術特色
 
@@ -222,18 +222,12 @@ mergemeet/
 
 → [信任分數系統詳細文檔](./docs/TRUST_SCORE_SYSTEM.md)
 
-## 🔮 未來擴充
-
-詳細規劃請參閱 [技術路線圖](./docs/ROADMAP.md)
-
 ## 📚 文檔
 
 ### 核心系統
 
 | 文檔 | 說明 |
 |------|------|
-| [配對演算法](./docs/MATCHING_ALGORITHM.md) | 5 維度評分系統、權重設計、效能優化 |
-| [信任分數系統](./docs/TRUST_SCORE_SYSTEM.md) | 信譽機制、分數規則、功能限制 |
 | [技術架構](./docs/ARCHITECTURE.md) | 系統架構、資料庫設計、API 設計 |
 | [安全機制](./docs/SECURITY.md) | 認證授權、資料保護、安全措施 |
 
@@ -241,8 +235,6 @@ mergemeet/
 
 | 文檔 | 說明 |
 |------|------|
-| [功能清單](./docs/FEATURES.md) | 完整功能列表與實作狀態 |
-| [技術路線圖](./docs/ROADMAP.md) | 未來開發計畫 |
 | [游標分頁](./docs/CURSOR_PAGINATION.md) | 分頁實作方式 |
 | [測試指南](./docs/testing/TESTING_GUIDE.md) | 測試策略與執行方式 |
 | [管理員設置指南](./docs/管理員設置指南.md) | 管理員帳號配置 |
@@ -258,6 +250,22 @@ mergemeet/
 
 本專案為學習與開發用途
 
-## 👥 貢獻者
+## Donation
 
-twtrubiks + Claude (Anthropic AI)
+文章都是我自己研究內化後原創，如果有幫助到您，也想鼓勵我的話，歡迎請我喝一杯咖啡 :laughing:
+
+綠界科技ECPAY ( 不需註冊會員 )
+
+![alt tag](https://payment.ecpay.com.tw/Upload/QRCode/201906/QRCode_672351b8-5ab3-42dd-9c7c-c24c3e6a10a0.png)
+
+[贊助者付款](http://bit.ly/2F7Jrha)
+
+歐付寶 ( 需註冊會員 )
+
+![alt tag](https://i.imgur.com/LRct9xa.png)
+
+[贊助者付款](https://payment.opay.tw/Broadcaster/Donate/9E47FDEF85ABE383A0F5FC6A218606F8)
+
+## 贊助名單
+
+[贊助名單](https://github.com/twtrubiks/Thank-you-for-donate)
