@@ -1,4 +1,5 @@
 """聊天訊息 REST API"""
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func, desc
@@ -350,9 +351,9 @@ async def mark_all_messages_as_read(
             detail="配對不存在或您無權操作"
         )
 
-    # 批量更新所有未讀訊息（只更新對方發送的訊息）
-    await db.execute(
-        Message.__table__.update()
+    # 1. 先查詢待標記的訊息（取得 id 和 sender_id，用於發送 WebSocket 通知）
+    unread_result = await db.execute(
+        select(Message.id, Message.sender_id)
         .where(
             and_(
                 Message.match_id == match_id,
@@ -361,9 +362,42 @@ async def mark_all_messages_as_read(
                 Message.deleted_at.is_(None)  # 未刪除
             )
         )
-        .values(is_read=func.now())
     )
-    await db.commit()
+    unread_messages = unread_result.all()
+
+    # 2. 批量更新所有未讀訊息
+    read_time = datetime.now(timezone.utc)
+    if unread_messages:
+        await db.execute(
+            Message.__table__.update()
+            .where(
+                and_(
+                    Message.match_id == match_id,
+                    Message.sender_id != current_user.id,
+                    Message.is_read.is_(None),
+                    Message.deleted_at.is_(None)
+                )
+            )
+            .values(is_read=read_time)
+        )
+        await db.commit()
+
+        # 3. 發送 WebSocket 通知給發送者（讓發送者即時看到已讀狀態）
+        for msg_id, sender_id in unread_messages:
+            await manager.send_personal_message(
+                str(sender_id),
+                {
+                    "type": "read_receipt",
+                    "message_id": str(msg_id),
+                    "read_by": str(current_user.id),
+                    "read_at": read_time.isoformat()
+                }
+            )
+
+        logger.info(
+            f"Marked {len(unread_messages)} messages as read in match {match_id} "
+            f"and sent WebSocket notifications"
+        )
 
     return None
 

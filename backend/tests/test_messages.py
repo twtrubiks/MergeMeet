@@ -853,3 +853,91 @@ async def test_mark_all_clears_unread_count(client: AsyncClient, matched_users: 
     conversations = response.json()
     conv = next((c for c in conversations if c["match_id"] == match_id), None)
     assert conv["unread_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_mark_all_messages_sends_websocket_notification(
+    client: AsyncClient, matched_users: dict, test_db: AsyncSession
+):
+    """測試標記所有訊息為已讀時發送 WebSocket 通知給發送者"""
+    match_id = matched_users["match_id"]
+    alice_token = matched_users["alice"]["token"]
+    alice_user_id = matched_users["alice"]["user_id"]
+    bob_user_id = matched_users["bob"]["user_id"]
+
+    # Bob 發送 3 條訊息給 Alice
+    messages_to_create = []
+    for i in range(3):
+        message = Message(
+            match_id=match_id,
+            sender_id=bob_user_id,
+            content=f"Message {i+1}",
+            message_type="TEXT"
+        )
+        test_db.add(message)
+        messages_to_create.append(message)
+    await test_db.commit()
+
+    # 取得建立的訊息 ID
+    for msg in messages_to_create:
+        await test_db.refresh(msg)
+    message_ids = [str(msg.id) for msg in messages_to_create]
+
+    # Mock WebSocket manager
+    with patch('app.api.messages.manager.send_personal_message', new_callable=AsyncMock) as mock_send:
+        # Alice 調用 read-all API
+        response = await client.post(
+            f"/api/messages/matches/{match_id}/read-all",
+            headers={"Authorization": f"Bearer {alice_token}"}
+        )
+
+        assert response.status_code == 204
+
+        # 驗證 WebSocket 通知被發送
+        assert mock_send.call_count == 3  # 3 條訊息應該發送 3 次通知
+
+        # 驗證每次通知都發送給 Bob（訊息發送者）
+        for call in mock_send.call_args_list:
+            args, kwargs = call
+            assert args[0] == str(bob_user_id)  # 通知發送給 Bob
+            payload = args[1]
+            assert payload["type"] == "read_receipt"
+            assert payload["message_id"] in message_ids
+            assert payload["read_by"] == str(alice_user_id)
+            assert "read_at" in payload
+
+
+@pytest.mark.asyncio
+async def test_mark_all_messages_no_notification_when_no_unread(
+    client: AsyncClient, matched_users: dict, test_db: AsyncSession
+):
+    """測試沒有未讀訊息時不發送 WebSocket 通知"""
+    from datetime import datetime, timezone
+
+    match_id = matched_users["match_id"]
+    alice_token = matched_users["alice"]["token"]
+    bob_user_id = matched_users["bob"]["user_id"]
+
+    # Bob 發送 1 條已讀訊息
+    message = Message(
+        match_id=match_id,
+        sender_id=bob_user_id,
+        content="Already read message",
+        message_type="TEXT",
+        is_read=datetime.now(timezone.utc)  # 已讀
+    )
+    test_db.add(message)
+    await test_db.commit()
+
+    # Mock WebSocket manager
+    with patch('app.api.messages.manager.send_personal_message', new_callable=AsyncMock) as mock_send:
+        # Alice 調用 read-all API
+        response = await client.post(
+            f"/api/messages/matches/{match_id}/read-all",
+            headers={"Authorization": f"Bearer {alice_token}"}
+        )
+
+        assert response.status_code == 204
+
+        # 驗證沒有發送任何 WebSocket 通知
+        assert mock_send.call_count == 0

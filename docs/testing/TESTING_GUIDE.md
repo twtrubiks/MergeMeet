@@ -213,14 +213,16 @@ npm run dev
 - Alice 視窗：訊息立即顯示在右側
 - Bob 視窗：**即時**收到訊息（不需刷新），顯示在左側
 
-#### 測試案例：已讀狀態
+#### 測試案例：已讀狀態（即時更新）
 
-1. Bob 查看 Alice 發送的訊息
+1. **視窗 A**：Alice 發送訊息給 Bob
+2. **視窗 B**：Bob 進入聊天室查看訊息
 
 **預期結果：**
 
-- Alice 視窗顯示訊息為「已讀」（✓✓）
-- Network: `POST /api/messages/read` 返回 `204`
+- Alice 視窗的訊息**即時**從「✓ 已送達」變成「✓✓ 已讀」（不需刷新）
+- Network: `POST /api/messages/matches/{match_id}/read-all` 返回 `204`
+- WebSocket: Alice 收到 `read_receipt` 事件，觸發 UI 即時更新
 
 #### 測試案例：刪除訊息
 
