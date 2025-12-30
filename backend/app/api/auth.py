@@ -45,6 +45,11 @@ from app.schemas.auth import (
     VerifyResetTokenResponse,
     ChangePasswordRequest,
     ChangePasswordResponse,
+    LogoutResponse,
+    EmailVerificationResponse,
+    ResendVerificationResponse,
+    ForgotPasswordResponse,
+    ResetPasswordResponse,
 )
 from app.services.token_blacklist import token_blacklist
 from app.services.email import EmailService
@@ -731,7 +736,7 @@ async def refresh_token_endpoint(
     )
 
 
-@router.post("/logout", response_model=dict)
+@router.post("/logout", response_model=LogoutResponse)
 async def logout(
     response: Response,
     current_user: User = Depends(get_current_user),
@@ -786,7 +791,7 @@ async def logout(
     }
 
 
-@router.post("/verify-email", response_model=dict)
+@router.post("/verify-email", response_model=EmailVerificationResponse)
 async def verify_email(
     request: EmailVerificationRequest,
     db: AsyncSession = Depends(get_db),
@@ -877,7 +882,7 @@ async def verify_email(
     }
 
 
-@router.post("/resend-verification", response_model=dict)
+@router.post("/resend-verification", response_model=ResendVerificationResponse)
 async def resend_verification(
     request: ResendVerificationRequest,
     db: AsyncSession = Depends(get_db)
@@ -934,7 +939,7 @@ async def resend_verification(
     return success_message
 
 
-@router.post("/forgot-password", response_model=dict)
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
 async def forgot_password(
     request: ForgotPasswordRequest,
     db: AsyncSession = Depends(get_db)
@@ -1031,7 +1036,7 @@ async def verify_reset_token(
     return VerifyResetTokenResponse(valid=True, email=mask_email(user.email))
 
 
-@router.post("/reset-password", response_model=dict)
+@router.post("/reset-password", response_model=ResetPasswordResponse)
 async def reset_password(
     request: ResetPasswordRequest,
     db: AsyncSession = Depends(get_db)

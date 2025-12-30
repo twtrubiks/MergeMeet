@@ -244,3 +244,68 @@ class ChangePasswordResponse(BaseModel):
 
     message: str = Field(..., description="結果訊息")
     tokens_invalidated: bool = Field(..., description="是否已使所有 Token 失效")
+
+
+class LogoutResponse(BaseModel):
+    """登出回應"""
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "message": "登出成功",
+            "user_id": "550e8400-e29b-41d4-a716-446655440000",
+            "tokens_invalidated": ["access_token", "refresh_token"]
+        }
+    })
+
+    message: str = Field(..., description="結果訊息")
+    user_id: str = Field(..., description="用戶 ID")
+    tokens_invalidated: list[str] = Field(default_factory=list, description="已失效的 Token 類型列表")
+
+
+class EmailVerificationResponse(BaseModel):
+    """Email 驗證回應"""
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "message": "Email 驗證成功",
+            "email": "user@example.com",
+            "verified": True
+        }
+    })
+
+    message: str = Field(..., description="結果訊息")
+    email: str = Field(..., description="已驗證的 Email")
+    verified: bool = Field(..., description="是否已驗證")
+
+
+class ResendVerificationResponse(BaseModel):
+    """重新發送驗證碼回應"""
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "message": "如果該信箱已註冊且未驗證，驗證碼已發送",
+            "email": "user@example.com"
+        }
+    })
+
+    message: str = Field(..., description="結果訊息")
+    email: str = Field(..., description="目標 Email")
+
+
+class ForgotPasswordResponse(BaseModel):
+    """忘記密碼回應"""
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "message": "如果該信箱已註冊，我們已發送密碼重置郵件"
+        }
+    })
+
+    message: str = Field(..., description="結果訊息")
+
+
+class ResetPasswordResponse(BaseModel):
+    """重置密碼回應"""
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "message": "密碼重置成功，請使用新密碼登入"
+        }
+    })
+
+    message: str = Field(..., description="結果訊息")
