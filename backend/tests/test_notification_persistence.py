@@ -16,8 +16,7 @@ from sqlalchemy import select
 
 from app.models.user import User
 from app.models.notification import Notification
-from app.models.profile import Profile, InterestTag
-from app.models.match import Match, Message
+from app.models.profile import InterestTag
 from app.websocket.manager import manager
 
 

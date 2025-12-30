@@ -1,9 +1,8 @@
 """WebSocket 即時通訊測試"""
 import pytest
-import json
 import uuid
 import asyncio
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select

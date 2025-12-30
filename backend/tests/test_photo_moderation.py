@@ -5,9 +5,7 @@ from datetime import date, datetime, timezone
 
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient
 from PIL import Image
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.profile import Photo, Profile

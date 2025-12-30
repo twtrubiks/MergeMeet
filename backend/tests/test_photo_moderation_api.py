@@ -1,7 +1,7 @@
 """照片審核 API 測試"""
 import io
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date
 from unittest.mock import patch
 
 import pytest

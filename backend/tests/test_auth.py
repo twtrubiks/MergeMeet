@@ -10,7 +10,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from app.main import app
 from app.models.user import User
-from app.core.security import get_password_hash, decode_token
+from app.core.security import get_password_hash
 from app.api.auth import verification_codes, generate_verification_code
 from app.services.token_invalidator import TokenInvalidator
 from app.services.redis_client import get_redis

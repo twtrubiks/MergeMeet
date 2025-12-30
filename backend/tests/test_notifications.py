@@ -8,8 +8,7 @@
 ========================================
 """
 import pytest
-import uuid
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -18,8 +17,7 @@ from io import BytesIO
 from PIL import Image
 
 from app.models.user import User
-from app.models.profile import Profile, InterestTag
-from app.models.match import Match, Message
+from app.models.profile import InterestTag
 from app.websocket.manager import manager
 
 

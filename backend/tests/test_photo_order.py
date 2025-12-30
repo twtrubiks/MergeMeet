@@ -8,7 +8,7 @@ import uuid
 import io
 from PIL import Image
 
-from app.models.profile import Profile, Photo
+from app.models.profile import Photo
 
 
 def create_test_image():

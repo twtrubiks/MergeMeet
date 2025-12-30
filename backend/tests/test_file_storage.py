@@ -1,15 +1,14 @@
 """檔案儲存服務測試"""
 import pytest
-import os
 import io
 import asyncio
 import tempfile
 import shutil
 from pathlib import Path
 from PIL import Image
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-from app.services.file_storage import FileStorageService, file_storage
+from app.services.file_storage import FileStorageService
 from app.core.config import settings
 
 

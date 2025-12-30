@@ -4,13 +4,13 @@ import asyncio
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from PIL import Image
 
 from app.models.user import User
-from app.models.profile import Profile, InterestTag
-from app.models.match import Like, Match, Pass
+from app.models.profile import InterestTag
+from app.models.match import Pass
 
 
 @pytest.fixture

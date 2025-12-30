@@ -3,9 +3,8 @@ import pytest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock
 from httpx import AsyncClient
-import redis.asyncio as aioredis
 
-from app.services.token_blacklist import TokenBlacklist, token_blacklist
+from app.services.token_blacklist import TokenBlacklist
 
 
 class TestTokenBlacklist:
