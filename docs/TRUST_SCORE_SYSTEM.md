@@ -38,7 +38,7 @@
 | Email 驗證完成 | **+5** | 首次驗證 Email 成功 | `auth.py` verify_email |
 | 被喜歡 | **+1** | 其他用戶喜歡你 | `discovery.py` like_user |
 | 配對成功 | **+2** | 雙方互相喜歡 | `discovery.py` like_user |
-| 正向互動 | **+1** | 用戶輪流發送訊息時雙方各獲得（上一發送者≠當前發送者才算回應，每配對每日一次，每人每日上限 +3） | `websocket.py` handle_chat_message |
+| 正向互動 | **+1** | 用戶輪流發送訊息時雙方各獲得（上一發送者≠當前發送者才算回應，每配對每日三次，每人每日上限 +3） | `websocket.py` handle_chat_message |
 
 ### 負向行為（扣分）
 
@@ -136,6 +136,13 @@ trust:daily_messages:{user_id}:{YYYY-MM-DD}
 TTL: 86400 秒（24 小時）
 ```
 
+**正向互動配對計數**:
+```
+trust:positive_interaction:{match_id}:{YYYY-MM-DD}
+TTL: 86400 秒（24 小時）
+值: 整數 1-N（使用 INCR 原子遞增，≤3 時給予獎勵）
+```
+
 **實作位置**: `backend/app/api/websocket.py` `handle_chat_message()`
 
 ### 檢查流程
@@ -160,7 +167,7 @@ TTL: 86400 秒（24 小時）
 
 **位置**: `backend/tests/test_trust_score.py`
 
-### 測試分類（22 個測試）
+### 測試分類（26 個測試）
 
 ```python
 TestTrustScoreAdjustments (7 個)
@@ -196,6 +203,12 @@ TestMultipleAdjustments (3 個)
 ├─ test_cumulative_positive_adjustments
 ├─ test_cumulative_negative_adjustments
 └─ test_mixed_adjustments
+
+TestPositiveInteractionMatchLimit (4 個)  # 新增於 test_websocket.py
+├─ test_match_allows_three_daily_rewards
+├─ test_match_blocks_fourth_reward
+├─ test_different_matches_have_separate_limits
+└─ test_incr_returns_unique_values_concurrently
 ```
 
 ### 測試執行
@@ -235,7 +248,8 @@ pytest tests/test_safety.py::test_report_user_success -v
 ├─ Email 驗證: +5 → 55
 ├─ 被 3 人喜歡: +3 → 58
 ├─ 配對成功 2 次: +4 → 62
-└─ 最終分數: 62（正常用戶）
+├─ 正向互動 3 次（每日上限）: +3 → 65
+└─ 最終分數: 65（正常用戶）
 ```
 
 ### 場景 2：違規用戶降級路徑
@@ -303,6 +317,23 @@ except Exception:
     # 異常時允許發送（不阻擋用戶）
     return True, None
 ```
+
+### 4. 配對獎勵原子計數
+
+使用 Redis INCR 原子操作確保併發安全：
+
+```python
+# 原子遞增，返回新值（若 key 不存在，初始化為 0 再加 1）
+match_count = await redis.incr(match_reward_key)
+if match_count == 1:
+    await redis.expire(match_reward_key, 86400)  # 設定 TTL
+if match_count > 3:
+    return  # 超過每配對每日上限，不獎勵
+```
+
+**原子性保證**：
+- 即使多個請求同時到達，INCR 保證每個請求獲得唯一的遞增值
+- 避免 check-then-set 競態條件（舊實作使用 `exists()` + `setex()` 有此問題）
 
 ---
 

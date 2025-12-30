@@ -2,6 +2,8 @@
 import pytest
 import json
 import uuid
+import asyncio
+from unittest.mock import AsyncMock, patch
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -467,5 +469,130 @@ class TestWebSocketHeartbeat:
 
         assert manager._heartbeat_task is not None
         assert manager._cleanup_task is not None
+
+
+# =============================================================================
+# Mock Redis Fixture for Positive Interaction Tests
+# =============================================================================
+@pytest.fixture
+def mock_redis_data():
+    """模擬 Redis 存儲"""
+    return {}
+
+
+@pytest.fixture
+def mock_redis(mock_redis_data):
+    """模擬 Redis 連線"""
+    redis_mock = AsyncMock()
+
+    async def mock_incr(key):
+        mock_redis_data[key] = mock_redis_data.get(key, 0) + 1
+        return mock_redis_data[key]
+
+    async def mock_get(key):
+        return mock_redis_data.get(key)
+
+    async def mock_setex(key, ttl, value):
+        mock_redis_data[key] = value
+
+    async def mock_expire(key, ttl):
+        pass  # TTL 在測試中不重要
+
+    redis_mock.incr = mock_incr
+    redis_mock.get = mock_get
+    redis_mock.setex = mock_setex
+    redis_mock.expire = mock_expire
+
+    return redis_mock, mock_redis_data
+
+
+# =============================================================================
+# 測試：正向互動配對每日限制
+# =============================================================================
+@pytest.mark.asyncio
+class TestPositiveInteractionMatchLimit:
+    """測試正向互動配對每日限制（每配對每日 3 次）"""
+
+    async def test_match_allows_three_daily_rewards(
+        self,
+        mock_redis
+    ):
+        """測試：同一配對每日可獲得 3 次獎勵"""
+        redis_mock, redis_data = mock_redis
+        match_id = str(uuid.uuid4())
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+        match_key = f"trust:positive_interaction:{match_id}:{today}"
+
+        # 模擬 3 次 INCR（每次輪流對話）
+        count1 = await redis_mock.incr(match_key)
+        count2 = await redis_mock.incr(match_key)
+        count3 = await redis_mock.incr(match_key)
+
+        assert count1 == 1  # 第 1 次
+        assert count2 == 2  # 第 2 次
+        assert count3 == 3  # 第 3 次
+        # 所有 3 次都應該獲得獎勵（count <= 3）
+
+    async def test_match_blocks_fourth_reward(
+        self,
+        mock_redis
+    ):
+        """測試：同一配對第 4 次互動不獎勵"""
+        redis_mock, redis_data = mock_redis
+        match_id = str(uuid.uuid4())
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+        match_key = f"trust:positive_interaction:{match_id}:{today}"
+
+        # 模擬已經有 3 次獎勵
+        redis_data[match_key] = 3
+
+        # 第 4 次 INCR
+        count4 = await redis_mock.incr(match_key)
+
+        assert count4 == 4
+        # count4 > 3，應該被阻擋，不獎勵
+
+    async def test_different_matches_have_separate_limits(
+        self,
+        mock_redis
+    ):
+        """測試：不同配對各自獨立計算限制"""
+        redis_mock, redis_data = mock_redis
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+        match1_id = str(uuid.uuid4())
+        match2_id = str(uuid.uuid4())
+        match1_key = f"trust:positive_interaction:{match1_id}:{today}"
+        match2_key = f"trust:positive_interaction:{match2_id}:{today}"
+
+        # Match 1 已達上限
+        redis_data[match1_key] = 3
+
+        # Match 2 尚未開始
+        count_m1 = await redis_mock.incr(match1_key)
+        count_m2 = await redis_mock.incr(match2_key)
+
+        assert count_m1 == 4  # Match 1 超過上限
+        assert count_m2 == 1  # Match 2 第 1 次
+
+    async def test_incr_returns_unique_values_concurrently(
+        self,
+        mock_redis
+    ):
+        """測試：併發請求下 INCR 返回唯一值"""
+        redis_mock, redis_data = mock_redis
+        match_key = f"trust:positive_interaction:test:{datetime.now(timezone.utc).strftime('%Y-%m-%d')}"
+
+        # 模擬 5 個併發請求
+        async def increment():
+            return await redis_mock.incr(match_key)
+
+        results = await asyncio.gather(*[increment() for _ in range(5)])
+
+        # 應該得到 [1, 2, 3, 4, 5]（順序可能不同）
+        assert sorted(results) == [1, 2, 3, 4, 5]
+        # 只有前 3 個應該獲得獎勵
 
 

@@ -315,7 +315,7 @@ async def _check_and_reward_positive_interaction(
     雙方各獲得 +1 信任分數。
 
     限制機制：
-    - 每個配對每天最多獎勵一次
+    - 每個配對每天最多獎勵三次
     - 每個用戶每天最多獲得 +3 分（跨配對總限制）
 
     Args:
@@ -344,14 +344,22 @@ async def _check_and_reward_positive_interaction(
         if last_sender is None or last_sender == sender_id_str:
             return  # 首次訊息或連續發送，不獎勵
 
-        # 4. 檢查配對今天是否已獎勵
-        if await redis.exists(match_reward_key):
-            return  # 今天已獎勵過
+        # 4. 原子遞增配對獎勵計數
+        match_count = await redis.incr(match_reward_key)
 
-        # 5. 標記配對已獎勵
-        await redis.setex(match_reward_key, 86400, "1")
+        # 5. 首次遞增時設定 TTL（key 不存在時 INCR 會創建）
+        if match_count == 1:
+            await redis.expire(match_reward_key, 86400)
 
-        # 6. 獎勵雙方（檢查每日上限）
+        # 6. 檢查是否超過配對每日上限（3 次）
+        if match_count > 3:
+            logger.debug(
+                f"Match {match_id_str} reached daily limit (3), "
+                f"current count: {match_count}"
+            )
+            return
+
+        # 7. 獎勵雙方（檢查每日上限）
         previous_sender_id = uuid.UUID(last_sender)
         receiver_id = match.user2_id if match.user1_id == sender_id else match.user1_id
         previous_daily_key = f"trust:positive_daily_total:{last_sender}:{today}"
@@ -369,7 +377,7 @@ async def _check_and_reward_positive_interaction(
             await redis.setex(previous_daily_key, 86400, str(previous_count + 1))
             logger.debug(
                 f"Positive interaction: User {last_sender} rewarded +1 "
-                f"(match: {match_id_str}, daily: {previous_count + 1}/3)"
+                f"(match: {match_id_str}, match_count: {match_count}/3, daily: {previous_count + 1}/3)"
             )
 
         # 檢查並獎勵回應者（當前發送者）
@@ -385,7 +393,7 @@ async def _check_and_reward_positive_interaction(
             await redis.setex(sender_daily_key, 86400, str(sender_count + 1))
             logger.debug(
                 f"Positive interaction: User {sender_id_str} rewarded +1 "
-                f"(match: {match_id_str}, daily: {sender_count + 1}/3)"
+                f"(match: {match_id_str}, match_count: {match_count}/3, daily: {sender_count + 1}/3)"
             )
 
     except Exception as e:
