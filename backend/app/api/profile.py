@@ -13,7 +13,7 @@ import logging
 import io
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, get_current_admin_user
 from app.core.config import settings
 from app.models.user import User
 from app.models.profile import Profile, Photo, InterestTag
@@ -912,16 +912,10 @@ async def get_interest_tags(
 )
 async def create_interest_tag(
     request: InterestTagCreateRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db)
 ):
     """建立興趣標籤（僅管理員）"""
-    if not current_user.is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="需要管理員權限"
-        )
-
     # 檢查標籤是否已存在
     result = await db.execute(
         select(InterestTag).where(InterestTag.name == request.name)
