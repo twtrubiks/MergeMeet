@@ -447,11 +447,12 @@ async def _send_message_notification(
     await db.commit()
     logger.info(f"Persisted notification_message for user {receiver_id_str}")
 
-    # 發送 WebSocket 通知
+    # 發送 WebSocket 通知（包含 notification_id 讓前端可以標記已讀）
     await manager.send_personal_message(
         receiver_id_str,
         {
             "type": "notification_message",
+            "notification_id": str(notification.id),
             "match_id": str(match.id),
             "sender_id": str(sender_id),
             "sender_name": sender_name,

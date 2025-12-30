@@ -240,6 +240,7 @@ class TestNotificationLiked:
             recipient_id, notification_data = notification_liked_call
             assert recipient_id == bob_user_id  # 通知發送給 Bob
             assert notification_data["type"] == "notification_liked"
+            assert "notification_id" in notification_data  # 必須包含資料庫通知 ID
             assert "timestamp" in notification_data
             # notification_liked 不應該包含喜歡者的資訊（保持神秘感）
             assert "liker_id" not in notification_data
@@ -320,6 +321,7 @@ class TestNotificationMatch:
             for recipient_id, notification_data in match_notifications:
                 recipients.add(recipient_id)
                 assert notification_data["type"] == "notification_match"
+                assert "notification_id" in notification_data  # 必須包含資料庫通知 ID
                 assert "match_id" in notification_data
                 assert "matched_user_id" in notification_data
                 assert "matched_user_name" in notification_data

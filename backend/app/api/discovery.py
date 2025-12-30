@@ -519,11 +519,12 @@ async def _send_like_notifications(
         await db.commit()
         logger.info(f"Persisted notification_match for users {target_user_id} and {current_user_id}")
 
-        # 發送 WebSocket 通知給對方（配對成功）
+        # 發送 WebSocket 通知給對方（配對成功，包含 notification_id 讓前端可以標記已讀）
         await manager.send_personal_message(
             str(target_user_id),
             {
                 "type": "notification_match",
+                "notification_id": str(notification_for_target.id),
                 "match_id": str(match_id),
                 "matched_user_id": str(current_user_id),
                 "matched_user_name": current_name,
@@ -533,11 +534,12 @@ async def _send_like_notifications(
         )
         logger.info(f"Sent notification_match to user {target_user_id} for match {match_id}")
 
-        # 發送 WebSocket 通知給當前用戶（配對成功）
+        # 發送 WebSocket 通知給當前用戶（配對成功，包含 notification_id 讓前端可以標記已讀）
         await manager.send_personal_message(
             str(current_user_id),
             {
                 "type": "notification_match",
+                "notification_id": str(notification_for_current.id),
                 "match_id": str(match_id),
                 "matched_user_id": str(target_user_id),
                 "matched_user_name": target_name,
@@ -563,11 +565,12 @@ async def _send_like_notifications(
         await db.commit()
         logger.info(f"Persisted notification_liked for user {target_user_id}")
 
-        # 發送 WebSocket 通知
+        # 發送 WebSocket 通知（包含 notification_id 讓前端可以標記已讀）
         await manager.send_personal_message(
             str(target_user_id),
             {
                 "type": "notification_liked",
+                "notification_id": str(notification_liked.id),
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
         )

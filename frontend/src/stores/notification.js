@@ -77,7 +77,8 @@ export const useNotificationStore = defineStore('notification', () => {
    */
   const addNotification = (notification) => {
     const newNotification = {
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      // 優先使用傳入的 ID（資料庫 ID），否則生成臨時 ID
+      id: notification.id || (Date.now().toString() + Math.random().toString(36).substr(2, 9)),
       ...notification,
       read: false,
       createdAt: new Date()
@@ -103,6 +104,7 @@ export const useNotificationStore = defineStore('notification', () => {
     logger.debug('[Notification] Received notification_message:', data)
 
     addNotification({
+      id: data.notification_id,  // 使用資料庫通知 ID
       type: NotificationType.NEW_MESSAGE,
       title: `${data.sender_name} 發送了訊息`,
       content: data.preview || '新訊息',
@@ -110,7 +112,8 @@ export const useNotificationStore = defineStore('notification', () => {
         matchId: data.match_id,
         senderId: data.sender_id
       },
-      timestamp: data.timestamp
+      timestamp: data.timestamp,
+      fromAPI: !!data.notification_id  // 有資料庫 ID 則標記為 API 來源
     })
 
     // 同時更新 ChatList 的未讀計數
@@ -140,6 +143,7 @@ export const useNotificationStore = defineStore('notification', () => {
     logger.debug('[Notification] Received notification_match:', data)
 
     addNotification({
+      id: data.notification_id,  // 使用資料庫通知 ID
       type: NotificationType.NEW_MATCH,
       title: '恭喜！你有新配對',
       content: `你和 ${data.matched_user_name} 互相喜歡！`,
@@ -149,7 +153,8 @@ export const useNotificationStore = defineStore('notification', () => {
         userName: data.matched_user_name,
         userAvatar: data.matched_user_avatar
       },
-      timestamp: data.timestamp
+      timestamp: data.timestamp,
+      fromAPI: !!data.notification_id  // 有資料庫 ID 則標記為 API 來源
     })
   }
 
@@ -161,11 +166,13 @@ export const useNotificationStore = defineStore('notification', () => {
     logger.debug('[Notification] Received notification_liked:', data)
 
     addNotification({
+      id: data.notification_id,  // 使用資料庫通知 ID
       type: NotificationType.SOMEONE_LIKED_YOU,
       title: '有人喜歡你',
       content: '有人對你表示好感，快去探索看看吧！',
       data: {},  // 不透露是誰喜歡，保持神秘感
-      timestamp: data.timestamp
+      timestamp: data.timestamp,
+      fromAPI: !!data.notification_id  // 有資料庫 ID 則標記為 API 來源
     })
   }
 
@@ -382,6 +389,45 @@ export const useNotificationStore = defineStore('notification', () => {
   }
 
   /**
+   * 呼叫 API 批量標記指定配對的訊息通知為已讀
+   * 當用戶進入聊天室時調用，確保資料庫同步更新
+   * @param {string} matchId - 配對 ID
+   */
+  const markMessageNotificationsAsReadByMatchIdAPI = async (matchId) => {
+    // 1. 收集符合條件的通知 ID
+    const notificationIds = notifications.value
+      .filter(n => {
+        const notificationMatchId = n.data?.matchId || n.data?.match_id
+        return (
+          n.type === NotificationType.NEW_MESSAGE &&
+          !n.read &&
+          notificationMatchId === matchId &&
+          n.fromAPI  // 只處理有資料庫 ID 的通知
+        )
+      })
+      .map(n => n.id)
+
+    if (notificationIds.length === 0) {
+      // 沒有需要標記的通知，仍然更新本地狀態
+      markMessageNotificationsAsReadByMatchId(matchId)
+      return
+    }
+
+    // 2. 批量呼叫 API
+    try {
+      await Promise.all(
+        notificationIds.map(id => apiClient.put(`/notifications/${id}/read`))
+      )
+      // 3. 成功後更新本地狀態
+      markMessageNotificationsAsReadByMatchId(matchId)
+      logger.debug('[Notification] Marked message notifications as read via API for match:', matchId, 'count:', notificationIds.length)
+    } catch (error) {
+      logger.error('[Notification] Failed to mark message notifications as read:', error)
+      throw error
+    }
+  }
+
+  /**
    * 重置 Store
    */
   const $reset = () => {
@@ -415,6 +461,7 @@ export const useNotificationStore = defineStore('notification', () => {
     markAsReadAPI,
     markAllAsReadAPI,
     deleteNotificationAPI,
+    markMessageNotificationsAsReadByMatchIdAPI,
 
     // Constants
     NotificationType

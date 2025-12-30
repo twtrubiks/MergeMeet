@@ -120,7 +120,7 @@
 ├──────────────────────┤
 │ id (PK)              │
 │ email                │◄──────┐
-│ password             │       │
+│ password_hash        │       │
 │ email_verified       │       │ 1:1
 │ date_of_birth        │       │
 │ trust_score          │       │
@@ -234,15 +234,28 @@
 ┌──────────────┐
 │ Notification │ (通知記錄 - 持久化)
 ├──────────────┤
-│ id (PK)      │
+│ id (PK)      │ ← WebSocket 通知包含此 ID
 │ user_id      │
 │ type         │ (message/match/liked)
 │ title        │
 │ content      │
 │ data (JSONB) │
-│ is_read      │
+│ is_read      │ ← 前端透過 API 標記已讀
 │ created_at   │
 └──────────────┘
+
+WebSocket 通知 Payload（包含 notification_id 讓前端可以標記已讀）:
+
+| 類型 | 欄位 |
+|------|------|
+| notification_message | notification_id, match_id, sender_id, sender_name, preview, timestamp |
+| notification_match | notification_id, match_id, matched_user_id, matched_user_name, matched_user_avatar, timestamp |
+| notification_liked | notification_id, timestamp |
+
+**批量標記通知已讀**：進入聊天室時，前端會自動批量標記該配對的所有訊息通知為已讀：
+- 呼叫 `markMessageNotificationsAsReadByMatchIdAPI(matchId)`
+- 批量發送 `PUT /api/notifications/{id}/read` 請求
+- 確保資料庫同步更新
 
 ┌─────────────────┐   ┌──────────────────┐   ┌────────────────────┐
 │  SensitiveWord  │   │  ContentAppeal   │   │   ModerationLog    │
@@ -466,9 +479,10 @@ if profile.location is None:
 ### 7.1 測試統計
 
 ```
-後端測試（22 個測試檔案）：
+後端測試（23 個測試檔案）：
 ├── test_auth.py - 認證功能測試
 ├── test_login_limiter.py - 登入限制測試
+├── test_last_active_middleware.py - 最後活躍中間件測試
 ├── test_profile.py - 個人檔案測試
 ├── test_photo_order.py - 照片順序測試
 ├── test_discovery.py - 探索配對測試

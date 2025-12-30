@@ -374,9 +374,9 @@ export const useChatStore = defineStore('chat', () => {
     // 發送 WebSocket 已讀回條（通知對方）
     await markConversationAsRead(matchId)
 
-    // 同步清除對應的訊息通知（讓通知鈴鐺數字也減少）
+    // 同步清除對應的訊息通知（讓通知鈴鐺數字也減少，並持久化到資料庫）
     const notificationStore = useNotificationStore()
-    notificationStore.markMessageNotificationsAsReadByMatchId(matchId)
+    await notificationStore.markMessageNotificationsAsReadByMatchIdAPI(matchId)
 
     // 返回結果供前端使用 cursor 資訊
     return result
