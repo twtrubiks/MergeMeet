@@ -124,7 +124,7 @@ cd backend && pytest -v --cov=app    # 後端測試
 cd frontend && npm run test          # 前端測試
 ```
 
-- 後端測試: 364 個（覆蓋率 >80%）
+- 後端測試: 379 個（覆蓋率 >80%）
 - 前端測試: 89 個（Vitest）
 
 ## 📊 專案結構
@@ -133,11 +133,11 @@ cd frontend && npm run test          # 前端測試
 mergemeet/
 ├── backend/                  # 後端 FastAPI 應用
 │   ├── app/
-│   │   ├── api/              # API 路由 (10 個模組)
+│   │   ├── api/              # API 路由
 │   │   ├── core/             # 核心配置 (config, security, database)
-│   │   ├── models/           # SQLAlchemy 模型 (14 個)
+│   │   ├── models/           # SQLAlchemy 模型
 │   │   ├── schemas/          # Pydantic Schemas
-│   │   ├── services/         # 業務邏輯 (11 個服務)
+│   │   ├── services/         # 業務邏輯
 │   │   ├── websocket/        # WebSocket 管理
 │   │   └── main.py           # 主應用
 │   ├── alembic/              # 資料庫遷移
@@ -147,9 +147,9 @@ mergemeet/
 │
 ├── frontend/                 # 前端 Vue 3 應用
 │   └── src/
-│       ├── views/            # 頁面 (17 個)
-│       ├── components/       # Vue 組件 (16 個)
-│       ├── stores/           # Pinia Stores (7 個)
+│       ├── views/            # 頁面組件
+│       ├── components/       # 共用組件
+│       ├── stores/           # Pinia Stores
 │       ├── composables/      # Vue Composables
 │       ├── api/              # API 客戶端
 │       ├── utils/            # 工具函數

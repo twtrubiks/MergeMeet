@@ -167,58 +167,26 @@ TTL: 86400 秒（24 小時）
 
 **位置**: `backend/tests/test_trust_score.py`
 
-### 測試分類（26 個測試）
+### 測試分類
 
-```python
-TestTrustScoreAdjustments (7 個)
-├─ test_email_verified_increases_score
-├─ test_received_like_increases_score
-├─ test_match_created_increases_score
-├─ test_reported_decreases_score
-├─ test_report_confirmed_decreases_score
-├─ test_content_violation_decreases_score
-└─ test_blocked_decreases_score
-
-TestScoreBoundaries (3 個)
-├─ test_score_never_exceeds_max
-├─ test_score_never_below_min
-└─ test_invalid_action_raises_error
-
-TestGetScore (2 個)
-├─ test_get_score_returns_current_score
-└─ test_get_score_user_not_found
-
-TestRestrictions (3 個)
-├─ test_normal_user_not_restricted
-├─ test_low_trust_user_is_restricted
-└─ test_boundary_score_not_restricted
-
-TestMessageRateLimiting (4 個)
-├─ test_normal_user_no_limit
-├─ test_low_trust_user_has_limit
-├─ test_exceeded_limit_blocks_message
-└─ test_record_message_increments_counter
-
-TestMultipleAdjustments (3 個)
-├─ test_cumulative_positive_adjustments
-├─ test_cumulative_negative_adjustments
-└─ test_mixed_adjustments
-
-TestPositiveInteractionMatchLimit (4 個)  # 新增於 test_websocket.py
-├─ test_match_allows_three_daily_rewards
-├─ test_match_blocks_fourth_reward
-├─ test_different_matches_have_separate_limits
-└─ test_incr_returns_unique_values_concurrently
-```
+| 類別 | 用途 |
+|------|------|
+| `TestTrustScoreAdjustments` | 各種行為的分數調整 |
+| `TestScoreBoundaries` | 分數邊界處理 |
+| `TestGetScore` | 分數查詢 |
+| `TestRestrictions` | 功能限制判斷 |
+| `TestMessageRateLimiting` | 訊息速率限制 |
+| `TestMultipleAdjustments` | 累積調整 |
+| `TestPositiveInteractionMatchLimit` | 正向互動配對限制（位於 test_websocket.py） |
 
 ### 測試執行
 
 ```bash
+# 查看完整測試清單
+pytest tests/test_trust_score.py --collect-only -q
+
 # 執行所有信任分數測試
 pytest tests/test_trust_score.py -v
-
-# 測試結果
-22 passed
 ```
 
 ### 整合測試

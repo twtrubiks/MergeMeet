@@ -37,14 +37,13 @@
 ### 2.1 整體架構圖
 
 ```
-┌─────────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────────────────┐
 │                     用戶端 (Browser)                      │
-│  ┌─────────────────────────────────────────────────┐     │
+│  ┌──────────────────────────────────────────────────┐    │
 │  │           Vue.js 3 Frontend                      │    │
 │  │  ┌──────────┐  ┌──────────┐  ┌──────────────┐    │    │
 │  │  │  Views   │  │  Pinia   │  │  WebSocket   │    │    │
 │  │  │Components│  │  Stores  │  │    Client    │    │    │
-│  │  │  (17個)  │  │  (7個)   │  │ (Composable)  │    │    │
 │  │  └──────────┘  └──────────┘  └──────────────┘    │    │
 │  └──────────────────────────────────────────────────┘    │
 └──────────────────────┬───────────────────────────────────┘
@@ -54,7 +53,7 @@
 │                   FastAPI Backend                       │
 │  ┌──────────────┐  ┌─────────────┐  ┌──────────────┐    │
 │  │  API Routes  │  │  Services   │  │  WebSocket   │    │
-│  │  (10個模組)   │  │  (11個服務) │  │   Manager     │    │
+│  │              │  │             │  │   Manager    │    │
 │  └──────┬───────┘  └──────┬──────┘  └──────┬───────┘    │
 │         │                 │                │            │
 │         └──────────┬──────┴────────────────┘            │
@@ -63,18 +62,18 @@
 │            │  SQLAlchemy  │                             │
 │            │   2.0 Async  │                             │
 │            │     ORM      │                             │
-│            └──────┬───────┘                             │
+│            └───────┬──────┘                             │
 └────────────────────┼────────────────────────────────────┘
                      │
         ┌────────────┴─────────────┐
         ▼                          ▼
 ┌───────────────┐          ┌──────────────┐
 │  PostgreSQL   │          │    Redis     │
-│   17 + PostGIS│          │      8.x     │
+│ 17 + PostGIS  │          │     8.x      │
 │               │          │              │
 │  - Users      │          │  - Cache     │
 │  - Profiles   │          │  - Sessions  │
-│  - Matches    │          │  - 登入限制  │
+│  - Matches    │          │  - 登入限制   │
 │  - Messages   │          │              │
 │  - Reports    │          └──────────────┘
 └───────────────┘
@@ -115,165 +114,167 @@
 #### 資料模型關係圖
 
 ```
-┌──────────────────────┐
-│        User          │ (用戶基本資料)
-├──────────────────────┤
-│ id (PK)              │
-│ email                │◄──────┐
-│ password_hash        │       │
-│ email_verified       │       │ 1:1
-│ date_of_birth        │       │
-│ trust_score          │       │
-│ warning_count        │       │
-│ is_active            │       │
-│ is_admin             │       │
-│ ban_reason           │       │
-│ banned_until         │       │
-│ password_reset_token │       │
-│ password_reset_expires│      │
-│ created_at           │       │
-│ updated_at           │       │
-└──────────────────────┘       │
-                               │
-                ┌──────────────┴──────────────┐
-                │          Profile            │ (個人檔案)
-                ├─────────────────────────────┤
-                │ id (PK)                     │
-                │ user_id                     │
-                │ display_name                │ ← 顯示名稱
-                │ bio                         │
-                │ gender                      │
-                │ location (PostGIS Point)    │
-                │ location_name               │
-                │ min_age_preference          │
-                │ max_age_preference          │
-                │ max_distance_km             │
-                │ gender_preference           │
-                │ is_complete                 │
-                │ is_visible                  │
-                │ last_active                 │
-                │ created_at                  │
-                │ updated_at                  │
-                └─────────────────────────────┘
-                               │
-          ┌────────────────────┴────────────────────┐
-          │ 1:N                                     │ N:M
-          ▼                                         ▼
-    ┌─────────────────────────┐            ┌─────────────┐
-    │         Photo           │            │ InterestTag │ (興趣標籤)
-    │        (照片)           │            ├─────────────┤
-    ├─────────────────────────┤            │ id (PK)     │
-    │ id (PK)                 │            │ name        │
-    │ profile_id              │            │ category    │
-    │ url                     │            │ icon        │
-    │ thumbnail_url           │            │ is_active   │
-    │ is_profile_picture      │            └─────────────┘
-    │ display_order           │
-    │ file_size               │
-    │ width                   │
-    │ height                  │
-    │ mime_type               │
-    │ moderation_status       │ ← 審核狀態 (pending/approved/rejected)
-    │ rejection_reason        │
-    │ reviewed_by             │
-    │ reviewed_at             │
-    │ auto_moderation_score   │
-    │ auto_moderation_labels  │
-    │ created_at              │
-    └─────────────────────────┘
+┌───────────────────────────┐
+│           User            │  (用戶基本資料)
+├───────────────────────────┤
+│ id (PK)                   │
+│ email                     │
+│ password_hash             │
+│ email_verified            │
+│ date_of_birth             │
+│ trust_score               │
+│ warning_count             │
+│ is_active                 │
+│ is_admin                  │
+│ ban_reason                │
+│ banned_until              │
+│ password_reset_token      │
+│ password_reset_expires    │
+│ created_at                │
+│ updated_at                │
+└─────────────┬─────────────┘
+              │
+              │ 1:1
+              ▼
+┌───────────────────────────┐
+│          Profile          │  (個人檔案)
+├───────────────────────────┤
+│ id (PK)                   │
+│ user_id (FK)              │
+│ display_name              │  ← 顯示名稱
+│ bio                       │
+│ gender                    │
+│ location (PostGIS Point)  │
+│ location_name             │
+│ min_age_preference        │
+│ max_age_preference        │
+│ max_distance_km           │
+│ gender_preference         │
+│ is_complete               │
+│ is_visible                │
+│ last_active               │
+│ created_at                │
+│ updated_at                │
+└─────────────┬─────────────┘
+              │
+      ┌───────┴──────────────────────────────────┐
+      │ 1:N(一對多)                               │ N:M (多對多)
+      ▼                                          ▼
+┌─────────────────────────┐     ┌─────────────────────────┐
+│          Photo          │     │       InterestTag       │  (興趣標籤)
+│                         │     ├─────────────────────────┤
+├─────────────────────────┤     │ id (PK)                 │
+│ id (PK)                 │     │ name                    │
+│ profile_id (FK)         │     │ category                │
+│ url                     │     │ icon                    │
+│ thumbnail_url           │     │ is_active               │
+│ is_profile_picture      │     │ created_at              │
+│ display_order           │     └─────────────────────────┘
+│ file_size               │
+│ width                   │
+│ height                  │
+│ mime_type               │
+│ moderation_status       │  ← 審核狀態 (pending/approved/rejected)
+│ rejection_reason        │
+│ reviewed_by             │
+│ reviewed_at             │
+│ auto_moderation_score   │
+│ auto_moderation_labels  │
+│ created_at              │
+└─────────────────────────┘
 
-┌──────────────┐  ┌──────────────┐  ┌───────────────┐
-│     Like     │  │     Pass     │  │     Match     │ (配對記錄)
-├──────────────┤  ├──────────────┤  ├───────────────┤
-│ id (PK)      │  │ id (PK)      │  │ id (PK)       │
-│ from_user_id │  │ from_user_id │  │ user1_id      │
-│ to_user_id   │  │ to_user_id   │  │ user2_id      │
-│ created_at   │  │ passed_at    │  │ status        │
-└──────────────┘  └──────────────┘  │ matched_at    │
-                                    │ unmatched_at  │
-                                    │ unmatched_by  │
-                                    └───────────────┘
-       │                 │                    │
-       │        24小時內跳過的用戶             │
-       │        不會再次出現在探索頁           │
-       │                                      │
-       └──────────────────────────────────────┘
-                 互相喜歡時建立 Match
-                            │ 1:N
-                            ▼
-                      ┌─────────────────┐
-                      │     Message     │ (聊天訊息)
-                      ├─────────────────┤
-                      │ id (PK)         │
-                      │ match_id        │
-                      │ sender_id       │
-                      │ content         │
-                      │ message_type    │ (TEXT/IMAGE/GIF)
-                      │ is_read (DateTime)│ ← 讀取時間
-                      │ deleted_at      │ (軟刪除)
-                      │ sent_at         │
-                      └─────────────────┘
 
-┌──────────────┐      ┌──────────────────┐
-│ BlockedUser  │      │      Report      │ (舉報記錄)
-├──────────────┤      ├──────────────────┤
-│ id (PK)      │      │ id (PK)          │
-│ blocker_id   │      │ reporter_id      │
-│ blocked_id   │      │ reported_user_id │
-│ reason       │      │ report_type      │
-│ created_at   │      │ reason           │
-└──────────────┘      │ evidence         │
-                      │ status           │
-                      │ admin_notes      │ ← 管理員備註
-                      │ reviewed_by      │
-                      │ reviewed_at      │
-                      │ created_at       │
-                      │ updated_at       │
-                      └──────────────────┘
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│      Like       │     │      Pass       │     │      Match      │  (配對記錄)
+├─────────────────┤     ├─────────────────┤     ├─────────────────┤
+│ id (PK)         │     │ id (PK)         │     │ id (PK)         │
+│ from_user_id    │     │ from_user_id    │     │ user1_id        │
+│ to_user_id      │     │ to_user_id      │     │ user2_id        │
+│ created_at      │     │ passed_at       │     │ status          │
+└────────┬────────┘     └────────┬────────┘     │ matched_at      │
+         │                       │              │ unmatched_at    │
+         │                       │              │ unmatched_by    │
+         ▼                       ▼              └────────┬────────┘
+   永久不再出現           24小時內不出現                     │
+   在探索頁              24小時後重新出現                    │
+         │                       │                       │
+         └───────────┬───────────┘                       │
+                     │                                   │
+                     └────── 互相喜歡時建立 Match ─────────┘
+                                    │
+                                    │ 1:N (一對多)
+                                    ▼
+                          ┌─────────────────────┐
+                          │       Message       │  (聊天訊息)
+                          ├─────────────────────┤
+                          │ id (PK)             │
+                          │ match_id (FK)       │
+                          │ sender_id           │
+                          │ content             │
+                          │ message_type        │  (TEXT/IMAGE/GIF)
+                          │ is_read (DateTime)  │  ← 讀取時間
+                          │ deleted_at          │  (軟刪除)
+                          │ sent_at             │
+                          └─────────────────────┘
 
-┌──────────────┐
-│ Notification │ (通知記錄 - 持久化)
-├──────────────┤
-│ id (PK)      │ ← WebSocket 通知包含此 ID
-│ user_id      │
-│ type         │ (message/match/liked)
-│ title        │
-│ content      │
-│ data (JSONB) │
-│ is_read      │ ← 前端透過 API 標記已讀
-│ created_at   │
-└──────────────┘
 
-WebSocket 通知 Payload（包含 notification_id 讓前端可以標記已讀）:
+┌─────────────────────┐          ┌─────────────────────┐
+│     BlockedUser     │          │        Report       │  (舉報記錄)
+├─────────────────────┤          ├─────────────────────┤
+│ id (PK)             │          │ id (PK)             │
+│ blocker_id          │          │ reporter_id         │
+│ blocked_id          │          │ reported_user_id    │
+│ reason              │          │ report_type         │
+│ created_at          │          │ reason              │
+└─────────────────────┘          │ evidence            │
+                                 │ status              │
+                                 │ admin_notes         │  ← 管理員備註
+                                 │ reviewed_by         │
+                                 │ reviewed_at         │
+                                 │ created_at          │
+                                 │ updated_at          │
+                                 └─────────────────────┘
 
-| 類型 | 欄位 |
-|------|------|
+
+┌─────────────────────┐
+│     Notification    │  (通知記錄 - 持久化)
+├─────────────────────┤
+│ id (PK)             │  ← WebSocket 通知包含此 ID
+│ user_id             │
+│ type                │  (message/match/liked)
+│ title               │
+│ content             │
+│ data (JSONB)        │
+│ is_read             │  ← 前端透過 API 標記已讀
+│ created_at          │
+└─────────────────────┘
+
+**WebSocket 通知 Payload**（所有類型都包含 `notification_id` 供前端標記已讀）:
+
+| 類型                 | 欄位                                                    |
+|----------------------|---------------------------------------------------------|
 | notification_message | notification_id, match_id, sender_id, sender_name, preview, timestamp |
-| notification_match | notification_id, match_id, matched_user_id, matched_user_name, matched_user_avatar, timestamp |
-| notification_liked | notification_id, timestamp |
+| notification_match   | notification_id, match_id, matched_user_id, matched_user_name, matched_user_avatar, timestamp |
+| notification_liked   | notification_id, timestamp                              |
 
-**批量標記通知已讀**：進入聊天室時，前端會自動批量標記該配對的所有訊息通知為已讀：
-- 呼叫 `markMessageNotificationsAsReadByMatchIdAPI(matchId)`
-- 批量發送 `PUT /api/notifications/{id}/read` 請求
-- 確保資料庫同步更新
 
-┌─────────────────┐   ┌──────────────────┐   ┌────────────────────┐
-│  SensitiveWord  │   │  ContentAppeal   │   │   ModerationLog    │
-├─────────────────┤   ├──────────────────┤   ├────────────────────┤
-│ id (PK)         │   │ id (PK)          │   │ id (PK)            │
-│ word            │   │ user_id          │   │ user_id            │
-│ category        │   │ appeal_type      │   │ content_type       │
-│ severity        │   │ rejected_content │   │ original_content   │
-│ action          │   │ violations       │   │ is_approved        │
-│ (WARN/REJECT/   │   │ reason           │   │ violations         │
-│  AUTO_BAN)      │   │ status           │   │ triggered_word_ids │
-│ is_active       │   │ created_at       │   │ action_taken       │
-│ is_regex        │   │ updated_at       │   │ created_at         │
-│ description     │   └──────────────────┘   └────────────────────┘
-│ created_by      │
-│ created_at      │
-│ updated_at      │
-└─────────────────┘
+┌─────────────────────┐   ┌─────────────────────┐   ┌─────────────────────┐
+│    SensitiveWord    │   │    ContentAppeal    │   │    ModerationLog    │
+├─────────────────────┤   ├─────────────────────┤   ├─────────────────────┤
+│ id (PK)             │   │ id (PK)             │   │ id (PK)             │
+│ word                │   │ user_id             │   │ user_id             │
+│ category            │   │ appeal_type         │   │ content_type        │
+│ severity            │   │ rejected_content    │   │ original_content    │
+│ action              │   │ violations          │   │ is_approved         │
+│ (WARN/REJECT/       │   │ reason              │   │ violations          │
+│  AUTO_BAN)          │   │ status              │   │ triggered_word_ids  │
+│ is_active           │   │ admin_response      │   │ action_taken        │
+│ is_regex            │   │ reviewed_by         │   │ created_at          │
+│ description         │   │ reviewed_at         │   └─────────────────────┘
+│ created_by          │   │ created_at          │
+│ created_at          │   │ updated_at          │
+│ updated_at          │   └─────────────────────┘
+└─────────────────────┘
 ```
 
 ### 2.4 PostGIS 地理位置查詢
@@ -476,37 +477,16 @@ if profile.location is None:
 
 ## 7. 測試架構
 
-### 7.1 測試統計
+### 7.1 測試概況
 
-```
-後端測試（23 個測試檔案）：
-├── test_auth.py - 認證功能測試
-├── test_login_limiter.py - 登入限制測試
-├── test_last_active_middleware.py - 最後活躍中間件測試
-├── test_profile.py - 個人檔案測試
-├── test_photo_order.py - 照片順序測試
-├── test_discovery.py - 探索配對測試
-├── test_messages.py - 訊息測試
-├── test_websocket.py - WebSocket 測試
-├── test_safety.py - 安全功能測試
-├── test_content_moderation.py - 內容審核測試
-├── test_notifications.py - 通知測試
-├── test_notification_persistence.py - 通知持久化測試
-├── test_trust_score.py - 信任分數測試
-├── test_photo_moderation.py - 照片審核服務測試
-├── test_photo_moderation_api.py - 照片審核 API 測試
-├── test_moderation_api.py - 審核 API 測試
-├── test_token_blacklist.py - Token 黑名單測試
-├── test_verification_code.py - 驗證碼測試
-├── test_cookie_auth.py - Cookie 認證測試
-├── test_chat_image.py - 聊天圖片測試
-├── test_file_storage.py - 檔案儲存測試
-├── test_redis_integration.py - Redis 整合測試
-└── test_main.py - 主程式測試
+| 項目 | 說明 |
+|------|------|
+| 測試檔案位置 | `backend/tests/` |
+| 測試案例數 | 詳見 `pytest --collect-only` |
+| 覆蓋率目標 | >80% |
+| 測試框架 | pytest + pytest-asyncio |
 
-總計: 364 個測試案例
-覆蓋率: >80%
-```
+> 最新測試統計請參考 [README.md](../README.md#-測試) 或執行 `pytest -v --cov=app`
 
 ### 7.2 測試工具
 

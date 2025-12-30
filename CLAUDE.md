@@ -85,36 +85,7 @@ await axios.get('/api/profile/')         // 404
 
 ## 專案結構
 
-```text
-mergemeet/
-├── backend/                  # 後端 FastAPI 應用
-│   ├── app/
-│   │   ├── api/              # API 路由 (10 個模組)
-│   │   ├── core/             # 核心配置 (config, security, database)
-│   │   ├── models/           # SQLAlchemy 模型 (14 個)
-│   │   ├── schemas/          # Pydantic Schemas
-│   │   ├── services/         # 業務邏輯 (11 個服務)
-│   │   ├── websocket/        # WebSocket 管理
-│   │   └── main.py           # 主應用
-│   ├── alembic/              # 資料庫遷移
-│   ├── tests/                # pytest 測試
-│   ├── uploads/              # 檔案上傳
-│   └── scripts/              # 初始化腳本
-│
-├── frontend/                 # 前端 Vue 3 應用
-│   └── src/
-│       ├── views/            # 頁面 (17 個)
-│       ├── components/       # Vue 組件 (16 個)
-│       ├── stores/           # Pinia Stores (7 個)
-│       ├── composables/      # Vue Composables
-│       ├── api/              # API 客戶端
-│       ├── utils/            # 工具函數
-│       └── router/           # Vue Router
-│
-├── docs/                     # 專案文檔
-├── .claude/skills/           # Claude Code skills
-└── docker-compose.yml        # Docker 配置
-```
+> 詳見 [README.md](README.md#-專案結構)
 
 ---
 

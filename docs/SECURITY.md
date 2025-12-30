@@ -215,7 +215,7 @@ MergeMeet 使用信任分數系統自動追蹤用戶行為，維護平台安全�
 
 **實作位置：**
 - 服務層: `backend/app/services/trust_score.py`
-- 測試: `backend/tests/test_trust_score.py` (22 個測試案例)
+- 測試: `backend/tests/test_trust_score.py`
 - 文檔: [TRUST_SCORE_SYSTEM.md](./TRUST_SCORE_SYSTEM.md)
 
 ---
