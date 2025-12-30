@@ -220,7 +220,7 @@ npm run dev
 **預期結果：**
 
 - Alice 視窗顯示訊息為「已讀」（✓✓）
-- Network: `POST /api/messages/messages/read` 返回 `204`
+- Network: `POST /api/messages/read` 返回 `204`
 
 #### 測試案例：刪除訊息
 

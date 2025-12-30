@@ -152,49 +152,61 @@ onMounted(async () => {
 </template>
 ```
 
-### Pinia Store
+### Pinia Store（Composition API 風格）
 
 ```javascript
 // stores/profile.js
 import { defineStore } from 'pinia'
-import axios from 'axios'
+import { ref, computed } from 'vue'
+import apiClient from '@/api/client'
 
-export const useProfileStore = defineStore('profile', {
-  state: () => ({
-    profile: null,
-    photos: [],
-    loading: false,
-    error: null
-  }),
+export const useProfileStore = defineStore('profile', () => {
+  // State
+  const profile = ref(null)
+  const photos = ref([])
+  const loading = ref(false)
+  const error = ref(null)
 
-  getters: {
-    hasProfile: (state) => state.profile !== null,
-    primaryPhoto: (state) => {
-      return state.photos.find(photo => photo.is_primary)
-    }
-  },
+  // Getters
+  const hasProfile = computed(() => profile.value !== null)
+  const primaryPhoto = computed(() => {
+    return photos.value.find(photo => photo.is_primary)
+  })
 
-  actions: {
-    async fetchProfile() {
-      this.loading = true
-      try {
-        // 無尾隨斜線
-        const response = await axios.get('/api/profile')
-        this.profile = response.data
-      } catch (error) {
-        this.error = error.message
-        throw error
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async updateProfile(profileData) {
+  // Actions
+  const fetchProfile = async () => {
+    loading.value = true
+    try {
       // 無尾隨斜線
-      const response = await axios.put('/api/profile', profileData)
-      this.profile = response.data
-      return response.data
+      const response = await apiClient.get('/profile')
+      profile.value = response.data
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
     }
+  }
+
+  const updateProfile = async (profileData) => {
+    // 無尾隨斜線
+    const response = await apiClient.patch('/profile', profileData)
+    profile.value = response.data
+    return response.data
+  }
+
+  return {
+    // State
+    profile,
+    photos,
+    loading,
+    error,
+    // Getters
+    hasProfile,
+    primaryPhoto,
+    // Actions
+    fetchProfile,
+    updateProfile
   }
 })
 ```
@@ -204,7 +216,7 @@ export const useProfileStore = defineStore('profile', {
 ```javascript
 // router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import { useUserStore } from '@/stores/user'
 
 const routes = [
   {
@@ -226,9 +238,9 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
-  const authStore = useAuthStore()
+  const userStore = useUserStore()
 
-  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+  if (to.meta.requiresAuth && !userStore.isAuthenticated) {
     next('/login')
   } else {
     next()

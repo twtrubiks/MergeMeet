@@ -378,7 +378,7 @@ async def test_mark_messages_as_read(client: AsyncClient, matched_users: dict, t
 
     # Alice 標記訊息為已讀
     response = await client.post(
-        "/api/messages/messages/read",
+        "/api/messages/read",
         headers={"Authorization": f"Bearer {alice_token}"},
         json={"message_ids": [str(message.id)]}
     )
@@ -413,7 +413,7 @@ async def test_mark_multiple_messages_as_read(client: AsyncClient, matched_users
 
     # Alice 批量標記為已讀
     response = await client.post(
-        "/api/messages/messages/read",
+        "/api/messages/read",
         headers={"Authorization": f"Bearer {alice_token}"},
         json={"message_ids": message_ids}
     )
@@ -441,7 +441,7 @@ async def test_cannot_mark_own_messages_as_read(client: AsyncClient, matched_use
 
     # Alice 嘗試標記自己的訊息為已讀
     response = await client.post(
-        "/api/messages/messages/read",
+        "/api/messages/read",
         headers={"Authorization": f"Bearer {alice_token}"},
         json={"message_ids": [str(message.id)]}
     )

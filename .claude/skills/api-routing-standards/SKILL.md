@@ -91,8 +91,6 @@ app = FastAPI(
 |------|------|
 | 尾隨斜線規則 | [trailing-slash-rules.md](references/trailing-slash-rules.md) |
 | RESTful 原則 | [restful-principles.md](references/restful-principles.md) |
-| HTTP 狀態碼 | [status-codes.md](references/status-codes.md) |
-| 完整範例 | [complete-examples.md](references/complete-examples.md) |
 
 ---
 

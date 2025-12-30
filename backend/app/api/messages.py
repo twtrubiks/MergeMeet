@@ -256,7 +256,7 @@ async def get_conversations(
     return conversations
 
 
-@router.post("/messages/read", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/read", status_code=status.HTTP_204_NO_CONTENT)
 async def mark_messages_as_read(
     request: MarkAsReadRequest,
     current_user: User = Depends(get_current_user),

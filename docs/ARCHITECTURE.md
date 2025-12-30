@@ -39,32 +39,32 @@
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                     用戶端 (Browser)                      │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │           Vue.js 3 Frontend                      │   │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────────┐  │   │
-│  │  │  Views   │  │  Pinia   │  │  WebSocket   │  │   │
-│  │  │Components│  │  Stores  │  │    Client    │  │   │
-│  │  │  (17個)  │  │  (7個)   │  │ (Composable) │  │   │
-│  │  └──────────┘  └──────────┘  └──────────────┘  │   │
-│  └─────────────────────────────────────────────────┘   │
-└──────────────────────┬──────────────────────────────────┘
+│  ┌─────────────────────────────────────────────────┐     │
+│  │           Vue.js 3 Frontend                      │    │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────────┐    │    │
+│  │  │  Views   │  │  Pinia   │  │  WebSocket   │    │    │
+│  │  │Components│  │  Stores  │  │    Client    │    │    │
+│  │  │  (17個)  │  │  (7個)   │  │ (Composable)  │    │    │
+│  │  └──────────┘  └──────────┘  └──────────────┘    │    │
+│  └──────────────────────────────────────────────────┘    │
+└──────────────────────┬───────────────────────────────────┘
                        │ HTTPS / WSS
                        ▼
 ┌─────────────────────────────────────────────────────────┐
-│                   FastAPI Backend                        │
-│  ┌──────────────┐  ┌─────────────┐  ┌──────────────┐  │
-│  │  API Routes  │  │  Services   │  │  WebSocket   │  │
-│  │  (10個模組)   │  │  (9個服務)  │  │   Manager    │  │
-│  └──────┬───────┘  └──────┬──────┘  └──────┬───────┘  │
-│         │                  │                 │          │
-│         └──────────┬───────┴─────────────────┘          │
-│                    ▼                                     │
+│                   FastAPI Backend                       │
+│  ┌──────────────┐  ┌─────────────┐  ┌──────────────┐    │
+│  │  API Routes  │  │  Services   │  │  WebSocket   │    │
+│  │  (10個模組)   │  │  (11個服務) │  │   Manager     │    │
+│  └──────┬───────┘  └──────┬──────┘  └──────┬───────┘    │
+│         │                 │                │            │
+│         └──────────┬──────┴────────────────┘            │
+│                    ▼                                    │
 │            ┌──────────────┐                             │
 │            │  SQLAlchemy  │                             │
 │            │   2.0 Async  │                             │
 │            │     ORM      │                             │
 │            └──────┬───────┘                             │
-└────────────────────┼──────────────────────────────────┘
+└────────────────────┼────────────────────────────────────┘
                      │
         ┌────────────┴─────────────┐
         ▼                          ▼
@@ -115,71 +115,121 @@
 #### 資料模型關係圖
 
 ```
-┌─────────────┐
-│    User     │ (用戶基本資料)
-├─────────────┤
-│ id (PK)     │
-│ email       │◄──────┐
-│ password    │       │
-│ trust_score │       │ 1:1
-│ warning_cnt │       │
-└─────────────┘       │
-                      │
-                ┌─────┴──────┐
-                │  Profile   │ (個人檔案)
-                ├────────────┤
-                │ id (PK)    │
-                │ user_id    │
-                │ bio        │
-                │ location   │ (PostGIS Point)
-                └────────────┘
-                      │
-          ┌───────────┴───────────┐
-          │ 1:N                   │ N:M
-          ▼                       ▼
-    ┌────────────┐         ┌─────────────┐
-    │   Photo    │ (照片)  │ InterestTag │ (興趣標籤)
-    ├────────────┤         ├─────────────┤
-    │ id (PK)    │         │ id (PK)     │
-    │ profile_id │         │ name        │
-    │ file_path  │         │ category    │
-    │ is_primary │         │ icon        │
-    └────────────┘         │ is_active   │
-                           └─────────────┘
+┌──────────────────────┐
+│        User          │ (用戶基本資料)
+├──────────────────────┤
+│ id (PK)              │
+│ email                │◄──────┐
+│ password             │       │
+│ email_verified       │       │ 1:1
+│ date_of_birth        │       │
+│ trust_score          │       │
+│ warning_count        │       │
+│ is_active            │       │
+│ is_admin             │       │
+│ ban_reason           │       │
+│ banned_until         │       │
+│ password_reset_token │       │
+│ password_reset_expires│      │
+│ created_at           │       │
+│ updated_at           │       │
+└──────────────────────┘       │
+                               │
+                ┌──────────────┴──────────────┐
+                │          Profile            │ (個人檔案)
+                ├─────────────────────────────┤
+                │ id (PK)                     │
+                │ user_id                     │
+                │ display_name                │ ← 顯示名稱
+                │ bio                         │
+                │ gender                      │
+                │ location (PostGIS Point)    │
+                │ location_name               │
+                │ min_age_preference          │
+                │ max_age_preference          │
+                │ max_distance_km             │
+                │ gender_preference           │
+                │ is_complete                 │
+                │ is_visible                  │
+                │ last_active                 │
+                │ created_at                  │
+                │ updated_at                  │
+                └─────────────────────────────┘
+                               │
+          ┌────────────────────┴────────────────────┐
+          │ 1:N                                     │ N:M
+          ▼                                         ▼
+    ┌─────────────────────────┐            ┌─────────────┐
+    │         Photo           │            │ InterestTag │ (興趣標籤)
+    │        (照片)           │            ├─────────────┤
+    ├─────────────────────────┤            │ id (PK)     │
+    │ id (PK)                 │            │ name        │
+    │ profile_id              │            │ category    │
+    │ url                     │            │ icon        │
+    │ thumbnail_url           │            │ is_active   │
+    │ is_profile_picture      │            └─────────────┘
+    │ display_order           │
+    │ file_size               │
+    │ width                   │
+    │ height                  │
+    │ mime_type               │
+    │ moderation_status       │ ← 審核狀態 (pending/approved/rejected)
+    │ rejection_reason        │
+    │ reviewed_by             │
+    │ reviewed_at             │
+    │ auto_moderation_score   │
+    │ auto_moderation_labels  │
+    │ created_at              │
+    └─────────────────────────┘
 
-┌─────────────┐  ┌─────────────┐  ┌─────────────┐
-│    Like     │  │    Pass     │  │    Match    │ (配對記錄)
-├─────────────┤  ├─────────────┤  ├─────────────┤
-│ id (PK)     │  │ id (PK)     │  │ id (PK)     │
-│ liker_id    │  │ passer_id   │  │ user1_id    │
-│ liked_id    │  │ passed_id   │  │ user2_id    │
-│ created_at  │  │ passed_at   │  │ status      │
-└─────────────┘  └─────────────┘  │ matched_at  │
-       │                          └─────────────┘
-       └─────────────────────────────────┘
+┌──────────────┐  ┌──────────────┐  ┌───────────────┐
+│     Like     │  │     Pass     │  │     Match     │ (配對記錄)
+├──────────────┤  ├──────────────┤  ├───────────────┤
+│ id (PK)      │  │ id (PK)      │  │ id (PK)       │
+│ from_user_id │  │ from_user_id │  │ user1_id      │
+│ to_user_id   │  │ to_user_id   │  │ user2_id      │
+│ created_at   │  │ passed_at    │  │ status        │
+└──────────────┘  └──────────────┘  │ matched_at    │
+                                    │ unmatched_at  │
+                                    │ unmatched_by  │
+                                    └───────────────┘
+       │                 │                    │
+       │        24小時內跳過的用戶             │
+       │        不會再次出現在探索頁           │
+       │                                      │
+       └──────────────────────────────────────┘
                  互相喜歡時建立 Match
                             │ 1:N
                             ▼
-                      ┌─────────────┐
-                      │   Message   │ (聊天訊息)
-                      ├─────────────┤
-                      │ id (PK)     │
-                      │ match_id    │
-                      │ sender_id   │
-                      │ content     │
-                      │ is_read     │
-                      └─────────────┘
+                      ┌─────────────────┐
+                      │     Message     │ (聊天訊息)
+                      ├─────────────────┤
+                      │ id (PK)         │
+                      │ match_id        │
+                      │ sender_id       │
+                      │ content         │
+                      │ message_type    │ (TEXT/IMAGE/GIF)
+                      │ is_read (DateTime)│ ← 讀取時間
+                      │ deleted_at      │ (軟刪除)
+                      │ sent_at         │
+                      └─────────────────┘
 
-┌──────────────┐      ┌─────────────┐
-│ BlockedUser  │      │   Report    │ (舉報記錄)
-├──────────────┤      ├─────────────┤
-│ id (PK)      │      │ id (PK)     │
-│ blocker_id   │      │ reporter_id │
-│ blocked_id   │      │ reported_id │
-│ reason       │      │ report_type │
-│ created_at   │      │ reason      │
-└──────────────┘      │ status      │
-                      └─────────────┘
+┌──────────────┐      ┌──────────────────┐
+│ BlockedUser  │      │      Report      │ (舉報記錄)
+├──────────────┤      ├──────────────────┤
+│ id (PK)      │      │ id (PK)          │
+│ blocker_id   │      │ reporter_id      │
+│ blocked_id   │      │ reported_user_id │
+│ reason       │      │ report_type      │
+│ created_at   │      │ reason           │
+└──────────────┘      │ evidence         │
+                      │ status           │
+                      │ admin_notes      │ ← 管理員備註
+                      │ reviewed_by      │
+                      │ reviewed_at      │
+                      │ created_at       │
+                      │ updated_at       │
+                      └──────────────────┘
 
 ┌──────────────┐
 │ Notification │ (通知記錄 - 持久化)
@@ -194,17 +244,23 @@
 │ created_at   │
 └──────────────┘
 
-┌───────────────┐     ┌───────────────┐     ┌───────────────┐
-│ SensitiveWord │     │ ContentAppeal │     │ ModerationLog │
-├───────────────┤     ├───────────────┤     ├───────────────┤
-│ id (PK)       │     │ id (PK)       │     │ id (PK)       │
-│ word          │     │ user_id       │     │ user_id       │
-│ category      │     │ content_type  │     │ action        │
-│ severity      │     │ content_id    │     │ reason        │
-│ is_active     │     │ reason        │     │ details       │
-│ created_at    │     │ status        │     │ admin_id      │
-└───────────────┘     │ admin_notes   │     │ created_at    │
-                      └───────────────┘     └───────────────┘
+┌─────────────────┐   ┌──────────────────┐   ┌────────────────────┐
+│  SensitiveWord  │   │  ContentAppeal   │   │   ModerationLog    │
+├─────────────────┤   ├──────────────────┤   ├────────────────────┤
+│ id (PK)         │   │ id (PK)          │   │ id (PK)            │
+│ word            │   │ user_id          │   │ user_id            │
+│ category        │   │ appeal_type      │   │ content_type       │
+│ severity        │   │ rejected_content │   │ original_content   │
+│ action          │   │ violations       │   │ is_approved        │
+│ (WARN/REJECT/   │   │ reason           │   │ violations         │
+│  AUTO_BAN)      │   │ status           │   │ triggered_word_ids │
+│ is_active       │   │ created_at       │   │ action_taken       │
+│ is_regex        │   │ updated_at       │   │ created_at         │
+│ description     │   └──────────────────┘   └────────────────────┘
+│ created_by      │
+│ created_at      │
+│ updated_at      │
+└─────────────────┘
 ```
 
 ### 2.4 PostGIS 地理位置查詢
@@ -374,27 +430,15 @@ if profile.location is None:
 
 ## 4. 開發策略
 
-### 4.1 測試策略
+> 詳見 **Skill: mergemeet-quickstart** 的 [workflows.md](../.claude/skills/mergemeet-quickstart/references/workflows.md)
 
-專案重視測試覆蓋率，採用「功能開發 + 測試驗證」模式：
+包含：
+- Git 工作流程與分支策略
+- Conventional Commits 規範
+- TDD 測試流程（覆蓋率 >80%）
+- CI/CD 與發布流程
 
-- 開發功能後編寫對應測試
-- 維持 >80% 測試覆蓋率
-- 重構前確保測試通過
-
-### 4.2 Commit 規範
-
-採用 Conventional Commits 格式：
-
-- `feat`: 新功能
-- `fix`: 修復 Bug
-- `docs`: 文檔更新
-- `refactor`: 重構
-- `style`: 程式碼格式
-
-### 4.3 程式碼規範
-
-> 詳見 Skills：**backend-dev-fastapi**、**frontend-dev-vue3**
+程式碼規範詳見 Skills：**[backend-dev-fastapi](../.claude/skills/backend-dev-fastapi/SKILL.md)**、**[frontend-dev-vue3](../.claude/skills/frontend-dev-vue3/SKILL.md)**
 
 ---
 

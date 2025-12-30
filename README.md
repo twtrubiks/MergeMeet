@@ -135,9 +135,9 @@ mergemeet/
 │   ├── app/
 │   │   ├── api/              # API 路由 (10 個模組)
 │   │   ├── core/             # 核心配置 (config, security, database)
-│   │   ├── models/           # SQLAlchemy 模型 (13 個)
+│   │   ├── models/           # SQLAlchemy 模型 (14 個)
 │   │   ├── schemas/          # Pydantic Schemas
-│   │   ├── services/         # 業務邏輯 (9 個服務)
+│   │   ├── services/         # 業務邏輯 (11 個服務)
 │   │   ├── websocket/        # WebSocket 管理
 │   │   └── main.py           # 主應用
 │   ├── alembic/              # 資料庫遷移
