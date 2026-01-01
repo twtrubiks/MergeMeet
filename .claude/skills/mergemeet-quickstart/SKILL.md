@@ -21,7 +21,7 @@ docker compose up -d
 
 # 驗證服務
 docker compose ps
-# 預期結果: mergemeet-db (Up), mergemeet-redis (Up)
+# 預期結果: postgres (Up), redis (Up)
 ```
 
 ### 步驟 2：啟動後端
@@ -60,7 +60,7 @@ npm run dev
 
 ```bash
 # 連接到 PostgreSQL
-docker exec -it mergemeet-db psql -U mergemeet -d mergemeet
+docker exec -it mergemeet_postgres psql -U mergemeet -d mergemeet
 
 # 常用 SQL 指令
 \dt                    # 列出資料表
@@ -115,7 +115,7 @@ docker compose ps
 docker compose restart postgres
 
 # 測試連接
-docker exec -it mergemeet-db psql -U mergemeet -d mergemeet -c "SELECT 1;"
+docker exec -it mergemeet_postgres psql -U mergemeet -d mergemeet -c "SELECT 1;"
 ```
 
 ### 前端無法連接後端

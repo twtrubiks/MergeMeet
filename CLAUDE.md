@@ -93,7 +93,7 @@ await axios.get('/api/profile/')         // 404
 
 ```bash
 # 資料庫
-docker exec -it mergemeet-db psql -U mergemeet -d mergemeet
+docker exec -it mergemeet_postgres psql -U mergemeet -d mergemeet
 
 # 測試
 cd backend && pytest -v --cov=app

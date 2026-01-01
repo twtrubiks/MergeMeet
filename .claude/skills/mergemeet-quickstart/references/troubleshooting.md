@@ -22,18 +22,18 @@ sqlalchemy.exc.ProgrammingError: function st_distance(geometry, geometry) does n
 **診斷**:
 ```bash
 # 檢查 PostGIS 擴展是否存在
-docker exec -it mergemeet-db psql -U mergemeet -d mergemeet -c \
+docker exec -it mergemeet_postgres psql -U mergemeet -d mergemeet -c \
   "SELECT * FROM pg_extension WHERE extname = 'postgis';"
 
 # 檢查 PostGIS 版本
-docker exec -it mergemeet-db psql -U mergemeet -d mergemeet -c \
+docker exec -it mergemeet_postgres psql -U mergemeet -d mergemeet -c \
   "SELECT PostGIS_version();"
 ```
 
 **解決方案**:
 ```bash
 # 啟用 PostGIS 擴展
-docker exec -it mergemeet-db psql -U mergemeet -d mergemeet -c \
+docker exec -it mergemeet_postgres psql -U mergemeet -d mergemeet -c \
   "CREATE EXTENSION IF NOT EXISTS postgis;"
 ```
 
@@ -95,7 +95,7 @@ sqlalchemy.exc.TimeoutError: QueuePool limit of size 5 overflow 10 reached
 **診斷**:
 ```bash
 # 檢查活動連接數
-docker exec -it mergemeet-db psql -U mergemeet -d mergemeet -c \
+docker exec -it mergemeet_postgres psql -U mergemeet -d mergemeet -c \
   "SELECT COUNT(*) FROM pg_stat_activity;"
 ```
 

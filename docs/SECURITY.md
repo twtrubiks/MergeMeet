@@ -7,7 +7,7 @@
 MergeMeet 支援兩種認證方式，優先使用 HttpOnly Cookie 提供更高安全性。
 
 **主要認證方式：HttpOnly Cookie（推薦）**
-- Access Token: 30 分鐘有效期
+- Access Token: 30 分鐘有效期（預設，可透過環境變數調整）
 - Refresh Token: 30 天有效期
 - 存儲位置: HttpOnly Cookie（防止 XSS 攻擊）
 - 傳輸方式: 瀏覽器自動攜帶 Cookie + CSRF Token Header
