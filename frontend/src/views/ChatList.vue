@@ -3,7 +3,7 @@
     <div class="page-header">
       <!-- 返回主選單按鈕 -->
       <router-link to="/" class="back-home-btn">
-        <n-icon size="20"><Home /></n-icon>
+        <Icon name="home" size="sm" decorative />
         <span>返回主選單</span>
       </router-link>
 
@@ -13,9 +13,11 @@
       <div class="header-spacer"></div>
     </div>
 
-      <!-- 載入中 -->
-      <div v-if="chatStore.loading" class="loading">
-        <HeartLoader text="載入對話中..." />
+      <!-- 載入中 - 使用 Skeleton Loader -->
+      <div v-if="chatStore.loading" class="loading-skeleton">
+        <div class="conversation-list skeleton-list">
+          <SkeletonListItem variant="chat" v-for="i in 5" :key="i" />
+        </div>
       </div>
 
       <div v-else class="chat-list-container">
@@ -27,7 +29,7 @@
           <h2>還沒有對話</h2>
           <p>開始探索並配對來開啟對話！</p>
           <AnimatedButton variant="primary" @click="goToDiscovery">
-            🔍 開始探索
+            <Icon name="search" size="sm" decorative /> 開始探索
           </AnimatedButton>
         </div>
 
@@ -77,9 +79,7 @@
             </div>
 
             <!-- 箭頭圖示 -->
-            <n-icon size="20" class="arrow-icon">
-              <ChevronForward />
-            </n-icon>
+            <Icon name="chevron-forward" size="sm" decorative class="arrow-icon" />
           </div>
         </div>
       </div>
@@ -96,13 +96,13 @@
 <script setup>
 import { onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { NBadge, NButton, NIcon, NAvatar, NAlert, useMessage } from 'naive-ui'
-import { ChevronForward, Home } from '@vicons/ionicons5'
+import { NBadge, NAvatar, NAlert, useMessage } from 'naive-ui'
 import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
 import { useWebSocketStore } from '@/stores/websocket'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
-import HeartLoader from '@/components/ui/HeartLoader.vue'
+import SkeletonListItem from '@/components/ui/SkeletonListItem.vue'
+import Icon from '@/components/ui/Icon.vue'
 import { safeFormatDate } from '@/utils/dateFormat'
 import { logger } from '@/utils/logger'
 
@@ -180,13 +180,14 @@ onUnmounted(() => {
   background: linear-gradient(135deg, #FFF5F5 0%, #FFE5E5 100%);
 }
 
-/* 載入中 */
-.loading {
+/* 載入中 - Skeleton */
+.loading-skeleton {
+  padding: var(--space-5);
+}
+
+.skeleton-list {
   display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: calc(100vh - 80px);
-  padding: 40px;
+  flex-direction: column;
 }
 
 /* 返回主選單按鈕 */
@@ -384,7 +385,7 @@ onUnmounted(() => {
 
 .message-time {
   font-size: 0.8rem;
-  color: #999;
+  color: var(--color-text-muted);
   white-space: nowrap;
   flex-shrink: 0;
   font-weight: 600;
@@ -415,7 +416,7 @@ onUnmounted(() => {
 
 .no-message {
   font-size: 0.95rem;
-  color: #999;
+  color: var(--color-text-muted);
   font-style: italic;
   font-weight: 500;
 }

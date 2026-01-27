@@ -2,8 +2,8 @@
   <div class="discovery">
     <div class="container">
       <!-- 返回主選單按鈕 -->
-      <router-link to="/" class="back-home-btn">
-        <span class="btn-icon">🏠</span>
+      <router-link to="/" class="back-home-btn" aria-label="返回主選單">
+        <Icon name="home" size="sm" decorative class="btn-icon" />
         <span class="btn-text">返回主選單</span>
       </router-link>
 
@@ -15,14 +15,18 @@
       </div>
 
       <!-- 錯誤訊息 -->
-      <div v-else-if="discoveryStore.error" class="error-message">
-        <p>❌ {{ discoveryStore.error }}</p>
-        <button @click="loadCandidates" class="btn-retry">重試</button>
-      </div>
+      <ErrorState
+        v-else-if="discoveryStore.error"
+        title="無法載入候選人"
+        :message="discoveryStore.error"
+        @retry="loadCandidates"
+      />
 
       <!-- 沒有候選人 -->
       <div v-else-if="!discoveryStore.hasCandidates" class="empty-state">
-        <div class="empty-icon">🔍</div>
+        <div class="empty-icon" aria-hidden="true">
+          <Icon name="search" size="xl" decorative class="empty-search-icon" />
+        </div>
         <h2>沒有更多候選人了</h2>
         <p>請稍後再回來查看</p>
         <button @click="loadCandidates" class="btn-refresh">重新整理</button>
@@ -52,7 +56,7 @@
 
             <!-- 配對分數標籤 -->
             <div class="match-score">
-              <span class="score-icon">💕</span>
+              <Icon name="heart" size="sm" decorative class="score-icon" />
               <span class="score-value">{{ candidate.match_score }}%</span>
             </div>
 
@@ -62,8 +66,9 @@
               class="report-btn"
               @click.stop="handleOpenReportModal(candidate)"
               title="舉報此用戶"
+              aria-label="舉報此用戶"
             >
-              🚨
+              <Icon name="alert-outline" size="sm" decorative />
             </button>
           </div>
 
@@ -79,7 +84,8 @@
 
             <!-- 距離 -->
             <p v-if="candidate.distance_km" class="card-distance">
-              📍 {{ formatDistance(candidate.distance_km) }}
+              <Icon name="location" size="xs" decorative class="distance-icon" />
+              {{ formatDistance(candidate.distance_km) }}
             </p>
 
             <!-- 興趣標籤 -->
@@ -98,24 +104,24 @@
 
             <!-- 點擊查看詳情提示 -->
             <div v-if="index === 0" class="view-detail-hint">
-              <span>👆 點擊查看完整資料</span>
+              <span><Icon name="hand" size="xs" decorative /> 點擊查看完整資料</span>
             </div>
           </div>
 
           <!-- 滑動提示覆蓋層 -->
-          <div v-if="index === 0" class="swipe-overlay">
+          <div v-if="index === 0" class="swipe-overlay" aria-hidden="true">
             <div
               class="swipe-indicator like"
               :style="{ opacity: likeOpacity }"
             >
-              <span class="indicator-icon">❤️</span>
+              <Icon name="heart" size="lg" decorative class="indicator-icon" />
               <span class="indicator-text">喜歡</span>
             </div>
             <div
               class="swipe-indicator pass"
               :style="{ opacity: passOpacity }"
             >
-              <span class="indicator-icon">✖️</span>
+              <Icon name="close-outline" size="lg" decorative class="indicator-icon" />
               <span class="indicator-text">跳過</span>
             </div>
           </div>
@@ -123,13 +129,14 @@
       </div>
 
       <!-- 操作按鈕 -->
-      <div v-if="discoveryStore.hasCandidates" class="action-buttons">
+      <div v-if="discoveryStore.hasCandidates" class="action-buttons" role="group" aria-label="配對操作">
         <button
           @click="handlePass"
           class="action-btn pass-btn"
           :disabled="isAnimating"
+          aria-label="跳過此用戶"
         >
-          <span class="btn-icon">✖️</span>
+          <Icon name="close-outline" size="lg" decorative class="btn-icon" />
           <span class="btn-text">跳過</span>
           <div class="btn-ripple"></div>
         </button>
@@ -138,8 +145,9 @@
           @click="handleLike"
           class="action-btn like-btn"
           :disabled="isAnimating"
+          aria-label="喜歡此用戶"
         >
-          <span class="btn-icon">❤️</span>
+          <Icon name="heart" size="lg" decorative class="btn-icon" />
           <span class="btn-text">喜歡</span>
           <div class="btn-ripple"></div>
         </button>
@@ -174,10 +182,12 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import { useDiscoveryStore } from '@/stores/discovery'
+import Icon from '@/components/ui/Icon.vue'
 import MatchModal from '@/components/MatchModal.vue'
 import ReportModal from '@/components/ReportModal.vue'
 import UserDetailModal from '@/components/UserDetailModal.vue'
 import HeartLoader from '@/components/ui/HeartLoader.vue'
+import ErrorState from '@/components/ui/ErrorState.vue'
 import { throttle } from '@/utils/helpers'
 import { logger } from '@/utils/logger'
 
@@ -458,8 +468,8 @@ onUnmounted(() => {
 <style scoped>
 .discovery {
   min-height: 100vh;
-  background: linear-gradient(135deg, #FFF5F5 0%, #FFE5E5 100%);
-  padding: 20px;
+  background: linear-gradient(135deg, var(--color-primary-50) 0%, var(--color-primary-100) 100%);
+  padding: var(--space-5);
 }
 
 .container {
@@ -471,27 +481,27 @@ onUnmounted(() => {
 .back-home-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
   background: rgba(255, 255, 255, 0.95);
-  color: #FF6B6B;
+  color: var(--color-like-accessible);
   text-decoration: none;
-  border-radius: 25px;
-  font-weight: 600;
-  font-size: 0.95rem;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-  margin-bottom: 15px;
+  border-radius: var(--radius-full);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
+  box-shadow: var(--shadow-button);
+  transition: all var(--duration-slow) var(--easing-default);
+  margin-bottom: var(--space-4);
 }
 
 .back-home-btn:hover {
   background: white;
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(255, 107, 107, 0.3);
+  box-shadow: 0 6px 20px var(--color-like-alpha-20);
 }
 
 .back-home-btn .btn-icon {
-  font-size: 1.2rem;
+  display: inline-flex;
 }
 
 .back-home-btn .btn-text {
@@ -528,19 +538,19 @@ onUnmounted(() => {
 }
 
 .btn-retry {
-  padding: 12px 30px;
-  background: #FF6B6B;
+  padding: var(--space-3) var(--space-8);
+  background: var(--color-like);
   color: white;
   border: none;
-  border-radius: 25px;
-  font-size: 16px;
-  font-weight: 600;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all var(--duration-slow) var(--easing-default);
 }
 
 .btn-retry:hover {
-  background: #FF5252;
+  background: var(--color-like-hover);
   transform: translateY(-2px);
 }
 
@@ -551,8 +561,13 @@ onUnmounted(() => {
 }
 
 .empty-icon {
-  font-size: 80px;
-  margin-bottom: 20px;
+  margin-bottom: var(--space-5);
+  color: var(--color-like);
+}
+
+/* 放大空狀態搜尋圖標 */
+.empty-search-icon {
+  transform: scale(1.67); /* 80px / 48px ≈ 1.67 */
 }
 
 .empty-state h2 {
@@ -568,19 +583,19 @@ onUnmounted(() => {
 }
 
 .btn-refresh {
-  padding: 12px 30px;
-  background: #FF6B6B;
+  padding: var(--space-3) var(--space-8);
+  background: var(--color-like);
   color: white;
   border: none;
-  border-radius: 25px;
-  font-size: 16px;
-  font-weight: 600;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all var(--duration-slow) var(--easing-default);
 }
 
 .btn-refresh:hover {
-  background: #FF5252;
+  background: var(--color-like-hover);
   transform: translateY(-2px);
 }
 
@@ -671,13 +686,14 @@ onUnmounted(() => {
 }
 
 .score-icon {
-  font-size: 18px;
+  display: inline-flex;
+  color: var(--color-like);
 }
 
 .score-value {
-  font-size: 16px;
-  font-weight: 700;
-  color: #FF6B6B;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-like-accessible);
 }
 
 /* 舉報按鈕 */
@@ -741,9 +757,16 @@ onUnmounted(() => {
 }
 
 .card-distance {
-  font-size: 14px;
-  color: #999;
-  margin: 0 0 15px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-4);
+}
+
+.distance-icon {
+  display: inline-flex;
 }
 
 .card-interests {
@@ -755,12 +778,12 @@ onUnmounted(() => {
 
 .interest-tag {
   display: inline-block;
-  padding: 6px 12px;
-  background: #FFF0F0;
-  color: #FF6B6B;
-  border-radius: 15px;
-  font-size: 13px;
-  font-weight: 500;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-primary-alpha-10);
+  color: var(--color-primary-600);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
 }
 
 .card-bio {
@@ -772,16 +795,16 @@ onUnmounted(() => {
 
 /* 點擊查看詳情提示 */
 .view-detail-hint {
-  margin-top: 12px;
+  margin-top: var(--space-3);
   text-align: center;
-  font-size: 14px;
-  color: #FF6B6B;
-  font-weight: 500;
-  transition: all 0.2s ease;
+  font-size: var(--font-size-sm);
+  color: var(--color-like-accessible);
+  font-weight: var(--font-weight-medium);
+  transition: all var(--duration-normal) var(--easing-default);
 }
 
 .top-card .card-info:hover .view-detail-hint {
-  color: #FF5252;
+  color: var(--color-like-hover);
   transform: scale(1.05);
 }
 
@@ -811,7 +834,7 @@ onUnmounted(() => {
 
 .swipe-indicator.like {
   right: 50px;
-  background: rgba(76, 175, 80, 0.9);
+  background: rgba(56, 142, 60, 0.95);
   color: white;
   border: 3px solid white;
 }
@@ -824,7 +847,7 @@ onUnmounted(() => {
 }
 
 .indicator-icon {
-  font-size: 40px;
+  display: flex;
 }
 
 .indicator-text {
@@ -901,25 +924,25 @@ onUnmounted(() => {
 }
 
 .like-btn {
-  background: linear-gradient(135deg, #FF6B6B, #FF8E8E);
+  background: var(--color-like-gradient);
   color: white;
   border: 3px solid transparent;
 }
 
 .like-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #FF5252, #FF6B6B);
-  box-shadow: 0 10px 30px rgba(255, 107, 107, 0.5);
+  background: linear-gradient(135deg, var(--color-like-hover), var(--color-like));
+  box-shadow: var(--shadow-like-hover);
 }
 
-.btn-icon {
-  font-size: 38px;
+.action-btn .btn-icon {
+  display: flex;
   position: relative;
   z-index: 1;
-  transition: transform 0.3s ease;
+  transition: transform var(--duration-slow) var(--easing-default);
 }
 
 .action-btn:hover:not(:disabled) .btn-icon {
-  transform: scale(1.15);
+  transform: scale(1.1);
 }
 
 .btn-text {

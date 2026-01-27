@@ -181,10 +181,10 @@ const handleUserMenuSelect = (key) => {
   left: 0;
   right: 0;
   height: 56px;
-  background-color: #fff;
-  border-bottom: 1px solid #f0f0f0;
-  z-index: 1000;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-border-light);
+  z-index: var(--z-modal);
+  box-shadow: var(--shadow-sm);
 }
 
 .navbar-content {
@@ -207,9 +207,9 @@ const handleUserMenuSelect = (key) => {
 }
 
 .logo-text {
-  font-size: 22px;
-  font-weight: 700;
-  background: linear-gradient(135deg, #ff6b6b 0%, #ff8e8e 100%);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  background: var(--color-primary-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -224,27 +224,29 @@ const handleUserMenuSelect = (key) => {
 .nav-link {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border-radius: 8px;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
   text-decoration: none;
-  color: #666;
-  transition: all 0.2s;
-  font-size: 14px;
+  color: var(--color-text-muted);
+  transition: all var(--duration-normal);
+  font-size: var(--font-size-sm);
+  min-height: var(--touch-target-min);
 }
 
 .nav-link:hover {
-  background-color: #f5f5f5;
-  color: #333;
+  background-color: var(--color-background-light);
+  color: var(--color-text-primary);
 }
 
 .nav-link.active {
-  background-color: #fff0f0;
-  color: #ff6b6b;
+  background-color: var(--color-primary-alpha-10);
+  color: var(--color-primary-600);
 }
 
 .nav-text {
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
 }
 
 /* 右側 */
@@ -255,12 +257,17 @@ const handleUserMenuSelect = (key) => {
 }
 
 .user-menu-btn {
-  padding: 4px;
-  border-radius: 50%;
+  padding: var(--space-1);
+  border-radius: var(--radius-full);
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .user-menu-btn:hover {
-  background-color: #f5f5f5;
+  background-color: var(--color-background-light);
 }
 
 /* 響應式 */
@@ -270,11 +277,28 @@ const handleUserMenuSelect = (key) => {
   }
 
   .nav-link {
-    padding: 8px 12px;
+    padding: var(--space-2) var(--space-3);
+    min-width: var(--touch-target-min);
+    min-height: var(--touch-target-min);
   }
 
   .logo-text {
-    font-size: 18px;
+    font-size: var(--font-size-lg);
+  }
+}
+
+/* 極小螢幕 */
+@media (max-width: 360px) {
+  .navbar-content {
+    padding: 0 var(--space-2);
+  }
+
+  .navbar-center {
+    gap: var(--space-1);
+  }
+
+  .nav-link {
+    padding: var(--space-2);
   }
 }
 </style>

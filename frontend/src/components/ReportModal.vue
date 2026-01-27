@@ -4,7 +4,9 @@
       <div class="modal-content" @click.stop>
         <div class="modal-header">
           <h2>舉報用戶</h2>
-          <button class="close-btn" @click="handleClose">✕</button>
+          <button class="close-btn" @click="handleClose" aria-label="關閉舉報視窗">
+            <Icon name="close" size="md" decorative />
+          </button>
         </div>
 
         <div class="modal-body">
@@ -60,12 +62,12 @@
 
           <!-- 錯誤訊息 -->
           <div v-if="error" class="error-message">
-            ❌ {{ error }}
+            <Icon name="close" size="sm" decorative /> {{ error }}
           </div>
 
           <!-- 成功訊息 -->
           <div v-if="success" class="success-message">
-            ✅ 舉報已送出，感謝您的協助！
+            <Icon name="check-circle" size="sm" decorative /> 舉報已送出，感謝您的協助！
           </div>
         </div>
 
@@ -93,6 +95,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useSafetyStore } from '@/stores/safety'
+import Icon from '@/components/ui/Icon.vue'
 
 const props = defineProps({
   show: {
@@ -197,7 +200,7 @@ watch(() => props.show, (newVal) => {
 .modal-content {
   background: white;
   border-radius: 20px;
-  max-width: 500px;
+  max-width: min(500px, calc(100vw - 40px));
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
@@ -224,11 +227,11 @@ watch(() => props.show, (newVal) => {
   background: none;
   border: none;
   font-size: 28px;
-  color: #999;
+  color: var(--color-text-muted);
   cursor: pointer;
   padding: 0;
-  width: 32px;
-  height: 32px;
+  min-width: 44px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -301,7 +304,7 @@ textarea.form-control {
 .char-count {
   text-align: right;
   font-size: 12px;
-  color: #999;
+  color: var(--color-text-muted);
   margin-top: 4px;
 }
 
@@ -343,6 +346,7 @@ textarea.form-control {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+  min-height: 44px;
 }
 
 .btn:disabled {

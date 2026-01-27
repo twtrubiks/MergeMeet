@@ -3,7 +3,7 @@
     <div class="auth-card">
       <div class="auth-header">
         <div class="logo-animation">
-          <span class="logo-icon">🔐</span>
+          <Icon name="lock" size="xl" decorative />
         </div>
         <h1>忘記密碼</h1>
         <p>輸入您的 Email，我們將發送重置連結</p>
@@ -11,7 +11,7 @@
 
       <!-- 成功狀態 -->
       <div v-if="emailSent" class="success-message">
-        <div class="success-icon">✉️</div>
+        <div class="success-icon"><Icon name="check-circle" size="xl" decorative /></div>
         <h2>郵件已發送！</h2>
         <p class="success-text">
           我們已發送密碼重置郵件到
@@ -55,7 +55,7 @@
           :disabled="!isFormValid || isLoading"
           :loading="isLoading"
         >
-          <span v-if="!isLoading">📧 發送重置郵件</span>
+          <span v-if="!isLoading"><Icon name="chat" size="sm" decorative /> 發送重置郵件</span>
         </AnimatedButton>
       </form>
 
@@ -83,6 +83,7 @@ import { useRouter } from 'vue-router'
 import apiClient from '@/api/client'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 import FloatingInput from '@/components/ui/FloatingInput.vue'
+import Icon from '@/components/ui/Icon.vue'
 
 const router = useRouter()
 

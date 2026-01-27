@@ -3,7 +3,10 @@
     <div class="auth-card">
       <div class="auth-header">
         <div class="logo-animation">
-          <span class="logo-heart">💕</span>
+          <div class="logo-hearts">
+            <Icon name="heart" size="xl" decorative class="heart-icon heart-main" />
+            <Icon name="heart" size="lg" decorative class="heart-icon heart-small" />
+          </div>
         </div>
         <h1>加入 MergeMeet</h1>
         <p>開始你的交友之旅</p>
@@ -29,6 +32,7 @@
             type="password"
             :disabled="isLoading"
             :required="true"
+            :showPasswordToggle="true"
           />
           <div class="password-strength">
             <div class="strength-bar" :class="passwordStrengthClass"></div>
@@ -45,6 +49,7 @@
           :disabled="isLoading"
           :required="true"
           :error="passwordMismatchError"
+          :showPasswordToggle="true"
         />
 
         <!-- 出生日期 -->
@@ -64,7 +69,7 @@
 
         <!-- 錯誤訊息 -->
         <div v-if="error" class="error-message">
-          <span class="error-icon">⚠️</span>
+          <Icon name="warning" size="sm" decorative />
           <span>{{ error }}</span>
         </div>
 
@@ -75,7 +80,7 @@
           :disabled="!isFormValid"
           :loading="isLoading"
         >
-          <span v-if="!isLoading">🎉 註冊</span>
+          <span v-if="!isLoading"><Icon name="rocket" size="sm" decorative /> 註冊</span>
         </AnimatedButton>
       </form>
 
@@ -103,6 +108,7 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 import FloatingInput from '@/components/ui/FloatingInput.vue'
+import Icon from '@/components/ui/Icon.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -221,8 +227,8 @@ const handleRegister = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  padding: 20px;
+  background: var(--color-secondary-gradient);
+  padding: var(--space-5);
   overflow: hidden;
 }
 
@@ -286,13 +292,13 @@ const handleRegister = async () => {
   z-index: 1;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
-  border-radius: 24px;
-  padding: 40px;
+  border-radius: var(--radius-2xl);
+  padding: var(--space-10);
   max-width: 480px;
   width: 100%;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3),
+  box-shadow: var(--shadow-2xl),
               0 0 0 1px rgba(255, 255, 255, 0.2);
-  animation: slideUp 0.5s ease-out;
+  animation: slideUp var(--duration-slower) var(--easing-out);
   max-height: 90vh;
   overflow-y: auto;
 }
@@ -317,11 +323,31 @@ const handleRegister = async () => {
   margin-bottom: 16px;
 }
 
-.logo-heart {
-  display: inline-block;
-  font-size: 3.5rem;
-  animation: heartBeat 1.5s infinite;
+.logo-hearts {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 58px;
+}
+
+.heart-icon {
+  color: #f5576c;
   filter: drop-shadow(0 4px 8px rgba(245, 87, 108, 0.3));
+}
+
+.heart-main {
+  animation: heartBeat 1.5s infinite;
+}
+
+.heart-small {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  color: #f093fb;
+  animation: heartBeat 1.5s infinite;
+  animation-delay: 0.2s;
 }
 
 @keyframes heartBeat {
@@ -337,13 +363,13 @@ const handleRegister = async () => {
 }
 
 .auth-header h1 {
-  font-size: 2rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  background: var(--color-secondary-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .auth-header p {
@@ -394,7 +420,7 @@ const handleRegister = async () => {
 }
 
 .hint {
-  color: #666;
+  color: #555;
   font-size: 0.8rem;
   font-weight: 500;
   margin-top: -8px;
@@ -472,18 +498,18 @@ const handleRegister = async () => {
 }
 
 .login-link {
-  color: #f5576c;
+  color: var(--color-secondary-500);
   text-decoration: none;
-  font-weight: 600;
-  transition: all 0.3s ease;
+  font-weight: var(--font-weight-semibold);
+  transition: all var(--duration-slow) var(--easing-default);
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .login-link:hover {
-  color: #f093fb;
-  gap: 8px;
+  color: var(--color-secondary-600);
+  gap: var(--space-2);
 }
 
 /* 自定義滾動條 */
@@ -510,8 +536,21 @@ const handleRegister = async () => {
     font-size: 1.75rem;
   }
 
-  .logo-heart {
-    font-size: 3rem;
+  .logo-hearts {
+    width: 60px;
+    height: 48px;
+  }
+}
+
+/* 無障礙：減少動畫 */
+@media (prefers-reduced-motion: reduce) {
+  .logo-hearts .heart-icon,
+  .circle {
+    animation: none;
+  }
+
+  .auth-card {
+    animation: none;
   }
 }
 </style>

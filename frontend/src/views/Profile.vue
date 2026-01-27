@@ -3,7 +3,7 @@
     <div class="container">
       <!-- 返回主選單按鈕 -->
       <router-link to="/" class="back-home-btn">
-        <span class="btn-icon">🏠</span>
+        <Icon name="home" size="sm" decorative />
         <span class="btn-text">返回主選單</span>
       </router-link>
 
@@ -21,7 +21,7 @@
           <h1>👋 歡迎！</h1>
           <p class="subtitle">建立你的個人檔案，開始認識新朋友</p>
           <AnimatedButton variant="primary" @click="startCreating">
-            ✨ 建立個人檔案
+            <Icon name="flash" size="sm" decorative /> 建立個人檔案
           </AnimatedButton>
         </div>
       </div>
@@ -96,8 +96,8 @@
                   @click="getAutoLocation"
                   :disabled="gettingLocation"
                 >
-                  <span v-if="!gettingLocation">📍 自動獲取我的位置</span>
-                  <span v-else>🔄 定位中...</span>
+                  <span v-if="!gettingLocation"><Icon name="location" size="sm" decorative /> 自動獲取我的位置</span>
+                  <span v-else><Icon name="sync" size="sm" decorative /> 定位中...</span>
                 </button>
                 <small class="hint">或手動選擇城市</small>
               </div>
@@ -145,7 +145,7 @@
 
               <!-- 顯示座標信息（GPS 定位成功時） -->
               <small v-if="formData.gps_location" class="success-hint">
-                ✅ GPS 定位成功（已模糊化保護隱私）
+                <Icon name="check-circle" size="sm" decorative /> GPS 定位成功（已模糊化保護隱私）
               </small>
             </div>
 
@@ -187,7 +187,7 @@
                 :disabled="profileStore.loading"
                 :loading="profileStore.loading"
               >
-                <span v-if="!profileStore.loading">✨ 完成</span>
+                <span v-if="!profileStore.loading"><Icon name="check" size="sm" decorative /> 完成</span>
               </AnimatedButton>
             </div>
           </div>
@@ -220,11 +220,11 @@
                 {{ profileStore.profile.age }} 歲
               </p>
               <p class="profile-location" v-if="profileStore.profile.location_name">
-                📍 {{ profileStore.profile.location_name }}
+                <Icon name="location" size="sm" decorative /> {{ profileStore.profile.location_name }}
               </p>
             </div>
             <AnimatedButton variant="primary" @click="startEditing">
-              ✏️ 編輯
+              <Icon name="edit" size="sm" decorative /> 編輯
             </AnimatedButton>
           </div>
 
@@ -288,10 +288,14 @@
           <div class="profile-section">
             <div class="status-badges">
               <span class="badge" :class="profileStore.isProfileComplete ? 'badge-success' : 'badge-warning'">
-                {{ profileStore.isProfileComplete ? '✅ 檔案完整' : '⚠️ 檔案不完整' }}
+                <Icon v-if="profileStore.isProfileComplete" name="check-circle" size="sm" decorative />
+                <Icon v-else name="warning" size="sm" decorative />
+                {{ profileStore.isProfileComplete ? '檔案完整' : '檔案不完整' }}
               </span>
               <span class="badge" :class="profileStore.profile.is_visible ? 'badge-success' : 'badge-inactive'">
-                {{ profileStore.profile.is_visible ? '👁️ 公開' : '🔒 隱藏' }}
+                <Icon v-if="profileStore.profile.is_visible" name="eye" size="sm" decorative />
+                <Icon v-else name="lock" size="sm" decorative />
+                {{ profileStore.profile.is_visible ? '公開' : '隱藏' }}
               </span>
             </div>
           </div>
@@ -302,7 +306,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useProfileStore } from '@/stores/profile'
 import { useUserStore } from '@/stores/user'
@@ -310,6 +314,8 @@ import PhotoUploader from '@/components/PhotoUploader.vue'
 import InterestSelector from '@/components/InterestSelector.vue'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 import HeartLoader from '@/components/ui/HeartLoader.vue'
+import Icon from '@/components/ui/Icon.vue'
+import { useFormDirty } from '@/composables/useFormDirty'
 import { useMessage, useDialog } from 'naive-ui'
 import { logger } from '@/utils/logger'
 
@@ -334,8 +340,25 @@ const formData = ref({
   gps_location: null  // 存儲 GPS 定位結果 { latitude, longitude }
 })
 
+// 原始表單資料（用於髒狀態檢測）
+const originalFormData = ref({
+  display_name: '',
+  gender: '',
+  bio: '',
+  location_name: '',
+  gps_location: null
+})
+
 // 選擇的興趣標籤
 const selectedInterests = ref([])
+
+// 表單髒狀態追蹤（僅在編輯模式下啟用）
+const isFormActive = computed(() => isCreating.value || isEditing.value)
+const { isDirty, setClean } = useFormDirty(formData, originalFormData, {
+  confirmMessage: '您的個人檔案有未儲存的變更，確定要離開嗎？',
+  // 只有在編輯/建立模式下才啟用確認
+  confirmOnLeave: true
+})
 
 /**
  * 開始建立檔案
@@ -353,12 +376,16 @@ const startEditing = () => {
   isEditing.value = true
   currentStep.value = 1
   // 填充現有資料
-  formData.value = {
+  const existingData = {
     display_name: profileStore.profile.display_name,
     gender: profileStore.profile.gender,
     bio: profileStore.profile.bio,
-    location_name: profileStore.profile.location_name || ''
+    location_name: profileStore.profile.location_name || '',
+    gps_location: null
   }
+  formData.value = { ...existingData }
+  // 儲存原始資料用於髒狀態檢測
+  originalFormData.value = { ...existingData }
   selectedInterests.value = profileStore.profileInterests.map(i => i.id)
 }
 
@@ -644,6 +671,7 @@ const saveBasicInfo = async () => {
     // 只有成功後才切換狀態
     isCreating.value = false
     isEditing.value = true
+    setClean() // 標記表單為乾淨狀態
     message.success('個人檔案創建成功')
   } catch (error) {
     logger.error('建立個人檔案失敗:', error)
@@ -698,6 +726,7 @@ const submitProfile = async () => {
     isCreating.value = false
     isEditing.value = false
     currentStep.value = 1
+    setClean() // 標記表單為乾淨狀態
 
     // 重新載入檔案
     await fetchProfileData()
@@ -977,13 +1006,13 @@ onMounted(async () => {
 .form-group small {
   display: block;
   margin-top: 0.5rem;
-  color: #999;
+  color: var(--color-text-muted);
   font-size: 0.85rem;
   font-weight: 500;
 }
 
 .form-group .hint {
-  color: #999;
+  color: var(--color-text-muted);
   font-style: italic;
   font-weight: 400;
 }

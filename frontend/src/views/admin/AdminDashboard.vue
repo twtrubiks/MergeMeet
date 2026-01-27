@@ -12,14 +12,19 @@
     <!-- Tab 導航 -->
     <div class="admin-tabs">
       <n-tabs v-model:value="activeTab" type="line" animated @update:value="handleTabChange">
-        <n-tab-pane name="dashboard" tab="📊 儀表板">
+        <n-tab-pane name="dashboard">
+          <template #tab>
+            <span class="tab-label"><Icon name="stats" size="sm" decorative /> 儀表板</span>
+          </template>
           <div class="tab-content">
       <!-- 統計卡片 -->
       <div class="stats-section">
         <h2>系統統計</h2>
         <div class="stats-grid">
           <div class="stat-card">
-            <div class="stat-icon">👥</div>
+            <div class="stat-icon">
+              <Icon name="people" size="lg" decorative />
+            </div>
             <div class="stat-info">
               <div class="stat-value">{{ stats.total_users }}</div>
               <div class="stat-label">總用戶數</div>
@@ -27,7 +32,9 @@
           </div>
 
           <div class="stat-card">
-            <div class="stat-icon">✅</div>
+            <div class="stat-icon">
+              <Icon name="checkmark-done" size="lg" decorative />
+            </div>
             <div class="stat-info">
               <div class="stat-value">{{ stats.active_users }}</div>
               <div class="stat-label">活躍用戶</div>
@@ -35,7 +42,9 @@
           </div>
 
           <div class="stat-card">
-            <div class="stat-icon">💕</div>
+            <div class="stat-icon">
+              <Icon name="heart-half" size="lg" decorative />
+            </div>
             <div class="stat-info">
               <div class="stat-value">{{ stats.active_matches }}</div>
               <div class="stat-label">活躍配對</div>
@@ -43,7 +52,9 @@
           </div>
 
           <div class="stat-card">
-            <div class="stat-icon">💬</div>
+            <div class="stat-icon">
+              <Icon name="chatbubbles" size="lg" decorative />
+            </div>
             <div class="stat-info">
               <div class="stat-value">{{ stats.total_messages }}</div>
               <div class="stat-label">訊息總數</div>
@@ -51,7 +62,9 @@
           </div>
 
           <div class="stat-card warning">
-            <div class="stat-icon">⚠️</div>
+            <div class="stat-icon">
+              <Icon name="flag" size="lg" decorative />
+            </div>
             <div class="stat-info">
               <div class="stat-value">{{ stats.pending_reports }}</div>
               <div class="stat-label">待處理舉報</div>
@@ -59,7 +72,9 @@
           </div>
 
           <div class="stat-card danger">
-            <div class="stat-icon">🚫</div>
+            <div class="stat-icon">
+              <Icon name="ban" size="lg" decorative />
+            </div>
             <div class="stat-info">
               <div class="stat-value">{{ stats.banned_users }}</div>
               <div class="stat-label">被封禁用戶</div>
@@ -76,9 +91,14 @@
         </div>
 
         <n-spin :show="loading">
-          <div v-if="reports.length === 0" class="empty-state">
-            <p>暫無待處理舉報</p>
-          </div>
+          <ErrorState
+            v-if="reports.length === 0"
+            variant="info"
+            title="暫無待處理舉報"
+            message="目前沒有需要處理的舉報，系統運作正常"
+            :show-retry="false"
+            :icon-size="48"
+          />
 
           <div v-else class="reports-list">
             <div v-for="report in reports" :key="report.id" class="report-item">
@@ -116,35 +136,46 @@
           </div>
         </n-tab-pane>
 
-        <n-tab-pane name="moderation" tab="🛡️ 內容審核">
+        <n-tab-pane name="moderation">
+          <template #tab>
+            <span class="tab-label"><Icon name="shield-check" size="sm" decorative /> 內容審核</span>
+          </template>
           <div class="tab-content">
             <!-- 審核統計 -->
             <div class="moderation-stats">
               <h2>審核統計</h2>
               <div class="stats-grid">
                 <div class="stat-card">
-                  <div class="stat-icon">📝</div>
+                  <div class="stat-icon">
+                    <Icon name="document-text" size="lg" decorative />
+                  </div>
                   <div class="stat-info">
                     <div class="stat-value">{{ moderationStats.total_sensitive_words }}</div>
                     <div class="stat-label">敏感詞總數</div>
                   </div>
                 </div>
                 <div class="stat-card">
-                  <div class="stat-icon">✅</div>
+                  <div class="stat-icon">
+                    <Icon name="checkmark-done" size="lg" decorative />
+                  </div>
                   <div class="stat-info">
                     <div class="stat-value">{{ moderationStats.active_sensitive_words }}</div>
                     <div class="stat-label">啟用敏感詞</div>
                   </div>
                 </div>
                 <div class="stat-card warning">
-                  <div class="stat-icon">⏳</div>
+                  <div class="stat-icon">
+                    <Icon name="hourglass" size="lg" decorative />
+                  </div>
                   <div class="stat-info">
                     <div class="stat-value">{{ moderationStats.pending_appeals }}</div>
                     <div class="stat-label">待審核申訴</div>
                   </div>
                 </div>
                 <div class="stat-card">
-                  <div class="stat-icon">📊</div>
+                  <div class="stat-icon">
+                    <Icon name="stats" size="lg" decorative />
+                  </div>
                   <div class="stat-info">
                     <div class="stat-value">{{ moderationStats.total_violations_today }}</div>
                     <div class="stat-label">今日違規</div>
@@ -198,9 +229,14 @@
               </div>
 
               <n-spin :show="loadingAppeals">
-                <div v-if="appeals.length === 0" class="empty-state">
-                  <p>暫無待處理申訴</p>
-                </div>
+                <ErrorState
+                  v-if="appeals.length === 0"
+                  variant="info"
+                  title="暫無待處理申訴"
+                  message="目前沒有需要處理的內容申訴"
+                  :show-retry="false"
+                  :icon-size="48"
+                />
 
                 <div v-else class="appeals-list">
                   <div v-for="appeal in appeals" :key="appeal.id" class="appeal-item">
@@ -258,28 +294,37 @@
           </div>
         </n-tab-pane>
 
-        <n-tab-pane name="users" tab="👥 用戶管理">
+        <n-tab-pane name="users">
+          <template #tab>
+            <span class="tab-label"><Icon name="people" size="sm" decorative /> 用戶管理</span>
+          </template>
           <div class="tab-content">
             <!-- 用戶管理統計 -->
             <div class="users-stats-section">
               <h2>用戶統計</h2>
               <div class="stats-grid">
                 <div class="stat-card">
-                  <div class="stat-icon">👥</div>
+                  <div class="stat-icon">
+                    <Icon name="people" size="lg" decorative />
+                  </div>
                   <div class="stat-info">
                     <div class="stat-value">{{ stats.total_users }}</div>
                     <div class="stat-label">總用戶數</div>
                   </div>
                 </div>
                 <div class="stat-card">
-                  <div class="stat-icon">✅</div>
+                  <div class="stat-icon">
+                    <Icon name="checkmark-done" size="lg" decorative />
+                  </div>
                   <div class="stat-info">
                     <div class="stat-value">{{ stats.active_users }}</div>
                     <div class="stat-label">活躍用戶</div>
                   </div>
                 </div>
                 <div class="stat-card danger">
-                  <div class="stat-icon">🚫</div>
+                  <div class="stat-icon">
+                    <Icon name="ban" size="lg" decorative />
+                  </div>
                   <div class="stat-info">
                     <div class="stat-value">{{ stats.banned_users }}</div>
                     <div class="stat-label">被封禁用戶</div>
@@ -303,7 +348,7 @@
                   clearable
                   @keyup.enter="() => loadUsers(true)"
                 >
-                  <template #prefix>🔍</template>
+                  <template #prefix><Icon name="search" size="sm" decorative /></template>
                 </n-input>
                 <n-select
                   v-model:value="userFilters.is_active"
@@ -329,35 +374,46 @@
           </div>
         </n-tab-pane>
 
-        <n-tab-pane name="photo-moderation" tab="📷 照片審核">
+        <n-tab-pane name="photo-moderation">
+          <template #tab>
+            <span class="tab-label"><Icon name="image" size="sm" decorative /> 照片審核</span>
+          </template>
           <div class="tab-content">
             <!-- 照片審核統計 -->
             <div class="photo-stats-section">
               <h2>照片審核統計</h2>
               <div class="stats-grid">
                 <div class="stat-card warning">
-                  <div class="stat-icon">⏳</div>
+                  <div class="stat-icon">
+                    <Icon name="hourglass" size="lg" decorative />
+                  </div>
                   <div class="stat-info">
                     <div class="stat-value">{{ photoStats.pending_photos }}</div>
                     <div class="stat-label">待審核照片</div>
                   </div>
                 </div>
                 <div class="stat-card">
-                  <div class="stat-icon">✅</div>
+                  <div class="stat-icon">
+                    <Icon name="checkmark-done" size="lg" decorative />
+                  </div>
                   <div class="stat-info">
                     <div class="stat-value">{{ photoStats.approved_photos }}</div>
                     <div class="stat-label">已通過</div>
                   </div>
                 </div>
                 <div class="stat-card danger">
-                  <div class="stat-icon">❌</div>
+                  <div class="stat-icon">
+                    <Icon name="close-circle" size="lg" decorative />
+                  </div>
                   <div class="stat-info">
                     <div class="stat-value">{{ photoStats.rejected_photos }}</div>
                     <div class="stat-label">已拒絕</div>
                   </div>
                 </div>
                 <div class="stat-card">
-                  <div class="stat-icon">📊</div>
+                  <div class="stat-icon">
+                    <Icon name="stats" size="lg" decorative />
+                  </div>
                   <div class="stat-info">
                     <div class="stat-value">{{ photoStats.today_reviewed }}</div>
                     <div class="stat-label">今日已審核</div>
@@ -374,9 +430,14 @@
               </div>
 
               <n-spin :show="loadingPhotos">
-                <div v-if="pendingPhotos.length === 0" class="empty-state">
-                  <p>暫無待審核照片</p>
-                </div>
+                <ErrorState
+                  v-if="pendingPhotos.length === 0"
+                  variant="info"
+                  title="暫無待審核照片"
+                  message="目前沒有需要審核的用戶照片"
+                  :show-retry="false"
+                  :icon-size="48"
+                />
 
                 <div v-else class="photos-grid">
                   <div
@@ -602,6 +663,8 @@ import {
 import apiClient from '@/api/client'
 import { useUserStore } from '@/stores/user'
 import { logger } from '@/utils/logger'
+import Icon from '@/components/ui/Icon.vue'
+import ErrorState from '@/components/ui/ErrorState.vue'
 
 const router = useRouter()
 const message = useMessage()
@@ -801,13 +864,23 @@ const userColumns = [
     title: 'Email 驗證',
     key: 'email_verified',
     width: 100,
-    render: (row) => row.email_verified ? '✅' : '❌'
+    render: (row) => {
+      return h(NTag, {
+        type: row.email_verified ? 'success' : 'error',
+        size: 'small'
+      }, { default: () => row.email_verified ? '已驗證' : '未驗證' })
+    }
   },
   {
     title: '管理員',
     key: 'is_admin',
     width: 80,
-    render: (row) => row.is_admin ? '👑' : '-'
+    render: (row) => {
+      if (row.is_admin) {
+        return h(NTag, { type: 'info', size: 'small' }, { default: () => '管理員' })
+      }
+      return '-'
+    }
   },
   {
     title: '封禁原因',
@@ -1516,29 +1589,48 @@ onMounted(() => {
 
 .stat-card {
   background: white;
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 24px;
   display: flex;
   align-items: center;
   gap: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  transition: transform 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .stat-card:hover {
-  transform: translateY(-4px);
-}
-
-.stat-card.warning {
-  background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
-}
-
-.stat-card.danger {
-  background: linear-gradient(135deg, #fab1a0 0%, #ff7675 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .stat-icon {
-  font-size: 40px;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #e8f4fd 0%, #d4e9f7 100%);
+  color: #3498db;
+}
+
+/* 預設卡片圖示顏色 */
+.stat-card .stat-icon {
+  background: linear-gradient(135deg, #e8f4fd 0%, #d4e9f7 100%);
+  color: #3498db;
+}
+
+/* 警告狀態 */
+.stat-card.warning .stat-icon {
+  background: linear-gradient(135deg, #fef9e7 0%, #fdeaa8 100%);
+  color: #f39c12;
+}
+
+/* 危險狀態 */
+.stat-card.danger .stat-icon {
+  background: linear-gradient(135deg, #fdedec 0%, #f9d5d3 100%);
+  color: #e74c3c;
 }
 
 .stat-info {
@@ -1620,6 +1712,12 @@ onMounted(() => {
 .admin-tabs {
   background: white;
   padding: 0 40px;
+}
+
+.tab-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .tab-content {

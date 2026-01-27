@@ -2,35 +2,47 @@
   <div class="matches">
     <div class="container">
       <!-- 返回主選單按鈕 -->
-      <router-link to="/" class="back-home-btn">
-        <span class="btn-icon">🏠</span>
+      <router-link to="/" class="back-home-btn" aria-label="返回主選單">
+        <Icon name="home" size="sm" decorative class="btn-icon" />
         <span class="btn-text">返回主選單</span>
       </router-link>
 
-      <h1 class="page-title">💕 我的配對</h1>
+      <h1 class="page-title">
+        <Icon name="heart" size="lg" decorative class="title-heart-icon" />
+        我的配對
+      </h1>
 
-      <!-- 載入中 -->
-      <div v-if="discoveryStore.loading && discoveryStore.matches.length === 0" class="loading">
-        <HeartLoader text="載入配對列表..." />
+      <!-- 載入中 - 使用 Skeleton Loader -->
+      <div v-if="discoveryStore.loading && discoveryStore.matches.length === 0" class="loading-skeleton">
+        <div class="matches-grid">
+          <SkeletonCard v-for="i in 4" :key="i" />
+        </div>
       </div>
 
       <!-- 錯誤訊息 -->
-      <div v-else-if="discoveryStore.error" class="error-message">
-        <p>❌ {{ discoveryStore.error }}</p>
+      <div v-else-if="discoveryStore.error" class="error-message" role="alert">
+        <div class="error-icon" aria-hidden="true">
+          <Icon name="alert-outline" size="xl" decorative />
+        </div>
+        <p>{{ discoveryStore.error }}</p>
         <AnimatedButton variant="danger" @click="loadMatches">
-          🔄 重試
+          <Icon name="refresh" size="sm" decorative />
+          重試
         </AnimatedButton>
       </div>
 
       <!-- 空狀態 -->
       <div v-else-if="!discoveryStore.hasMatches" class="empty-state">
-        <div class="empty-animation">
-          <div class="broken-heart">💔</div>
+        <div class="empty-animation" aria-hidden="true">
+          <div class="broken-heart">
+            <Icon name="heart-dislike" size="xl" decorative class="broken-heart-icon" />
+          </div>
         </div>
         <h2>還沒有配對</h2>
         <p>開始探索並喜歡其他用戶來建立配對！</p>
         <AnimatedButton variant="primary" @click="$router.push('/discovery')">
-          🔍 開始探索
+          <Icon name="search" size="sm" decorative />
+          開始探索
         </AnimatedButton>
       </div>
 
@@ -51,7 +63,7 @@
         >
           <!-- 新配對標籤 -->
           <div v-if="isNewMatch(match.matched_at)" class="new-match-badge">
-            ✨ NEW
+            <Icon name="flash" size="sm" decorative /> NEW
           </div>
 
           <!-- 用戶頭像（可點擊查看詳情） -->
@@ -77,7 +89,8 @@
             </div>
 
             <p v-if="match.matched_user.distance_km" class="match-distance">
-              📍 {{ formatDistance(match.matched_user.distance_km) }}
+              <Icon name="location" size="xs" decorative />
+              {{ formatDistance(match.matched_user.distance_km) }}
             </p>
 
             <div class="match-meta">
@@ -113,7 +126,7 @@
               aria-label="與該用戶開始聊天對話"
               :aria-describedby="`chat-desc-${match.match_id}`"
             >
-              <span aria-hidden="true">💬</span>
+              <Icon name="chat" size="md" decorative />
               <span :id="`chat-desc-${match.match_id}`" class="sr-only">點擊後將開啟與 {{ match.matched_user.display_name }} 的聊天視窗</span>
             </button>
             <button
@@ -123,7 +136,7 @@
               aria-label="取消與該用戶的配對關係"
               :aria-describedby="`unmatch-desc-${match.match_id}`"
             >
-              <span aria-hidden="true">💔</span>
+              <Icon name="heart-dislike" size="md" decorative />
               <span :id="`unmatch-desc-${match.match_id}`" class="sr-only">點擊後將取消與 {{ match.matched_user.display_name }} 的配對</span>
             </button>
           </div>
@@ -152,7 +165,9 @@
       >
         <div class="modal-container" @click.stop>
           <div class="modal-content">
-            <div class="modal-icon" aria-hidden="true">⚠️</div>
+            <div class="modal-icon" aria-hidden="true">
+              <Icon name="alert-outline" size="xl" decorative class="modal-alert-icon" />
+            </div>
             <h2 id="unmatch-dialog-title" class="modal-title">確定要取消配對？</h2>
             <p id="unmatch-dialog-desc" class="modal-subtitle">
               此操作無法復原，您將不再能與 {{ unmatchTarget.matched_user.display_name }} 聊天。
@@ -185,13 +200,14 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useMessage } from 'naive-ui'
 import { useDiscoveryStore } from '@/stores/discovery'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
-import HeartLoader from '@/components/ui/HeartLoader.vue'
+import SkeletonCard from '@/components/ui/SkeletonCard.vue'
 import Badge from '@/components/ui/Badge.vue'
 import UserDetailModal from '@/components/UserDetailModal.vue'
+import Icon from '@/components/ui/Icon.vue'
 import { formatMatchDate } from '@/utils/dateFormat'
-import { useMessage } from 'naive-ui'
 import { logger } from '@/utils/logger'
 
 const router = useRouter()
@@ -366,61 +382,72 @@ onUnmounted(() => {
 .back-home-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
   background: rgba(255, 255, 255, 0.95);
-  color: #FF6B6B;
+  color: var(--color-like-accessible);
   text-decoration: none;
-  border-radius: 25px;
-  font-weight: 600;
-  font-size: 0.95rem;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-  margin-bottom: 15px;
+  border-radius: var(--radius-full);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
+  box-shadow: var(--shadow-button);
+  transition: all var(--duration-slow) var(--easing-default);
+  margin-bottom: var(--space-4);
 }
 
 .back-home-btn:hover {
   background: white;
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(255, 107, 107, 0.3);
+  box-shadow: 0 6px 20px var(--color-like-alpha-20);
 }
 
 .back-home-btn .btn-icon {
-  font-size: 1.2rem;
+  display: inline-flex;
 }
 
 .back-home-btn .btn-text {
-  font-size: 0.95rem;
+  font-size: var(--font-size-sm);
 }
 
 .page-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
   text-align: center;
-  font-size: 2.5rem;
-  font-weight: 800;
-  color: #333;
-  margin-bottom: 30px;
+  font-size: var(--font-size-4xl);
+  font-weight: var(--font-weight-extrabold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-8);
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* 載入中 */
-.loading {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 100px 20px;
+/* 標題愛心圖標 */
+.title-heart-icon {
+  color: var(--color-like);
+}
+
+/* 載入中 - Skeleton */
+.loading-skeleton {
+  padding: var(--space-5) 0;
 }
 
 /* 錯誤訊息 */
 .error-message {
   text-align: center;
-  padding: 60px 20px;
+  padding: var(--space-16) var(--space-5);
+}
+
+.error-icon {
+  color: var(--color-error-500);
+  margin-bottom: var(--space-4);
 }
 
 .error-message p {
-  color: #e74c3c;
-  font-size: 1.1rem;
-  margin-bottom: 24px;
-  font-weight: 600;
+  color: var(--color-error-600);
+  font-size: var(--font-size-lg);
+  margin-bottom: var(--space-6);
+  font-weight: var(--font-weight-semibold);
 }
 
 /* 空狀態 */
@@ -446,9 +473,14 @@ onUnmounted(() => {
 }
 
 .broken-heart {
-  font-size: 120px;
-  display: inline-block;
+  display: inline-flex;
+  color: var(--color-like);
   animation: heartbreak 2s ease-in-out infinite;
+}
+
+/* 放大空狀態心碎圖標 */
+.broken-heart-icon {
+  transform: scale(2.5); /* 120px / 48px = 2.5 */
 }
 
 @keyframes heartbreak {
@@ -667,16 +699,19 @@ onUnmounted(() => {
 
 .match-age {
   font-size: 1.2rem;
-  color: #999;
+  color: var(--color-text-muted);
   font-weight: 600;
   flex-shrink: 0;
 }
 
 .match-distance {
-  font-size: 0.9rem;
-  color: #666;
-  margin: 0 0 8px;
-  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-2);
+  font-weight: var(--font-weight-medium);
 }
 
 .match-meta {
@@ -716,7 +751,7 @@ onUnmounted(() => {
   align-items: center;
   padding: 6px 14px;
   background: rgba(0, 0, 0, 0.05);
-  color: #999;
+  color: var(--color-text-muted);
   border-radius: 16px;
   font-size: 0.8rem;
   font-weight: 600;
@@ -745,7 +780,7 @@ onUnmounted(() => {
 }
 
 .btn-chat {
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #38bdf8, #0ea5e9);
 }
 
 .btn-unmatch {
@@ -774,7 +809,7 @@ onUnmounted(() => {
 
 .btn-chat:hover {
   transform: scale(1.15) translateY(-3px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 8px 20px rgba(56, 189, 248, 0.4);
 }
 
 .btn-unmatch:hover {
@@ -832,9 +867,14 @@ onUnmounted(() => {
 }
 
 .modal-icon {
-  font-size: 5rem;
-  margin-bottom: 24px;
+  color: var(--color-warning-500);
+  margin-bottom: var(--space-6);
   animation: iconBounce 0.6s ease-out;
+}
+
+/* 放大彈窗警告圖標 */
+.modal-alert-icon {
+  transform: scale(1.33); /* 64px / 48px ≈ 1.33 */
 }
 
 @keyframes iconBounce {

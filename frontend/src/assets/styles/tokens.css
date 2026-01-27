@@ -1,0 +1,221 @@
+/**
+ * MergeMeet Design Tokens
+ * 交友平台設計系統 - CSS 變數定義
+ *
+ * 配色哲學：
+ * - Primary: 玫瑰紅 - 浪漫、熱情
+ * - Accent: 暖橘色 - 活力、配對成功
+ * - Like: 珊瑚紅 - 保留現有喜歡按鈕色
+ */
+
+:root {
+  /* === 交友平台主題配色 === */
+
+  /* Primary - 玫瑰紅 (浪漫、熱情) */
+  --color-primary-50: #FFF1F2;
+  --color-primary-100: #FFE4E6;
+  --color-primary-200: #FECDD3;
+  --color-primary-300: #FDA4AF;
+  --color-primary-400: #FB7185;
+  --color-primary-500: #F43F5E;
+  --color-primary-600: #E11D48;
+  --color-primary-700: #BE123C;
+  --color-primary-800: #9F1239;
+  --color-primary-900: #881337;
+  --color-primary-gradient: linear-gradient(135deg, #FB7185 0%, #EC4899 100%);
+  --color-primary-gradient-alt: linear-gradient(135deg, #F43F5E 0%, #FDA4AF 100%);
+  --color-primary-alpha-10: rgba(225, 29, 72, 0.1);
+  --color-primary-alpha-20: rgba(225, 29, 72, 0.2);
+  --color-primary-alpha-30: rgba(225, 29, 72, 0.3);
+
+  /* Secondary - 粉紫色漸層 (保留原有風格作為替代選項) */
+  --color-secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  --color-secondary-500: #f5576c;
+  --color-secondary-600: #f093fb;
+
+  /* Accent - 暖橘色 (活力、配對成功) */
+  --color-accent-300: #FDBA74;
+  --color-accent-400: #FB923C;
+  --color-accent-500: #F97316;
+  --color-accent-600: #EA580C;
+  --color-accent-gradient: linear-gradient(135deg, #F97316 0%, #FB923C 100%);
+
+  /* Like - 保留現有珊瑚紅 (用於 Like 按鈕) */
+  --color-like: #FF6B6B;
+  --color-like-hover: #FF5252;
+  --color-like-light: #FF8E8E;
+  --color-like-gradient: linear-gradient(135deg, #FF6B6B, #FF8E8E);
+  --color-like-alpha-10: rgba(255, 107, 107, 0.1);
+  --color-like-alpha-20: rgba(255, 107, 107, 0.2);
+  --color-like-alpha-40: rgba(255, 107, 107, 0.4);
+
+  /* 高對比度變體 - 用於小文字，符合 WCAG AA 標準 (4.5:1 對比度) */
+  --color-like-accessible: #C73A3A;       /* 替代 #FF6B6B 用於小文字 */
+  --color-primary-accessible: #BE123C;    /* 替代 #FB7185 用於小文字 */
+
+  /* Success - 配對成功、驗證通過 */
+  --color-success-400: #4ADE80;
+  --color-success-500: #22C55E;
+  --color-success-600: #16A34A;
+  --color-success-gradient: linear-gradient(135deg, #4CAF50 0%, #66BB6A 100%);
+  --color-success-alpha-10: rgba(76, 175, 80, 0.1);
+
+  /* Warning - 警告、剩餘次數 */
+  --color-warning-400: #FACC15;
+  --color-warning-500: #EAB308;
+  --color-warning-600: #CA8A04;
+  --color-warning-gradient: linear-gradient(135deg, #ff9800 0%, #ffc107 100%);
+
+  /* Error/Danger - 錯誤、刪除 */
+  --color-error-400: #F87171;
+  --color-error-500: #EF4444;
+  --color-error-600: #DC2626;
+  --color-error-gradient: linear-gradient(135deg, #F44336 0%, #E91E63 100%);
+  --color-error-alpha-10: rgba(244, 67, 54, 0.1);
+
+  /* 中性色 - 帶暖色調 */
+  --color-text-primary: #333333;       /* 主要文字 */
+  --color-text-secondary: #555555;     /* 次要文字 */
+  --color-text-muted: #666666;         /* 柔和提示 */
+  --color-text-light: #999999;         /* 淺色文字 */
+  --color-text-dark: #1F2937;          /* 強調文字 */
+
+  /* 背景色 */
+  --color-background: #FFF1F2;         /* 玫瑰白背景 */
+  --color-background-alt: #FFE4E6;     /* 次要背景 */
+  --color-background-light: #f5f5f5;   /* 淺灰背景 */
+  --color-surface: #FFFFFF;            /* 卡片表面 */
+  --color-surface-hover: #FFFAF0;      /* 懸停表面 */
+
+  /* 邊框色 */
+  --color-border: #e0e0e0;             /* 預設邊框 */
+  --color-border-light: #f0f0f0;       /* 淺色邊框 */
+  --color-border-primary: #FECDD3;     /* 主色邊框 */
+
+  /* === 間距 (4px 增量) === */
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+
+  /* === 字體大小 (rem 單位) === */
+  --font-size-xs: 0.75rem;     /* 12px */
+  --font-size-sm: 0.875rem;    /* 14px */
+  --font-size-base: 1rem;      /* 16px */
+  --font-size-lg: 1.125rem;    /* 18px */
+  --font-size-xl: 1.25rem;     /* 20px */
+  --font-size-2xl: 1.5rem;     /* 24px */
+  --font-size-3xl: 1.875rem;   /* 30px */
+  --font-size-4xl: 2.25rem;    /* 36px */
+  --font-size-5xl: 3rem;       /* 48px */
+
+  /* === 字重 === */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+
+  /* === 行高 === */
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* === 動畫 === */
+  --duration-fast: 0.15s;
+  --duration-normal: 0.2s;
+  --duration-slow: 0.3s;
+  --duration-slower: 0.5s;
+  --easing-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --easing-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --easing-in: cubic-bezier(0.4, 0, 1, 1);
+  --easing-out: cubic-bezier(0, 0, 0.2, 1);
+
+  /* === Z-index 規模 === */
+  --z-base: 0;
+  --z-dropdown: 100;
+  --z-sticky: 500;
+  --z-fixed: 700;
+  --z-modal-backdrop: 900;
+  --z-modal: 1000;
+  --z-popover: 1100;
+  --z-tooltip: 1200;
+
+  /* === 觸控目標 (WCAG 建議最小尺寸) === */
+  --touch-target-min: 44px;
+
+  /* === 圓角 === */
+  --radius-none: 0;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+
+  /* === 陰影 (帶玫瑰色調) === */
+  --shadow-sm: 0 1px 2px rgba(136, 19, 55, 0.05);
+  --shadow-md: 0 4px 12px rgba(136, 19, 55, 0.1);
+  --shadow-lg: 0 8px 24px rgba(136, 19, 55, 0.15);
+  --shadow-xl: 0 12px 40px rgba(136, 19, 55, 0.2);
+  --shadow-2xl: 0 20px 60px rgba(0, 0, 0, 0.3);
+
+  /* 特定元素陰影 */
+  --shadow-card: 0 8px 30px rgba(0, 0, 0, 0.15);
+  --shadow-card-hover: 0 12px 40px rgba(0, 0, 0, 0.2);
+  --shadow-button: 0 4px 15px rgba(0, 0, 0, 0.1);
+  --shadow-button-hover: 0 8px 25px rgba(225, 29, 72, 0.4);
+  --shadow-like-hover: 0 10px 30px rgba(255, 107, 107, 0.5);
+
+  /* === 容器最大寬度 === */
+  --container-sm: 640px;
+  --container-md: 768px;
+  --container-lg: 1024px;
+  --container-xl: 1200px;
+
+  /* === 斷點 (用於媒體查詢參考) === */
+  /* 注意: CSS 變數不能用於媒體查詢，這裡僅作為文檔參考 */
+  /* --breakpoint-sm: 640px; */
+  /* --breakpoint-md: 768px; */
+  /* --breakpoint-lg: 1024px; */
+  /* --breakpoint-xl: 1280px; */
+}
+
+/* === 全域重置與基礎樣式 === */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Screen Reader Only - 僅對螢幕閱讀器可見 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* 減少動態效果偏好 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

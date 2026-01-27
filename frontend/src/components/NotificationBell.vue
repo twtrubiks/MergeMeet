@@ -248,7 +248,7 @@ const formatTime = (timestamp) => {
 }
 
 .bell-button:hover {
-  color: #ff6b6b;
+  color: var(--color-like-accessible);
 }
 
 .notification-dropdown {
@@ -274,7 +274,7 @@ const formatTime = (timestamp) => {
 }
 
 .mark-all-btn {
-  color: #ff6b6b;
+  color: var(--color-like-accessible);
   font-size: 13px;
 }
 
@@ -289,7 +289,7 @@ const formatTime = (timestamp) => {
   align-items: center;
   justify-content: center;
   padding: 40px 20px;
-  color: #999;
+  color: var(--color-text-muted);
   gap: 12px;
 }
 
@@ -373,7 +373,7 @@ const formatTime = (timestamp) => {
 
 .notification-time {
   font-size: 12px;
-  color: #999;
+  color: var(--color-text-muted);
 }
 
 .unread-dot {
@@ -394,7 +394,7 @@ const formatTime = (timestamp) => {
 }
 
 .view-all-link {
-  color: #ff6b6b;
+  color: var(--color-like-accessible);
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;

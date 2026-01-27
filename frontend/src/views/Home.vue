@@ -4,7 +4,10 @@
       <!-- 頂部標題 -->
       <div class="hero-section">
         <div class="logo-animation">
-          <span class="logo-heart">💕</span>
+          <div class="logo-hearts">
+            <Icon name="heart" size="xl" decorative class="heart-icon heart-left" />
+            <Icon name="heart" size="xl" decorative class="heart-icon heart-right" />
+          </div>
         </div>
         <h1>歡迎使用 MergeMeet</h1>
         <p class="subtitle">現代化交友平台 - 完整功能版本</p>
@@ -13,8 +16,8 @@
       <!-- 認證狀態卡片 -->
       <GlassCard :hoverable="true" variant="primary">
         <template #icon>
-          <span v-if="userStore.isAuthenticated">✅</span>
-          <span v-else>🔐</span>
+          <Icon v-if="userStore.isAuthenticated" name="check-circle" size="lg" decorative />
+          <Icon v-else name="lock" size="lg" decorative />
         </template>
         <div class="auth-section">
           <h2>{{ userStore.isAuthenticated ? '已登入' : '認證狀態' }}</h2>
@@ -25,25 +28,25 @@
                 variant="primary"
                 @click="$router.push('/discovery')"
               >
-                🔍 開始探索
+                <Icon name="search" size="sm" decorative /> 開始探索
               </AnimatedButton>
               <AnimatedButton
                 variant="secondary"
                 @click="$router.push('/matches')"
               >
-                💕 我的配對
+                <Icon name="heart" size="sm" decorative /> 我的配對
               </AnimatedButton>
               <AnimatedButton
-                variant="ghost"
+                variant="secondary"
                 @click="$router.push('/profile')"
               >
-                👤 個人檔案
+                <Icon name="person" size="sm" decorative /> 個人檔案
               </AnimatedButton>
               <AnimatedButton
                 variant="danger"
                 @click="handleLogout"
               >
-                🚪 登出
+                <Icon name="logout" size="sm" decorative /> 登出
               </AnimatedButton>
             </div>
           </div>
@@ -54,13 +57,13 @@
                 variant="primary"
                 @click="$router.push('/login')"
               >
-                ✨ 登入
+                <Icon name="flash" size="sm" decorative /> 登入
               </AnimatedButton>
               <AnimatedButton
                 variant="secondary"
                 @click="$router.push('/register')"
               >
-                🎉 註冊
+                <Icon name="rocket" size="sm" decorative /> 註冊
               </AnimatedButton>
             </div>
           </div>
@@ -83,6 +86,7 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 import GlassCard from '@/components/ui/GlassCard.vue'
+import Icon from '@/components/ui/Icon.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -103,8 +107,8 @@ const handleLogout = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 40px 20px;
+  background: var(--color-primary-gradient);
+  padding: var(--space-10) var(--space-5);
   overflow: hidden;
 }
 
@@ -203,11 +207,25 @@ const handleLogout = () => {
   margin-bottom: 24px;
 }
 
-.logo-heart {
-  display: inline-block;
-  font-size: 5rem;
+.logo-hearts {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.heart-icon {
+  color: white;
+  filter: drop-shadow(0 8px 16px var(--color-like-alpha-40));
   animation: heartBeat 1.5s infinite, pulse 2s infinite;
-  filter: drop-shadow(0 8px 16px rgba(255, 107, 107, 0.4));
+}
+
+.heart-left {
+  transform: rotate(-15deg);
+}
+
+.heart-right {
+  transform: rotate(15deg);
 }
 
 @keyframes heartBeat {
@@ -249,7 +267,7 @@ h1 {
 
 /* Auth Section */
 .auth-section h2 {
-  color: #333;
+  color: var(--color-text-primary);
   font-size: 1.8rem;
   font-weight: 700;
   margin-bottom: 24px;
@@ -264,7 +282,7 @@ h1 {
 }
 
 .user-email {
-  color: #333;
+  color: var(--color-text-primary);
   font-weight: 600;
   font-size: 1.1rem;
   padding: 12px 24px;
@@ -288,7 +306,7 @@ h1 {
 }
 
 .info-text {
-  color: #444;
+  color: var(--color-text-secondary);
   font-size: 1.1rem;
   font-weight: 500;
   text-align: center;
@@ -311,10 +329,6 @@ h1 {
     font-size: 1.1rem;
   }
 
-  .logo-heart {
-    font-size: 4rem;
-  }
-
   .button-grid {
     grid-template-columns: 1fr;
   }
@@ -333,12 +347,23 @@ h1 {
     font-size: 1rem;
   }
 
-  .logo-heart {
-    font-size: 3.5rem;
-  }
-
   .auth-section h2 {
     font-size: 1.5rem;
+  }
+}
+
+/* 無障礙：減少動態效果 */
+@media (prefers-reduced-motion: reduce) {
+  .circle {
+    animation: none;
+  }
+
+  .heart-icon {
+    animation: none;
+  }
+
+  .hero-section {
+    animation: none;
   }
 }
 </style>

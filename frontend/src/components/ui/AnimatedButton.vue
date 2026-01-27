@@ -47,30 +47,17 @@ defineEmits(['click'])
 </script>
 
 <style scoped>
-/* Screen Reader Only - 僅對螢幕閱讀器可見 */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border-width: 0;
-}
-
 .animated-btn {
   position: relative;
   padding: 14px 32px;
   border: none;
-  border-radius: 12px;
-  font-size: 1rem;
-  font-weight: 600;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
   cursor: pointer;
   overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transition: all var(--duration-slow) var(--easing-default);
+  box-shadow: var(--shadow-button);
   isolation: isolate;
 }
 
@@ -99,7 +86,7 @@ defineEmits(['click'])
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .shine {
@@ -109,7 +96,7 @@ defineEmits(['click'])
   width: 100%;
   height: 100%;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-  transition: left 0.5s;
+  transition: left var(--duration-slower);
 }
 
 .animated-btn:hover .shine {
@@ -118,17 +105,17 @@ defineEmits(['click'])
 
 /* Variants */
 .animated-btn.primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-primary-gradient);
   color: white;
 }
 
 .animated-btn.primary:hover:not(:disabled) {
-  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+  box-shadow: var(--shadow-button-hover);
   transform: translateY(-2px);
 }
 
 .animated-btn.secondary {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  background: var(--color-secondary-gradient);
   color: white;
 }
 
@@ -138,7 +125,7 @@ defineEmits(['click'])
 }
 
 .animated-btn.success {
-  background: linear-gradient(135deg, #4CAF50 0%, #66BB6A 100%);
+  background: var(--color-success-gradient);
   color: white;
 }
 
@@ -148,7 +135,7 @@ defineEmits(['click'])
 }
 
 .animated-btn.danger {
-  background: linear-gradient(135deg, #F44336 0%, #E91E63 100%);
+  background: var(--color-error-gradient);
   color: white;
 }
 
@@ -159,17 +146,17 @@ defineEmits(['click'])
 
 .animated-btn.ghost {
   background: transparent;
-  border: 3px solid #5a5a9a;
-  color: #4a4a8a;
-  font-weight: 700;
+  border: 3px solid var(--color-primary-600);
+  color: var(--color-primary-700);
+  font-weight: var(--font-weight-bold);
   box-shadow: none;
 }
 
 .animated-btn.ghost:hover:not(:disabled) {
-  background: #5a5a9a;
-  border-color: #5a5a9a;
+  background: var(--color-primary-600);
+  border-color: var(--color-primary-600);
   color: white;
-  box-shadow: 0 8px 25px rgba(90, 90, 154, 0.3);
+  box-shadow: 0 8px 25px var(--color-primary-alpha-30);
 }
 
 /* Disabled state */
@@ -195,7 +182,7 @@ defineEmits(['click'])
   height: 20px;
   border: 3px solid rgba(255, 255, 255, 0.3);
   border-top-color: white;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   display: inline-block;
   animation: spin 0.8s linear infinite;
 }
@@ -212,7 +199,7 @@ defineEmits(['click'])
   left: 50%;
   width: 0;
   height: 0;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: rgba(255, 255, 255, 0.4);
   transform: translate(-50%, -50%);
   transition: width 0.6s, height 0.6s;

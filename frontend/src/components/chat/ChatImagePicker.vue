@@ -3,7 +3,7 @@
     <!-- 圖片選擇按鈕 -->
     <n-button text @click="triggerFileInput" :disabled="disabled">
       <template #icon>
-        <n-icon size="24"><ImageOutline /></n-icon>
+        <Icon name="image" size="md" label="選擇圖片" />
       </template>
     </n-button>
 
@@ -42,9 +42,9 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { NButton, NIcon, NModal, useMessage } from 'naive-ui'
-import { ImageOutline } from '@vicons/ionicons5'
+import { NButton, NModal, useMessage } from 'naive-ui'
 import { useChatStore } from '@/stores/chat'
+import Icon from '@/components/ui/Icon.vue'
 
 const props = defineProps({
   matchId: {

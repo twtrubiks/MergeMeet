@@ -60,7 +60,7 @@
 
           <!-- 距離 -->
           <p v-if="user.distance_km !== null && user.distance_km !== undefined" class="user-distance">
-            <span class="distance-icon">📍</span>
+            <Icon name="location" size="sm" decorative />
             {{ formatDistance(user.distance_km) }}
           </p>
 
@@ -88,6 +88,7 @@
 
 <script setup>
 import { ref, computed, watch, onUnmounted } from 'vue'
+import Icon from '@/components/ui/Icon.vue'
 
 const props = defineProps({
   show: {
@@ -201,7 +202,7 @@ onUnmounted(() => {
 .modal-container {
   background: white;
   border-radius: 20px;
-  max-width: 500px;
+  max-width: min(500px, calc(100vw - 40px));
   width: 100%;
   max-height: 90vh;
   overflow: hidden;
@@ -228,8 +229,8 @@ onUnmounted(() => {
   position: absolute;
   top: 12px;
   right: 12px;
-  width: 36px;
-  height: 36px;
+  min-width: 44px;
+  min-height: 44px;
   border: none;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.5);
@@ -406,7 +407,7 @@ onUnmounted(() => {
   display: inline-block;
   padding: 8px 16px;
   background: #FFF0F0;
-  color: #FF6B6B;
+  color: var(--color-like-accessible);
   border-radius: 20px;
   font-size: 14px;
   font-weight: 500;
@@ -477,9 +478,10 @@ onUnmounted(() => {
     height: 300px;
   }
 
+  /* Keep touch targets at 44px minimum */
   .carousel-btn {
-    width: 36px;
-    height: 36px;
+    min-width: 44px;
+    min-height: 44px;
     font-size: 24px;
   }
 

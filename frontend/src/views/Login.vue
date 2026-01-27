@@ -3,7 +3,10 @@
     <div class="auth-card">
       <div class="auth-header">
         <div class="logo-animation">
-          <span class="logo-heart">💕</span>
+          <div class="logo-hearts">
+            <Icon name="heart" size="xl" decorative class="heart-icon heart-main" />
+            <Icon name="heart" size="lg" decorative class="heart-icon heart-small" />
+          </div>
         </div>
         <h1>歡迎回來</h1>
         <p>登入 MergeMeet 開始配對</p>
@@ -11,7 +14,7 @@
 
       <!-- 鎖定警告 -->
       <div v-if="isLocked" class="lockout-warning">
-        <div class="lockout-icon">🔒</div>
+        <div class="lockout-icon"><Icon name="lock" size="xl" decorative /></div>
         <div class="lockout-message">帳號已暫時鎖定</div>
         <div class="lockout-countdown">
           請於 {{ formatCountdown(lockoutCountdown) }} 後再試
@@ -40,11 +43,12 @@
           :disabled="isLoading"
           :required="true"
           :error="error"
+          :showPasswordToggle="true"
         />
 
         <!-- 剩餘嘗試次數警告 -->
         <div v-if="showAttemptsWarning" class="attempts-warning">
-          ⚠️ 剩餘 {{ loginLimitInfo.remainingAttempts }} 次嘗試機會
+          <Icon name="warning" size="sm" decorative /> 剩餘 {{ loginLimitInfo.remainingAttempts }} 次嘗試機會
         </div>
 
         <!-- 忘記密碼連結 -->
@@ -59,7 +63,7 @@
           :disabled="!isFormValid"
           :loading="isLoading"
         >
-          <span v-if="!isLoading">✨ 登入</span>
+          <span v-if="!isLoading"><Icon name="flash" size="sm" decorative /> 登入</span>
         </AnimatedButton>
       </form>
 
@@ -87,6 +91,7 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 import FloatingInput from '@/components/ui/FloatingInput.vue'
+import Icon from '@/components/ui/Icon.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -185,8 +190,8 @@ const handleLogin = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 20px;
+  background: var(--color-primary-gradient);
+  padding: var(--space-5);
   overflow: hidden;
 }
 
@@ -250,13 +255,13 @@ const handleLogin = async () => {
   z-index: 1;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
-  border-radius: 24px;
-  padding: 48px;
+  border-radius: var(--radius-2xl);
+  padding: var(--space-12);
   max-width: 450px;
   width: 100%;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3),
+  box-shadow: var(--shadow-2xl),
               0 0 0 1px rgba(255, 255, 255, 0.2);
-  animation: slideUp 0.5s ease-out;
+  animation: slideUp var(--duration-slower) var(--easing-out);
 }
 
 @keyframes slideUp {
@@ -279,11 +284,31 @@ const handleLogin = async () => {
   margin-bottom: 20px;
 }
 
-.logo-heart {
-  display: inline-block;
-  font-size: 4rem;
-  animation: heartBeat 1.5s infinite;
+.logo-hearts {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 64px;
+}
+
+.heart-icon {
+  color: #ff6b6b;
   filter: drop-shadow(0 4px 8px rgba(255, 107, 107, 0.3));
+}
+
+.heart-main {
+  animation: heartBeat 1.5s infinite;
+}
+
+.heart-small {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  color: #f093fb;
+  animation: heartBeat 1.5s infinite;
+  animation-delay: 0.2s;
 }
 
 @keyframes heartBeat {
@@ -299,13 +324,13 @@ const handleLogin = async () => {
 }
 
 .auth-header h1 {
-  font-size: 2.2rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  background: var(--color-primary-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .auth-header p {
@@ -323,11 +348,11 @@ const handleLogin = async () => {
 /* 鎖定警告樣式 */
 .lockout-warning {
   text-align: center;
-  padding: 2rem;
-  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
-  border-radius: 12px;
+  padding: var(--space-8);
+  background: var(--color-like-gradient);
+  border-radius: var(--radius-md);
   color: white;
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--space-6);
 }
 
 .lockout-icon {
@@ -366,15 +391,15 @@ const handleLogin = async () => {
 }
 
 .forgot-password-link a {
-  color: #667eea;
+  color: var(--color-primary-600);
   text-decoration: none;
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: color 0.3s ease;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  transition: color var(--duration-slow) var(--easing-default);
 }
 
 .forgot-password-link a:hover {
-  color: #764ba2;
+  color: var(--color-primary-700);
   text-decoration: underline;
 }
 
@@ -391,18 +416,18 @@ const handleLogin = async () => {
 }
 
 .register-link {
-  color: #667eea;
+  color: var(--color-primary-600);
   text-decoration: none;
-  font-weight: 600;
-  transition: all 0.3s ease;
+  font-weight: var(--font-weight-semibold);
+  transition: all var(--duration-slow) var(--easing-default);
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .register-link:hover {
-  color: #764ba2;
-  gap: 8px;
+  color: var(--color-primary-700);
+  gap: var(--space-2);
 }
 
 /* 響應式設計 */
@@ -415,8 +440,21 @@ const handleLogin = async () => {
     font-size: 1.8rem;
   }
 
-  .logo-heart {
-    font-size: 3rem;
+  .logo-hearts {
+    width: 64px;
+    height: 52px;
+  }
+}
+
+/* 無障礙：減少動畫 */
+@media (prefers-reduced-motion: reduce) {
+  .logo-hearts .heart-icon,
+  .circle {
+    animation: none;
+  }
+
+  .auth-card {
+    animation: none;
   }
 }
 </style>

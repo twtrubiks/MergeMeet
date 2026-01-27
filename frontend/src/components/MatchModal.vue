@@ -46,10 +46,10 @@
 
           <!-- 操作按鈕 -->
           <div class="modal-actions">
-            <button class="btn-secondary" @click="handleClose">
+            <button class="btn-secondary" @click="handleClose" aria-label="繼續探索">
               繼續探索
             </button>
-            <button class="btn-primary" @click="goToMatches">
+            <button class="btn-primary" @click="goToMatches" aria-label="查看配對">
               查看配對
             </button>
           </div>
@@ -98,18 +98,18 @@ const goToMatches = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
-  padding: 20px;
+  z-index: var(--z-modal);
+  padding: var(--space-5);
 }
 
 /* Modal 容器 */
 .modal-container {
-  background: white;
-  border-radius: 20px;
-  max-width: 500px;
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  max-width: min(500px, calc(100vw - 40px));
   width: 100%;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-  animation: slideUp 0.3s ease-out;
+  box-shadow: var(--shadow-xl);
+  animation: slideUp var(--duration-slow) var(--easing-out);
 }
 
 @keyframes slideUp {
@@ -132,11 +132,29 @@ const goToMatches = () => {
 /* 配對成功圖示 */
 .match-icon {
   margin-bottom: 20px;
+  position: relative;
+}
+
+/* 背景柔光效果 */
+.match-icon::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle, var(--color-like-alpha-20) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: glow-pulse 2s ease-in-out infinite;
 }
 
 .heart-animation {
   font-size: 80px;
   animation: heartBeat 1s ease-in-out infinite;
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 0 15px var(--color-like-alpha-40));
 }
 
 @keyframes heartBeat {
@@ -154,12 +172,26 @@ const goToMatches = () => {
   }
 }
 
+/* 光環脈衝動畫 */
+@keyframes glow-pulse {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.6;
+    box-shadow: 0 0 20px var(--color-like-alpha-20);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.3);
+    opacity: 0.3;
+    box-shadow: 0 0 60px var(--color-like-alpha-40);
+  }
+}
+
 /* 標題 */
 .modal-title {
-  font-size: 28px;
-  font-weight: 700;
-  color: #FF6B6B;
-  margin: 0 0 10px;
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-like);
+  margin: 0 0 var(--space-3);
 }
 
 .modal-subtitle {
@@ -176,11 +208,11 @@ const goToMatches = () => {
 .user-avatar {
   width: 120px;
   height: 120px;
-  margin: 0 auto 15px;
-  border-radius: 50%;
+  margin: 0 auto var(--space-4);
+  border-radius: var(--radius-full);
   overflow: hidden;
-  border: 4px solid #FF6B6B;
-  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+  border: 4px solid var(--color-like);
+  box-shadow: 0 4px 12px var(--color-like-alpha-20);
 }
 
 .user-avatar img {
@@ -223,7 +255,7 @@ const goToMatches = () => {
 
 .interests-title {
   font-size: 14px;
-  color: #999;
+  color: var(--color-text-muted);
   margin: 0 0 10px;
 }
 
@@ -236,12 +268,12 @@ const goToMatches = () => {
 
 .interest-tag {
   display: inline-block;
-  padding: 6px 14px;
-  background: #FFF0F0;
-  color: #FF6B6B;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 500;
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-like-alpha-10);
+  color: var(--color-like-accessible);
+  border-radius: var(--radius-xl);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
 }
 
 /* 操作按鈕 */
@@ -252,32 +284,32 @@ const goToMatches = () => {
 
 .modal-actions button {
   flex: 1;
-  padding: 14px 20px;
+  padding: var(--space-4) var(--space-5);
   border: none;
-  border-radius: 12px;
-  font-size: 16px;
-  font-weight: 600;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all var(--duration-slow) var(--easing-default);
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #FF6B6B, #FF8E53);
+  background: var(--color-like-gradient);
   color: white;
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+  box-shadow: 0 6px 20px var(--color-like-alpha-40);
 }
 
 .btn-secondary {
-  background: #f5f5f5;
-  color: #666;
+  background: var(--color-background-light);
+  color: var(--color-text-muted);
 }
 
 .btn-secondary:hover {
-  background: #e0e0e0;
+  background: var(--color-border);
 }
 
 /* Modal 過渡效果 */

@@ -3,7 +3,7 @@
     <div class="settings-card">
       <div class="settings-header">
         <div class="logo-animation">
-          <span class="logo-icon">&#x2699;</span>
+          <Icon name="settings" size="xl" decorative />
         </div>
         <h1>帳號設定</h1>
         <p>管理您的帳號與配對偏好</p>
@@ -13,7 +13,10 @@
       <div class="settings-tabs">
         <n-tabs v-model:value="activeTab" type="line" animated>
           <!-- Tab 1: 配對設定（預設） -->
-          <n-tab-pane name="matching" tab="💕 配對設定">
+          <n-tab-pane name="matching">
+            <template #tab>
+              <span class="tab-label"><Icon name="heart" size="sm" decorative /> 配對設定</span>
+            </template>
             <div class="tab-content">
               <!-- 載入中 -->
               <div v-if="preferenceLoading" class="loading-state">
@@ -89,7 +92,7 @@
                         :value="option.value"
                         :disabled="preferenceSaving"
                       />
-                      <span class="option-icon">{{ option.icon }}</span>
+                      <span class="option-icon"><Icon :name="option.iconName" size="lg" decorative /></span>
                       <span class="option-label">{{ option.label }}</span>
                     </label>
                   </div>
@@ -99,7 +102,9 @@
                 <p v-if="preferenceError" class="error-message">{{ preferenceError }}</p>
 
                 <!-- 成功訊息 -->
-                <p v-if="preferenceSaveSuccess" class="success-message">&#x2705; 偏好設定已儲存</p>
+                <p v-if="preferenceSaveSuccess" class="success-message">
+                  <Icon name="check-circle" size="sm" decorative /> 偏好設定已儲存
+                </p>
 
                 <!-- 儲存按鈕 -->
                 <AnimatedButton
@@ -108,25 +113,28 @@
                   :disabled="!isPreferenceValid || preferenceSaving"
                   :loading="preferenceSaving"
                 >
-                  <span v-if="!preferenceSaving">&#x1F4BE; 儲存偏好</span>
+                  <span v-if="!preferenceSaving"><Icon name="save" size="sm" decorative /> 儲存偏好</span>
                 </AnimatedButton>
               </form>
             </div>
           </n-tab-pane>
 
           <!-- Tab 2: 帳號安全 -->
-          <n-tab-pane name="security" tab="🔐 帳號安全">
+          <n-tab-pane name="security">
+            <template #tab>
+              <span class="tab-label"><Icon name="shield" size="sm" decorative /> 帳號安全</span>
+            </template>
             <div class="tab-content">
               <!-- 密碼修改區塊 -->
               <div class="settings-section">
                 <h3 class="subsection-title">
-                  <span class="section-icon">&#x1F512;</span>
+                  <Icon name="lock" size="md" decorative />
                   修改密碼
                 </h3>
 
                 <!-- 成功狀態 -->
                 <div v-if="changeSuccess" class="success-state">
-                  <div class="success-icon">&#x2705;</div>
+                  <div class="success-icon"><Icon name="check-circle" size="xl" decorative /></div>
                   <h3>密碼修改成功！</h3>
                   <p class="success-text">已發送通知郵件到您的信箱</p>
                   <p class="redirect-text">{{ redirectCountdown }} 秒後自動跳轉至登入頁...</p>
@@ -198,7 +206,7 @@
                     :disabled="!isFormValid || isLoading"
                     :loading="isLoading"
                   >
-                    <span v-if="!isLoading">&#x1F510; 修改密碼</span>
+                    <span v-if="!isLoading"><Icon name="lock" size="sm" decorative /> 修改密碼</span>
                   </AnimatedButton>
                 </form>
               </div>
@@ -206,19 +214,19 @@
               <!-- 其他功能連結 -->
               <div class="settings-section quick-links">
                 <h3 class="subsection-title">
-                  <span class="section-icon">&#x1F4DD;</span>
+                  <Icon name="clipboard" size="md" decorative />
                   其他功能
                 </h3>
                 <div class="link-list">
                   <router-link to="/my-reports" class="link-item">
-                    <span class="link-icon">&#x1F4CB;</span>
+                    <span class="link-icon"><Icon name="clipboard" size="md" decorative /></span>
                     <span class="link-text">我的舉報記錄</span>
-                    <span class="link-arrow">&#x203A;</span>
+                    <span class="link-arrow"><Icon name="back" size="sm" decorative class="arrow-icon" /></span>
                   </router-link>
                   <router-link to="/blocked" class="link-item">
-                    <span class="link-icon">&#x1F6AB;</span>
+                    <span class="link-icon"><Icon name="shield" size="md" decorative /></span>
                     <span class="link-text">封鎖名單</span>
-                    <span class="link-arrow">&#x203A;</span>
+                    <span class="link-arrow"><Icon name="back" size="sm" decorative class="arrow-icon" /></span>
                   </router-link>
                 </div>
               </div>
@@ -229,7 +237,7 @@
 
       <!-- 返回首頁連結 -->
       <div class="settings-footer">
-        <router-link to="/" class="back-link">&#x2190; 返回首頁</router-link>
+        <router-link to="/" class="back-link"><Icon name="back" size="sm" decorative /> 返回首頁</router-link>
       </div>
     </div>
 
@@ -251,6 +259,8 @@ import { useProfileStore } from '@/stores/profile'
 import { authAPI } from '@/api/auth'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 import FloatingInput from '@/components/ui/FloatingInput.vue'
+import Icon from '@/components/ui/Icon.vue'
+import { useFormDirty } from '@/composables/useFormDirty'
 
 // Tab 狀態
 const activeTab = ref('matching')
@@ -372,6 +382,23 @@ const preferences = ref({
   genderPreference: 'all'
 })
 
+// 原始偏好設定（用於髒狀態檢測）
+const originalPreferences = ref({
+  minAge: 18,
+  maxAge: 50,
+  maxDistance: 50,
+  genderPreference: 'all'
+})
+
+// 表單髒狀態追蹤
+const { isDirty: isPreferencesDirty, setClean: setPreferencesClean } = useFormDirty(
+  preferences,
+  originalPreferences,
+  {
+    confirmMessage: '您的配對偏好有未儲存的變更，確定要離開嗎？'
+  }
+)
+
 const preferenceLoading = ref(false)
 const preferenceSaving = ref(false)
 const preferenceError = ref('')
@@ -379,10 +406,10 @@ const preferenceSaveSuccess = ref(false)
 
 // 性別選項
 const genderOptions = [
-  { value: 'male', label: '男性', icon: '👨' },
-  { value: 'female', label: '女性', icon: '👩' },
-  { value: 'both', label: '男女皆可', icon: '👫' },
-  { value: 'all', label: '不限', icon: '🌈' }
+  { value: 'male', label: '男性', iconName: 'male' },
+  { value: 'female', label: '女性', iconName: 'female' },
+  { value: 'both', label: '男女皆可', iconName: 'male-female' },
+  { value: 'all', label: '不限', iconName: 'heart' }
 ]
 
 // 年齡範圍驗證
@@ -411,12 +438,15 @@ const loadPreferences = async () => {
   try {
     await profileStore.fetchProfile()
     if (profileStore.profile) {
-      preferences.value = {
+      const loadedPrefs = {
         minAge: profileStore.profile.min_age_preference || 18,
         maxAge: profileStore.profile.max_age_preference || 50,
         maxDistance: profileStore.profile.max_distance_km || 50,
         genderPreference: profileStore.profile.gender_preference || 'all'
       }
+      preferences.value = { ...loadedPrefs }
+      // 儲存原始值用於髒狀態檢測
+      originalPreferences.value = { ...loadedPrefs }
     }
   } catch (err) {
     preferenceError.value = '載入偏好設定失敗'
@@ -443,6 +473,8 @@ const handleSavePreferences = async () => {
     })
 
     preferenceSaveSuccess.value = true
+    // 標記表單為乾淨狀態
+    setPreferencesClean()
     // 3 秒後隱藏成功訊息
     setTimeout(() => {
       preferenceSaveSuccess.value = false
@@ -475,8 +507,8 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 20px;
+  background: var(--color-primary-gradient);
+  padding: var(--space-5);
   overflow: hidden;
 }
 
@@ -540,13 +572,12 @@ onUnmounted(() => {
   z-index: 1;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
-  border-radius: 24px;
-  padding: 48px;
-  max-width: 480px;
+  border-radius: var(--radius-xl);
+  padding: var(--space-12);
+  max-width: min(480px, calc(100vw - 40px));
   width: 100%;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3),
-              0 0 0 1px rgba(255, 255, 255, 0.2);
-  animation: slideUp 0.5s ease-out;
+  box-shadow: var(--shadow-xl);
+  animation: slideUp var(--duration-slow) var(--easing-out);
 }
 
 @keyframes slideUp {
@@ -586,13 +617,13 @@ onUnmounted(() => {
 }
 
 .settings-header h1 {
-  font-size: 2.2rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  background: var(--color-primary-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .settings-header p {
@@ -617,15 +648,15 @@ onUnmounted(() => {
 }
 
 .settings-tabs :deep(.n-tabs-tab:hover) {
-  color: #667eea;
+  color: var(--color-primary-600);
 }
 
 .settings-tabs :deep(.n-tabs-tab--active) {
-  color: #667eea;
+  color: var(--color-primary-600);
 }
 
 .settings-tabs :deep(.n-tabs-bar) {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-primary-gradient);
 }
 
 .tab-content {
@@ -697,7 +728,7 @@ onUnmounted(() => {
 }
 
 .redirect-text {
-  color: #999;
+  color: var(--color-text-muted);
   font-size: 0.95rem;
   margin-bottom: 24px;
 }
@@ -766,14 +797,14 @@ onUnmounted(() => {
 }
 
 .back-link {
-  color: #667eea;
+  color: var(--color-primary-600);
   text-decoration: none;
-  font-weight: 600;
-  transition: all 0.3s ease;
+  font-weight: var(--font-weight-semibold);
+  transition: all var(--duration-slow) var(--easing-default);
 }
 
 .back-link:hover {
-  color: #764ba2;
+  color: var(--color-primary-700);
 }
 
 /* 配對偏好設定 */
@@ -825,7 +856,7 @@ onUnmounted(() => {
 
 .age-input input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: var(--color-primary-600);
 }
 
 .age-input input:disabled {
@@ -835,7 +866,7 @@ onUnmounted(() => {
 
 .range-separator {
   font-size: 1.5rem;
-  color: #999;
+  color: var(--color-text-muted);
   padding-top: 20px;
 }
 
@@ -857,8 +888,8 @@ onUnmounted(() => {
   height: 8px;
   -webkit-appearance: none;
   appearance: none;
-  background: linear-gradient(to right, #667eea, #764ba2);
-  border-radius: 4px;
+  background: var(--color-primary-gradient);
+  border-radius: var(--radius-sm);
   outline: none;
 }
 
@@ -868,11 +899,11 @@ onUnmounted(() => {
   width: 24px;
   height: 24px;
   background: white;
-  border: 3px solid #667eea;
+  border: 3px solid var(--color-primary-600);
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-  transition: transform 0.2s ease;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--duration-normal) var(--easing-default);
 }
 
 .distance-input input[type="range"]::-webkit-slider-thumb:hover {
@@ -883,24 +914,24 @@ onUnmounted(() => {
   width: 24px;
   height: 24px;
   background: white;
-  border: 3px solid #667eea;
+  border: 3px solid var(--color-primary-600);
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-sm);
 }
 
 .distance-value {
   min-width: 80px;
   text-align: right;
-  font-weight: 600;
-  color: #667eea;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-primary-600);
 }
 
 .distance-marks {
   display: flex;
   justify-content: space-between;
   font-size: 0.75rem;
-  color: #999;
+  color: var(--color-text-muted);
   padding: 0 4px;
 }
 
@@ -925,13 +956,13 @@ onUnmounted(() => {
 }
 
 .gender-option:hover {
-  border-color: #667eea;
-  background: #f8f8ff;
+  border-color: var(--color-primary-600);
+  background: var(--color-background);
 }
 
 .gender-option.active {
-  border-color: #667eea;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+  border-color: var(--color-primary-600);
+  background: var(--color-primary-alpha-10);
 }
 
 .gender-option input {
@@ -968,9 +999,9 @@ onUnmounted(() => {
 .spinner {
   width: 40px;
   height: 40px;
-  margin: 0 auto 16px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #667eea;
+  margin: 0 auto var(--space-4);
+  border: 4px solid var(--color-border-light);
+  border-top: 4px solid var(--color-primary-600);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -1008,7 +1039,7 @@ onUnmounted(() => {
 }
 
 .link-item:hover {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+  background: var(--color-primary-alpha-10);
   transform: translateX(4px);
 }
 
@@ -1024,24 +1055,40 @@ onUnmounted(() => {
 }
 
 .link-arrow {
-  font-size: 1.5rem;
-  color: #999;
+  display: flex;
+  align-items: center;
+  color: var(--color-text-muted);
   transition: transform 0.3s ease;
+}
+
+.link-arrow .arrow-icon {
+  transform: rotate(180deg);
 }
 
 .link-item:hover .link-arrow {
   transform: translateX(4px);
-  color: #667eea;
+  color: var(--color-primary-600);
+}
+
+/* Tab 標籤樣式 */
+.tab-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* 響應式設計 */
 @media (max-width: 480px) {
+  .settings-container {
+    padding: var(--space-3);
+  }
+
   .settings-card {
-    padding: 32px 24px;
+    padding: var(--space-8) var(--space-6);
   }
 
   .settings-header h1 {
-    font-size: 1.8rem;
+    font-size: var(--font-size-2xl);
   }
 
   .logo-icon,
@@ -1055,11 +1102,18 @@ onUnmounted(() => {
 
   .age-range {
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-3);
   }
 
   .range-separator {
     display: none;
+  }
+
+  /* Ensure touch targets on mobile */
+  .btn,
+  .age-input input,
+  select.form-control {
+    min-height: var(--touch-target-min);
   }
 }
 </style>

@@ -313,7 +313,7 @@ const formattedTime = computed(() => {
   align-items: center;
   gap: 4px;
   font-size: 11px;
-  color: #999;
+  color: var(--color-text-muted);
   padding: 0 4px;
 }
 

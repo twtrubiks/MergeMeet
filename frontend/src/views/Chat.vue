@@ -5,7 +5,7 @@
       <div class="chat-header">
         <n-button text @click="goBack" class="back-button">
           <template #icon>
-            <n-icon><ArrowBack /></n-icon>
+            <Icon name="back" size="md" label="返回" />
           </template>
         </n-button>
 
@@ -36,7 +36,7 @@
         >
           <n-button text class="more-button">
             <template #icon>
-              <n-icon size="24"><EllipsisVertical /></n-icon>
+              <Icon name="ellipsis-vertical" size="md" label="更多選項" />
             </template>
           </n-button>
         </n-dropdown>
@@ -109,7 +109,7 @@
           class="send-button"
         >
           <template #icon>
-            <n-icon><Send /></n-icon>
+            <Icon name="send" size="sm" decorative />
           </template>
           發送
         </n-button>
@@ -150,8 +150,10 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, watch, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NButton, NIcon, NAvatar, NInput, NEmpty, NSpin, NAlert, NDropdown, useMessage, useDialog } from 'naive-ui'
-import { ArrowBack, Send, EllipsisVertical, BanOutline, AlertCircleOutline } from '@vicons/ionicons5'
+// 保留 NIcon 和圖標導入用於 h() 渲染 dropdown 選項（n-dropdown API 要求）
+import { BanOutline, AlertCircleOutline } from '@vicons/ionicons5'
 import { useChatStore } from '@/stores/chat'
+import Icon from '@/components/ui/Icon.vue'
 import { useUserStore } from '@/stores/user'
 import { useSafetyStore } from '@/stores/safety'
 import { useWebSocketStore } from '@/stores/websocket'
@@ -605,7 +607,7 @@ onUnmounted(() => {
 
 .user-hint {
   font-size: 12px;
-  color: #999;
+  color: var(--color-text-muted);
   margin-top: 2px;
 }
 
@@ -719,7 +721,7 @@ onUnmounted(() => {
   display: flex;
   justify-content: center;
   padding: 12px;
-  color: #999;
+  color: var(--color-text-muted);
   font-size: 12px;
 }
 

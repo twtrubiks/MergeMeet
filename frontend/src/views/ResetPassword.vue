@@ -3,7 +3,7 @@
     <div class="auth-card">
       <div class="auth-header">
         <div class="logo-animation">
-          <span class="logo-icon">🔒</span>
+          <Icon name="lock" size="xl" decorative />
         </div>
         <h1>重置密碼</h1>
         <p v-if="!verifying && tokenValid">設定您的新密碼</p>
@@ -17,7 +17,7 @@
 
       <!-- Token 無效 -->
       <div v-else-if="!tokenValid" class="error-state">
-        <div class="error-icon">❌</div>
+        <div class="error-icon"><Icon name="close" size="xl" decorative /></div>
         <h2>鏈接無效</h2>
         <p class="error-text">{{ tokenError }}</p>
         <AnimatedButton
@@ -36,7 +36,7 @@
 
       <!-- 成功狀態 -->
       <div v-else-if="resetSuccess" class="success-state">
-        <div class="success-icon">✅</div>
+        <div class="success-icon"><Icon name="check-circle" size="xl" decorative /></div>
         <h2>密碼重置成功！</h2>
         <p class="success-text">您的密碼已更新，請使用新密碼登入。</p>
         <AnimatedButton
@@ -103,7 +103,7 @@
           :disabled="!isFormValid || isLoading"
           :loading="isLoading"
         >
-          <span v-if="!isLoading">🔐 重置密碼</span>
+          <span v-if="!isLoading"><Icon name="lock" size="sm" decorative /> 重置密碼</span>
         </AnimatedButton>
       </form>
     </div>
@@ -123,6 +123,7 @@ import { useRoute, useRouter } from 'vue-router'
 import apiClient from '@/api/client'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 import FloatingInput from '@/components/ui/FloatingInput.vue'
+import Icon from '@/components/ui/Icon.vue'
 
 const route = useRoute()
 const router = useRouter()

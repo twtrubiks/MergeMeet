@@ -24,17 +24,23 @@
         >
           <img :src="photo.url" :alt="'Photo ' + photo.display_order" />
           <div class="photo-overlay">
-            <button @click="handleDelete(photo.id)" class="btn-delete" title="刪除">
-              🗑️
-            </button>
             <button
-              v-if="!photo.is_profile_picture"
-              @click="handleSetPrimary(photo.id)"
-              class="btn-set-primary"
-              title="設為主頭像"
-            >
-              ⭐
-            </button>
+                @click="handleDelete(photo.id)"
+                class="btn-delete"
+                title="刪除"
+                aria-label="刪除此照片"
+              >
+                <Icon name="trash" size="sm" decorative />
+              </button>
+              <button
+                v-if="!photo.is_profile_picture"
+                @click="handleSetPrimary(photo.id)"
+                class="btn-set-primary"
+                title="設為主頭像"
+                aria-label="將此照片設為主頭像"
+              >
+                <Icon name="star" size="sm" decorative />
+              </button>
             <div v-if="photo.is_profile_picture" class="photo-badge">主頭像</div>
           </div>
           <!-- 審核狀態標籤 -->
@@ -148,6 +154,7 @@ import draggable from 'vuedraggable'
 import { useProfileStore } from '@/stores/profile'
 import apiClient from '@/api/client'
 import { logger } from '@/utils/logger'
+import Icon from '@/components/ui/Icon.vue'
 
 const emit = defineEmits(['photos-changed'])
 
@@ -369,7 +376,7 @@ const submitAppeal = async () => {
 }
 
 .hint {
-  color: #999;
+  color: var(--color-text-muted);
   font-size: 0.9rem;
   margin-bottom: 1rem;
 }
@@ -452,13 +459,16 @@ const submitAppeal = async () => {
   background: white;
   border: none;
   border-radius: 50%;
-  width: 40px;
-  height: 40px;
+  width: var(--touch-target-min, 44px);
+  height: var(--touch-target-min, 44px);
   font-size: 1.2rem;
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.3s, transform 0.2s;
   position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-delete {
@@ -761,7 +771,7 @@ const submitAppeal = async () => {
 .char-count {
   text-align: right;
   font-size: 0.75rem;
-  color: #999;
+  color: var(--color-text-muted);
   margin-top: 4px;
 }
 

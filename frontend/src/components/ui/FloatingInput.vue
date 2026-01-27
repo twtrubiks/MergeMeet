@@ -1,8 +1,8 @@
 <template>
-  <div class="floating-input" :class="{ 'has-value': hasValue, 'is-focused': isFocused, 'has-error': error }">
+  <div class="floating-input" :class="{ 'has-value': hasValue, 'is-focused': isFocused, 'has-error': error, 'has-toggle': showPasswordToggle && type === 'password' }">
     <input
       :id="id"
-      :type="type"
+      :type="computedType"
       :value="modelValue"
       :placeholder="placeholder"
       :required="required"
@@ -18,6 +18,15 @@
     <label :for="id" class="input-label">
       {{ label }}
     </label>
+    <button
+      v-if="showPasswordToggle && type === 'password'"
+      type="button"
+      class="password-toggle"
+      @click="togglePasswordVisibility"
+      :aria-label="showPassword ? '隱藏密碼' : '顯示密碼'"
+    >
+      <Icon :name="showPassword ? 'eye-off' : 'eye'" size="sm" decorative />
+    </button>
     <div class="input-border"></div>
     <div
       v-if="error"
@@ -33,6 +42,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import Icon from '@/components/ui/Icon.vue'
 
 const props = defineProps({
   id: {
@@ -70,13 +80,32 @@ const props = defineProps({
   error: {
     type: String,
     default: ''
+  },
+  showPasswordToggle: {
+    type: Boolean,
+    default: false
   }
 })
 
 defineEmits(['update:modelValue'])
 
 const isFocused = ref(false)
+const showPassword = ref(false)
+
 const hasValue = computed(() => props.modelValue !== '' && props.modelValue !== null)
+
+// 計算實際的 input type（用於密碼顯示切換）
+const computedType = computed(() => {
+  if (props.type === 'password' && props.showPasswordToggle && showPassword.value) {
+    return 'text'
+  }
+  return props.type
+})
+
+// 切換密碼顯示
+const togglePasswordVisibility = () => {
+  showPassword.value = !showPassword.value
+}
 </script>
 
 <style scoped>
@@ -180,5 +209,41 @@ const hasValue = computed(() => props.modelValue !== '' && props.modelValue !== 
 .floating-input.is-focused .input-field {
   box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15),
               0 8px 16px rgba(102, 126, 234, 0.1);
+}
+
+/* Password toggle button */
+.floating-input.has-toggle .input-field {
+  padding-right: 48px;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.password-toggle:hover {
+  background: rgba(102, 126, 234, 0.1);
+  color: #667eea;
+}
+
+.password-toggle:focus {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+}
+
+.floating-input.has-error .password-toggle {
+  top: calc(50% - 10px);
 }
 </style>

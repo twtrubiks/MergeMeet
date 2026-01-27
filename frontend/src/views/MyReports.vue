@@ -271,7 +271,7 @@ onMounted(() => {
   gap: 8px;
   padding: 10px 20px;
   background: rgba(255, 255, 255, 0.95);
-  color: #FF6B6B;
+  color: var(--color-like-accessible);
   text-decoration: none;
   border-radius: 25px;
   font-weight: 600;
@@ -321,13 +321,13 @@ onMounted(() => {
 
 .tab-btn:hover {
   background: white;
-  color: #FF6B6B;
+  color: var(--color-like-accessible);
 }
 
 .tab-btn.active {
-  background: #FF6B6B;
+  background: var(--color-like-accessible);
   color: white;
-  box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+  box-shadow: 0 4px 15px rgba(199, 58, 58, 0.4);
 }
 
 /* 載入狀態 */
@@ -373,7 +373,7 @@ onMounted(() => {
 
 .empty-state p {
   font-size: 14px;
-  color: #999;
+  color: var(--color-text-muted);
   margin: 0;
 }
 
@@ -512,7 +512,7 @@ onMounted(() => {
 .report-time,
 .reviewed-time {
   font-size: 13px;
-  color: #999;
+  color: var(--color-text-muted);
 }
 
 /* 響應式設計 */

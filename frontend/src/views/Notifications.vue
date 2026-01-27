@@ -60,8 +60,9 @@
               class="delete-btn"
               @click.stop="handleDelete(notification.id)"
               title="刪除"
+              aria-label="刪除此通知"
             >
-              🗑️
+              <Icon name="trash" size="sm" decorative />
             </button>
           </div>
 
@@ -89,6 +90,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotificationStore, NotificationType } from '@/stores/notification'
 import { logger } from '@/utils/logger'
+import Icon from '@/components/ui/Icon.vue'
 
 const router = useRouter()
 const notificationStore = useNotificationStore()
@@ -297,7 +299,7 @@ onMounted(() => {
   gap: 8px;
   padding: 10px 20px;
   background: rgba(255, 255, 255, 0.95);
-  color: #FF6B6B;
+  color: var(--color-like-accessible);
   text-decoration: none;
   border-radius: 25px;
   font-weight: 600;
@@ -397,7 +399,7 @@ onMounted(() => {
 
 .empty-state p {
   font-size: 14px;
-  color: #999;
+  color: var(--color-text-muted);
   margin: 0;
 }
 
@@ -486,7 +488,7 @@ onMounted(() => {
 
 .notification-time {
   font-size: 12px;
-  color: #999;
+  color: var(--color-text-muted);
 }
 
 /* 操作按鈕 */
@@ -498,8 +500,8 @@ onMounted(() => {
 }
 
 .delete-btn {
-  width: 32px;
-  height: 32px;
+  width: var(--touch-target-min, 44px);
+  height: var(--touch-target-min, 44px);
   border: none;
   border-radius: 50%;
   background: transparent;
@@ -536,8 +538,8 @@ onMounted(() => {
 .load-more-btn {
   padding: 10px 30px;
   background: transparent;
-  color: #FF6B6B;
-  border: 2px solid #FF6B6B;
+  color: var(--color-like-accessible);
+  border: 2px solid var(--color-like-accessible);
   border-radius: 20px;
   font-size: 14px;
   font-weight: 600;
@@ -546,7 +548,7 @@ onMounted(() => {
 }
 
 .load-more-btn:hover:not(:disabled) {
-  background: #FF6B6B;
+  background: var(--color-like-accessible);
   color: white;
 }
 

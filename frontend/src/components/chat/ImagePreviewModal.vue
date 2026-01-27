@@ -13,7 +13,7 @@
         @click="$emit('update:show', false)"
       >
         <template #icon>
-          <n-icon size="28"><CloseOutline /></n-icon>
+          <Icon name="close-outline" size="lg" label="關閉" />
         </template>
       </n-button>
 
@@ -30,8 +30,8 @@
 
 <script setup>
 import { onMounted, onUnmounted } from 'vue'
-import { NModal, NButton, NIcon } from 'naive-ui'
-import { CloseOutline } from '@vicons/ionicons5'
+import { NModal, NButton } from 'naive-ui'
+import Icon from '@/components/ui/Icon.vue'
 
 const props = defineProps({
   show: {

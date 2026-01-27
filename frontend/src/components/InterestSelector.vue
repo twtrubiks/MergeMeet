@@ -3,8 +3,8 @@
     <h3>興趣標籤</h3>
     <p class="hint">
       選擇 3-10 個興趣標籤 (已選擇: {{ selectedCount }}/10)
-      <span v-if="selectedCount < 3" class="warning">⚠️ 至少選擇 3 個</span>
-      <span v-else-if="selectedCount >= 3 && selectedCount <= 10" class="success">✅</span>
+      <span v-if="selectedCount < 3" class="warning"><Icon name="warning" size="sm" decorative /> 至少選擇 3 個</span>
+      <span v-else-if="selectedCount >= 3 && selectedCount <= 10" class="success"><Icon name="check-circle" size="sm" decorative /></span>
     </p>
 
     <!-- 分類標籤 -->
@@ -48,6 +48,7 @@
 <script setup>
 import { computed, watch } from 'vue'
 import { useProfileStore } from '@/stores/profile'
+import Icon from '@/components/ui/Icon.vue'
 
 const props = defineProps({
   modelValue: {
@@ -248,7 +249,7 @@ const toggleTag = (tagId) => {
 .empty-state {
   text-align: center;
   padding: 2rem;
-  color: #999;
+  color: var(--color-text-muted);
 }
 
 @media (max-width: 768px) {

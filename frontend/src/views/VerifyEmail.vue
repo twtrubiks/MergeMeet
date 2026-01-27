@@ -3,7 +3,7 @@
     <div class="auth-card">
       <div class="auth-header">
         <div class="logo-animation">
-          <span class="logo-icon">📧</span>
+          <Icon name="chat" size="xl" decorative />
         </div>
         <h1>驗證您的 Email</h1>
         <p>我們已發送驗證碼至</p>
@@ -12,7 +12,7 @@
 
       <!-- 驗證成功狀態 -->
       <div v-if="verifySuccess" class="success-state">
-        <div class="success-icon">✅</div>
+        <div class="success-icon"><Icon name="check-circle" size="xl" decorative /></div>
         <h2>驗證成功！</h2>
         <p class="success-text">正在前往個人資料頁面...</p>
       </div>
@@ -94,6 +94,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
+import Icon from '@/components/ui/Icon.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -501,7 +502,7 @@ onUnmounted(() => {
 }
 
 .cooldown-text {
-  color: #999;
+  color: var(--color-text-muted);
   font-size: 0.9rem;
 }
 
@@ -546,7 +547,7 @@ onUnmounted(() => {
 }
 
 .hint-text {
-  color: #999;
+  color: var(--color-text-muted);
   font-size: 0.85rem;
 }
 

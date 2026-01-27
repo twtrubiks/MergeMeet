@@ -11,13 +11,13 @@
 
       <!-- 錯誤訊息 -->
       <div v-else-if="safetyStore.error" class="error-message">
-        <p>❌ {{ safetyStore.error }}</p>
+        <p><Icon name="close" size="sm" decorative /> {{ safetyStore.error }}</p>
         <button @click="loadBlockedUsers" class="btn-retry">重試</button>
       </div>
 
       <!-- 空狀態 -->
       <div v-else-if="!safetyStore.hasBlockedUsers" class="empty-state">
-        <div class="empty-icon">🚫</div>
+        <div class="empty-icon"><Icon name="shield" size="xl" decorative /></div>
         <h2>沒有封鎖任何用戶</h2>
         <p>封鎖的用戶會出現在這裡</p>
         <router-link to="/discovery" class="btn-discover">
@@ -34,7 +34,7 @@
         >
           <div class="blocked-info">
             <div class="blocked-header">
-              <div class="blocked-icon">🚫</div>
+              <div class="blocked-icon"><Icon name="shield" size="md" decorative /></div>
               <div class="blocked-details">
                 <h3 class="blocked-email">{{ blockedUser.blocked_user_email }}</h3>
                 <p class="blocked-date">
@@ -91,6 +91,7 @@
 import { ref, onMounted } from 'vue'
 import { useSafetyStore } from '@/stores/safety'
 import { logger } from '@/utils/logger'
+import Icon from '@/components/ui/Icon.vue'
 
 const safetyStore = useSafetyStore()
 
@@ -318,7 +319,7 @@ onMounted(() => {
 
 .blocked-date {
   font-size: 13px;
-  color: #999;
+  color: var(--color-text-muted);
   margin: 0;
 }
 
