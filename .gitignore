@@ -60,3 +60,4 @@ temp/
 
 # Claude Code (local settings may contain tokens)
 .claude/settings.local.json
+.claude/skills/ui-ux-pro-max/
