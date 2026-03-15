@@ -64,7 +64,6 @@ frontend/
 │   │   ├── notification.js     # 通知
 │   │   └── websocket.js        # WebSocket 狀態
 │   ├── composables/            # Vue composables
-│   │   └── useWebSocket.js
 │   ├── router/                 # Vue Router
 │   │   └── index.js
 │   └── api/                    # API 客戶端

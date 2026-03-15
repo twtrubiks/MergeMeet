@@ -4,18 +4,6 @@ import { useProfileStore } from '@/stores/profile'
 import { discreteMessage } from '@/utils/discreteApi'
 import Home from '@/views/Home.vue'
 import Login from '@/views/Login.vue'
-import Register from '@/views/Register.vue'
-import ForgotPassword from '@/views/ForgotPassword.vue'
-import ResetPassword from '@/views/ResetPassword.vue'
-import VerifyEmail from '@/views/VerifyEmail.vue'
-import Profile from '@/views/Profile.vue'
-import Discovery from '@/views/Discovery.vue'
-import Matches from '@/views/Matches.vue'
-import Blocked from '@/views/Blocked.vue'
-import ChatList from '@/views/ChatList.vue'
-import Chat from '@/views/Chat.vue'
-import AdminLogin from '@/views/admin/AdminLogin.vue'
-import AdminDashboard from '@/views/admin/AdminDashboard.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -35,31 +23,31 @@ const router = createRouter({
     {
       path: '/register',
       name: 'register',
-      component: Register,
+      component: () => import('@/views/Register.vue'),
       meta: { requiresAuth: false }
     },
     {
       path: '/forgot-password',
       name: 'forgot-password',
-      component: ForgotPassword,
+      component: () => import('@/views/ForgotPassword.vue'),
       meta: { requiresAuth: false }
     },
     {
       path: '/reset-password',
       name: 'reset-password',
-      component: ResetPassword,
+      component: () => import('@/views/ResetPassword.vue'),
       meta: { requiresAuth: false }
     },
     {
       path: '/verify-email',
       name: 'verify-email',
-      component: VerifyEmail,
+      component: () => import('@/views/VerifyEmail.vue'),
       meta: { requiresAuth: true }
     },
     {
       path: '/profile',
       name: 'profile',
-      component: Profile,
+      component: () => import('@/views/Profile.vue'),
       meta: { requiresAuth: true }
     },
     {
@@ -83,43 +71,43 @@ const router = createRouter({
     {
       path: '/discovery',
       name: 'discovery',
-      component: Discovery,
+      component: () => import('@/views/Discovery.vue'),
       meta: { requiresAuth: true, requiresCompleteProfile: true }
     },
     {
       path: '/matches',
       name: 'matches',
-      component: Matches,
+      component: () => import('@/views/Matches.vue'),
       meta: { requiresAuth: true }
     },
     {
       path: '/blocked',
       name: 'blocked',
-      component: Blocked,
+      component: () => import('@/views/Blocked.vue'),
       meta: { requiresAuth: true }
     },
     {
       path: '/messages',
       name: 'messages',
-      component: ChatList,
+      component: () => import('@/views/ChatList.vue'),
       meta: { requiresAuth: true }
     },
     {
       path: '/messages/:matchId',
       name: 'chat',
-      component: Chat,
+      component: () => import('@/views/Chat.vue'),
       meta: { requiresAuth: true }
     },
     {
       path: '/admin/login',
       name: 'admin-login',
-      component: AdminLogin,
+      component: () => import('@/views/admin/AdminLogin.vue'),
       meta: { requiresAuth: false, requiresAdmin: false }
     },
     {
       path: '/admin',
       name: 'admin-dashboard',
-      component: AdminDashboard,
+      component: () => import('@/views/admin/AdminDashboard.vue'),
       meta: { requiresAuth: true, requiresAdmin: true }
     }
   ]

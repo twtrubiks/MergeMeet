@@ -36,7 +36,7 @@
 |-----|------|------|
 | 對話列表 | `GET /api/messages/conversations` | ChatList.vue |
 | 聊天記錄 | `GET /api/messages/matches/{id}/messages` | Chat.vue |
-| 即時訊息 | WebSocket `/ws` | useWebSocket |
+| 即時訊息 | WebSocket `/ws` | useWebSocketStore |
 
 ## 安全功能
 

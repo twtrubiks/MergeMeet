@@ -20,7 +20,6 @@
     "axios": "^1.6.5",
     "naive-ui": "^2.38.1",
     "pinia": "^2.1.7",
-    "socket.io-client": "^4.6.1",
     "vue": "^3.4.0",
     "vue-router": "^4.2.5",
     "vuedraggable": "^4.1.0"
@@ -31,16 +30,12 @@
     "@vitest/coverage-v8": "^4.0.9",
     "@vitest/ui": "^4.0.9",
     "@vue/test-utils": "^2.4.3",
-    "autoprefixer": "^10.4.17",
     "eslint": "^10.0.3",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-vue": "^10.8.0",
     "globals": "^17.4.0",
-    "happy-dom": "^20.0.10",
     "jsdom": "^27.2.0",
-    "postcss": "^8.4.33",
     "prettier": "^3.8.1",
-    "tailwindcss": "^3.4.1",
     "vite": "^5.0.12",
     "vitest": "^4.0.9"
   }
