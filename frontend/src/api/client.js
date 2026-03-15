@@ -33,6 +33,14 @@ function getCookie(name) {
 let refreshPromise = null
 let isRedirectingToLogin = false
 
+/**
+ * 重置登入跳轉旗標
+ * 在 Login 頁面掛載時呼叫，確保旗標不會永久卡在 true
+ */
+export function resetRedirectFlag() {
+  isRedirectingToLogin = false
+}
+
 // 建立 axios 實例
 const apiClient = axios.create({
   baseURL: '/api',
@@ -124,16 +132,17 @@ apiClient.interceptors.response.use(
         // 重新發送原本的請求
         return apiClient(originalRequest)
       } catch (refreshError) {
-        // 刷新失敗，清除本地 Token
-        localStorage.removeItem('access_token')
-        localStorage.removeItem('refresh_token')
-
         // 只有第一個失敗的請求顯示提示並跳轉
         // 避免多個請求同時跳轉造成多次提示
         if (!isRedirectingToLogin) {
           isRedirectingToLogin = true
           await showSessionExpiredMessage()
-          window.location.href = '/login'
+          // 通知 Pinia Store 清除認證狀態（避免循環依賴，使用 CustomEvent）
+          // 必須在 router.push 之前，否則 router guard 會因 isAuthenticated=true 擋住跳轉
+          window.dispatchEvent(new CustomEvent('session-expired'))
+          // 使用 dynamic import 避免與 router → stores → client 的循環依賴
+          const { default: router } = await import('@/router')
+          router.push('/login')
         }
 
         return Promise.reject(refreshError)

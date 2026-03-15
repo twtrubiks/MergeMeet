@@ -85,9 +85,10 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { resetRedirectFlag } from '@/api/client'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 import FloatingInput from '@/components/ui/FloatingInput.vue'
 import Icon from '@/components/ui/Icon.vue'
@@ -152,6 +153,11 @@ watch(
     }
   }
 )
+
+// 重置登入跳轉旗標，避免 client.js 中 isRedirectingToLogin 永久卡在 true
+onMounted(() => {
+  resetRedirectFlag()
+})
 
 // 清理定時器
 onUnmounted(() => {

@@ -295,6 +295,14 @@ export const useUserStore = defineStore('user', () => {
         logger.debug('Token refreshed, store updated')
       }
     })
+
+    // 監聽 Session 過期事件
+    // 當 client.js 的 Token 刷新失敗時觸發，清除前端認證狀態
+    // 確保 router guard 不會因 isAuthenticated=true 擋住跳轉到 login 頁
+    window.addEventListener('session-expired', () => {
+      clearTokens()
+      logger.debug('Session expired, store cleared')
+    })
   }
 
   return {
