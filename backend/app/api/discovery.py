@@ -167,7 +167,7 @@ async def browse_users(
     query = query.where(Profile.user_id.notin_(blocked_me_subquery))
 
     # 排除 24 小時內跳過的用戶（類似 Tinder 做法）
-    pass_cutoff = datetime.now() - timedelta(hours=24)
+    pass_cutoff = datetime.now(UTC) - timedelta(hours=24)
     passed_users_subquery = select(Pass.to_user_id).where(
         Pass.from_user_id == current_user.id,
         Pass.passed_at > pass_cutoff,  # 只排除 24 小時內跳過的

@@ -15,7 +15,7 @@
 """
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -260,7 +260,7 @@ Hi {username},
         Returns:
             bool: 是否成功發送
         """
-        change_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        change_time = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
 
         html_content = f"""  # noqa: E501
 <!DOCTYPE html>

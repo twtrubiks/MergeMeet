@@ -1,7 +1,7 @@
 """內容審核管理 API - 敏感詞管理和申訴處理"""
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import and_, desc, func, select
@@ -410,7 +410,7 @@ async def get_moderation_stats(
     rejected_appeals = rejected_appeals_result.scalar()
 
     # 違規統計
-    now = datetime.now()
+    now = datetime.now(UTC)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week_start = now - timedelta(days=7)
     month_start = now - timedelta(days=30)

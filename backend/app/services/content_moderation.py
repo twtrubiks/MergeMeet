@@ -13,7 +13,7 @@ import logging
 import re
 import uuid
 from collections import OrderedDict
-from datetime import datetime
+from datetime import UTC, datetime
 
 import redis.asyncio as aioredis
 from sqlalchemy import select
@@ -142,7 +142,7 @@ class ContentModerationService:
         Returns:
             敏感詞列表（如果快取有效），否則 None
         """
-        now = datetime.now()
+        now = datetime.now(UTC)
         cache_timestamp = cls._cache_time.get(cache_key)
 
         if not cache_timestamp:
@@ -194,7 +194,7 @@ class ContentModerationService:
             logger.warning(f"Memory cache evicted due to size limit: {oldest_key}")
 
         cls._cache[cache_key] = words_data
-        cls._cache_time[cache_key] = datetime.now()
+        cls._cache_time[cache_key] = datetime.now(UTC)
         logger.info(f"Sensitive words cached to memory ({len(words_data)} words)")
 
     @classmethod

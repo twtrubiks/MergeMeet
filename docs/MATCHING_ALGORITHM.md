@@ -120,7 +120,7 @@ distance_label = (
 > **實作狀態**: `last_active` 由 `LastActiveMiddleware` 自動更新，每次已認證請求成功後都會記錄活躍時間。
 
 ```python
-last_active = datetime.now() - timedelta(hours=5)  # 5 小時前上線
+last_active = datetime.now(UTC) - timedelta(hours=5)  # 5 小時前上線
 hours_ago = 5
 
 if hours_ago < 1:       score = 20 分  # 剛上線
@@ -145,7 +145,7 @@ else:                   score = 0 分   # 不活躍
 def _calculate_activity_score(last_active) -> float:
     if not last_active:
         return 0
-    hours_ago = (datetime.now(timezone.utc) - last_active).total_seconds() / 3600
+    hours_ago = (datetime.now(UTC) - last_active).total_seconds() / 3600
 
     if hours_ago < 1:
         return 20
