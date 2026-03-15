@@ -164,7 +164,7 @@ async def health_check():
         logger.warning("Redis health check timeout")
     except Exception as e:
         health_status["redis"]["connected"] = False
-        health_status["redis"]["error"] = str(e)
+        health_status["redis"]["error"] = "unavailable"
         logger.warning(f"Redis health check failed: {e}")
 
     return health_status

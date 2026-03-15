@@ -46,8 +46,8 @@ class TokenInvalidator:
             user_id: 用戶 ID
         """
         if not cls._redis:
-            logger.warning("TokenInvalidator: Redis not configured, skipping invalidation")
-            return
+            logger.critical("TokenInvalidator: Redis not configured, cannot invalidate tokens")
+            raise RuntimeError("Redis is required for token invalidation")
 
         key = cls._get_key(user_id)
         timestamp = int(datetime.now(UTC).timestamp())
@@ -70,8 +70,8 @@ class TokenInvalidator:
             bool: True 如果 Token 有效，False 如果已被失效
         """
         if not cls._redis:
-            # Redis 不可用時，允許 Token（降級處理）
-            return True
+            logger.critical("TokenInvalidator: Redis not configured, rejecting token for safety")
+            return False
 
         key = cls._get_key(user_id)
 
@@ -91,9 +91,8 @@ class TokenInvalidator:
 
             return True
         except aioredis.RedisError as e:
-            logger.warning(f"Failed to check token validity for user {user_id}: {e}")
-            # Redis 錯誤時，允許 Token（降級處理）
-            return True
+            logger.critical(f"TokenInvalidator: Redis error, rejecting token for safety: {e}")
+            return False
 
 
 # 全局實例（供 main.py 初始化）
