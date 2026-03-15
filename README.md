@@ -37,7 +37,7 @@
 
 配對頁面
 
-![](./docs/screenshots/02-discovery-swipe.png)
+![](./docs/screenshots/02-discovery.png)
 
 帳號設定
 
@@ -213,7 +213,7 @@ cd frontend && npx prettier --write src/  # 前端 format
 |------|------|
 | **認證系統** | 註冊、登入、Email 驗證、密碼重置、JWT Token |
 | **個人檔案** | 資料管理、照片上傳（6張）、興趣標籤、地理位置 |
-| **探索配對** | Tinder 風格卡片、滑動手勢、5 維度配對演算法 |
+| **探索配對** | Tinder 風格卡片、按鈕與鍵盤快捷鍵操作、5 維度配對演算法 |
 | **即時聊天** | WebSocket、圖片訊息、已讀回條、打字指示器 |
 | **安全功能** | 封鎖、舉報、內容審核、信任分數系統 |
 | **管理後台** | 統計儀表板、舉報管理、用戶管理 |

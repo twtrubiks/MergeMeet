@@ -39,10 +39,11 @@
           v-for="(candidate, index) in visibleCandidates"
           :key="candidate.user_id"
           class="candidate-card"
-          :class="{ 'top-card': index === 0 }"
-          :style="index === 0 ? cardStyle : {}"
-          @mousedown="index === 0 ? handlePointerDown($event) : null"
-          @touchstart="index === 0 ? handlePointerDown($event) : null"
+          :class="{
+            'top-card': index === 0,
+            'exit-right': index === 0 && exitDirection === 'right',
+            'exit-left': index === 0 && exitDirection === 'left'
+          }"
         >
           <!-- 照片 -->
           <div class="card-image">
@@ -107,18 +108,6 @@
             <!-- 點擊查看詳情提示 -->
             <div v-if="index === 0" class="view-detail-hint">
               <span><Icon name="hand" size="xs" decorative /> 點擊查看完整資料</span>
-            </div>
-          </div>
-
-          <!-- 滑動提示覆蓋層 -->
-          <div v-if="index === 0" class="swipe-overlay" aria-hidden="true">
-            <div class="swipe-indicator like" :style="{ opacity: likeOpacity }">
-              <Icon name="heart" size="lg" decorative class="indicator-icon" />
-              <span class="indicator-text">喜歡</span>
-            </div>
-            <div class="swipe-indicator pass" :style="{ opacity: passOpacity }">
-              <Icon name="close-outline" size="lg" decorative class="indicator-icon" />
-              <span class="indicator-text">跳過</span>
             </div>
           </div>
         </div>
@@ -199,7 +188,6 @@ import ReportModal from '@/components/ReportModal.vue'
 import UserDetailModal from '@/components/UserDetailModal.vue'
 import HeartLoader from '@/components/ui/HeartLoader.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
-import { throttle } from '@/utils/helpers'
 import { logger } from '@/utils/logger'
 
 const message = useMessage()
@@ -211,13 +199,9 @@ const defaultAvatar = '/default-avatar.svg'
 // 螢幕閱讀器播報文字
 const srAnnouncement = ref('')
 
-// 卡片拖拽狀態
-const dragStartX = ref(0)
-const dragStartY = ref(0)
-const dragCurrentX = ref(0)
-const dragCurrentY = ref(0)
-const isDragging = ref(false)
+// 動畫狀態
 const isAnimating = ref(false)
+const exitDirection = ref('')
 
 // 配對成功彈窗
 const showMatchModal = ref(false)
@@ -233,34 +217,6 @@ const selectedUser = ref(null)
 // 顯示的候選人（最多顯示 3 張卡片）
 const visibleCandidates = computed(() => {
   return discoveryStore.candidates.slice(0, 3)
-})
-
-// 卡片樣式（根據拖拽位置計算）
-const cardStyle = computed(() => {
-  if (!isDragging.value) return {}
-
-  const deltaX = dragCurrentX.value - dragStartX.value
-  const deltaY = dragCurrentY.value - dragStartY.value
-  const rotation = deltaX * 0.1
-
-  return {
-    transform: `translate(${deltaX}px, ${deltaY}px) rotate(${rotation}deg)`,
-    transition: 'none'
-  }
-})
-
-// 喜歡指示器透明度
-const likeOpacity = computed(() => {
-  if (!isDragging.value) return 0
-  const deltaX = dragCurrentX.value - dragStartX.value
-  return Math.max(0, Math.min(1, deltaX / 100))
-})
-
-// 跳過指示器透明度
-const passOpacity = computed(() => {
-  if (!isDragging.value) return 0
-  const deltaX = dragCurrentX.value - dragStartX.value
-  return Math.max(0, Math.min(1, -deltaX / 100))
 })
 
 /**
@@ -338,85 +294,61 @@ const loadCandidates = async () => {
 }
 
 /**
- * 處理喜歡（內部實現）
+ * 等待退場動畫完成
  */
-const _handleLike = async () => {
+const waitForExitAnimation = () => {
+  return new Promise((resolve) => {
+    const card = document.querySelector('.top-card')
+    if (!card) return resolve()
+
+    const cleanup = () => {
+      card.removeEventListener('transitionend', onEnd)
+      clearTimeout(timer)
+      resolve()
+    }
+    const onEnd = () => cleanup()
+    card.addEventListener('transitionend', onEnd)
+    // 安全逾時：避免 transitionend 未觸發時卡住
+    const timer = setTimeout(cleanup, 350)
+  })
+}
+
+/**
+ * 統一處理卡片退場動作（喜歡/跳過）
+ */
+const handleCardAction = async (direction, apiCall) => {
   if (!discoveryStore.currentCandidate || isAnimating.value) return
 
   isAnimating.value = true
   const userId = discoveryStore.currentCandidate.user_id
 
-  // 動畫：向右滑出
-  animateCardExit('right')
-
-  setTimeout(async () => {
-    try {
-      const result = await discoveryStore.likeUser(userId)
-
-      // 如果配對成功，顯示彈窗
-      if (result.matched) {
-        showMatchModal.value = true
-      }
-
-      // 如果候選人不足，重新載入
-      if (discoveryStore.candidates.length < 5) {
-        await loadCandidates()
-      }
-    } catch (error) {
-      logger.error('喜歡操作失敗:', error)
-      // 使用 store 已解析的錯誤訊息（避免重複解析）
+  // 動畫與 API 同時進行
+  exitDirection.value = direction
+  const [, result] = await Promise.all([
+    waitForExitAnimation(),
+    apiCall(userId).catch((error) => {
+      logger.error('操作失敗:', error)
       message.error(discoveryStore.error || '操作失敗，請稍後再試')
-    } finally {
-      isAnimating.value = false
-    }
-  }, 300)
+      return null
+    })
+  ])
+
+  exitDirection.value = ''
+
+  if (result?.matched) {
+    showMatchModal.value = true
+  }
+
+  if (discoveryStore.candidates.length < 5) {
+    loadCandidates()
+  }
+
+  isAnimating.value = false
 }
 
-/**
- * 處理跳過（內部實現）
- */
-const _handlePass = async () => {
-  if (!discoveryStore.currentCandidate || isAnimating.value) return
-
-  isAnimating.value = true
-  const userId = discoveryStore.currentCandidate.user_id
-
-  // 動畫：向左滑出
-  animateCardExit('left')
-
-  setTimeout(async () => {
-    try {
-      await discoveryStore.passUser(userId)
-
-      // 如果候選人不足，重新載入
-      if (discoveryStore.candidates.length < 5) {
-        await loadCandidates()
-      }
-    } catch (error) {
-      logger.error('跳過操作失敗:', error)
-      // 使用 store 已解析的錯誤訊息（避免重複解析）
-      message.error(discoveryStore.error || '操作失敗，請稍後再試')
-    } finally {
-      isAnimating.value = false
-    }
-  }, 300)
-}
-
-// 節流處理：防止快速重複點擊（500ms 間隔）
-const handleLike = throttle(_handleLike, 500)
-const handlePass = throttle(_handlePass, 500)
-
-/**
- * 卡片退出動畫
- */
-const animateCardExit = (direction) => {
-  const card = document.querySelector('.top-card')
-  if (!card) return
-
-  const distance = direction === 'right' ? 1000 : -1000
-  card.style.transition = 'transform 0.3s ease-out'
-  card.style.transform = `translateX(${distance}px) rotate(${direction === 'right' ? 20 : -20}deg)`
-}
+// isAnimating 已防止重複執行，不需額外 throttle
+const handleLike = () => handleCardAction('right', (uid) => discoveryStore.likeUser(uid))
+const handlePass = () => handleCardAction('left', (uid) => discoveryStore.passUser(uid))
 
 /**
  * 關閉配對成功彈窗
@@ -456,8 +388,6 @@ const handleReported = () => {
  * 開啟用戶詳情彈窗
  */
 const openUserDetail = (candidate) => {
-  // 只有在非拖拽狀態下才開啟
-  if (isDragging.value) return
   selectedUser.value = candidate
   showUserDetail.value = true
 }
@@ -470,63 +400,13 @@ const closeUserDetail = () => {
   selectedUser.value = null
 }
 
-/**
- * 鼠標/觸控事件處理
- */
-const handlePointerDown = (event) => {
-  if (isAnimating.value) return
-
-  isDragging.value = true
-  dragStartX.value = event.clientX || event.touches[0].clientX
-  dragStartY.value = event.clientY || event.touches[0].clientY
-  dragCurrentX.value = dragStartX.value
-  dragCurrentY.value = dragStartY.value
-}
-
-const handlePointerMove = (event) => {
-  if (!isDragging.value) return
-
-  dragCurrentX.value = event.clientX || event.touches[0].clientX
-  dragCurrentY.value = event.clientY || event.touches[0].clientY
-}
-
-const handlePointerUp = () => {
-  if (!isDragging.value) return
-
-  const deltaX = dragCurrentX.value - dragStartX.value
-
-  // 如果滑動距離超過閾值，執行操作
-  if (Math.abs(deltaX) > 100) {
-    if (deltaX > 0) {
-      handleLike()
-    } else {
-      handlePass()
-    }
-  }
-
-  isDragging.value = false
-  dragStartX.value = 0
-  dragStartY.value = 0
-  dragCurrentX.value = 0
-  dragCurrentY.value = 0
-}
-
 // 綁定全域事件監聽器
 onMounted(async () => {
-  document.addEventListener('mousemove', handlePointerMove)
-  document.addEventListener('mouseup', handlePointerUp)
-  document.addEventListener('touchmove', handlePointerMove)
-  document.addEventListener('touchend', handlePointerUp)
   document.addEventListener('keydown', handleKeydown)
-
   await loadCandidates()
 })
 
 onUnmounted(() => {
-  document.removeEventListener('mousemove', handlePointerMove)
-  document.removeEventListener('mouseup', handlePointerUp)
-  document.removeEventListener('touchmove', handlePointerMove)
-  document.removeEventListener('touchend', handlePointerUp)
   document.removeEventListener('keydown', handleKeydown)
 })
 </script>
@@ -728,15 +608,27 @@ onUnmounted(() => {
 
 .top-card {
   z-index: 10;
-  cursor: grab;
 }
 
 .top-card:hover {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
 }
 
-.top-card:active {
-  cursor: grabbing;
+/* 卡片退場動畫 */
+.candidate-card.exit-right {
+  transform: translateX(1000px) rotate(20deg);
+  opacity: 0;
+  transition:
+    transform 0.3s ease-out,
+    opacity 0.3s ease-out;
+}
+
+.candidate-card.exit-left {
+  transform: translateX(-1000px) rotate(-20deg);
+  opacity: 0;
+  transition:
+    transform 0.3s ease-out,
+    opacity 0.3s ease-out;
 }
 
 /* 卡片圖片 */
@@ -900,52 +792,6 @@ onUnmounted(() => {
 .top-card .card-info:hover .view-detail-hint {
   color: var(--color-like-hover);
   transform: scale(1.05);
-}
-
-/* 滑動提示覆蓋層 */
-.swipe-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 360px; /* 只覆蓋圖片區域，不覆蓋 card-info */
-  pointer-events: none;
-}
-
-.swipe-indicator {
-  position: absolute;
-  top: 50px;
-  padding: 15px 25px;
-  border-radius: 10px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  font-weight: 700;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.swipe-indicator.like {
-  right: 50px;
-  background: rgba(56, 142, 60, 0.95);
-  color: white;
-  border: 3px solid white;
-}
-
-.swipe-indicator.pass {
-  left: 50px;
-  background: rgba(244, 67, 54, 0.9);
-  color: white;
-  border: 3px solid white;
-}
-
-.indicator-icon {
-  display: flex;
-}
-
-.indicator-text {
-  font-size: 20px;
 }
 
 /* 操作按鈕 */
