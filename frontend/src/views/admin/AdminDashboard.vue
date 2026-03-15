@@ -572,24 +572,10 @@
           <p><strong>上傳時間:</strong> {{ formatDate(selectedPhoto.created_at) }}</p>
         </div>
         <div class="detail-actions" style="margin-top: 16px; display: flex; gap: 8px">
-          <n-button
-            type="success"
-            @click="
-              reviewPhoto(selectedPhoto.id, 'APPROVED')
-              showPhotoDetailModal = false
-            "
-          >
+          <n-button type="success" @click="approveAndCloseDetail(selectedPhoto.id)">
             通過
           </n-button>
-          <n-button
-            type="error"
-            @click="
-              showRejectModal(selectedPhoto)
-              showPhotoDetailModal = false
-            "
-          >
-            拒絕
-          </n-button>
+          <n-button type="error" @click="rejectAndCloseDetail(selectedPhoto)"> 拒絕 </n-button>
         </div>
       </div>
     </n-modal>
@@ -1402,6 +1388,18 @@ const reviewPhoto = async (photoId, status, rejectionReason = null) => {
     logger.error('審核照片失敗:', error)
     message.error(error.response?.data?.detail || '審核失敗')
   }
+}
+
+// 照片詳情 Modal - 通過並關閉
+const approveAndCloseDetail = (photoId) => {
+  reviewPhoto(photoId, 'APPROVED')
+  showPhotoDetailModal.value = false
+}
+
+// 照片詳情 Modal - 拒絕並關閉
+const rejectAndCloseDetail = (photo) => {
+  showRejectModal(photo)
+  showPhotoDetailModal.value = false
 }
 
 // 顯示拒絕 Modal
