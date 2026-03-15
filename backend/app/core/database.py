@@ -32,16 +32,16 @@ Base = declarative_base()
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """取得資料庫 Session（依賴注入）"""
+    """取得資料庫 Session（依賴注入）
+
+    Transaction 由 handler 自行管理，需明確呼叫 await db.commit()。
+    """
     async with AsyncSessionLocal() as session:
         try:
             yield session
-            await session.commit()
         except Exception:
             await session.rollback()
             raise
-        finally:
-            await session.close()
 
 
 async def init_db() -> None:
