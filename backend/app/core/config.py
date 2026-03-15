@@ -22,7 +22,8 @@ class Settings(BaseSettings):
     )
 
     # Redis（用於 Token 黑名單、登入限制、信任分數、內容審核快取）
-    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    # ⚠️ 正式環境請更換為安全密碼
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://:mergemeet_redis123@localhost:6379/0")
 
     # 環境設定
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")

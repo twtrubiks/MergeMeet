@@ -21,12 +21,13 @@ services:
   redis:
     image: redis:8-alpine
     container_name: mergemeet_redis
+    command: redis-server --requirepass mergemeet_redis123
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "mergemeet_redis123", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5

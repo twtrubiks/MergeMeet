@@ -18,7 +18,7 @@ docker compose logs -f postgres
 
 # 進入容器
 docker exec -it mergemeet_postgres psql -U mergemeet -d mergemeet
-docker exec -it mergemeet_redis redis-cli
+docker exec -it mergemeet_redis redis-cli -a mergemeet_redis123
 ```
 
 ---
