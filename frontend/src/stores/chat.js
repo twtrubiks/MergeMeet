@@ -75,26 +75,6 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   /**
-   * 初始化 WebSocket 連接和訊息處理器（保留向後兼容）
-   * @deprecated 使用 initChatHandlers() 代替
-   * @returns {Promise<void>}
-   */
-  const initWebSocket = () => {
-    initChatHandlers()
-    // WebSocket 連接由全域 Store 管理，這裡只等待連接
-    return wsStore.connect()
-  }
-
-  /**
-   * 關閉 WebSocket 連接（保留向後兼容）
-   * @deprecated WebSocket 連接由 App.vue 統一管理
-   */
-  const closeWebSocket = () => {
-    // 不再由 Chat Store 管理 WebSocket 連接
-    logger.debug('[ChatStore] closeWebSocket called (no-op, managed by App.vue)')
-  }
-
-  /**
    * 獲取對話列表
    *
    * 優化：保留本地已讀狀態，避免時序競爭問題
@@ -551,9 +531,7 @@ export const useChatStore = defineStore('chat', () => {
 
     // WebSocket（全域 Store 參考）
     wsStore,
-    initWebSocket, // 保留向後兼容
-    closeWebSocket, // 保留向後兼容
-    initChatHandlers, // 新方法：只註冊訊息處理器
+    initChatHandlers,
 
     // Actions
     fetchConversations,

@@ -90,7 +90,7 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { NBadge, NAvatar, NAlert, useMessage } from 'naive-ui'
 import { useChatStore } from '@/stores/chat'
@@ -161,12 +161,6 @@ onMounted(async () => {
     message.error('載入對話列表失敗')
     logger.error('載入對話列表失敗:', error)
   }
-})
-
-onUnmounted(() => {
-  // 組件卸載時清理 WebSocket (但不完全斷開，因為可能還有其他組件需要使用)
-  // 如果需要完全斷開，可以調用 chatStore.closeWebSocket()
-  // 這裡我們保持連接，只是清理本地狀態
 })
 </script>
 

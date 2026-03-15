@@ -633,35 +633,46 @@ const geocodeLocation = (locationName) => {
 }
 
 /**
+ * 將 formData 中的位置欄位（gps_location / location_name）
+ * 轉換為 API 所需的 location 物件，並清理臨時欄位。
+ * @returns 處理後的 profileData，若地點無法識別則回傳 null
+ */
+const resolveLocationData = (profileData) => {
+  // 優先使用 GPS 定位座標（更精確）
+  if (profileData.gps_location) {
+    profileData.location = {
+      latitude: profileData.gps_location.latitude,
+      longitude: profileData.gps_location.longitude,
+      location_name: profileData.location_name || '台灣'
+    }
+    delete profileData.gps_location
+    delete profileData.location_name
+  }
+  // 降級：使用城市中心座標
+  else if (profileData.location_name) {
+    const coords = geocodeLocation(profileData.location_name)
+    if (!coords) {
+      return null
+    }
+    profileData.location = {
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      location_name: profileData.location_name
+    }
+    delete profileData.location_name
+  }
+  return profileData
+}
+
+/**
  * 儲存基本資料
  */
 const saveBasicInfo = async () => {
   try {
-    const profileData = { ...formData.value }
-
-    // 優先使用 GPS 定位座標（更精確）
-    if (profileData.gps_location) {
-      profileData.location = {
-        latitude: profileData.gps_location.latitude,
-        longitude: profileData.gps_location.longitude,
-        location_name: profileData.location_name || '台灣'
-      }
-      delete profileData.gps_location
-      delete profileData.location_name
-    }
-    // 降級：使用城市中心座標
-    else if (profileData.location_name) {
-      const coords = geocodeLocation(profileData.location_name)
-      if (!coords) {
-        message.error('無法識別該地點，請選擇有效的城市')
-        return
-      }
-      profileData.location = {
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        location_name: profileData.location_name
-      }
-      delete profileData.location_name
+    const profileData = resolveLocationData({ ...formData.value })
+    if (!profileData) {
+      message.error('無法識別該地點，請選擇有效的城市')
+      return
     }
 
     await profileStore.createProfile(profileData)
@@ -684,31 +695,10 @@ const submitProfile = async () => {
   try {
     // 更新基本資料（如果有修改）
     if (isEditing.value) {
-      const profileData = { ...formData.value }
-
-      // 優先使用 GPS 定位座標（更精確）
-      if (profileData.gps_location) {
-        profileData.location = {
-          latitude: profileData.gps_location.latitude,
-          longitude: profileData.gps_location.longitude,
-          location_name: profileData.location_name || '台灣'
-        }
-        delete profileData.gps_location
-        delete profileData.location_name
-      }
-      // 降級：使用城市中心座標
-      else if (profileData.location_name) {
-        const coords = geocodeLocation(profileData.location_name)
-        if (!coords) {
-          message.error('無法識別該地點，請選擇有效的城市')
-          return
-        }
-        profileData.location = {
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          location_name: profileData.location_name
-        }
-        delete profileData.location_name
+      const profileData = resolveLocationData({ ...formData.value })
+      if (!profileData) {
+        message.error('無法識別該地點，請選擇有效的城市')
+        return
       }
 
       await profileStore.updateProfile(profileData)

@@ -5,6 +5,41 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
+_WEAK_PASSWORDS = frozenset(
+    {
+        "12345678",
+        "password",
+        "qwerty123",
+        "11111111",
+        "88888888",
+        "admin123",
+        "1q2w3e4r",
+    }
+)
+
+
+def _validate_password_strength(v: str) -> str:
+    """驗證密碼強度（共用邏輯）
+
+    要求:
+    - 至少 8 個字元（由 Field 定義）
+    - 至少包含一個大寫字母
+    - 至少包含一個小寫字母
+    - 至少包含一個數字
+    - 不能是常見弱密碼
+    """
+    if not re.search(r"[A-Z]", v):
+        raise ValueError("密碼必須包含至少一個大寫字母")
+    if not re.search(r"[a-z]", v):
+        raise ValueError("密碼必須包含至少一個小寫字母")
+    if not re.search(r"\d", v):
+        raise ValueError("密碼必須包含至少一個數字")
+
+    if v.lower() in _WEAK_PASSWORDS:
+        raise ValueError("密碼太常見，請使用更強的密碼")
+
+    return v
+
 
 class RegisterRequest(BaseModel):
     """註冊請求"""
@@ -26,36 +61,7 @@ class RegisterRequest(BaseModel):
     @field_validator("password")
     @classmethod
     def validate_password(cls, v: str) -> str:
-        """驗證密碼強度
-
-        要求:
-        - 至少 8 個字元（已在 Field 定義）
-        - 至少包含一個大寫字母
-        - 至少包含一個小寫字母
-        - 至少包含一個數字
-        - 不能是常見弱密碼
-        """
-        if not re.search(r"[A-Z]", v):
-            raise ValueError("密碼必須包含至少一個大寫字母")
-        if not re.search(r"[a-z]", v):
-            raise ValueError("密碼必須包含至少一個小寫字母")
-        if not re.search(r"\d", v):
-            raise ValueError("密碼必須包含至少一個數字")
-
-        # 檢查常見弱密碼（最嚴重的弱密碼）
-        weak_passwords = [
-            "12345678",
-            "password",
-            "qwerty123",
-            "11111111",
-            "88888888",
-            "admin123",
-            "1q2w3e4r",
-        ]
-        if v.lower() in weak_passwords:
-            raise ValueError("密碼太常見，請使用更強的密碼")
-
-        return v
+        return _validate_password_strength(v)
 
 
 class LoginRequest(BaseModel):
@@ -175,28 +181,7 @@ class ResetPasswordRequest(BaseModel):
     @field_validator("new_password")
     @classmethod
     def validate_password(cls, v: str) -> str:
-        """驗證密碼強度（複用 RegisterRequest 的邏輯）"""
-        if not re.search(r"[A-Z]", v):
-            raise ValueError("密碼必須包含至少一個大寫字母")
-        if not re.search(r"[a-z]", v):
-            raise ValueError("密碼必須包含至少一個小寫字母")
-        if not re.search(r"\d", v):
-            raise ValueError("密碼必須包含至少一個數字")
-
-        # 檢查常見弱密碼
-        weak_passwords = [
-            "12345678",
-            "password",
-            "qwerty123",
-            "11111111",
-            "88888888",
-            "admin123",
-            "1q2w3e4r",
-        ]
-        if v.lower() in weak_passwords:
-            raise ValueError("密碼太常見，請使用更強的密碼")
-
-        return v
+        return _validate_password_strength(v)
 
 
 class VerifyResetTokenResponse(BaseModel):
@@ -229,28 +214,7 @@ class ChangePasswordRequest(BaseModel):
     @field_validator("new_password")
     @classmethod
     def validate_new_password(cls, v: str) -> str:
-        """驗證新密碼強度（複用 RegisterRequest 的邏輯）"""
-        if not re.search(r"[A-Z]", v):
-            raise ValueError("密碼必須包含至少一個大寫字母")
-        if not re.search(r"[a-z]", v):
-            raise ValueError("密碼必須包含至少一個小寫字母")
-        if not re.search(r"\d", v):
-            raise ValueError("密碼必須包含至少一個數字")
-
-        # 檢查常見弱密碼
-        weak_passwords = [
-            "12345678",
-            "password",
-            "qwerty123",
-            "11111111",
-            "88888888",
-            "admin123",
-            "1q2w3e4r",
-        ]
-        if v.lower() in weak_passwords:
-            raise ValueError("密碼太常見，請使用更強的密碼")
-
-        return v
+        return _validate_password_strength(v)
 
 
 class ChangePasswordResponse(BaseModel):
