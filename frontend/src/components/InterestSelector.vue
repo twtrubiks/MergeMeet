@@ -3,17 +3,17 @@
     <h3>興趣標籤</h3>
     <p class="hint">
       選擇 3-10 個興趣標籤 (已選擇: {{ selectedCount }}/10)
-      <span v-if="selectedCount < 3" class="warning"><Icon name="warning" size="sm" decorative /> 至少選擇 3 個</span>
-      <span v-else-if="selectedCount >= 3 && selectedCount <= 10" class="success"><Icon name="check-circle" size="sm" decorative /></span>
+      <span v-if="selectedCount < 3" class="warning"
+        ><Icon name="warning" size="sm" decorative /> 至少選擇 3 個</span
+      >
+      <span v-else-if="selectedCount >= 3 && selectedCount <= 10" class="success"
+        ><Icon name="check-circle" size="sm" decorative
+      /></span>
     </p>
 
     <!-- 分類標籤 -->
     <div v-if="Object.keys(tagsByCategory).length > 0" class="categories">
-      <div
-        v-for="(tags, category) in tagsByCategory"
-        :key="category"
-        class="category-section"
-      >
+      <div v-for="(tags, category) in tagsByCategory" :key="category" class="category-section">
         <h4 class="category-title">{{ getCategoryName(category) }}</h4>
         <div class="tags-grid">
           <button
@@ -21,8 +21,8 @@
             :key="tag.id"
             class="tag-button"
             :class="{ selected: isSelected(tag.id) }"
-            @click="toggleTag(tag.id)"
             :disabled="!isSelected(tag.id) && selectedCount >= 10"
+            @click="toggleTag(tag.id)"
           >
             <span class="tag-icon">{{ tag.icon }}</span>
             <span class="tag-name">{{ tag.name }}</span>
@@ -243,7 +243,9 @@ const toggleTag = (tagId) => {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .empty-state {

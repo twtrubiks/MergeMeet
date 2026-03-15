@@ -8,7 +8,7 @@
   - 提供導航連結
 -->
 <template>
-  <header class="navbar" v-if="userStore.isAuthenticated">
+  <header v-if="userStore.isAuthenticated" class="navbar">
     <div class="navbar-content">
       <!-- 左側：Logo/標題 -->
       <div class="navbar-left">
@@ -41,17 +41,8 @@
         <!-- 用戶選單 -->
         <n-dropdown :options="userMenuOptions" @select="handleUserMenuSelect">
           <n-button text class="user-menu-btn">
-            <n-avatar
-              v-if="userAvatar"
-              :src="userAvatar"
-              :size="32"
-              round
-            />
-            <n-avatar
-              v-else
-              :size="32"
-              round
-            >
+            <n-avatar v-if="userAvatar" :src="userAvatar" :size="32" round />
+            <n-avatar v-else :size="32" round>
               {{ userInitial }}
             </n-avatar>
           </n-button>
@@ -88,7 +79,7 @@ const profileStore = useProfileStore()
 const userAvatar = computed(() => {
   const profile = profileStore.profile
   if (profile?.photos?.length > 0) {
-    const primaryPhoto = profile.photos.find(p => p.is_primary)
+    const primaryPhoto = profile.photos.find((p) => p.is_primary)
     return primaryPhoto?.url || profile.photos[0]?.url
   }
   return null

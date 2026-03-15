@@ -35,7 +35,7 @@ export const NotificationType = {
 
 export const useNotificationStore = defineStore('notification', () => {
   // State
-  const notifications = ref([])  // 通知列表
+  const notifications = ref([]) // 通知列表
   const loading = ref(false)
 
   // Getters
@@ -43,7 +43,7 @@ export const useNotificationStore = defineStore('notification', () => {
    * 未讀通知數量
    */
   const unreadCount = computed(() => {
-    return notifications.value.filter(n => !n.read).length
+    return notifications.value.filter((n) => !n.read).length
   })
 
   /**
@@ -78,7 +78,7 @@ export const useNotificationStore = defineStore('notification', () => {
   const addNotification = (notification) => {
     const newNotification = {
       // 優先使用傳入的 ID（資料庫 ID），否則生成臨時 ID
-      id: notification.id || (Date.now().toString() + Math.random().toString(36).substr(2, 9)),
+      id: notification.id || Date.now().toString() + Math.random().toString(36).substr(2, 9),
       ...notification,
       read: false,
       createdAt: new Date()
@@ -104,7 +104,7 @@ export const useNotificationStore = defineStore('notification', () => {
     logger.debug('[Notification] Received notification_message:', data)
 
     addNotification({
-      id: data.notification_id,  // 使用資料庫通知 ID
+      id: data.notification_id, // 使用資料庫通知 ID
       type: NotificationType.NEW_MESSAGE,
       title: `${data.sender_name} 發送了訊息`,
       content: data.preview || '新訊息',
@@ -113,12 +113,12 @@ export const useNotificationStore = defineStore('notification', () => {
         senderId: data.sender_id
       },
       timestamp: data.timestamp,
-      fromAPI: !!data.notification_id  // 有資料庫 ID 則標記為 API 來源
+      fromAPI: !!data.notification_id // 有資料庫 ID 則標記為 API 來源
     })
 
     // 同時更新 ChatList 的未讀計數
     const chatStore = useChatStore()
-    const conv = chatStore.conversations.find(c => c.match_id === data.match_id)
+    const conv = chatStore.conversations.find((c) => c.match_id === data.match_id)
     if (conv) {
       conv.unread_count = (conv.unread_count || 0) + 1
       conv.last_message = {
@@ -129,7 +129,7 @@ export const useNotificationStore = defineStore('notification', () => {
       // 將對話移到列表頂部
       chatStore.conversations = [
         conv,
-        ...chatStore.conversations.filter(c => c.match_id !== data.match_id)
+        ...chatStore.conversations.filter((c) => c.match_id !== data.match_id)
       ]
       logger.debug('[Notification] Updated conversation unread_count:', conv.unread_count)
     }
@@ -143,7 +143,7 @@ export const useNotificationStore = defineStore('notification', () => {
     logger.debug('[Notification] Received notification_match:', data)
 
     addNotification({
-      id: data.notification_id,  // 使用資料庫通知 ID
+      id: data.notification_id, // 使用資料庫通知 ID
       type: NotificationType.NEW_MATCH,
       title: '恭喜！你有新配對',
       content: `你和 ${data.matched_user_name} 互相喜歡！`,
@@ -154,7 +154,7 @@ export const useNotificationStore = defineStore('notification', () => {
         userAvatar: data.matched_user_avatar
       },
       timestamp: data.timestamp,
-      fromAPI: !!data.notification_id  // 有資料庫 ID 則標記為 API 來源
+      fromAPI: !!data.notification_id // 有資料庫 ID 則標記為 API 來源
     })
   }
 
@@ -166,13 +166,13 @@ export const useNotificationStore = defineStore('notification', () => {
     logger.debug('[Notification] Received notification_liked:', data)
 
     addNotification({
-      id: data.notification_id,  // 使用資料庫通知 ID
+      id: data.notification_id, // 使用資料庫通知 ID
       type: NotificationType.SOMEONE_LIKED_YOU,
       title: '有人喜歡你',
       content: '有人對你表示好感，快去探索看看吧！',
-      data: {},  // 不透露是誰喜歡，保持神秘感
+      data: {}, // 不透露是誰喜歡，保持神秘感
       timestamp: data.timestamp,
-      fromAPI: !!data.notification_id  // 有資料庫 ID 則標記為 API 來源
+      fromAPI: !!data.notification_id // 有資料庫 ID 則標記為 API 來源
     })
   }
 
@@ -198,7 +198,7 @@ export const useNotificationStore = defineStore('notification', () => {
 
     // 返回取消註冊函數
     return () => {
-      unsubscribers.forEach(unsub => unsub())
+      unsubscribers.forEach((unsub) => unsub())
       logger.log('[Notification] Listeners unregistered')
     }
   }
@@ -208,7 +208,7 @@ export const useNotificationStore = defineStore('notification', () => {
    * @param {string} notificationId - 通知 ID
    */
   const markAsRead = (notificationId) => {
-    const notification = notifications.value.find(n => n.id === notificationId)
+    const notification = notifications.value.find((n) => n.id === notificationId)
     if (notification && !notification.read) {
       notification.read = true
       logger.debug('[Notification] Marked as read:', notificationId)
@@ -220,7 +220,7 @@ export const useNotificationStore = defineStore('notification', () => {
    */
   const markAllAsRead = () => {
     let count = 0
-    notifications.value.forEach(n => {
+    notifications.value.forEach((n) => {
       if (!n.read) {
         n.read = true
         count++
@@ -234,7 +234,7 @@ export const useNotificationStore = defineStore('notification', () => {
    * @param {string} notificationId - 通知 ID
    */
   const removeNotification = (notificationId) => {
-    const index = notifications.value.findIndex(n => n.id === notificationId)
+    const index = notifications.value.findIndex((n) => n.id === notificationId)
     if (index > -1) {
       notifications.value.splice(index, 1)
       logger.debug('[Notification] Removed:', notificationId)
@@ -248,21 +248,22 @@ export const useNotificationStore = defineStore('notification', () => {
    */
   const markMessageNotificationsAsReadByMatchId = (matchId) => {
     let count = 0
-    notifications.value.forEach(n => {
+    notifications.value.forEach((n) => {
       // 只處理訊息類型的通知，且 matchId 匹配
       // 注意：WebSocket 通知用 camelCase (matchId)，API 通知用 snake_case (match_id)
       const notificationMatchId = n.data?.matchId || n.data?.match_id
-      if (
-        n.type === NotificationType.NEW_MESSAGE &&
-        !n.read &&
-        notificationMatchId === matchId
-      ) {
+      if (n.type === NotificationType.NEW_MESSAGE && !n.read && notificationMatchId === matchId) {
         n.read = true
         count++
       }
     })
     if (count > 0) {
-      logger.debug('[Notification] Marked message notifications as read for match:', matchId, 'count:', count)
+      logger.debug(
+        '[Notification] Marked message notifications as read for match:',
+        matchId,
+        'count:',
+        count
+      )
     }
   }
 
@@ -297,7 +298,7 @@ export const useNotificationStore = defineStore('notification', () => {
       const data = response.data
 
       // 將 API 回應轉換為前端格式
-      const apiNotifications = data.notifications.map(n => ({
+      const apiNotifications = data.notifications.map((n) => ({
         id: n.id,
         type: n.type,
         title: n.title,
@@ -316,7 +317,12 @@ export const useNotificationStore = defineStore('notification', () => {
         notifications.value = [...notifications.value, ...apiNotifications]
       }
 
-      logger.debug('[Notification] Fetched from API:', apiNotifications.length, 'total:', data.total)
+      logger.debug(
+        '[Notification] Fetched from API:',
+        apiNotifications.length,
+        'total:',
+        data.total
+      )
       return data
     } catch (error) {
       logger.error('[Notification] Failed to fetch:', error)
@@ -396,16 +402,16 @@ export const useNotificationStore = defineStore('notification', () => {
   const markMessageNotificationsAsReadByMatchIdAPI = async (matchId) => {
     // 1. 收集符合條件的通知 ID
     const notificationIds = notifications.value
-      .filter(n => {
+      .filter((n) => {
         const notificationMatchId = n.data?.matchId || n.data?.match_id
         return (
           n.type === NotificationType.NEW_MESSAGE &&
           !n.read &&
           notificationMatchId === matchId &&
-          n.fromAPI  // 只處理有資料庫 ID 的通知
+          n.fromAPI // 只處理有資料庫 ID 的通知
         )
       })
-      .map(n => n.id)
+      .map((n) => n.id)
 
     if (notificationIds.length === 0) {
       // 沒有需要標記的通知，仍然更新本地狀態
@@ -415,12 +421,15 @@ export const useNotificationStore = defineStore('notification', () => {
 
     // 2. 批量呼叫 API
     try {
-      await Promise.all(
-        notificationIds.map(id => apiClient.put(`/notifications/${id}/read`))
-      )
+      await Promise.all(notificationIds.map((id) => apiClient.put(`/notifications/${id}/read`)))
       // 3. 成功後更新本地狀態
       markMessageNotificationsAsReadByMatchId(matchId)
-      logger.debug('[Notification] Marked message notifications as read via API for match:', matchId, 'count:', notificationIds.length)
+      logger.debug(
+        '[Notification] Marked message notifications as read via API for match:',
+        matchId,
+        'count:',
+        notificationIds.length
+      )
     } catch (error) {
       logger.error('[Notification] Failed to mark message notifications as read:', error)
       throw error

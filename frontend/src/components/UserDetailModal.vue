@@ -3,7 +3,7 @@
     <div v-if="show" class="modal-overlay" @click="handleClose">
       <div class="modal-container" @click.stop>
         <!-- 關閉按鈕 -->
-        <button class="close-btn" @click="handleClose" aria-label="關閉">
+        <button class="close-btn" aria-label="關閉" @click="handleClose">
           <span>×</span>
         </button>
 
@@ -14,11 +14,7 @@
             class="carousel-track"
             :style="{ transform: `translateX(-${currentPhotoIndex * 100}%)` }"
           >
-            <div
-              v-for="(photo, index) in photos"
-              :key="index"
-              class="carousel-slide"
-            >
+            <div v-for="(photo, index) in photos" :key="index" class="carousel-slide">
               <img :src="photo" :alt="`${user.display_name} 的照片 ${index + 1}`" />
             </div>
           </div>
@@ -30,12 +26,8 @@
 
           <!-- 左右切換按鈕 -->
           <template v-if="photos.length > 1">
-            <button class="carousel-btn prev" @click.stop="prevPhoto" aria-label="上一張">
-              ‹
-            </button>
-            <button class="carousel-btn next" @click.stop="nextPhoto" aria-label="下一張">
-              ›
-            </button>
+            <button class="carousel-btn prev" aria-label="上一張" @click.stop="prevPhoto">‹</button>
+            <button class="carousel-btn next" aria-label="下一張" @click.stop="nextPhoto">›</button>
           </template>
 
           <!-- 指示器 -->
@@ -59,18 +51,17 @@
           </div>
 
           <!-- 距離 -->
-          <p v-if="user.distance_km !== null && user.distance_km !== undefined" class="user-distance">
+          <p
+            v-if="user.distance_km !== null && user.distance_km !== undefined"
+            class="user-distance"
+          >
             <Icon name="location" size="sm" decorative />
             {{ formatDistance(user.distance_km) }}
           </p>
 
           <!-- 興趣標籤 -->
           <div v-if="user.interests && user.interests.length > 0" class="user-interests">
-            <span
-              v-for="interest in user.interests"
-              :key="interest"
-              class="interest-tag"
-            >
+            <span v-for="interest in user.interests" :key="interest" class="interest-tag">
               {{ interest }}
             </span>
           </div>
@@ -162,18 +153,21 @@ const handleKeydown = (event) => {
 }
 
 // 監聽 show 狀態
-watch(() => props.show, (newVal) => {
-  if (newVal) {
-    // 開啟時重置照片索引並添加鍵盤監聽
-    currentPhotoIndex.value = 0
-    window.addEventListener('keydown', handleKeydown)
-    // 防止背景滾動
-    document.body.style.overflow = 'hidden'
-  } else {
-    window.removeEventListener('keydown', handleKeydown)
-    document.body.style.overflow = ''
+watch(
+  () => props.show,
+  (newVal) => {
+    if (newVal) {
+      // 開啟時重置照片索引並添加鍵盤監聽
+      currentPhotoIndex.value = 0
+      window.addEventListener('keydown', handleKeydown)
+      // 防止背景滾動
+      document.body.style.overflow = 'hidden'
+    } else {
+      window.removeEventListener('keydown', handleKeydown)
+      document.body.style.overflow = ''
+    }
   }
-})
+)
 
 // 組件卸載時清理
 onUnmounted(() => {
@@ -282,7 +276,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #FF6B6B, #FF8E53);
+  background: linear-gradient(135deg, #ff6b6b, #ff8e53);
 }
 
 .placeholder-text {
@@ -406,7 +400,7 @@ onUnmounted(() => {
 .interest-tag {
   display: inline-block;
   padding: 8px 16px;
-  background: #FFF0F0;
+  background: #fff0f0;
   color: var(--color-like-accessible);
   border-radius: 20px;
   font-size: 14px;

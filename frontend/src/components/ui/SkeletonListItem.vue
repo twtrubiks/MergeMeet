@@ -8,12 +8,7 @@
   <SkeletonListItem variant="match" />
 -->
 <template>
-  <div
-    class="skeleton-list-item"
-    :class="variant"
-    role="status"
-    aria-label="載入中"
-  >
+  <div class="skeleton-list-item" :class="variant" role="status" aria-label="載入中">
     <!-- 頭像 -->
     <div class="skeleton-avatar">
       <div class="skeleton-shimmer"></div>

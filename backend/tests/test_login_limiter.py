@@ -2,14 +2,16 @@
 
 測試 LoginLimiter 服務和登入 API 整合。
 """
-import pytest
+
 from unittest.mock import AsyncMock
 
+import pytest
+
 from app.services.login_limiter import (
-    LoginLimiter,
-    LoginAttemptResult,
+    LOCKOUT_SECONDS,
     MAX_ATTEMPTS,
-    LOCKOUT_SECONDS
+    LoginAttemptResult,
+    LoginLimiter,
 )
 
 
@@ -124,11 +126,7 @@ class TestLoginAttemptResult:
 
     def test_dataclass_creation(self):
         """測試：建立結果物件"""
-        result = LoginAttemptResult(
-            is_locked=True,
-            remaining_attempts=0,
-            lockout_seconds=900
-        )
+        result = LoginAttemptResult(is_locked=True, remaining_attempts=0, lockout_seconds=900)
 
         assert result.is_locked is True
         assert result.remaining_attempts == 0

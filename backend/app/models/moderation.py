@@ -1,14 +1,17 @@
 """內容審核相關資料模型"""
-from sqlalchemy import Column, String, DateTime, Text, Boolean, ForeignKey
+
+import uuid
+
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
-import uuid
 
 from app.core.database import Base
 
 
 class SensitiveWord(Base):
     """敏感詞模型"""
+
     __tablename__ = "sensitive_words"
 
     # 主鍵
@@ -38,9 +41,7 @@ class SensitiveWord(Base):
 
     # 創建者（管理員）
     created_by = Column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
     # 時間戳記
@@ -53,6 +54,7 @@ class SensitiveWord(Base):
 
 class ContentAppeal(Base):
     """內容申訴模型"""
+
     __tablename__ = "content_appeals"
 
     # 主鍵
@@ -60,10 +62,7 @@ class ContentAppeal(Base):
 
     # 申訴者
     user_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
 
     # 申訴類型
@@ -84,9 +83,7 @@ class ContentAppeal(Base):
     # 管理員回覆
     admin_response = Column(Text, nullable=True)
     reviewed_by = Column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
 
@@ -100,6 +97,7 @@ class ContentAppeal(Base):
 
 class ModerationLog(Base):
     """審核日誌模型 - 記錄所有審核動作"""
+
     __tablename__ = "moderation_logs"
 
     # 主鍵
@@ -107,10 +105,7 @@ class ModerationLog(Base):
 
     # 被審核的用戶
     user_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
 
     # 內容類型

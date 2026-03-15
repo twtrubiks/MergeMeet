@@ -92,9 +92,7 @@ export function useFormDirty(formData, originalData, options = {}) {
    * 設定原始資料快照
    */
   const setSnapshot = () => {
-    originalSnapshot.value = JSON.parse(JSON.stringify(
-      originalData?.value || formData.value
-    ))
+    originalSnapshot.value = JSON.parse(JSON.stringify(originalData?.value || formData.value))
   }
 
   /**

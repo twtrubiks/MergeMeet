@@ -1,7 +1,8 @@
 """安全相關工具：JWT 認證、密碼加密"""
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+
 import hashlib
+from datetime import UTC, datetime, timedelta
+
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
@@ -29,7 +30,7 @@ def _pre_hash_password(password: str) -> str:
     if len(password) > MAX_PASSWORD_LENGTH:
         raise ValueError(f"密碼長度不能超過 {MAX_PASSWORD_LENGTH} 字元")
 
-    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -63,7 +64,7 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(pre_hashed)
 
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """
     建立 JWT Access Token
 
@@ -77,22 +78,15 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     to_encode = data.copy()
 
     if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = (
-            datetime.now(timezone.utc)
-            + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        )
+        expire = datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
     # iat (issued at) 用於 Token 全局失效檢查（密碼重置後）
-    iat = int(datetime.now(timezone.utc).timestamp())
+    iat = int(datetime.now(UTC).timestamp())
     to_encode.update({"exp": expire, "type": "access", "iat": iat})
 
-    encoded_jwt = jwt.encode(
-        to_encode,
-        settings.SECRET_KEY,
-        algorithm=settings.ALGORITHM
-    )
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
     return encoded_jwt
 
@@ -108,22 +102,18 @@ def create_refresh_token(data: dict) -> str:
         JWT Refresh Token 字串
     """
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    expire = datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
     # iat (issued at) 用於 Token 全局失效檢查（密碼重置後）
-    iat = int(datetime.now(timezone.utc).timestamp())
+    iat = int(datetime.now(UTC).timestamp())
     to_encode.update({"exp": expire, "type": "refresh", "iat": iat})
 
-    encoded_jwt = jwt.encode(
-        to_encode,
-        settings.SECRET_KEY,
-        algorithm=settings.ALGORITHM
-    )
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
     return encoded_jwt
 
 
-def decode_token(token: str) -> Optional[dict]:
+def decode_token(token: str) -> dict | None:
     """
     解碼 JWT Token
 
@@ -134,11 +124,7 @@ def decode_token(token: str) -> Optional[dict]:
         解碼後的資料，若失敗則返回 None
     """
     try:
-        payload = jwt.decode(
-            token,
-            settings.SECRET_KEY,
-            algorithms=[settings.ALGORITHM]
-        )
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return payload
     except JWTError:
         return None

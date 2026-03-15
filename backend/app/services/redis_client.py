@@ -3,9 +3,11 @@
 提供 Redis 連線管理和通用操作封裝。
 用於登入限制、快取等功能。
 """
-import redis.asyncio as redis
-from typing import Optional
+
 import logging
+from typing import Optional
+
+import redis.asyncio as redis
 
 from app.core.config import settings
 
@@ -19,7 +21,7 @@ class RedisClient:
     """
 
     _instance: Optional["RedisClient"] = None
-    _pool: Optional[redis.ConnectionPool] = None
+    _pool: redis.ConnectionPool | None = None
 
     def __new__(cls):
         if cls._instance is None:
@@ -34,9 +36,7 @@ class RedisClient:
         """
         if self._pool is None:
             self._pool = redis.ConnectionPool.from_url(
-                settings.REDIS_URL,
-                encoding="utf-8",
-                decode_responses=True
+                settings.REDIS_URL, encoding="utf-8", decode_responses=True
             )
             logger.info(f"Redis connection pool created: {settings.REDIS_URL}")
         return redis.Redis(connection_pool=self._pool)

@@ -3,16 +3,16 @@
 在每個已認證請求成功後自動更新 Profile.last_active，
 讓配對算法的活躍度評分能正常運作。
 """
+
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 from uuid import UUID
 
+from sqlalchemy import update
+from sqlalchemy.ext.asyncio import async_sessionmaker
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
-from sqlalchemy import update
-from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.core.database import AsyncSessionLocal
 from app.core.security import decode_token
@@ -21,7 +21,7 @@ from app.models.profile import Profile
 logger = logging.getLogger(__name__)
 
 # 可覆寫的 session factory（用於測試）
-_session_factory: Optional[async_sessionmaker] = None
+_session_factory: async_sessionmaker | None = None
 
 
 def set_session_factory(factory: async_sessionmaker) -> None:
@@ -62,7 +62,7 @@ class LastActiveMiddleware(BaseHTTPMiddleware):
 
         return response
 
-    def _extract_user_id(self, request: Request) -> Optional[str]:
+    def _extract_user_id(self, request: Request) -> str | None:
         """從請求中提取 user_id
 
         支援兩種認證模式：
@@ -104,7 +104,7 @@ class LastActiveMiddleware(BaseHTTPMiddleware):
                 await session.execute(
                     update(Profile)
                     .where(Profile.user_id == UUID(user_id))
-                    .values(last_active=datetime.now(timezone.utc))
+                    .values(last_active=datetime.now(UTC))
                 )
                 await session.commit()
                 logger.debug(f"Updated last_active for user {user_id}")

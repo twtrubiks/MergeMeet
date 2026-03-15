@@ -11,11 +11,7 @@
 
       <!-- 操作欄 -->
       <div v-if="notificationStore.unreadCount > 0" class="action-bar">
-        <button
-          class="mark-all-btn"
-          @click="handleMarkAllRead"
-          :disabled="markingAllRead"
-        >
+        <button class="mark-all-btn" :disabled="markingAllRead" @click="handleMarkAllRead">
           {{ markingAllRead ? '處理中...' : '全部標記已讀' }}
         </button>
       </div>
@@ -58,9 +54,9 @@
           <div class="notification-actions">
             <button
               class="delete-btn"
-              @click.stop="handleDelete(notification.id)"
               title="刪除"
               aria-label="刪除此通知"
+              @click.stop="handleDelete(notification.id)"
             >
               <Icon name="trash" size="sm" decorative />
             </button>
@@ -72,11 +68,7 @@
 
         <!-- 載入更多 -->
         <div v-if="hasMore" class="load-more">
-          <button
-            class="load-more-btn"
-            @click="loadMore"
-            :disabled="loadingMore"
-          >
+          <button class="load-more-btn" :disabled="loadingMore" @click="loadMore">
             {{ loadingMore ? '載入中...' : '載入更多' }}
           </button>
         </div>
@@ -283,7 +275,7 @@ onMounted(() => {
 <style scoped>
 .notifications-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #FFF5F5 0%, #FFE5E5 100%);
+  background: linear-gradient(135deg, #fff5f5 0%, #ffe5e5 100%);
   padding: 20px;
 }
 
@@ -336,7 +328,7 @@ onMounted(() => {
 
 .mark-all-btn {
   padding: 10px 20px;
-  background: #FF6B6B;
+  background: #ff6b6b;
   color: white;
   border: none;
   border-radius: 20px;
@@ -347,7 +339,7 @@ onMounted(() => {
 }
 
 .mark-all-btn:hover:not(:disabled) {
-  background: #FF5252;
+  background: #ff5252;
   transform: translateY(-2px);
 }
 
@@ -366,15 +358,19 @@ onMounted(() => {
   width: 40px;
   height: 40px;
   border: 4px solid #f3f3f3;
-  border-top: 4px solid #FF6B6B;
+  border-top: 4px solid #ff6b6b;
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 16px;
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* 空狀態 */
@@ -525,7 +521,7 @@ onMounted(() => {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background-color: #FF6B6B;
+  background-color: #ff6b6b;
 }
 
 /* 載入更多 */

@@ -69,7 +69,7 @@ defineProps({
   position: absolute;
   width: 20px;
   height: 20px;
-  background: linear-gradient(135deg, #FF6B6B, #FF8E53);
+  background: linear-gradient(135deg, #ff6b6b, #ff8e53);
   border-radius: 50%;
 }
 
@@ -96,7 +96,8 @@ defineProps({
 }
 
 @keyframes heartBeat {
-  0%, 100% {
+  0%,
+  100% {
     transform: rotate(-45deg) scale(0.8);
     opacity: 0.5;
   }
@@ -114,7 +115,8 @@ defineProps({
 }
 
 @keyframes fadeInOut {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.5;
   }
   50% {

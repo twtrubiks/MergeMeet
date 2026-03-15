@@ -14,9 +14,9 @@ Redis Key 設計:
 - 20: 限制閾值
 - 0: 最低分（高度可疑）
 """
+
 import uuid
-from datetime import datetime, timezone
-from typing import Optional, Tuple
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,7 +45,6 @@ class TrustScoreService:
         "received_like": +1,
         "match_created": +2,
         "positive_interaction": +1,  # 預留：未來正常互動使用
-
         # 負向行為
         "reported": -5,
         "report_confirmed": -10,
@@ -55,11 +54,7 @@ class TrustScoreService:
 
     @classmethod
     async def adjust_score(
-        cls,
-        db: AsyncSession,
-        user_id: uuid.UUID,
-        action: str,
-        reason: Optional[str] = None
+        cls, db: AsyncSession, user_id: uuid.UUID, action: str, reason: str | None = None
     ) -> int:
         """
         調整用戶信任分數
@@ -82,9 +77,7 @@ class TrustScoreService:
         adjustment = cls.ADJUSTMENTS[action]
 
         # 查詢用戶
-        result = await db.execute(
-            select(User).where(User.id == user_id)
-        )
+        result = await db.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
 
         if not user:
@@ -102,11 +95,7 @@ class TrustScoreService:
         return new_score
 
     @classmethod
-    async def get_score(
-        cls,
-        db: AsyncSession,
-        user_id: uuid.UUID
-    ) -> int:
+    async def get_score(cls, db: AsyncSession, user_id: uuid.UUID) -> int:
         """
         獲取用戶當前信任分數
 
@@ -117,19 +106,13 @@ class TrustScoreService:
         Returns:
             信任分數（用戶不存在時返回預設值）
         """
-        result = await db.execute(
-            select(User.trust_score).where(User.id == user_id)
-        )
+        result = await db.execute(select(User.trust_score).where(User.id == user_id))
         score = result.scalar_one_or_none()
 
         return score if score is not None else cls.DEFAULT_SCORE
 
     @classmethod
-    async def is_restricted(
-        cls,
-        db: AsyncSession,
-        user_id: uuid.UUID
-    ) -> bool:
+    async def is_restricted(cls, db: AsyncSession, user_id: uuid.UUID) -> bool:
         """
         檢查用戶是否處於受限狀態
 
@@ -145,11 +128,8 @@ class TrustScoreService:
 
     @classmethod
     async def check_message_rate_limit(
-        cls,
-        user_id: uuid.UUID,
-        trust_score: int,
-        redis
-    ) -> Tuple[bool, int]:
+        cls, user_id: uuid.UUID, trust_score: int, redis
+    ) -> tuple[bool, int]:
         """
         檢查低信任用戶的訊息速率限制
 
@@ -168,7 +148,7 @@ class TrustScoreService:
             return True, -1
 
         # 獲取今日已發送數量
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
         key = f"trust:daily_messages:{user_id}:{today}"
 
         count_str = await redis.get(key)
@@ -180,11 +160,7 @@ class TrustScoreService:
         return can_send, max(0, remaining)
 
     @classmethod
-    async def record_message_sent(
-        cls,
-        user_id: uuid.UUID,
-        redis
-    ) -> int:
+    async def record_message_sent(cls, user_id: uuid.UUID, redis) -> int:
         """
         記錄用戶發送訊息（用於限制計數）
 
@@ -195,7 +171,7 @@ class TrustScoreService:
         Returns:
             今日已發送的訊息數量
         """
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
         key = f"trust:daily_messages:{user_id}:{today}"
 
         # 增加計數

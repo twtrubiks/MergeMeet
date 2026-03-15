@@ -1,6 +1,6 @@
 """配對推薦服務"""
-from typing import Dict, List
-from datetime import datetime, timezone
+
+from datetime import UTC, datetime
 
 
 def _calculate_distance_score(distance_km: float) -> float:
@@ -36,9 +36,9 @@ def _calculate_activity_score(last_active) -> float:
         return 0
 
     if isinstance(last_active, str):
-        last_active = datetime.fromisoformat(last_active.replace('Z', '+00:00'))
+        last_active = datetime.fromisoformat(last_active.replace("Z", "+00:00"))
 
-    hours_ago = (datetime.now(timezone.utc) - last_active).total_seconds() / 3600
+    hours_ago = (datetime.now(UTC) - last_active).total_seconds() / 3600
 
     if hours_ago < 1:
         return 20
@@ -51,7 +51,7 @@ def _calculate_activity_score(last_active) -> float:
     return 0
 
 
-def _calculate_completeness_score(candidate: Dict) -> float:
+def _calculate_completeness_score(candidate: dict) -> float:
     """計算檔案完整度分數（最高 5 分）
 
     權重調整：原 10 分改為 5 分，騰出 5 分給信任分數
@@ -102,11 +102,7 @@ def _calculate_trust_score_weight(trust_score: int) -> float:
 class MatchingService:
     """配對推薦服務"""
 
-    def calculate_match_score(
-        self,
-        user_profile: Dict,
-        candidate: Dict
-    ) -> float:
+    def calculate_match_score(self, user_profile: dict, candidate: dict) -> float:
         """
         計算配對分數
 
@@ -147,11 +143,7 @@ class MatchingService:
 
         return min(score, 100)
 
-    def rank_candidates(
-        self,
-        user_profile: Dict,
-        candidates: List[Dict]
-    ) -> List[Dict]:
+    def rank_candidates(self, user_profile: dict, candidates: list[dict]) -> list[dict]:
         """
         對候選人進行排序
 
@@ -166,10 +158,7 @@ class MatchingService:
         scored_candidates = []
         for candidate in candidates:
             score = self.calculate_match_score(user_profile, candidate)
-            candidate_with_score = {
-                **candidate,
-                "match_score": score
-            }
+            candidate_with_score = {**candidate, "match_score": score}
             scored_candidates.append(candidate_with_score)
 
         # 依分數排序（高到低）
@@ -177,11 +166,7 @@ class MatchingService:
 
         return scored_candidates
 
-    def filter_by_preferences(
-        self,
-        user_profile: Dict,
-        candidate: Dict
-    ) -> bool:
+    def filter_by_preferences(self, user_profile: dict, candidate: dict) -> bool:
         """
         根據用戶偏好篩選候選人
 

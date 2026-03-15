@@ -24,28 +24,16 @@
           <div v-if="userStore.isAuthenticated" class="auth-info">
             <p class="user-email">{{ userStore.userEmail }}</p>
             <div class="button-grid">
-              <AnimatedButton
-                variant="primary"
-                @click="$router.push('/discovery')"
-              >
+              <AnimatedButton variant="primary" @click="$router.push('/discovery')">
                 <Icon name="search" size="sm" decorative /> 開始探索
               </AnimatedButton>
-              <AnimatedButton
-                variant="secondary"
-                @click="$router.push('/matches')"
-              >
+              <AnimatedButton variant="secondary" @click="$router.push('/matches')">
                 <Icon name="heart" size="sm" decorative /> 我的配對
               </AnimatedButton>
-              <AnimatedButton
-                variant="secondary"
-                @click="$router.push('/profile')"
-              >
+              <AnimatedButton variant="secondary" @click="$router.push('/profile')">
                 <Icon name="person" size="sm" decorative /> 個人檔案
               </AnimatedButton>
-              <AnimatedButton
-                variant="danger"
-                @click="handleLogout"
-              >
+              <AnimatedButton variant="danger" @click="handleLogout">
                 <Icon name="logout" size="sm" decorative /> 登出
               </AnimatedButton>
             </div>
@@ -53,16 +41,10 @@
           <div v-else class="auth-actions">
             <p class="info-text">請登入或註冊以使用完整功能</p>
             <div class="button-group">
-              <AnimatedButton
-                variant="primary"
-                @click="$router.push('/login')"
-              >
+              <AnimatedButton variant="primary" @click="$router.push('/login')">
                 <Icon name="flash" size="sm" decorative /> 登入
               </AnimatedButton>
-              <AnimatedButton
-                variant="secondary"
-                @click="$router.push('/register')"
-              >
+              <AnimatedButton variant="secondary" @click="$router.push('/register')">
                 <Icon name="rocket" size="sm" decorative /> 註冊
               </AnimatedButton>
             </div>
@@ -164,7 +146,8 @@ const handleLogout = () => {
 }
 
 @keyframes float {
-  0%, 100% {
+  0%,
+  100% {
     transform: translate(0, 0) scale(1);
   }
   25% {
@@ -217,7 +200,9 @@ const handleLogout = () => {
 .heart-icon {
   color: white;
   filter: drop-shadow(0 8px 16px var(--color-like-alpha-40));
-  animation: heartBeat 1.5s infinite, pulse 2s infinite;
+  animation:
+    heartBeat 1.5s infinite,
+    pulse 2s infinite;
 }
 
 .heart-left {
@@ -229,19 +214,23 @@ const handleLogout = () => {
 }
 
 @keyframes heartBeat {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
-  10%, 30% {
+  10%,
+  30% {
     transform: scale(1.15);
   }
-  20%, 40% {
+  20%,
+  40% {
     transform: scale(0.95);
   }
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     filter: drop-shadow(0 8px 16px rgba(255, 107, 107, 0.4));
   }
   50% {

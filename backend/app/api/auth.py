@@ -7,58 +7,59 @@
 - ✅ 密碼重置功能：發送郵件 + 重置 Token
 - ✅ 密碼修改功能：POST /change-password（需舊密碼驗證，修改後 Token 失效）
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-from datetime import date, datetime, timedelta, timezone
-from dateutil.relativedelta import relativedelta
-import secrets
-import string
+
 import asyncio
 import logging
-from typing import Dict, Tuple, Optional
+import secrets
+import string
+from datetime import UTC, date, datetime, timedelta
 
+import redis.asyncio as aioredis
+from dateutil.relativedelta import relativedelta
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import settings
+from app.core.cookie_utils import clear_auth_cookies, generate_csrf_token, set_auth_cookies
 from app.core.database import get_db
-from app.core.utils import mask_email
+from app.core.dependencies import get_current_user
 from app.core.security import (
-    verify_password,
-    get_password_hash,
     create_access_token,
     create_refresh_token,
     decode_token,
+    get_password_hash,
+    verify_password,
 )
-from app.core.config import settings
-from app.core.dependencies import get_current_user
-from app.core.cookie_utils import set_auth_cookies, clear_auth_cookies, generate_csrf_token
+from app.core.utils import mask_email
 from app.models.user import User
 from app.schemas.auth import (
-    RegisterRequest,
-    LoginRequest,
-    TokenResponse,
-    RefreshTokenRequest,
-    EmailVerificationRequest,
-    ResendVerificationRequest,
-    ForgotPasswordRequest,
-    ResetPasswordRequest,
-    VerifyResetTokenResponse,
     ChangePasswordRequest,
     ChangePasswordResponse,
-    LogoutResponse,
+    EmailVerificationRequest,
     EmailVerificationResponse,
-    ResendVerificationResponse,
+    ForgotPasswordRequest,
     ForgotPasswordResponse,
+    LoginRequest,
+    LogoutResponse,
+    RefreshTokenRequest,
+    RegisterRequest,
+    ResendVerificationRequest,
+    ResendVerificationResponse,
+    ResetPasswordRequest,
     ResetPasswordResponse,
+    TokenResponse,
+    VerifyResetTokenResponse,
 )
-from app.services.token_blacklist import token_blacklist
 from app.services.email import EmailService
-from app.services.redis_client import get_redis
 from app.services.login_limiter import LoginLimiter
-from app.services.verification_limiter import VerificationLimiter
-from app.services.trust_score import TrustScoreService
+from app.services.redis_client import get_redis
+from app.services.token_blacklist import token_blacklist
 from app.services.token_invalidator import TokenInvalidator
-import redis.asyncio as aioredis
+from app.services.trust_score import TrustScoreService
+from app.services.verification_limiter import VerificationLimiter
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -66,10 +67,10 @@ logger = logging.getLogger(__name__)
 
 def _generate_auth_tokens(
     user_id: str,
-    email: Optional[str] = None,
-    email_verified: Optional[bool] = None,
-    is_admin: Optional[bool] = None
-) -> Tuple[str, str]:
+    email: str | None = None,
+    email_verified: bool | None = None,
+    is_admin: bool | None = None,
+) -> tuple[str, str]:
     """生成認證 token (access + refresh)
 
     Args:
@@ -104,17 +105,17 @@ class VerificationCodeStore:
     - verify:{email} - 驗證碼 (value: 6 位數碼, TTL: 600 秒)
     """
 
-    def __init__(self, ttl_minutes: int = 10, redis_client: Optional[aioredis.Redis] = None):
+    def __init__(self, ttl_minutes: int = 10, redis_client: aioredis.Redis | None = None):
         """初始化驗證碼存儲
 
         Args:
             ttl_minutes: 驗證碼過期時間（分鐘）
             redis_client: Redis 連線（可選，不提供時使用純內存模式）
         """
-        self._redis: Optional[aioredis.Redis] = redis_client
+        self._redis: aioredis.Redis | None = redis_client
         self._use_redis: bool = redis_client is not None
         # 內存回退存儲: email -> (code, expires_at)
-        self._fallback: Dict[str, Tuple[str, datetime]] = {}
+        self._fallback: dict[str, tuple[str, datetime]] = {}
         self._lock = asyncio.Lock()
         self._ttl = timedelta(minutes=ttl_minutes)
         self._ttl_seconds = ttl_minutes * 60
@@ -146,18 +147,17 @@ class VerificationCodeStore:
                 return
             except aioredis.RedisError as e:
                 logger.warning(
-                    f"Redis unavailable for verification code, "
-                    f"falling back to memory: {e}"
+                    f"Redis unavailable for verification code, falling back to memory: {e}"
                 )
                 self._use_redis = False
 
         # 內存回退
         async with self._lock:
-            expires_at = datetime.now(timezone.utc) + self._ttl
+            expires_at = datetime.now(UTC) + self._ttl
             self._fallback[email.lower()] = (code, expires_at)
             logger.debug(f"Verification code stored in memory (fallback) for {email}")
 
-    async def get(self, email: str) -> Optional[str]:
+    async def get(self, email: str) -> str | None:
         """獲取驗證碼，自動檢查過期
 
         Args:
@@ -174,8 +174,7 @@ class VerificationCodeStore:
                 return await self._redis.get(key)
             except aioredis.RedisError as e:
                 logger.warning(
-                    f"Redis unavailable for verification code get, "
-                    f"falling back to memory: {e}"
+                    f"Redis unavailable for verification code get, falling back to memory: {e}"
                 )
                 self._use_redis = False
 
@@ -188,7 +187,7 @@ class VerificationCodeStore:
             code, expires_at = self._fallback[email_lower]
 
             # 檢查是否過期
-            if datetime.now(timezone.utc) > expires_at:
+            if datetime.now(UTC) > expires_at:
                 del self._fallback[email_lower]
                 return None
 
@@ -220,10 +219,9 @@ class VerificationCodeStore:
             清理的驗證碼數量
         """
         async with self._lock:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             expired_keys = [
-                email for email, (_, expires_at) in self._fallback.items()
-                if now > expires_at
+                email for email, (_, expires_at) in self._fallback.items() if now > expires_at
             ]
 
             for email in expired_keys:
@@ -231,8 +229,7 @@ class VerificationCodeStore:
 
             if expired_keys:
                 logger.info(
-                    f"Cleaned up {len(expired_keys)} expired verification codes "
-                    f"from memory"
+                    f"Cleaned up {len(expired_keys)} expired verification codes from memory"
                 )
 
             return len(expired_keys)
@@ -269,7 +266,7 @@ verification_codes = VerificationCodeStore(ttl_minutes=10)
 #         # 使用 Redis MULTI/EXEC 確保原子性
 #         # ...
 #
-email_rate_limit: Dict[str, Tuple[datetime, int]] = {}
+email_rate_limit: dict[str, tuple[datetime, int]] = {}
 email_rate_limit_lock = asyncio.Lock()
 
 
@@ -288,7 +285,7 @@ async def check_email_rate_limit(email: str) -> bool:
         HTTPException 如果超過限制
     """
     async with email_rate_limit_lock:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         if email in email_rate_limit:
             last_sent, count_today = email_rate_limit[email]
@@ -299,7 +296,7 @@ async def check_email_rate_limit(email: str) -> bool:
                 remaining = 60 - int(time_since_last)
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail=f"發送過於頻繁，請等待 {remaining} 秒後再試"
+                    detail=f"發送過於頻繁，請等待 {remaining} 秒後再試",
                 )
 
             # 檢查是否是新的一天（重置計數）
@@ -310,7 +307,7 @@ async def check_email_rate_limit(email: str) -> bool:
                 if count_today >= 5:
                     raise HTTPException(
                         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                        detail="今日發送次數已達上限（5 次），請明天再試"
+                        detail="今日發送次數已達上限（5 次），請明天再試",
                     )
                 email_rate_limit[email] = (now, count_today + 1)
         else:
@@ -322,14 +319,12 @@ async def check_email_rate_limit(email: str) -> bool:
 
 def generate_verification_code() -> str:
     """生成 6 位數驗證碼（使用加密安全隨機數）"""
-    return ''.join(secrets.choice(string.digits) for _ in range(6))
+    return "".join(secrets.choice(string.digits) for _ in range(6))
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(
-    request: RegisterRequest,
-    response: Response,
-    db: AsyncSession = Depends(get_db)
+    request: RegisterRequest, response: Response, db: AsyncSession = Depends(get_db)
 ):
     """
     用戶註冊（支援 HttpOnly Cookie + Bearer Token 雙模式）
@@ -347,21 +342,18 @@ async def register(
 
     if age < 18:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="必須年滿 18 歲才能註冊"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="必須年滿 18 歲才能註冊"
         )
 
     # 檢查 Email 是否已註冊
-    result = await db.execute(
-        select(User).where(User.email == request.email)
-    )
+    result = await db.execute(select(User).where(User.email == request.email))
     existing_user = result.scalar_one_or_none()
 
     if existing_user:
         # 防止用戶枚舉：不透露 Email 是否已註冊
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="註冊失敗，請檢查輸入資料"  # 模糊訊息
+            detail="註冊失敗，請檢查輸入資料",  # 模糊訊息
         )
 
     # 建立用戶（修復：使用資料庫唯一約束處理並發註冊）
@@ -383,20 +375,17 @@ async def register(
         await db.rollback()
         logger.warning(f"Concurrent registration attempt for email: {mask_email(request.email)}")
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="註冊失敗，請檢查輸入資料"
-        )
+            status_code=status.HTTP_400_BAD_REQUEST, detail="註冊失敗，請檢查輸入資料"
+        ) from None
 
     # 生成驗證碼並發送 Email
     verification_code = generate_verification_code()
     await verification_codes.set(request.email, verification_code)
 
     # 發送驗證郵件
-    username = request.email.split('@')[0]
+    username = request.email.split("@")[0]
     email_sent = await EmailService.send_verification_email(
-        to_email=request.email,
-        username=username,
-        verification_code=verification_code
+        to_email=request.email, username=username, verification_code=verification_code
     )
 
     if email_sent:
@@ -406,9 +395,7 @@ async def register(
 
     # 生成 JWT Token（包含 email 資訊供前端使用）
     access_token, refresh_token = _generate_auth_tokens(
-        str(new_user.id),
-        email=new_user.email,
-        email_verified=new_user.email_verified
+        str(new_user.id), email=new_user.email, email_verified=new_user.email_verified
     )
 
     # 生成 CSRF Token 並設置 Cookie（HttpOnly Cookie 模式）
@@ -429,7 +416,7 @@ async def login(
     request: LoginRequest,
     response: Response,
     db: AsyncSession = Depends(get_db),
-    redis_conn: aioredis.Redis = Depends(get_redis)
+    redis_conn: aioredis.Redis = Depends(get_redis),
 ):
     """
     用戶登入（支援 HttpOnly Cookie + Bearer Token 雙模式）
@@ -459,14 +446,12 @@ async def login(
             detail="登入嘗試次數過多，帳號已暫時鎖定",
             headers={
                 "X-RateLimit-Remaining": "0",
-                "X-Lockout-Seconds": str(limit_status.lockout_seconds)
-            }
+                "X-Lockout-Seconds": str(limit_status.lockout_seconds),
+            },
         )
 
     # 查找用戶
-    result = await db.execute(
-        select(User).where(User.email == request.email)
-    )
+    result = await db.execute(select(User).where(User.email == request.email))
     user = result.scalar_one_or_none()
 
     # 驗證用戶存在且密碼正確
@@ -481,8 +466,8 @@ async def login(
                 detail="登入嘗試次數過多，帳號已暫時鎖定",
                 headers={
                     "X-RateLimit-Remaining": "0",
-                    "X-Lockout-Seconds": str(attempt_result.lockout_seconds)
-                }
+                    "X-Lockout-Seconds": str(attempt_result.lockout_seconds),
+                },
             )
         else:
             raise HTTPException(
@@ -491,22 +476,18 @@ async def login(
                 headers={
                     "WWW-Authenticate": "Bearer",
                     "X-RateLimit-Remaining": str(attempt_result.remaining_attempts),
-                    "X-Lockout-Seconds": "0"
-                }
+                    "X-Lockout-Seconds": "0",
+                },
             )
 
     # 檢查帳號是否啟用
     if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="帳號已被停用"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="帳號已被停用")
 
     # 檢查是否被封禁（修復：使用 datetime 而非 date）
-    if user.banned_until and user.banned_until > datetime.now(timezone.utc):
+    if user.banned_until and user.banned_until > datetime.now(UTC):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"帳號已被封禁至 {user.banned_until}"
+            status_code=status.HTTP_403_FORBIDDEN, detail=f"帳號已被封禁至 {user.banned_until}"
         )
 
     # 登入成功，清除失敗記錄
@@ -514,9 +495,7 @@ async def login(
 
     # 生成 JWT Token（包含 email 資訊供前端使用）
     access_token, refresh_token = _generate_auth_tokens(
-        str(user.id),
-        email=user.email,
-        email_verified=user.email_verified
+        str(user.id), email=user.email, email_verified=user.email_verified
     )
 
     # 生成 CSRF Token 並設置 Cookie（HttpOnly Cookie 模式）
@@ -537,7 +516,7 @@ async def admin_login(
     request: LoginRequest,
     response: Response,
     db: AsyncSession = Depends(get_db),
-    redis_conn: aioredis.Redis = Depends(get_redis)
+    redis_conn: aioredis.Redis = Depends(get_redis),
 ):
     """
     管理員登入（支援 HttpOnly Cookie + Bearer Token 雙模式）
@@ -562,14 +541,12 @@ async def admin_login(
             detail="登入嘗試次數過多，帳號已暫時鎖定",
             headers={
                 "X-RateLimit-Remaining": "0",
-                "X-Lockout-Seconds": str(limit_status.lockout_seconds)
-            }
+                "X-Lockout-Seconds": str(limit_status.lockout_seconds),
+            },
         )
 
     # 查找用戶
-    result = await db.execute(
-        select(User).where(User.email == request.email)
-    )
+    result = await db.execute(select(User).where(User.email == request.email))
     user = result.scalar_one_or_none()
 
     # 驗證用戶存在且密碼正確
@@ -583,8 +560,8 @@ async def admin_login(
                 detail="登入嘗試次數過多，帳號已暫時鎖定",
                 headers={
                     "X-RateLimit-Remaining": "0",
-                    "X-Lockout-Seconds": str(attempt_result.lockout_seconds)
-                }
+                    "X-Lockout-Seconds": str(attempt_result.lockout_seconds),
+                },
             )
         else:
             raise HTTPException(
@@ -593,29 +570,22 @@ async def admin_login(
                 headers={
                     "WWW-Authenticate": "Bearer",
                     "X-RateLimit-Remaining": str(attempt_result.remaining_attempts),
-                    "X-Lockout-Seconds": "0"
-                }
+                    "X-Lockout-Seconds": "0",
+                },
             )
 
     # 檢查是否為管理員
     if not user.is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="沒有管理員權限"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="沒有管理員權限")
 
     # 檢查帳號是否啟用
     if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="帳號已被停用"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="帳號已被停用")
 
     # 檢查是否被封禁（修復：使用 datetime 而非 date）
-    if user.banned_until and user.banned_until > datetime.now(timezone.utc):
+    if user.banned_until and user.banned_until > datetime.now(UTC):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"帳號已被封禁至 {user.banned_until}"
+            status_code=status.HTTP_403_FORBIDDEN, detail=f"帳號已被封禁至 {user.banned_until}"
         )
 
     # 登入成功，清除失敗記錄
@@ -623,10 +593,7 @@ async def admin_login(
 
     # 生成 JWT Token（包含 email 和 is_admin 資訊供前端使用）
     access_token, refresh_token = _generate_auth_tokens(
-        str(user.id),
-        email=user.email,
-        email_verified=user.email_verified,
-        is_admin=True
+        str(user.id), email=user.email, email_verified=user.email_verified, is_admin=True
     )
 
     # 生成 CSRF Token 並設置 Cookie（HttpOnly Cookie 模式）
@@ -645,9 +612,9 @@ async def admin_login(
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token_endpoint(
     response: Response,
-    request: Optional[RefreshTokenRequest] = None,
-    refresh_token_cookie: Optional[str] = Cookie(None, alias="refresh_token"),
-    db: AsyncSession = Depends(get_db)
+    request: RefreshTokenRequest | None = None,
+    refresh_token_cookie: str | None = Cookie(None, alias="refresh_token"),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     刷新 Access Token（支援 HttpOnly Cookie + Bearer Token 雙模式）
@@ -694,9 +661,7 @@ async def refresh_token_endpoint(
         )
 
     # 驗證用戶存在
-    result = await db.execute(
-        select(User).where(User.id == user_id)
-    )
+    result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
 
     if not user or not user.is_active:
@@ -708,11 +673,9 @@ async def refresh_token_endpoint(
 
     # 將舊的 Refresh Token 加入黑名單（Token 輪換，增強安全性）
     if payload.get("exp"):
-        old_expires_at = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+        old_expires_at = datetime.fromtimestamp(payload["exp"], tz=UTC)
     else:
-        old_expires_at = datetime.now(timezone.utc) + timedelta(
-            days=settings.REFRESH_TOKEN_EXPIRE_DAYS
-        )
+        old_expires_at = datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     await token_blacklist.add(token, old_expires_at)
 
     # 生成新的 Token（包含 email 和 is_admin 資訊供前端使用）
@@ -720,7 +683,7 @@ async def refresh_token_endpoint(
         str(user.id),
         email=user.email,
         email_verified=user.email_verified,
-        is_admin=user.is_admin if user.is_admin else None
+        is_admin=user.is_admin if user.is_admin else None,
     )
 
     # 生成 CSRF Token 並設置新 Cookie
@@ -740,9 +703,9 @@ async def refresh_token_endpoint(
 async def logout(
     response: Response,
     current_user: User = Depends(get_current_user),
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
-    access_token_cookie: Optional[str] = Cookie(None, alias="access_token"),
-    refresh_token_cookie: Optional[str] = Cookie(None, alias="refresh_token"),
+    credentials: HTTPAuthorizationCredentials | None = Depends(HTTPBearer(auto_error=False)),
+    access_token_cookie: str | None = Cookie(None, alias="access_token"),
+    refresh_token_cookie: str | None = Cookie(None, alias="refresh_token"),
 ):
     """
     用戶登出（支援 HttpOnly Cookie + Bearer Token 雙模式）
@@ -759,11 +722,9 @@ async def logout(
     if access_token:
         payload = decode_token(access_token)
         if payload and payload.get("exp"):
-            expires_at = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+            expires_at = datetime.fromtimestamp(payload["exp"], tz=UTC)
         else:
-            expires_at = datetime.now(timezone.utc) + timedelta(
-                minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-            )
+            expires_at = datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         await token_blacklist.add(access_token, expires_at)
         tokens_blacklisted.append("access_token")
 
@@ -771,11 +732,9 @@ async def logout(
     if refresh_token_cookie:
         payload = decode_token(refresh_token_cookie)
         if payload and payload.get("exp"):
-            expires_at = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+            expires_at = datetime.fromtimestamp(payload["exp"], tz=UTC)
         else:
-            expires_at = datetime.now(timezone.utc) + timedelta(
-                days=settings.REFRESH_TOKEN_EXPIRE_DAYS
-            )
+            expires_at = datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
         await token_blacklist.add(refresh_token_cookie, expires_at)
         tokens_blacklisted.append("refresh_token")
 
@@ -787,7 +746,7 @@ async def logout(
     return {
         "message": "登出成功",
         "user_id": str(current_user.id),
-        "tokens_invalidated": tokens_blacklisted
+        "tokens_invalidated": tokens_blacklisted,
     }
 
 
@@ -795,7 +754,7 @@ async def logout(
 async def verify_email(
     request: EmailVerificationRequest,
     db: AsyncSession = Depends(get_db),
-    redis_conn: aioredis.Redis = Depends(get_redis)
+    redis_conn: aioredis.Redis = Depends(get_redis),
 ):
     """
     驗證 Email
@@ -814,8 +773,8 @@ async def verify_email(
             detail=f"驗證嘗試次數過多，請等待 {limit_status.lockout_seconds // 60} 分鐘後再試",
             headers={
                 "X-RateLimit-Remaining": "0",
-                "X-Lockout-Seconds": str(limit_status.lockout_seconds)
-            }
+                "X-Lockout-Seconds": str(limit_status.lockout_seconds),
+            },
         )
 
     # 檢查驗證碼
@@ -824,7 +783,7 @@ async def verify_email(
     if not stored_code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="驗證碼不存在或已過期（10分鐘有效期），請重新發送"
+            detail="驗證碼不存在或已過期（10分鐘有效期），請重新發送",
         )
 
     if stored_code != request.verification_code:
@@ -837,30 +796,23 @@ async def verify_email(
                 detail="驗證嘗試次數過多，請等待 15 分鐘後再試",
                 headers={
                     "X-RateLimit-Remaining": "0",
-                    "X-Lockout-Seconds": str(attempt_result.lockout_seconds)
-                }
+                    "X-Lockout-Seconds": str(attempt_result.lockout_seconds),
+                },
             )
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"驗證碼錯誤，剩餘 {attempt_result.remaining_attempts} 次嘗試機會",
-                headers={
-                    "X-RateLimit-Remaining": str(attempt_result.remaining_attempts)
-                }
+                headers={"X-RateLimit-Remaining": str(attempt_result.remaining_attempts)},
             )
 
     # 更新用戶狀態
-    result = await db.execute(
-        select(User).where(User.email == request.email)
-    )
+    result = await db.execute(select(User).where(User.email == request.email))
     user = result.scalar_one_or_none()
 
     if not user:
         # 安全考量：返回與驗證碼錯誤相同的訊息，防止用戶枚舉
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="驗證碼錯誤或已過期"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="驗證碼錯誤或已過期")
 
     user.email_verified = True
     await db.commit()
@@ -875,17 +827,12 @@ async def verify_email(
     # 刪除已使用的驗證碼
     await verification_codes.delete(request.email)
 
-    return {
-        "message": "Email 驗證成功",
-        "email": request.email,
-        "verified": True
-    }
+    return {"message": "Email 驗證成功", "email": request.email, "verified": True}
 
 
 @router.post("/resend-verification", response_model=ResendVerificationResponse)
 async def resend_verification(
-    request: ResendVerificationRequest,
-    db: AsyncSession = Depends(get_db)
+    request: ResendVerificationRequest, db: AsyncSession = Depends(get_db)
 ):
     """
     重新發送驗證碼
@@ -905,9 +852,7 @@ async def resend_verification(
     success_message = {"message": "如果該信箱已註冊且未驗證，驗證碼已發送", "email": email}
 
     # 檢查用戶
-    result = await db.execute(
-        select(User).where(User.email == email)
-    )
+    result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
 
     # 用戶不存在或已驗證，直接返回成功訊息（不洩露資訊）
@@ -916,7 +861,9 @@ async def resend_verification(
         return success_message
 
     if user.email_verified:
-        logger.info(f"Resend verification requested for already verified email: {mask_email(email)}")
+        logger.info(
+            f"Resend verification requested for already verified email: {mask_email(email)}"
+        )
         return success_message
 
     # 生成新的驗證碼並發送 Email
@@ -924,11 +871,9 @@ async def resend_verification(
     await verification_codes.set(email, verification_code)
 
     # 發送驗證郵件
-    username = email.split('@')[0]
+    username = email.split("@")[0]
     email_sent = await EmailService.send_verification_email(
-        to_email=email,
-        username=username,
-        verification_code=verification_code
+        to_email=email, username=username, verification_code=verification_code
     )
 
     if email_sent:
@@ -940,10 +885,7 @@ async def resend_verification(
 
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
-async def forgot_password(
-    request: ForgotPasswordRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def forgot_password(request: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
     """
     忘記密碼 - 發送密碼重置郵件
 
@@ -960,9 +902,7 @@ async def forgot_password(
     await check_email_rate_limit(request.email)
 
     # 查找用戶
-    result = await db.execute(
-        select(User).where(User.email == request.email)
-    )
+    result = await db.execute(select(User).where(User.email == request.email))
     user = result.scalar_one_or_none()
 
     # 即使用戶不存在也返回成功（安全考量，不洩漏用戶是否存在）
@@ -978,18 +918,16 @@ async def forgot_password(
     # 生成重置 Token
     reset_token = secrets.token_urlsafe(32)
     user.password_reset_token = reset_token
-    user.password_reset_expires = datetime.now(timezone.utc) + timedelta(
+    user.password_reset_expires = datetime.now(UTC) + timedelta(
         minutes=settings.PASSWORD_RESET_TOKEN_EXPIRE_MINUTES
     )
 
     await db.commit()
 
     # 發送郵件
-    username = request.email.split('@')[0]  # 使用 Email 前綴作為暫時用戶名
+    username = request.email.split("@")[0]  # 使用 Email 前綴作為暫時用戶名
     email_sent = await EmailService.send_password_reset_email(
-        to_email=request.email,
-        username=username,
-        reset_token=reset_token
+        to_email=request.email, username=username, reset_token=reset_token
     )
 
     if email_sent:
@@ -1001,10 +939,7 @@ async def forgot_password(
 
 
 @router.get("/verify-reset-token", response_model=VerifyResetTokenResponse)
-async def verify_reset_token(
-    token: str,
-    db: AsyncSession = Depends(get_db)
-):
+async def verify_reset_token(token: str, db: AsyncSession = Depends(get_db)):
     """
     驗證密碼重置 Token 是否有效
 
@@ -1015,16 +950,14 @@ async def verify_reset_token(
         - valid=False: Token 無效或已過期
     """
     # 查找擁有此 Token 的用戶
-    result = await db.execute(
-        select(User).where(User.password_reset_token == token)
-    )
+    result = await db.execute(select(User).where(User.password_reset_token == token))
     user = result.scalar_one_or_none()
 
     if not user:
         return VerifyResetTokenResponse(valid=False, email=None)
 
     # 檢查 Token 是否過期
-    if user.password_reset_expires < datetime.now(timezone.utc):
+    if user.password_reset_expires < datetime.now(UTC):
         # 清除過期的 Token
         user.password_reset_token = None
         user.password_reset_expires = None
@@ -1037,10 +970,7 @@ async def verify_reset_token(
 
 
 @router.post("/reset-password", response_model=ResetPasswordResponse)
-async def reset_password(
-    request: ResetPasswordRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def reset_password(request: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
     """
     重置密碼 - 使用重置 Token 設定新密碼
 
@@ -1050,27 +980,21 @@ async def reset_password(
     - 使用 bcrypt 加密新密碼
     """
     # 查找擁有此 Token 的用戶
-    result = await db.execute(
-        select(User).where(User.password_reset_token == request.token)
-    )
+    result = await db.execute(select(User).where(User.password_reset_token == request.token))
     user = result.scalar_one_or_none()
 
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="無效的重置鏈接"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="無效的重置鏈接")
 
     # 檢查 Token 是否過期
-    if user.password_reset_expires < datetime.now(timezone.utc):
+    if user.password_reset_expires < datetime.now(UTC):
         # 清除過期的 Token
         user.password_reset_token = None
         user.password_reset_expires = None
         await db.commit()
 
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="重置鏈接已過期，請重新申請"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="重置鏈接已過期，請重新申請"
         )
 
     # 更新密碼
@@ -1093,7 +1017,7 @@ async def change_password(
     request: ChangePasswordRequest,
     credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     修改密碼
@@ -1107,16 +1031,12 @@ async def change_password(
     """
     # 1. 驗證當前密碼
     if not verify_password(request.current_password, current_user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="當前密碼錯誤"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="當前密碼錯誤")
 
     # 2. 檢查新密碼不能與舊密碼相同
     if verify_password(request.new_password, current_user.password_hash):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="新密碼不能與當前密碼相同"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="新密碼不能與當前密碼相同"
         )
 
     # 3. 更新密碼
@@ -1127,28 +1047,24 @@ async def change_password(
     token = credentials.credentials
     payload = decode_token(token)
     if payload and payload.get("exp"):
-        expires_at = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+        expires_at = datetime.fromtimestamp(payload["exp"], tz=UTC)
     else:
-        expires_at = datetime.now(timezone.utc) + timedelta(
-            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-        )
+        expires_at = datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     await token_blacklist.add(token, expires_at)
 
     # 5. 發送密碼變更通知 Email
-    username = current_user.email.split('@')[0]
+    username = current_user.email.split("@")[0]
     email_sent = await EmailService.send_password_changed_email(
-        to_email=current_user.email,
-        username=username
+        to_email=current_user.email, username=username
     )
 
     if email_sent:
         logger.info(f"Password changed notification sent to {mask_email(current_user.email)}")
     else:
-        logger.warning(f"Failed to send password changed notification to {mask_email(current_user.email)}")
+        logger.warning(
+            f"Failed to send password changed notification to {mask_email(current_user.email)}"
+        )
 
     logger.info(f"Password changed for user: {mask_email(current_user.email)}")
 
-    return ChangePasswordResponse(
-        message="密碼修改成功，請重新登入",
-        tokens_invalidated=True
-    )
+    return ChangePasswordResponse(message="密碼修改成功，請重新登入", tokens_invalidated=True)

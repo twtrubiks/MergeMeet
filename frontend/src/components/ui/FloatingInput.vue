@@ -1,5 +1,13 @@
 <template>
-  <div class="floating-input" :class="{ 'has-value': hasValue, 'is-focused': isFocused, 'has-error': error, 'has-toggle': showPasswordToggle && type === 'password' }">
+  <div
+    class="floating-input"
+    :class="{
+      'has-value': hasValue,
+      'is-focused': isFocused,
+      'has-error': error,
+      'has-toggle': showPasswordToggle && type === 'password'
+    }"
+  >
     <input
       :id="id"
       :type="computedType"
@@ -10,10 +18,10 @@
       :autocomplete="autocomplete"
       :aria-invalid="!!error"
       :aria-describedby="error ? `${id}-error` : undefined"
+      class="input-field"
       @input="$emit('update:modelValue', $event.target.value)"
       @focus="isFocused = true"
       @blur="isFocused = false"
-      class="input-field"
     />
     <label :for="id" class="input-label">
       {{ label }}
@@ -22,19 +30,13 @@
       v-if="showPasswordToggle && type === 'password'"
       type="button"
       class="password-toggle"
-      @click="togglePasswordVisibility"
       :aria-label="showPassword ? '隱藏密碼' : '顯示密碼'"
+      @click="togglePasswordVisibility"
     >
       <Icon :name="showPassword ? 'eye-off' : 'eye'" size="sm" decorative />
     </button>
     <div class="input-border"></div>
-    <div
-      v-if="error"
-      :id="`${id}-error`"
-      class="error-message"
-      role="alert"
-      aria-live="assertive"
-    >
+    <div v-if="error" :id="`${id}-error`" class="error-message" role="alert" aria-live="assertive">
       {{ error }}
     </div>
   </div>
@@ -207,8 +209,9 @@ const togglePasswordVisibility = () => {
 
 /* Glow effect on focus */
 .floating-input.is-focused .input-field {
-  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15),
-              0 8px 16px rgba(102, 126, 234, 0.1);
+  box-shadow:
+    0 0 0 4px rgba(102, 126, 234, 0.15),
+    0 8px 16px rgba(102, 126, 234, 0.1);
 }
 
 /* Password toggle button */

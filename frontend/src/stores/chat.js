@@ -29,7 +29,7 @@ export const useChatStore = defineStore('chat', () => {
 
   // Getters
   const currentConversation = computed(() => {
-    return conversations.value.find(c => c.match_id === currentMatchId.value)
+    return conversations.value.find((c) => c.match_id === currentMatchId.value)
   })
 
   const currentMessages = computed(() => {
@@ -69,7 +69,7 @@ export const useChatStore = defineStore('chat', () => {
 
     // 返回取消註冊函數
     return () => {
-      unsubscribers.forEach(unsub => unsub())
+      unsubscribers.forEach((unsub) => unsub())
       logger.debug('[ChatStore] Chat handlers unregistered')
     }
   }
@@ -109,9 +109,7 @@ export const useChatStore = defineStore('chat', () => {
     try {
       // 記錄本地已標記為已讀的對話（unread_count = 0）
       const localReadConversations = new Set(
-        conversations.value
-          .filter(c => c.unread_count === 0)
-          .map(c => c.match_id)
+        conversations.value.filter((c) => c.unread_count === 0).map((c) => c.match_id)
       )
 
       const response = await apiClient.get('/messages/conversations')
@@ -120,7 +118,7 @@ export const useChatStore = defineStore('chat', () => {
       // 合併：保留本地已讀狀態
       // 如果本地 unread_count 是 0，但後端返回非 0，保留本地的 0
       // （因為用戶已經看過了，只是 WebSocket 還沒同步完成）
-      newConversations.forEach(conv => {
+      newConversations.forEach((conv) => {
         if (localReadConversations.has(conv.match_id) && conv.unread_count > 0) {
           logger.debug('[Chat] Preserving local read state for:', conv.match_id)
           conv.unread_count = 0
@@ -166,10 +164,7 @@ export const useChatStore = defineStore('chat', () => {
         // 載入更多歷史訊息：將歷史訊息插入到開頭
         // response.data.messages 是正序（舊的在前）
         const existingMessages = messages.value[matchId] || []
-        messages.value[matchId] = [
-          ...response.data.messages,
-          ...existingMessages
-        ]
+        messages.value[matchId] = [...response.data.messages, ...existingMessages]
       } else {
         // 初次載入：直接覆蓋（API 是權威來源）
         messages.value[matchId] = response.data.messages
@@ -231,7 +226,7 @@ export const useChatStore = defineStore('chat', () => {
 
     // 只通過全域 WebSocket Store 發送已讀回條
     // 後端會標記資料庫並通知對方
-    messageIds.forEach(msgId => {
+    messageIds.forEach((msgId) => {
       wsStore.sendReadReceipt(msgId)
     })
 
@@ -247,7 +242,7 @@ export const useChatStore = defineStore('chat', () => {
   const markConversationAsRead = async (matchId) => {
     // 先更新本地對話列表的未讀數（無論如何都設為 0）
     // 這確保用戶離開聊天室後看到的是已讀狀態
-    const conv = conversations.value.find(c => c.match_id === matchId)
+    const conv = conversations.value.find((c) => c.match_id === matchId)
     if (conv && conv.unread_count > 0) {
       conv.unread_count = 0
       logger.debug('[Chat] Set conversation unread_count to 0:', matchId)
@@ -257,8 +252,8 @@ export const useChatStore = defineStore('chat', () => {
     if (!messages.value[matchId]) return
 
     const unreadMessages = messages.value[matchId]
-      .filter(m => !m.is_read && m.sender_id !== currentUserId())
-      .map(m => m.id)
+      .filter((m) => !m.is_read && m.sender_id !== currentUserId())
+      .map((m) => m.id)
 
     if (unreadMessages.length > 0) {
       await markAsRead(unreadMessages)
@@ -274,7 +269,7 @@ export const useChatStore = defineStore('chat', () => {
 
       // 從本地狀態移除
       for (const matchId in messages.value) {
-        const index = messages.value[matchId].findIndex(m => m.id === messageId)
+        const index = messages.value[matchId].findIndex((m) => m.id === messageId)
         if (index > -1) {
           messages.value[matchId].splice(index, 1)
           break
@@ -297,13 +292,9 @@ export const useChatStore = defineStore('chat', () => {
       const formData = new FormData()
       formData.append('file', file)
 
-      const response = await apiClient.post(
-        `/messages/matches/${matchId}/upload-image`,
-        formData,
-        {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        }
-      )
+      const response = await apiClient.post(`/messages/matches/${matchId}/upload-image`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
 
       logger.debug('[Chat] Image uploaded:', response.data)
       return response.data
@@ -366,7 +357,7 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     // 更新本地對話列表的未讀數
-    const conv = conversations.value.find(c => c.match_id === matchId)
+    const conv = conversations.value.find((c) => c.match_id === matchId)
     if (conv && conv.unread_count > 0) {
       conv.unread_count = 0
     }
@@ -399,7 +390,11 @@ export const useChatStore = defineStore('chat', () => {
     const message = data.message
     const matchId = message.match_id
 
-    logger.debug('[Chat] Received new message:', { matchId, messageId: message.id, messageType: message.message_type })
+    logger.debug('[Chat] Received new message:', {
+      matchId,
+      messageId: message.id,
+      messageType: message.message_type
+    })
 
     // 確保該配對的訊息陣列存在，使用解構賦值確保響應式
     if (!messages.value[matchId]) {
@@ -410,17 +405,20 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     // 檢查是否已存在 (避免重複)
-    const exists = messages.value[matchId].some(m => m.id === message.id)
+    const exists = messages.value[matchId].some((m) => m.id === message.id)
     if (!exists) {
       // 使用解構賦值更新陣列，確保響應式更新
       messages.value[matchId] = [...messages.value[matchId], message]
-      logger.debug('[Chat] Message added to store:', { matchId, totalMessages: messages.value[matchId].length })
+      logger.debug('[Chat] Message added to store:', {
+        matchId,
+        totalMessages: messages.value[matchId].length
+      })
     } else {
       logger.debug('[Chat] Message already exists, skipping')
     }
 
     // 更新對話列表中的最後一條訊息
-    const conv = conversations.value.find(c => c.match_id === matchId)
+    const conv = conversations.value.find((c) => c.match_id === matchId)
     if (conv) {
       conv.last_message = message
 
@@ -437,10 +435,7 @@ export const useChatStore = defineStore('chat', () => {
       }
 
       // 將對話移到列表頂部
-      conversations.value = [
-        conv,
-        ...conversations.value.filter(c => c.match_id !== matchId)
-      ]
+      conversations.value = [conv, ...conversations.value.filter((c) => c.match_id !== matchId)]
     }
   }
 
@@ -481,7 +476,7 @@ export const useChatStore = defineStore('chat', () => {
 
     // 更新訊息狀態（使用 map 創建新陣列觸發 Vue 響應式）
     for (const matchId in messages.value) {
-      const messageIndex = messages.value[matchId].findIndex(m => m.id === message_id)
+      const messageIndex = messages.value[matchId].findIndex((m) => m.id === message_id)
       if (messageIndex > -1) {
         // 創建新陣列以觸發 Vue 響應式更新
         messages.value[matchId] = messages.value[matchId].map((m, index) =>
@@ -503,7 +498,7 @@ export const useChatStore = defineStore('chat', () => {
 
     // 從本地狀態移除訊息
     if (messages.value[match_id]) {
-      const index = messages.value[match_id].findIndex(m => m.id === message_id)
+      const index = messages.value[match_id].findIndex((m) => m.id === message_id)
       if (index > -1) {
         messages.value[match_id].splice(index, 1)
         logger.debug('[Chat] Message removed from local state:', message_id)
@@ -556,9 +551,9 @@ export const useChatStore = defineStore('chat', () => {
 
     // WebSocket（全域 Store 參考）
     wsStore,
-    initWebSocket,       // 保留向後兼容
-    closeWebSocket,      // 保留向後兼容
-    initChatHandlers,    // 新方法：只註冊訊息處理器
+    initWebSocket, // 保留向後兼容
+    closeWebSocket, // 保留向後兼容
+    initChatHandlers, // 新方法：只註冊訊息處理器
 
     // Actions
     fetchConversations,

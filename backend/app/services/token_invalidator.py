@@ -10,10 +10,11 @@ Redis Key 設計：
 - Token 驗證時，檢查 Token 的 iat 是否早於此時間戳
 - 如果 Token 是在失效時間之前創建的，則拒絕
 """
-import redis.asyncio as aioredis
-from datetime import datetime, timezone
-from typing import Optional
+
 import logging
+from datetime import UTC, datetime
+
+import redis.asyncio as aioredis
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ INVALIDATION_TTL = 7 * 24 * 60 * 60  # 7 days in seconds
 class TokenInvalidator:
     """Token 全局失效管理器"""
 
-    _redis: Optional[aioredis.Redis] = None
+    _redis: aioredis.Redis | None = None
 
     @classmethod
     def set_redis(cls, redis_conn: aioredis.Redis) -> None:
@@ -49,7 +50,7 @@ class TokenInvalidator:
             return
 
         key = cls._get_key(user_id)
-        timestamp = int(datetime.now(timezone.utc).timestamp())
+        timestamp = int(datetime.now(UTC).timestamp())
 
         try:
             await cls._redis.setex(key, INVALIDATION_TTL, str(timestamp))
@@ -83,7 +84,9 @@ class TokenInvalidator:
             # 如果 Token 是在失效時間之前創建的，則無效
             invalidated_timestamp = int(invalidated_at)
             if token_iat < invalidated_timestamp:
-                logger.debug(f"Token rejected for user {user_id}: issued at {token_iat}, invalidated at {invalidated_timestamp}")
+                logger.debug(
+                    f"Token rejected for user {user_id}: issued at {token_iat}, invalidated at {invalidated_timestamp}"
+                )
                 return False
 
             return True

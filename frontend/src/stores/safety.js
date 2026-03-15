@@ -17,9 +17,7 @@ export const useSafetyStore = defineStore('safety', () => {
 
   // Getters
   const hasBlockedUsers = computed(() => blockedUsers.value.length > 0)
-  const blockedUserIds = computed(() =>
-    blockedUsers.value.map(u => u.blocked_user_id)
-  )
+  const blockedUserIds = computed(() => blockedUsers.value.map((u) => u.blocked_user_id))
 
   /**
    * 封鎖用戶
@@ -57,9 +55,7 @@ export const useSafetyStore = defineStore('safety', () => {
       await apiClient.delete(`/safety/block/${userId}`)
 
       // 從列表中移除
-      blockedUsers.value = blockedUsers.value.filter(
-        u => u.blocked_user_id !== userId
-      )
+      blockedUsers.value = blockedUsers.value.filter((u) => u.blocked_user_id !== userId)
 
       return true
     } catch (err) {

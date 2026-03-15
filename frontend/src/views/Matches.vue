@@ -13,7 +13,10 @@
       </h1>
 
       <!-- 載入中 - 使用 Skeleton Loader -->
-      <div v-if="discoveryStore.loading && discoveryStore.matches.length === 0" class="loading-skeleton">
+      <div
+        v-if="discoveryStore.loading && discoveryStore.matches.length === 0"
+        class="loading-skeleton"
+      >
         <div class="matches-grid">
           <SkeletonCard v-for="i in 4" :key="i" />
         </div>
@@ -49,119 +52,127 @@
       <!-- 配對列表 -->
       <div v-else>
         <div class="matches-stats">
-          <Badge variant="success" size="large">
-            {{ discoveryStore.matches.length }} 個配對
-          </Badge>
+          <Badge variant="success" size="large"> {{ discoveryStore.matches.length }} 個配對 </Badge>
         </div>
 
         <div class="matches-grid">
-        <div
-          v-for="(match, index) in discoveryStore.matches"
-          :key="match.match_id"
-          class="match-card"
-          :style="{ animationDelay: `${index * 0.1}s` }"
-        >
-          <!-- 新配對標籤 -->
-          <div v-if="isNewMatch(match.matched_at)" class="new-match-badge">
-            <Icon name="flash" size="sm" decorative /> NEW
-          </div>
+          <div
+            v-for="(match, index) in discoveryStore.matches"
+            :key="match.match_id"
+            class="match-card"
+            :style="{ animationDelay: `${index * 0.1}s` }"
+          >
+            <!-- 新配對標籤 -->
+            <div v-if="isNewMatch(match.matched_at)" class="new-match-badge">
+              <Icon name="flash" size="sm" decorative /> NEW
+            </div>
 
-          <!-- 用戶頭像（可點擊查看詳情） -->
-          <div class="match-avatar clickable" @click="openUserDetail(match)">
-            <div class="avatar-ring" :class="{ online: isOnline(match.matched_user.last_active) }">
-              <img
-                v-if="match.matched_user.photos && match.matched_user.photos.length > 0"
-                :src="match.matched_user.photos[0]"
-                :alt="match.matched_user.display_name"
+            <!-- 用戶頭像（可點擊查看詳情） -->
+            <div class="match-avatar clickable" @click="openUserDetail(match)">
+              <div
+                class="avatar-ring"
+                :class="{ online: isOnline(match.matched_user.last_active) }"
               >
-              <div v-else class="avatar-placeholder">
-                {{ (match.matched_user.display_name || 'U')[0] }}
+                <img
+                  v-if="match.matched_user.photos && match.matched_user.photos.length > 0"
+                  :src="match.matched_user.photos[0]"
+                  :alt="match.matched_user.display_name"
+                />
+                <div v-else class="avatar-placeholder">
+                  {{ (match.matched_user.display_name || 'U')[0] }}
+                </div>
+              </div>
+              <div v-if="isOnline(match.matched_user.last_active)" class="online-pulse"></div>
+            </div>
+
+            <!-- 用戶資訊（可點擊查看詳情） -->
+            <div class="match-info clickable" @click="openUserDetail(match)">
+              <div class="match-header">
+                <h3 class="match-name">{{ match.matched_user.display_name }}</h3>
+                <span class="match-age">{{ match.matched_user.age }}</span>
+              </div>
+
+              <p v-if="match.matched_user.distance_km" class="match-distance">
+                <Icon name="location" size="xs" decorative />
+                {{ formatDistance(match.matched_user.distance_km) }}
+              </p>
+
+              <div class="match-meta">
+                <Badge variant="info" size="small">
+                  {{ formatDate(match.matched_at) }}
+                </Badge>
+                <Badge
+                  v-if="isOnline(match.matched_user.last_active)"
+                  variant="success"
+                  size="small"
+                >
+                  ● 在線
+                </Badge>
+              </div>
+
+              <!-- 共同興趣 -->
+              <div
+                v-if="match.matched_user.interests && match.matched_user.interests.length > 0"
+                class="match-interests"
+              >
+                <span
+                  v-for="interest in match.matched_user.interests.slice(0, 3)"
+                  :key="interest"
+                  class="interest-tag"
+                >
+                  {{ interest }}
+                </span>
+                <span v-if="match.matched_user.interests.length > 3" class="interest-more">
+                  +{{ match.matched_user.interests.length - 3 }}
+                </span>
               </div>
             </div>
-            <div class="online-pulse" v-if="isOnline(match.matched_user.last_active)"></div>
-          </div>
 
-          <!-- 用戶資訊（可點擊查看詳情） -->
-          <div class="match-info clickable" @click="openUserDetail(match)">
-            <div class="match-header">
-              <h3 class="match-name">{{ match.matched_user.display_name }}</h3>
-              <span class="match-age">{{ match.matched_user.age }}</span>
-            </div>
-
-            <p v-if="match.matched_user.distance_km" class="match-distance">
-              <Icon name="location" size="xs" decorative />
-              {{ formatDistance(match.matched_user.distance_km) }}
-            </p>
-
-            <div class="match-meta">
-              <Badge variant="info" size="small">
-                {{ formatDate(match.matched_at) }}
-              </Badge>
-              <Badge v-if="isOnline(match.matched_user.last_active)" variant="success" size="small">
-                ● 在線
-              </Badge>
-            </div>
-
-            <!-- 共同興趣 -->
-            <div v-if="match.matched_user.interests && match.matched_user.interests.length > 0" class="match-interests">
-              <span
-                v-for="interest in match.matched_user.interests.slice(0, 3)"
-                :key="interest"
-                class="interest-tag"
+            <!-- 操作按鈕 -->
+            <div class="match-actions">
+              <button
+                class="btn-chat"
+                title="開始聊天"
+                aria-label="與該用戶開始聊天對話"
+                :aria-describedby="`chat-desc-${match.match_id}`"
+                @click="openChat(match.match_id)"
               >
-                {{ interest }}
-              </span>
-              <span v-if="match.matched_user.interests.length > 3" class="interest-more">
-                +{{ match.matched_user.interests.length - 3 }}
-              </span>
+                <Icon name="chat" size="md" decorative />
+                <span :id="`chat-desc-${match.match_id}`" class="sr-only"
+                  >點擊後將開啟與 {{ match.matched_user.display_name }} 的聊天視窗</span
+                >
+              </button>
+              <button
+                class="btn-unmatch"
+                title="取消配對"
+                aria-label="取消與該用戶的配對關係"
+                :aria-describedby="`unmatch-desc-${match.match_id}`"
+                @click="showUnmatchConfirm(match)"
+              >
+                <Icon name="heart-dislike" size="md" decorative />
+                <span :id="`unmatch-desc-${match.match_id}`" class="sr-only"
+                  >點擊後將取消與 {{ match.matched_user.display_name }} 的配對</span
+                >
+              </button>
             </div>
-          </div>
-
-          <!-- 操作按鈕 -->
-          <div class="match-actions">
-            <button
-              @click="openChat(match.match_id)"
-              class="btn-chat"
-              title="開始聊天"
-              aria-label="與該用戶開始聊天對話"
-              :aria-describedby="`chat-desc-${match.match_id}`"
-            >
-              <Icon name="chat" size="md" decorative />
-              <span :id="`chat-desc-${match.match_id}`" class="sr-only">點擊後將開啟與 {{ match.matched_user.display_name }} 的聊天視窗</span>
-            </button>
-            <button
-              @click="showUnmatchConfirm(match)"
-              class="btn-unmatch"
-              title="取消配對"
-              aria-label="取消與該用戶的配對關係"
-              :aria-describedby="`unmatch-desc-${match.match_id}`"
-            >
-              <Icon name="heart-dislike" size="md" decorative />
-              <span :id="`unmatch-desc-${match.match_id}`" class="sr-only">點擊後將取消與 {{ match.matched_user.display_name }} 的配對</span>
-            </button>
           </div>
         </div>
-      </div>
       </div>
     </div>
 
     <!-- 用戶詳情彈窗 -->
-    <UserDetailModal
-      :show="showUserDetail"
-      :user="selectedUser || {}"
-      @close="closeUserDetail"
-    />
+    <UserDetailModal :show="showUserDetail" :user="selectedUser || {}" @close="closeUserDetail" />
 
     <!-- 取消配對確認彈窗 -->
     <Transition name="modal">
       <div
         v-if="unmatchTarget"
         class="modal-overlay"
-        @click="cancelUnmatch"
         role="dialog"
         aria-modal="true"
         aria-labelledby="unmatch-dialog-title"
         aria-describedby="unmatch-dialog-desc"
+        @click="cancelUnmatch"
       >
         <div class="modal-container" @click.stop>
           <div class="modal-content">
@@ -175,17 +186,17 @@
             <div class="modal-actions">
               <AnimatedButton
                 variant="ghost"
-                @click="cancelUnmatch"
                 aria-label="取消此操作，返回配對列表"
+                @click="cancelUnmatch"
               >
                 取消
               </AnimatedButton>
               <AnimatedButton
                 variant="danger"
                 :loading="isUnmatching"
-                @click="confirmUnmatch"
                 aria-label="確認取消配對"
                 :aria-busy="isUnmatching"
+                @click="confirmUnmatch"
               >
                 <span v-if="!isUnmatching">確定取消</span>
               </AnimatedButton>
@@ -369,7 +380,7 @@ onUnmounted(() => {
 
 .matches {
   min-height: 100vh;
-  background: linear-gradient(135deg, #FFF5F5 0%, #FFE5E5 100%);
+  background: linear-gradient(135deg, #fff5f5 0%, #ffe5e5 100%);
   padding: 20px;
 }
 
@@ -484,7 +495,8 @@ onUnmounted(() => {
 }
 
 @keyframes heartbreak {
-  0%, 100% {
+  0%,
+  100% {
     transform: rotate(0deg) scale(1);
   }
   25% {
@@ -578,7 +590,7 @@ onUnmounted(() => {
   position: absolute;
   top: 12px;
   left: 12px;
-  background: linear-gradient(135deg, #FFD700, #FFA500);
+  background: linear-gradient(135deg, #ffd700, #ffa500);
   color: white;
   padding: 6px 12px;
   border-radius: 20px;
@@ -591,7 +603,8 @@ onUnmounted(() => {
 }
 
 @keyframes glow {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
   }
   50% {
@@ -624,7 +637,7 @@ onUnmounted(() => {
 }
 
 .avatar-ring.online {
-  background: linear-gradient(135deg, #4CAF50, #66BB6A);
+  background: linear-gradient(135deg, #4caf50, #66bb6a);
 }
 
 .avatar-ring img,
@@ -640,7 +653,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #FF6B6B, #FF8E53);
+  background: linear-gradient(135deg, #ff6b6b, #ff8e53);
   color: white;
   font-size: 36px;
   font-weight: 800;
@@ -652,7 +665,7 @@ onUnmounted(() => {
   right: 8px;
   width: 20px;
   height: 20px;
-  background: #4CAF50;
+  background: #4caf50;
   border-radius: 50%;
   border: 3px solid white;
   box-shadow: 0 0 0 rgba(76, 175, 80, 0.7);
@@ -798,7 +811,9 @@ onUnmounted(() => {
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.3);
   transform: translate(-50%, -50%);
-  transition: width 0.4s, height 0.4s;
+  transition:
+    width 0.4s,
+    height 0.4s;
 }
 
 .btn-chat:hover::before,
@@ -878,7 +893,8 @@ onUnmounted(() => {
 }
 
 @keyframes iconBounce {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
   50% {
@@ -910,11 +926,13 @@ onUnmounted(() => {
 }
 
 /* Modal 過渡效果 */
-.modal-enter-active, .modal-leave-active {
+.modal-enter-active,
+.modal-leave-active {
   transition: opacity 0.3s ease;
 }
 
-.modal-enter-from, .modal-leave-to {
+.modal-enter-from,
+.modal-leave-to {
   opacity: 0;
 }
 

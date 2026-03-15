@@ -1,7 +1,9 @@
 """驗證碼存儲測試"""
-import pytest
-from datetime import datetime, timezone, timedelta
+
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
+
+import pytest
 
 from app.api.auth import VerificationCodeStore
 
@@ -74,7 +76,7 @@ class TestVerificationCodeStore:
         """測試清理過期驗證碼"""
         # 手動加入過期的驗證碼
         expired_email = "expired@example.com"
-        store._fallback[expired_email] = ("123456", datetime.now(timezone.utc) - timedelta(seconds=1))
+        store._fallback[expired_email] = ("123456", datetime.now(UTC) - timedelta(seconds=1))
 
         valid_email = "valid@example.com"
         await store.set(valid_email, "654321")
@@ -157,7 +159,7 @@ class TestVerificationCodeStoreFallback:
         code = "777666"
 
         # 先手動加入內存
-        store._fallback[email.lower()] = (code, datetime.now(timezone.utc) + timedelta(minutes=10))
+        store._fallback[email.lower()] = (code, datetime.now(UTC) + timedelta(minutes=10))
 
         # 獲取時會嘗試 Redis，失敗後回退到內存
         result = await store.get(email)
@@ -186,7 +188,7 @@ class TestVerificationCodeStoreFallback:
         # 先加入 Redis
         await store.set(email, code)
         # 手動加入內存
-        store._fallback[email.lower()] = (code, datetime.now(timezone.utc) + timedelta(minutes=10))
+        store._fallback[email.lower()] = (code, datetime.now(UTC) + timedelta(minutes=10))
 
         await store.delete(email)
 

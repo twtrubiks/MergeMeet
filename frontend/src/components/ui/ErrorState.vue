@@ -16,12 +16,7 @@
   />
 -->
 <template>
-  <div
-    class="error-state"
-    :class="variant"
-    role="alert"
-    aria-live="polite"
-  >
+  <div class="error-state" :class="variant" role="alert" aria-live="polite">
     <!-- 圖標 -->
     <div class="error-icon" aria-hidden="true">
       <n-icon :size="iconSize">
@@ -37,10 +32,7 @@
 
     <!-- 操作按鈕 -->
     <div v-if="showRetry" class="error-actions">
-      <AnimatedButton
-        :variant="buttonVariant"
-        @click="$emit('retry')"
-      >
+      <AnimatedButton :variant="buttonVariant" @click="$emit('retry')">
         <Icon name="refresh" size="sm" decorative />
         {{ retryText }}
       </AnimatedButton>
@@ -57,11 +49,7 @@
 import { computed } from 'vue'
 import { NIcon } from 'naive-ui'
 // 保留 NIcon 和圖標導入用於動態 iconComponent（依據 variant 切換圖標）
-import {
-  AlertCircleOutline,
-  WarningOutline,
-  InformationCircleOutline
-} from '@vicons/ionicons5'
+import { AlertCircleOutline, WarningOutline, InformationCircleOutline } from '@vicons/ionicons5'
 import AnimatedButton from './AnimatedButton.vue'
 import Icon from './Icon.vue'
 
@@ -165,7 +153,8 @@ const buttonVariant = computed(() => {
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
     opacity: 1;
   }

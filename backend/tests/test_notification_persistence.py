@@ -7,40 +7,37 @@
 3. 通知自動建立測試 (Like/Match/Message 觸發)
 ============================
 """
-import pytest
+
 import uuid
 from unittest.mock import AsyncMock, patch
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
-from app.models.user import User
+import pytest
+from httpx import AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.notification import Notification
 from app.models.profile import InterestTag
+from app.models.user import User
 from app.websocket.manager import manager
 
-
 # ==================== Fixtures ====================
+
 
 @pytest.fixture
 async def test_user_with_token(client: AsyncClient, auth_user: dict, test_db: AsyncSession):
     """創建測試用戶並返回 token"""
-    result = await test_db.execute(
-        select(User).where(User.email == auth_user["email"])
-    )
+    result = await test_db.execute(select(User).where(User.email == auth_user["email"]))
     user = result.scalar_one()
 
-    return {
-        "token": auth_user["token"],
-        "user_id": str(user.id),
-        "user": user
-    }
+    return {"token": auth_user["token"], "user_id": str(user.id), "user": user}
 
 
 @pytest.fixture
 async def notification_users(client: AsyncClient, auth_user_pair: dict, test_db: AsyncSession):
     """創建用於通知測試的用戶（Alice 和 Bob）含完整檔案"""
     from io import BytesIO
+
     from PIL import Image
 
     token_a = auth_user_pair["alice"]["token"]
@@ -52,48 +49,50 @@ async def notification_users(client: AsyncClient, auth_user_pair: dict, test_db:
     )
     alice = result.scalar_one()
 
-    result = await test_db.execute(
-        select(User).where(User.email == auth_user_pair["bob"]["email"])
-    )
+    result = await test_db.execute(select(User).where(User.email == auth_user_pair["bob"]["email"]))
     bob = result.scalar_one()
 
     # 建立 Profile
-    await client.post("/api/profile",
+    await client.post(
+        "/api/profile",
         headers={"Authorization": f"Bearer {token_a}"},
         json={
             "display_name": "Alice Persist",
             "gender": "female",
             "bio": "測試通知持久化",
-            "location": {"latitude": 25.0330, "longitude": 121.5654}
-        }
+            "location": {"latitude": 25.0330, "longitude": 121.5654},
+        },
     )
-    await client.patch("/api/profile",
+    await client.patch(
+        "/api/profile",
         headers={"Authorization": f"Bearer {token_a}"},
         json={
             "min_age_preference": 25,
             "max_age_preference": 45,
             "max_distance_km": 50,
-            "gender_preference": "male"
-        }
+            "gender_preference": "male",
+        },
     )
 
-    await client.post("/api/profile",
+    await client.post(
+        "/api/profile",
         headers={"Authorization": f"Bearer {token_b}"},
         json={
             "display_name": "Bob Persist",
             "gender": "male",
             "bio": "測試通知持久化",
-            "location": {"latitude": 25.0500, "longitude": 121.5500}
-        }
+            "location": {"latitude": 25.0500, "longitude": 121.5500},
+        },
     )
-    await client.patch("/api/profile",
+    await client.patch(
+        "/api/profile",
         headers={"Authorization": f"Bearer {token_b}"},
         json={
             "min_age_preference": 22,
             "max_age_preference": 40,
             "max_distance_km": 30,
-            "gender_preference": "female"
-        }
+            "gender_preference": "female",
+        },
     )
 
     # 建立興趣標籤
@@ -115,45 +114,52 @@ async def notification_users(client: AsyncClient, auth_user_pair: dict, test_db:
 
     tag_ids = [str(tag.id) for tag in existing_tags[:3]]
 
-    await client.put("/api/profile/interests",
+    await client.put(
+        "/api/profile/interests",
         headers={"Authorization": f"Bearer {token_a}"},
-        json={"interest_ids": tag_ids}
+        json={"interest_ids": tag_ids},
     )
-    await client.put("/api/profile/interests",
+    await client.put(
+        "/api/profile/interests",
         headers={"Authorization": f"Bearer {token_b}"},
-        json={"interest_ids": tag_ids}
+        json={"interest_ids": tag_ids},
     )
 
     # 上傳照片
     def create_test_image():
-        img = Image.new('RGB', (100, 100), color='blue')
+        img = Image.new("RGB", (100, 100), color="blue")
         buffer = BytesIO()
-        img.save(buffer, format='JPEG')
+        img.save(buffer, format="JPEG")
         buffer.seek(0)
         return buffer
 
-    await client.post("/api/profile/photos",
+    await client.post(
+        "/api/profile/photos",
         headers={"Authorization": f"Bearer {token_a}"},
-        files={"file": ("photo.jpg", create_test_image(), "image/jpeg")}
+        files={"file": ("photo.jpg", create_test_image(), "image/jpeg")},
     )
-    await client.post("/api/profile/photos",
+    await client.post(
+        "/api/profile/photos",
         headers={"Authorization": f"Bearer {token_b}"},
-        files={"file": ("photo.jpg", create_test_image(), "image/jpeg")}
+        files={"file": ("photo.jpg", create_test_image(), "image/jpeg")},
     )
 
     return {
         "alice": {"token": token_a, "user_id": str(alice.id), "user": alice},
-        "bob": {"token": token_b, "user_id": str(bob.id), "user": bob}
+        "bob": {"token": token_b, "user_id": str(bob.id), "user": bob},
     }
 
 
 # ==================== TestNotificationModel ====================
 
+
 class TestNotificationModel:
     """Notification Model 測試"""
 
     @pytest.mark.asyncio
-    async def test_create_notification_message_type(self, test_db: AsyncSession, test_user_with_token):
+    async def test_create_notification_message_type(
+        self, test_db: AsyncSession, test_user_with_token
+    ):
         """測試：建立 notification_message 類型通知"""
         user = test_user_with_token["user"]
 
@@ -165,8 +171,8 @@ class TestNotificationModel:
             data={
                 "match_id": str(uuid.uuid4()),
                 "sender_id": str(uuid.uuid4()),
-                "sender_name": "Bob"
-            }
+                "sender_name": "Bob",
+            },
         )
         test_db.add(notification)
         await test_db.commit()
@@ -179,7 +185,9 @@ class TestNotificationModel:
         assert notification.data["sender_name"] == "Bob"
 
     @pytest.mark.asyncio
-    async def test_create_notification_match_type(self, test_db: AsyncSession, test_user_with_token):
+    async def test_create_notification_match_type(
+        self, test_db: AsyncSession, test_user_with_token
+    ):
         """測試：建立 notification_match 類型通知"""
         user = test_user_with_token["user"]
 
@@ -192,8 +200,8 @@ class TestNotificationModel:
                 "match_id": str(uuid.uuid4()),
                 "matched_user_id": str(uuid.uuid4()),
                 "matched_user_name": "Alice",
-                "matched_user_avatar": "/uploads/alice.jpg"
-            }
+                "matched_user_avatar": "/uploads/alice.jpg",
+            },
         )
         test_db.add(notification)
         await test_db.commit()
@@ -202,16 +210,14 @@ class TestNotificationModel:
         assert notification.data["matched_user_name"] == "Alice"
 
     @pytest.mark.asyncio
-    async def test_create_notification_liked_type(self, test_db: AsyncSession, test_user_with_token):
+    async def test_create_notification_liked_type(
+        self, test_db: AsyncSession, test_user_with_token
+    ):
         """測試：建立 notification_liked 類型通知"""
         user = test_user_with_token["user"]
 
         notification = Notification(
-            user_id=user.id,
-            type="notification_liked",
-            title="有人喜歡你！",
-            content=None,
-            data={}
+            user_id=user.id, type="notification_liked", title="有人喜歡你！", content=None, data={}
         )
         test_db.add(notification)
         await test_db.commit()
@@ -220,14 +226,14 @@ class TestNotificationModel:
         assert notification.data == {}
 
     @pytest.mark.asyncio
-    async def test_notification_user_relationship(self, test_db: AsyncSession, test_user_with_token):
+    async def test_notification_user_relationship(
+        self, test_db: AsyncSession, test_user_with_token
+    ):
         """測試：Notification 與 User 關聯"""
         user = test_user_with_token["user"]
 
         notification = Notification(
-            user_id=user.id,
-            type="notification_liked",
-            title="有人喜歡你！"
+            user_id=user.id, type="notification_liked", title="有人喜歡你！"
         )
         test_db.add(notification)
         await test_db.commit()
@@ -241,11 +247,7 @@ class TestNotificationModel:
         """測試：Notification 預設值"""
         user = test_user_with_token["user"]
 
-        notification = Notification(
-            user_id=user.id,
-            type="notification_message",
-            title="測試"
-        )
+        notification = Notification(user_id=user.id, type="notification_message", title="測試")
         test_db.add(notification)
         await test_db.commit()
         await test_db.refresh(notification)
@@ -257,6 +259,7 @@ class TestNotificationModel:
 
 # ==================== TestNotificationAPI ====================
 
+
 class TestNotificationAPI:
     """Notification API 測試"""
 
@@ -265,7 +268,7 @@ class TestNotificationAPI:
         """測試：取得空的通知列表"""
         response = await client.get(
             "/api/notifications",
-            headers={"Authorization": f"Bearer {test_user_with_token['token']}"}
+            headers={"Authorization": f"Bearer {test_user_with_token['token']}"},
         )
 
         assert response.status_code == 200
@@ -277,25 +280,20 @@ class TestNotificationAPI:
 
     @pytest.mark.asyncio
     async def test_get_notifications_list_with_data(
-        self,
-        client: AsyncClient,
-        test_db: AsyncSession,
-        test_user_with_token
+        self, client: AsyncClient, test_db: AsyncSession, test_user_with_token
     ):
         """測試：取得有資料的通知列表"""
         user = test_user_with_token["user"]
 
         # 建立測試通知
         notification1 = Notification(
-            user_id=user.id,
-            type="notification_liked",
-            title="有人喜歡你！"
+            user_id=user.id, type="notification_liked", title="有人喜歡你！"
         )
         notification2 = Notification(
             user_id=user.id,
             type="notification_match",
             title="新配對！",
-            data={"match_id": str(uuid.uuid4())}
+            data={"match_id": str(uuid.uuid4())},
         )
         test_db.add(notification1)
         test_db.add(notification2)
@@ -303,7 +301,7 @@ class TestNotificationAPI:
 
         response = await client.get(
             "/api/notifications",
-            headers={"Authorization": f"Bearer {test_user_with_token['token']}"}
+            headers={"Authorization": f"Bearer {test_user_with_token['token']}"},
         )
 
         assert response.status_code == 200
@@ -314,10 +312,7 @@ class TestNotificationAPI:
 
     @pytest.mark.asyncio
     async def test_get_notifications_pagination(
-        self,
-        client: AsyncClient,
-        test_db: AsyncSession,
-        test_user_with_token
+        self, client: AsyncClient, test_db: AsyncSession, test_user_with_token
     ):
         """測試：通知列表分頁"""
         user = test_user_with_token["user"]
@@ -325,9 +320,7 @@ class TestNotificationAPI:
         # 建立 5 個通知
         for i in range(5):
             notification = Notification(
-                user_id=user.id,
-                type="notification_liked",
-                title=f"通知 {i}"
+                user_id=user.id, type="notification_liked", title=f"通知 {i}"
             )
             test_db.add(notification)
         await test_db.commit()
@@ -335,7 +328,7 @@ class TestNotificationAPI:
         # 取得前 2 個
         response = await client.get(
             "/api/notifications?limit=2&offset=0",
-            headers={"Authorization": f"Bearer {test_user_with_token['token']}"}
+            headers={"Authorization": f"Bearer {test_user_with_token['token']}"},
         )
 
         assert response.status_code == 200
@@ -346,7 +339,7 @@ class TestNotificationAPI:
         # 取得後 2 個
         response = await client.get(
             "/api/notifications?limit=2&offset=2",
-            headers={"Authorization": f"Bearer {test_user_with_token['token']}"}
+            headers={"Authorization": f"Bearer {test_user_with_token['token']}"},
         )
 
         assert response.status_code == 200
@@ -355,39 +348,27 @@ class TestNotificationAPI:
 
     @pytest.mark.asyncio
     async def test_get_notifications_unread_only(
-        self,
-        client: AsyncClient,
-        test_db: AsyncSession,
-        test_user_with_token
+        self, client: AsyncClient, test_db: AsyncSession, test_user_with_token
     ):
         """測試：只取得未讀通知"""
         user = test_user_with_token["user"]
 
         # 建立 2 個未讀 + 1 個已讀
         notification1 = Notification(
-            user_id=user.id,
-            type="notification_liked",
-            title="未讀 1",
-            is_read=False
+            user_id=user.id, type="notification_liked", title="未讀 1", is_read=False
         )
         notification2 = Notification(
-            user_id=user.id,
-            type="notification_liked",
-            title="未讀 2",
-            is_read=False
+            user_id=user.id, type="notification_liked", title="未讀 2", is_read=False
         )
         notification3 = Notification(
-            user_id=user.id,
-            type="notification_liked",
-            title="已讀",
-            is_read=True
+            user_id=user.id, type="notification_liked", title="已讀", is_read=True
         )
         test_db.add_all([notification1, notification2, notification3])
         await test_db.commit()
 
         response = await client.get(
             "/api/notifications?unread_only=true",
-            headers={"Authorization": f"Bearer {test_user_with_token['token']}"}
+            headers={"Authorization": f"Bearer {test_user_with_token['token']}"},
         )
 
         assert response.status_code == 200
@@ -400,7 +381,7 @@ class TestNotificationAPI:
         """測試：取得未讀數量（為 0）"""
         response = await client.get(
             "/api/notifications/unread-count",
-            headers={"Authorization": f"Bearer {test_user_with_token['token']}"}
+            headers={"Authorization": f"Bearer {test_user_with_token['token']}"},
         )
 
         assert response.status_code == 200
@@ -409,10 +390,7 @@ class TestNotificationAPI:
 
     @pytest.mark.asyncio
     async def test_get_unread_count_with_unread(
-        self,
-        client: AsyncClient,
-        test_db: AsyncSession,
-        test_user_with_token
+        self, client: AsyncClient, test_db: AsyncSession, test_user_with_token
     ):
         """測試：取得未讀數量（有未讀）"""
         user = test_user_with_token["user"]
@@ -420,16 +398,14 @@ class TestNotificationAPI:
         # 建立 3 個未讀通知
         for _ in range(3):
             notification = Notification(
-                user_id=user.id,
-                type="notification_liked",
-                title="有人喜歡你！"
+                user_id=user.id, type="notification_liked", title="有人喜歡你！"
             )
             test_db.add(notification)
         await test_db.commit()
 
         response = await client.get(
             "/api/notifications/unread-count",
-            headers={"Authorization": f"Bearer {test_user_with_token['token']}"}
+            headers={"Authorization": f"Bearer {test_user_with_token['token']}"},
         )
 
         assert response.status_code == 200
@@ -438,19 +414,13 @@ class TestNotificationAPI:
 
     @pytest.mark.asyncio
     async def test_mark_single_notification_as_read(
-        self,
-        client: AsyncClient,
-        test_db: AsyncSession,
-        test_user_with_token
+        self, client: AsyncClient, test_db: AsyncSession, test_user_with_token
     ):
         """測試：標記單個通知為已讀"""
         user = test_user_with_token["user"]
 
         notification = Notification(
-            user_id=user.id,
-            type="notification_liked",
-            title="有人喜歡你！",
-            is_read=False
+            user_id=user.id, type="notification_liked", title="有人喜歡你！", is_read=False
         )
         test_db.add(notification)
         await test_db.commit()
@@ -458,7 +428,7 @@ class TestNotificationAPI:
 
         response = await client.put(
             f"/api/notifications/{notification.id}/read",
-            headers={"Authorization": f"Bearer {test_user_with_token['token']}"}
+            headers={"Authorization": f"Bearer {test_user_with_token['token']}"},
         )
 
         assert response.status_code == 200
@@ -471,10 +441,7 @@ class TestNotificationAPI:
 
     @pytest.mark.asyncio
     async def test_mark_all_notifications_as_read(
-        self,
-        client: AsyncClient,
-        test_db: AsyncSession,
-        test_user_with_token
+        self, client: AsyncClient, test_db: AsyncSession, test_user_with_token
     ):
         """測試：標記全部通知為已讀"""
         user = test_user_with_token["user"]
@@ -483,10 +450,7 @@ class TestNotificationAPI:
         notifications = []
         for _ in range(3):
             notification = Notification(
-                user_id=user.id,
-                type="notification_liked",
-                title="有人喜歡你！",
-                is_read=False
+                user_id=user.id, type="notification_liked", title="有人喜歡你！", is_read=False
             )
             test_db.add(notification)
             notifications.append(notification)
@@ -494,7 +458,7 @@ class TestNotificationAPI:
 
         response = await client.put(
             "/api/notifications/read-all",
-            headers={"Authorization": f"Bearer {test_user_with_token['token']}"}
+            headers={"Authorization": f"Bearer {test_user_with_token['token']}"},
         )
 
         assert response.status_code == 200
@@ -504,24 +468,19 @@ class TestNotificationAPI:
         # 驗證未讀數量為 0
         response = await client.get(
             "/api/notifications/unread-count",
-            headers={"Authorization": f"Bearer {test_user_with_token['token']}"}
+            headers={"Authorization": f"Bearer {test_user_with_token['token']}"},
         )
         assert response.json()["unread_count"] == 0
 
     @pytest.mark.asyncio
     async def test_delete_notification(
-        self,
-        client: AsyncClient,
-        test_db: AsyncSession,
-        test_user_with_token
+        self, client: AsyncClient, test_db: AsyncSession, test_user_with_token
     ):
         """測試：刪除通知"""
         user = test_user_with_token["user"]
 
         notification = Notification(
-            user_id=user.id,
-            type="notification_liked",
-            title="有人喜歡你！"
+            user_id=user.id, type="notification_liked", title="有人喜歡你！"
         )
         test_db.add(notification)
         await test_db.commit()
@@ -530,7 +489,7 @@ class TestNotificationAPI:
 
         response = await client.delete(
             f"/api/notifications/{notification_id}",
-            headers={"Authorization": f"Bearer {test_user_with_token['token']}"}
+            headers={"Authorization": f"Bearer {test_user_with_token['token']}"},
         )
 
         assert response.status_code == 200
@@ -553,24 +512,20 @@ class TestNotificationAPI:
 
 # ==================== TestNotificationAutoCreate ====================
 
+
 class TestNotificationAutoCreate:
     """通知自動建立測試（Like/Match/Message 觸發時寫入 DB）"""
 
     @pytest.mark.asyncio
     async def test_like_creates_notification_liked_in_db(
-        self,
-        client: AsyncClient,
-        test_db: AsyncSession,
-        notification_users: dict
+        self, client: AsyncClient, test_db: AsyncSession, notification_users: dict
     ):
         """測試：單方 Like 時在 DB 建立 notification_liked"""
         alice = notification_users["alice"]
-        bob = notification_users["bob"]
 
         # Alice 瀏覽取得 Bob
         response = await client.get(
-            "/api/discovery/browse?limit=10",
-            headers={"Authorization": f"Bearer {alice['token']}"}
+            "/api/discovery/browse?limit=10", headers={"Authorization": f"Bearer {alice['token']}"}
         )
         candidates = response.json()
         if len(candidates) == 0:
@@ -579,11 +534,11 @@ class TestNotificationAutoCreate:
         bob_user_id = candidates[0]["user_id"]
 
         # Mock WebSocket 發送
-        with patch.object(manager, 'send_personal_message', new_callable=AsyncMock):
+        with patch.object(manager, "send_personal_message", new_callable=AsyncMock):
             # Alice 喜歡 Bob
             response = await client.post(
                 f"/api/discovery/like/{bob_user_id}",
-                headers={"Authorization": f"Bearer {alice['token']}"}
+                headers={"Authorization": f"Bearer {alice['token']}"},
             )
             assert response.status_code == 200
             assert response.json()["is_match"] is False
@@ -592,7 +547,7 @@ class TestNotificationAutoCreate:
         result = await test_db.execute(
             select(Notification).where(
                 Notification.user_id == uuid.UUID(bob_user_id),
-                Notification.type == "notification_liked"
+                Notification.type == "notification_liked",
             )
         )
         notification = result.scalar_one_or_none()
@@ -603,10 +558,7 @@ class TestNotificationAutoCreate:
 
     @pytest.mark.asyncio
     async def test_match_creates_notification_match_in_db(
-        self,
-        client: AsyncClient,
-        test_db: AsyncSession,
-        notification_users: dict
+        self, client: AsyncClient, test_db: AsyncSession, notification_users: dict
     ):
         """測試：互相 Like 時在 DB 建立 notification_match 給雙方"""
         alice = notification_users["alice"]
@@ -614,8 +566,7 @@ class TestNotificationAutoCreate:
 
         # 取得雙方 user_id
         response = await client.get(
-            "/api/discovery/browse?limit=10",
-            headers={"Authorization": f"Bearer {alice['token']}"}
+            "/api/discovery/browse?limit=10", headers={"Authorization": f"Bearer {alice['token']}"}
         )
         candidates = response.json()
         if len(candidates) == 0:
@@ -623,29 +574,27 @@ class TestNotificationAutoCreate:
         bob_user_id = candidates[0]["user_id"]
 
         response = await client.get(
-            "/api/discovery/browse?limit=10",
-            headers={"Authorization": f"Bearer {bob['token']}"}
+            "/api/discovery/browse?limit=10", headers={"Authorization": f"Bearer {bob['token']}"}
         )
         candidates = response.json()
         alice_user_id = next(
-            (c["user_id"] for c in candidates if "Alice" in c["display_name"]),
-            None
+            (c["user_id"] for c in candidates if "Alice" in c["display_name"]), None
         )
         if not alice_user_id:
             pytest.skip("Bob 看不到 Alice")
 
         # Alice 先喜歡 Bob
-        with patch.object(manager, 'send_personal_message', new_callable=AsyncMock):
+        with patch.object(manager, "send_personal_message", new_callable=AsyncMock):
             await client.post(
                 f"/api/discovery/like/{bob_user_id}",
-                headers={"Authorization": f"Bearer {alice['token']}"}
+                headers={"Authorization": f"Bearer {alice['token']}"},
             )
 
         # Bob 喜歡 Alice（觸發配對）
-        with patch.object(manager, 'send_personal_message', new_callable=AsyncMock):
+        with patch.object(manager, "send_personal_message", new_callable=AsyncMock):
             response = await client.post(
                 f"/api/discovery/like/{alice_user_id}",
-                headers={"Authorization": f"Bearer {bob['token']}"}
+                headers={"Authorization": f"Bearer {bob['token']}"},
             )
             assert response.status_code == 200
             assert response.json()["is_match"] is True
@@ -654,7 +603,7 @@ class TestNotificationAutoCreate:
         result = await test_db.execute(
             select(Notification).where(
                 Notification.user_id == uuid.UUID(alice_user_id),
-                Notification.type == "notification_match"
+                Notification.type == "notification_match",
             )
         )
         alice_notification = result.scalar_one_or_none()
@@ -664,7 +613,7 @@ class TestNotificationAutoCreate:
         result = await test_db.execute(
             select(Notification).where(
                 Notification.user_id == uuid.UUID(bob_user_id),
-                Notification.type == "notification_match"
+                Notification.type == "notification_match",
             )
         )
         bob_notification = result.scalar_one_or_none()

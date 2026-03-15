@@ -1,7 +1,7 @@
 <template>
   <div class="chat-image-picker">
     <!-- 圖片選擇按鈕 -->
-    <n-button text @click="triggerFileInput" :disabled="disabled">
+    <n-button text :disabled="disabled" @click="triggerFileInput">
       <template #icon>
         <Icon name="image" size="md" label="選擇圖片" />
       </template>
@@ -12,8 +12,8 @@
       ref="fileInputRef"
       type="file"
       accept="image/jpeg,image/png,image/gif,image/webp"
-      @change="handleFileSelect"
       style="display: none"
+      @change="handleFileSelect"
     />
 
     <!-- 預覽 Modal -->
@@ -31,9 +31,7 @@
       <template #footer>
         <div class="preview-actions">
           <n-button @click="cancelUpload">取消</n-button>
-          <n-button type="primary" :loading="uploading" @click="confirmUpload">
-            發送
-          </n-button>
+          <n-button type="primary" :loading="uploading" @click="confirmUpload"> 發送 </n-button>
         </div>
       </template>
     </n-modal>

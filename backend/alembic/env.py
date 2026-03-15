@@ -1,9 +1,12 @@
 """Alembic 環境配置"""
-from logging.config import fileConfig
-from sqlalchemy import engine_from_config, pool
-from alembic import context
+
 import os
 import sys
+from logging.config import fileConfig
+
+from sqlalchemy import engine_from_config, pool
+
+from alembic import context
 
 # 加入專案路徑
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -17,11 +20,6 @@ if config.config_file_name is not None:
 
 # 導入所有模型（這樣 Alembic 才能偵測到）
 from app.core.database import Base
-from app.models import (
-    User, Profile, Photo, InterestTag, profile_interests,
-    Like, Match, Message, BlockedUser
-)
-from app.models.report import Report  # 舉報模型
 
 # 設定 MetaData
 target_metadata = Base.metadata
@@ -31,8 +29,7 @@ from app.core.config import settings
 
 # Alembic 需要使用同步驅動，將 asyncpg 替換為 psycopg2
 sync_database_url = str(settings.DATABASE_URL).replace(
-    "postgresql+asyncpg://",
-    "postgresql+psycopg2://"
+    "postgresql+asyncpg://", "postgresql+psycopg2://"
 )
 config.set_main_option("sqlalchemy.url", sync_database_url)
 
@@ -74,13 +71,16 @@ def include_object(object, name, type_, reflected, compare_to):
         bool: True 表示包含此對象，False 表示排除
     """
     # 排除 tiger 和 topology schema 的所有對象
-    if hasattr(object, 'schema') and object.schema in ['tiger', 'topology', 'tiger_data']:
+    if hasattr(object, "schema") and object.schema in ["tiger", "topology", "tiger_data"]:
         return False
 
     # 排除 PostGIS 系統表
     postgis_tables = [
-        'spatial_ref_sys', 'geography_columns', 'geometry_columns',
-        'raster_columns', 'raster_overviews'
+        "spatial_ref_sys",
+        "geography_columns",
+        "geometry_columns",
+        "raster_columns",
+        "raster_overviews",
     ]
     if type_ == "table" and name in postgis_tables:
         return False

@@ -3,11 +3,12 @@
 負責照片的審核流程管理、狀態轉換、信任分數整合。
 預留自動審核擴展接口。
 """
+
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -40,7 +41,7 @@ class PhotoModerationService:
     }
 
     # Session factory（供測試注入）
-    _session_factory: Optional[async_sessionmaker] = None
+    _session_factory: async_sessionmaker | None = None
 
     @classmethod
     def set_session_factory(cls, factory: async_sessionmaker) -> None:
@@ -66,16 +67,13 @@ class PhotoModerationService:
         if cls._session_factory is not None:
             return cls._session_factory
         from app.core.database import AsyncSessionLocal
+
         return AsyncSessionLocal
 
     @classmethod
     async def get_pending_photos(
-        cls,
-        db: AsyncSession,
-        page: int = 1,
-        page_size: int = 20,
-        status: Optional[str] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        cls, db: AsyncSession, page: int = 1, page_size: int = 20, status: str | None = None
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         取得待審核照片列表
 
@@ -115,29 +113,27 @@ class PhotoModerationService:
 
         photos = []
         for photo, profile, user in rows:
-            photos.append({
-                "id": str(photo.id),
-                "url": photo.url,
-                "thumbnail_url": photo.thumbnail_url,
-                "profile_id": str(profile.id),
-                "user_id": str(user.id),
-                "user_email": cls._mask_email(user.email),
-                "display_name": profile.display_name,
-                "moderation_status": photo.moderation_status,
-                "created_at": photo.created_at.isoformat() if photo.created_at else None,
-                "file_size": photo.file_size,
-                "width": photo.width,
-                "height": photo.height,
-            })
+            photos.append(
+                {
+                    "id": str(photo.id),
+                    "url": photo.url,
+                    "thumbnail_url": photo.thumbnail_url,
+                    "profile_id": str(profile.id),
+                    "user_id": str(user.id),
+                    "user_email": cls._mask_email(user.email),
+                    "display_name": profile.display_name,
+                    "moderation_status": photo.moderation_status,
+                    "created_at": photo.created_at.isoformat() if photo.created_at else None,
+                    "file_size": photo.file_size,
+                    "width": photo.width,
+                    "height": photo.height,
+                }
+            )
 
         return photos, total
 
     @classmethod
-    async def get_photo_detail(
-        cls,
-        db: AsyncSession,
-        photo_id: uuid.UUID
-    ) -> Optional[Dict[str, Any]]:
+    async def get_photo_detail(cls, db: AsyncSession, photo_id: uuid.UUID) -> dict[str, Any] | None:
         """
         取得照片詳情
 
@@ -189,8 +185,8 @@ class PhotoModerationService:
         photo_id: uuid.UUID,
         admin_id: uuid.UUID,
         status: str,
-        rejection_reason: Optional[str] = None
-    ) -> Tuple[bool, str]:
+        rejection_reason: str | None = None,
+    ) -> tuple[bool, str]:
         """
         審核照片
 
@@ -213,9 +209,7 @@ class PhotoModerationService:
 
         # 查詢照片
         result = await db.execute(
-            select(Photo)
-            .options(selectinload(Photo.profile))
-            .where(Photo.id == photo_id)
+            select(Photo).options(selectinload(Photo.profile)).where(Photo.id == photo_id)
         )
         photo = result.scalar_one_or_none()
 
@@ -223,9 +217,7 @@ class PhotoModerationService:
             return False, "照片不存在"
 
         # 取得用戶 ID
-        profile_result = await db.execute(
-            select(Profile).where(Profile.id == photo.profile_id)
-        )
+        profile_result = await db.execute(select(Profile).where(Profile.id == photo.profile_id))
         profile = profile_result.scalar_one_or_none()
         if not profile:
             return False, "個人檔案不存在"
@@ -233,15 +225,13 @@ class PhotoModerationService:
         # 更新照片狀態
         photo.moderation_status = status
         photo.reviewed_by = admin_id
-        photo.reviewed_at = datetime.now(timezone.utc)
+        photo.reviewed_at = datetime.now(UTC)
 
         if status == cls.STATUS_REJECTED:
             photo.rejection_reason = rejection_reason
 
             # 扣除信任分數
-            await TrustScoreService.adjust_score(
-                db, profile.user_id, "content_violation"
-            )
+            await TrustScoreService.adjust_score(db, profile.user_id, "content_violation")
 
         # 記錄審核日誌
         await cls._log_moderation(
@@ -257,7 +247,7 @@ class PhotoModerationService:
         return True, "審核完成"
 
     @classmethod
-    async def get_stats(cls, db: AsyncSession) -> Dict[str, int]:
+    async def get_stats(cls, db: AsyncSession) -> dict[str, int]:
         """
         取得照片審核統計
 
@@ -273,40 +263,32 @@ class PhotoModerationService:
 
         # 各狀態統計
         pending_result = await db.execute(
-            select(func.count(Photo.id))
-            .where(Photo.moderation_status == cls.STATUS_PENDING)
+            select(func.count(Photo.id)).where(Photo.moderation_status == cls.STATUS_PENDING)
         )
         pending = pending_result.scalar() or 0
 
         approved_result = await db.execute(
-            select(func.count(Photo.id))
-            .where(Photo.moderation_status == cls.STATUS_APPROVED)
+            select(func.count(Photo.id)).where(Photo.moderation_status == cls.STATUS_APPROVED)
         )
         approved = approved_result.scalar() or 0
 
         rejected_result = await db.execute(
-            select(func.count(Photo.id))
-            .where(Photo.moderation_status == cls.STATUS_REJECTED)
+            select(func.count(Photo.id)).where(Photo.moderation_status == cls.STATUS_REJECTED)
         )
         rejected = rejected_result.scalar() or 0
 
         # 今日統計
-        today_start = datetime.now(timezone.utc).replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
+        today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
 
         today_pending_result = await db.execute(
-            select(func.count(Photo.id))
-            .where(
-                Photo.moderation_status == cls.STATUS_PENDING,
-                Photo.created_at >= today_start
+            select(func.count(Photo.id)).where(
+                Photo.moderation_status == cls.STATUS_PENDING, Photo.created_at >= today_start
             )
         )
         today_pending = today_pending_result.scalar() or 0
 
         today_reviewed_result = await db.execute(
-            select(func.count(Photo.id))
-            .where(Photo.reviewed_at >= today_start)
+            select(func.count(Photo.id)).where(Photo.reviewed_at >= today_start)
         )
         today_reviewed = today_reviewed_result.scalar() or 0
 
@@ -326,7 +308,7 @@ class PhotoModerationService:
         user_id: uuid.UUID,
         photo_id: uuid.UUID,
         is_approved: bool,
-        rejection_reason: Optional[str],
+        rejection_reason: str | None,
     ) -> None:
         """記錄審核日誌（使用獨立事務確保日誌不遺失）"""
         SessionFactory = cls._get_session_factory()
@@ -338,10 +320,9 @@ class PhotoModerationService:
                     original_content=str(photo_id),
                     is_approved=is_approved,
                     violations=json.dumps(
-                        [rejection_reason] if rejection_reason else [],
-                        ensure_ascii=False
+                        [rejection_reason] if rejection_reason else [], ensure_ascii=False
                     ),
-                    action_taken="APPROVED" if is_approved else "REJECTED"
+                    action_taken="APPROVED" if is_approved else "REJECTED",
                 )
                 log_db.add(log)
                 await log_db.commit()
@@ -355,21 +336,17 @@ class PhotoModerationService:
         if not email or "@" not in email:
             return email
         local, domain = email.split("@", 1)
-        if len(local) <= 2:
-            masked_local = local[0] + "***"
-        else:
-            masked_local = local[0] + "***" + local[-1]
+        masked_local = (  # noqa: SIM108
+            local[0] + "***" if len(local) <= 2 else local[0] + "***" + local[-1]
+        )
         return f"{masked_local}@{domain}"
 
     # ==================== 自動審核擴展接口 ====================
 
     @classmethod
     async def auto_moderate(
-        cls,
-        photo_id: uuid.UUID,
-        image_data: bytes,
-        db: AsyncSession
-    ) -> Tuple[bool, int, List[str]]:
+        cls, photo_id: uuid.UUID, image_data: bytes, db: AsyncSession
+    ) -> tuple[bool, int, list[str]]:
         """
         自動審核接口（預留擴展）
 
@@ -393,11 +370,7 @@ class PhotoModerationService:
 
     @classmethod
     async def process_auto_moderation_result(
-        cls,
-        db: AsyncSession,
-        photo_id: uuid.UUID,
-        score: int,
-        labels: List[str]
+        cls, db: AsyncSession, photo_id: uuid.UUID, score: int, labels: list[str]
     ) -> None:
         """
         處理自動審核結果（預留擴展）
@@ -408,9 +381,7 @@ class PhotoModerationService:
             score: 信心分數 (0-100)
             labels: 檢測到的標籤
         """
-        result = await db.execute(
-            select(Photo).where(Photo.id == photo_id)
-        )
+        result = await db.execute(select(Photo).where(Photo.id == photo_id))
         photo = result.scalar_one_or_none()
 
         if photo:

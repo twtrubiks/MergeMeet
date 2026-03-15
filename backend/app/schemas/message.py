@@ -1,11 +1,13 @@
 """訊息相關 Schema"""
-from pydantic import BaseModel, ConfigDict, Field, UUID4
+
 from datetime import datetime
-from typing import Optional, List
+
+from pydantic import UUID4, BaseModel, ConfigDict, Field
 
 
 class MessageResponse(BaseModel):
     """訊息回應"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID4
@@ -13,7 +15,7 @@ class MessageResponse(BaseModel):
     sender_id: UUID4
     content: str
     message_type: str
-    is_read: Optional[datetime] = None
+    is_read: datetime | None = None
     sent_at: datetime
 
 
@@ -24,21 +26,23 @@ class ChatHistoryResponse(BaseModel):
     - 初次載入：不傳 before_id，取最新 N 條
     - 載入更多：傳入 next_cursor，取更早的訊息
     """
-    messages: List[MessageResponse]
+
+    messages: list[MessageResponse]
     has_more: bool
-    next_cursor: Optional[UUID4] = None  # 最舊訊息 ID，供下次查詢
+    next_cursor: UUID4 | None = None  # 最舊訊息 ID，供下次查詢
     total: int  # 總訊息數（供 UI 顯示）
 
 
 class MatchWithLastMessageResponse(BaseModel):
     """配對與最後一條訊息"""
+
     model_config = ConfigDict(from_attributes=True)
 
     match_id: UUID4
     other_user_id: UUID4
     other_user_name: str
-    other_user_avatar: Optional[str] = None
-    last_message: Optional[MessageResponse] = None
+    other_user_avatar: str | None = None
+    last_message: MessageResponse | None = None
     unread_count: int
     matched_at: datetime
 
@@ -49,6 +53,7 @@ class SendMessageRequest(BaseModel):
     訊息長度限制：1-2000 字符
     即時聊天訊息不宜過長，防止濫用和 DoS 攻擊
     """
+
     match_id: UUID4
     content: str = Field(..., min_length=1, max_length=2000)
     message_type: str = Field(default="TEXT", pattern="^(TEXT|IMAGE|GIF)$")
@@ -56,11 +61,13 @@ class SendMessageRequest(BaseModel):
 
 class MarkAsReadRequest(BaseModel):
     """標記為已讀請求"""
-    message_ids: List[UUID4] = Field(..., min_length=1)
+
+    message_ids: list[UUID4] = Field(..., min_length=1)
 
 
 class ChatImageUploadResponse(BaseModel):
     """聊天圖片上傳回應"""
+
     image_id: UUID4
     image_url: str
     thumbnail_url: str

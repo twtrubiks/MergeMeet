@@ -12,18 +12,18 @@
   /* === 交友平台主題配色 === */
 
   /* Primary - 玫瑰紅 (浪漫、熱情) */
-  --color-primary-50: #FFF1F2;
-  --color-primary-100: #FFE4E6;
-  --color-primary-200: #FECDD3;
-  --color-primary-300: #FDA4AF;
-  --color-primary-400: #FB7185;
-  --color-primary-500: #F43F5E;
-  --color-primary-600: #E11D48;
-  --color-primary-700: #BE123C;
-  --color-primary-800: #9F1239;
+  --color-primary-50: #fff1f2;
+  --color-primary-100: #ffe4e6;
+  --color-primary-200: #fecdd3;
+  --color-primary-300: #fda4af;
+  --color-primary-400: #fb7185;
+  --color-primary-500: #f43f5e;
+  --color-primary-600: #e11d48;
+  --color-primary-700: #be123c;
+  --color-primary-800: #9f1239;
   --color-primary-900: #881337;
-  --color-primary-gradient: linear-gradient(135deg, #FB7185 0%, #EC4899 100%);
-  --color-primary-gradient-alt: linear-gradient(135deg, #F43F5E 0%, #FDA4AF 100%);
+  --color-primary-gradient: linear-gradient(135deg, #fb7185 0%, #ec4899 100%);
+  --color-primary-gradient-alt: linear-gradient(135deg, #f43f5e 0%, #fda4af 100%);
   --color-primary-alpha-10: rgba(225, 29, 72, 0.1);
   --color-primary-alpha-20: rgba(225, 29, 72, 0.2);
   --color-primary-alpha-30: rgba(225, 29, 72, 0.3);
@@ -34,63 +34,63 @@
   --color-secondary-600: #f093fb;
 
   /* Accent - 暖橘色 (活力、配對成功) */
-  --color-accent-300: #FDBA74;
-  --color-accent-400: #FB923C;
-  --color-accent-500: #F97316;
-  --color-accent-600: #EA580C;
-  --color-accent-gradient: linear-gradient(135deg, #F97316 0%, #FB923C 100%);
+  --color-accent-300: #fdba74;
+  --color-accent-400: #fb923c;
+  --color-accent-500: #f97316;
+  --color-accent-600: #ea580c;
+  --color-accent-gradient: linear-gradient(135deg, #f97316 0%, #fb923c 100%);
 
   /* Like - 保留現有珊瑚紅 (用於 Like 按鈕) */
-  --color-like: #FF6B6B;
-  --color-like-hover: #FF5252;
-  --color-like-light: #FF8E8E;
-  --color-like-gradient: linear-gradient(135deg, #FF6B6B, #FF8E8E);
+  --color-like: #ff6b6b;
+  --color-like-hover: #ff5252;
+  --color-like-light: #ff8e8e;
+  --color-like-gradient: linear-gradient(135deg, #ff6b6b, #ff8e8e);
   --color-like-alpha-10: rgba(255, 107, 107, 0.1);
   --color-like-alpha-20: rgba(255, 107, 107, 0.2);
   --color-like-alpha-40: rgba(255, 107, 107, 0.4);
 
   /* 高對比度變體 - 用於小文字，符合 WCAG AA 標準 (4.5:1 對比度) */
-  --color-like-accessible: #C73A3A;       /* 替代 #FF6B6B 用於小文字 */
-  --color-primary-accessible: #BE123C;    /* 替代 #FB7185 用於小文字 */
+  --color-like-accessible: #c73a3a; /* 替代 #FF6B6B 用於小文字 */
+  --color-primary-accessible: #be123c; /* 替代 #FB7185 用於小文字 */
 
   /* Success - 配對成功、驗證通過 */
-  --color-success-400: #4ADE80;
-  --color-success-500: #22C55E;
-  --color-success-600: #16A34A;
-  --color-success-gradient: linear-gradient(135deg, #4CAF50 0%, #66BB6A 100%);
+  --color-success-400: #4ade80;
+  --color-success-500: #22c55e;
+  --color-success-600: #16a34a;
+  --color-success-gradient: linear-gradient(135deg, #4caf50 0%, #66bb6a 100%);
   --color-success-alpha-10: rgba(76, 175, 80, 0.1);
 
   /* Warning - 警告、剩餘次數 */
-  --color-warning-400: #FACC15;
-  --color-warning-500: #EAB308;
-  --color-warning-600: #CA8A04;
+  --color-warning-400: #facc15;
+  --color-warning-500: #eab308;
+  --color-warning-600: #ca8a04;
   --color-warning-gradient: linear-gradient(135deg, #ff9800 0%, #ffc107 100%);
 
   /* Error/Danger - 錯誤、刪除 */
-  --color-error-400: #F87171;
-  --color-error-500: #EF4444;
-  --color-error-600: #DC2626;
-  --color-error-gradient: linear-gradient(135deg, #F44336 0%, #E91E63 100%);
+  --color-error-400: #f87171;
+  --color-error-500: #ef4444;
+  --color-error-600: #dc2626;
+  --color-error-gradient: linear-gradient(135deg, #f44336 0%, #e91e63 100%);
   --color-error-alpha-10: rgba(244, 67, 54, 0.1);
 
   /* 中性色 - 帶暖色調 */
-  --color-text-primary: #333333;       /* 主要文字 */
-  --color-text-secondary: #555555;     /* 次要文字 */
-  --color-text-muted: #666666;         /* 柔和提示 */
-  --color-text-light: #999999;         /* 淺色文字 */
-  --color-text-dark: #1F2937;          /* 強調文字 */
+  --color-text-primary: #333333; /* 主要文字 */
+  --color-text-secondary: #555555; /* 次要文字 */
+  --color-text-muted: #666666; /* 柔和提示 */
+  --color-text-light: #999999; /* 淺色文字 */
+  --color-text-dark: #1f2937; /* 強調文字 */
 
   /* 背景色 */
-  --color-background: #FFF1F2;         /* 玫瑰白背景 */
-  --color-background-alt: #FFE4E6;     /* 次要背景 */
-  --color-background-light: #f5f5f5;   /* 淺灰背景 */
-  --color-surface: #FFFFFF;            /* 卡片表面 */
-  --color-surface-hover: #FFFAF0;      /* 懸停表面 */
+  --color-background: #fff1f2; /* 玫瑰白背景 */
+  --color-background-alt: #ffe4e6; /* 次要背景 */
+  --color-background-light: #f5f5f5; /* 淺灰背景 */
+  --color-surface: #ffffff; /* 卡片表面 */
+  --color-surface-hover: #fffaf0; /* 懸停表面 */
 
   /* 邊框色 */
-  --color-border: #e0e0e0;             /* 預設邊框 */
-  --color-border-light: #f0f0f0;       /* 淺色邊框 */
-  --color-border-primary: #FECDD3;     /* 主色邊框 */
+  --color-border: #e0e0e0; /* 預設邊框 */
+  --color-border-light: #f0f0f0; /* 淺色邊框 */
+  --color-border-primary: #fecdd3; /* 主色邊框 */
 
   /* === 間距 (4px 增量) === */
   --space-0: 0;
@@ -107,15 +107,15 @@
   --space-20: 80px;
 
   /* === 字體大小 (rem 單位) === */
-  --font-size-xs: 0.75rem;     /* 12px */
-  --font-size-sm: 0.875rem;    /* 14px */
-  --font-size-base: 1rem;      /* 16px */
-  --font-size-lg: 1.125rem;    /* 18px */
-  --font-size-xl: 1.25rem;     /* 20px */
-  --font-size-2xl: 1.5rem;     /* 24px */
-  --font-size-3xl: 1.875rem;   /* 30px */
-  --font-size-4xl: 2.25rem;    /* 36px */
-  --font-size-5xl: 3rem;       /* 48px */
+  --font-size-xs: 0.75rem; /* 12px */
+  --font-size-sm: 0.875rem; /* 14px */
+  --font-size-base: 1rem; /* 16px */
+  --font-size-lg: 1.125rem; /* 18px */
+  --font-size-xl: 1.25rem; /* 20px */
+  --font-size-2xl: 1.5rem; /* 24px */
+  --font-size-3xl: 1.875rem; /* 30px */
+  --font-size-4xl: 2.25rem; /* 36px */
+  --font-size-5xl: 3rem; /* 48px */
 
   /* === 字重 === */
   --font-weight-normal: 400;

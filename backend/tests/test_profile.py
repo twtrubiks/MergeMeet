@@ -1,18 +1,20 @@
 """個人檔案完整功能測試"""
-import pytest
+
 import io
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from PIL import Image
 
-from app.models.user import User
-from app.models.profile import Profile, Photo, InterestTag
+import pytest
+from httpx import AsyncClient
+from PIL import Image
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.config import settings
+from app.models.profile import InterestTag, Photo, Profile
+from app.models.user import User
 
 
 @pytest.fixture
@@ -26,9 +28,9 @@ def temp_upload_dir():
 @pytest.fixture
 def sample_image_bytes():
     """產生測試用 JPEG 圖片"""
-    img = Image.new('RGB', (800, 600), color='red')
+    img = Image.new("RGB", (800, 600), color="red")
     buffer = io.BytesIO()
-    img.save(buffer, format='JPEG')
+    img.save(buffer, format="JPEG")
     buffer.seek(0)
     return buffer.read()
 
@@ -38,7 +40,8 @@ async def user_with_profile(client: AsyncClient, auth_user: dict):
     """創建擁有個人檔案的用戶"""
     token = auth_user["token"]
 
-    response = await client.post("/api/profile",
+    response = await client.post(
+        "/api/profile",
         headers={"Authorization": f"Bearer {token}"},
         json={
             "display_name": "Test User",
@@ -47,9 +50,9 @@ async def user_with_profile(client: AsyncClient, auth_user: dict):
             "location": {
                 "latitude": 25.0330,
                 "longitude": 121.5654,
-                "location_name": "台北市信義區"
-            }
-        }
+                "location_name": "台北市信義區",
+            },
+        },
     )
     assert response.status_code == 201
     return {**auth_user, "profile": response.json()}
@@ -60,7 +63,8 @@ async def test_create_profile_success(client: AsyncClient, auth_user: dict):
     """測試成功創建個人檔案"""
     token = auth_user["token"]
 
-    response = await client.post("/api/profile",
+    response = await client.post(
+        "/api/profile",
         headers={"Authorization": f"Bearer {token}"},
         json={
             "display_name": "John Doe",
@@ -69,9 +73,9 @@ async def test_create_profile_success(client: AsyncClient, auth_user: dict):
             "location": {
                 "latitude": 25.0330,
                 "longitude": 121.5654,
-                "location_name": "台北市信義區"
-            }
-        }
+                "location_name": "台北市信義區",
+            },
+        },
     )
 
     assert response.status_code == 201
@@ -89,18 +93,15 @@ async def test_create_profile_duplicate(client: AsyncClient, user_with_profile: 
     """測試無法重複創建個人檔案"""
     token = user_with_profile["token"]
 
-    response = await client.post("/api/profile",
+    response = await client.post(
+        "/api/profile",
         headers={"Authorization": f"Bearer {token}"},
         json={
             "display_name": "Another Name",
             "gender": "female",
             "bio": "Test",
-            "location": {
-                "latitude": 25.0,
-                "longitude": 121.5,
-                "location_name": "台北市"
-            }
-        }
+            "location": {"latitude": 25.0, "longitude": 121.5, "location_name": "台北市"},
+        },
     )
 
     assert response.status_code == 400
@@ -112,9 +113,7 @@ async def test_get_profile_success(client: AsyncClient, user_with_profile: dict)
     """測試成功取得個人檔案"""
     token = user_with_profile["token"]
 
-    response = await client.get("/api/profile",
-        headers={"Authorization": f"Bearer {token}"}
-    )
+    response = await client.get("/api/profile", headers={"Authorization": f"Bearer {token}"})
 
     assert response.status_code == 200
     data = response.json()
@@ -128,9 +127,7 @@ async def test_get_profile_not_exists(client: AsyncClient, auth_user: dict):
     """測試取得不存在的個人檔案"""
     token = auth_user["token"]
 
-    response = await client.get("/api/profile",
-        headers={"Authorization": f"Bearer {token}"}
-    )
+    response = await client.get("/api/profile", headers={"Authorization": f"Bearer {token}"})
 
     assert response.status_code == 404
 
@@ -140,7 +137,8 @@ async def test_update_profile_success(client: AsyncClient, user_with_profile: di
     """測試成功更新個人檔案"""
     token = user_with_profile["token"]
 
-    response = await client.patch("/api/profile",
+    response = await client.patch(
+        "/api/profile",
         headers={"Authorization": f"Bearer {token}"},
         json={
             "display_name": "Updated Name",
@@ -148,8 +146,8 @@ async def test_update_profile_success(client: AsyncClient, user_with_profile: di
             "min_age_preference": 25,
             "max_age_preference": 35,
             "max_distance_km": 50,
-            "gender_preference": "female"
-        }
+            "gender_preference": "female",
+        },
     )
 
     assert response.status_code == 200
@@ -167,12 +165,13 @@ async def test_update_profile_invalid_age_range(client: AsyncClient, user_with_p
     """測試無效的年齡範圍"""
     token = user_with_profile["token"]
 
-    response = await client.patch("/api/profile",
+    response = await client.patch(
+        "/api/profile",
         headers={"Authorization": f"Bearer {token}"},
         json={
             "min_age_preference": 35,
-            "max_age_preference": 25  # max < min
-        }
+            "max_age_preference": 25,  # max < min
+        },
     )
 
     assert response.status_code == 422
@@ -185,15 +184,15 @@ async def test_get_interest_tags(client: AsyncClient, auth_user: dict, test_db: 
     tags = [
         InterestTag(name="旅遊", category="興趣"),
         InterestTag(name="美食", category="興趣"),
-        InterestTag(name="運動", category="興趣")
+        InterestTag(name="運動", category="興趣"),
     ]
     for tag in tags:
         test_db.add(tag)
     await test_db.commit()
 
     token = auth_user["token"]
-    response = await client.get("/api/profile/interest-tags",
-        headers={"Authorization": f"Bearer {token}"}
+    response = await client.get(
+        "/api/profile/interest-tags", headers={"Authorization": f"Bearer {token}"}
     )
 
     assert response.status_code == 200
@@ -207,12 +206,10 @@ async def test_create_interest_tag_admin_only(client: AsyncClient, auth_user: di
     """測試只有管理員可以創建興趣標籤"""
     token = auth_user["token"]
 
-    response = await client.post("/api/profile/interest-tags",
+    response = await client.post(
+        "/api/profile/interest-tags",
         headers={"Authorization": f"Bearer {token}"},
-        json={
-            "name": "新興趣",
-            "category": "興趣"
-        }
+        json={"name": "新興趣", "category": "興趣"},
     )
 
     # 一般用戶應該被拒絕
@@ -220,12 +217,14 @@ async def test_create_interest_tag_admin_only(client: AsyncClient, auth_user: di
 
 
 @pytest.mark.asyncio
-async def test_update_interests_success(client: AsyncClient, user_with_profile: dict, test_db: AsyncSession):
+async def test_update_interests_success(
+    client: AsyncClient, user_with_profile: dict, test_db: AsyncSession
+):
     """測試成功更新興趣標籤"""
     # 創建測試興趣標籤
     tags = []
     for i in range(5):
-        tag = InterestTag(name=f"興趣{i+1}", category="興趣")
+        tag = InterestTag(name=f"興趣{i + 1}", category="興趣")
         test_db.add(tag)
         await test_db.flush()
         tags.append(tag)
@@ -234,9 +233,10 @@ async def test_update_interests_success(client: AsyncClient, user_with_profile: 
     token = user_with_profile["token"]
     tag_ids = [str(tag.id) for tag in tags[:3]]  # 選擇前 3 個
 
-    response = await client.put("/api/profile/interests",
+    response = await client.put(
+        "/api/profile/interests",
         headers={"Authorization": f"Bearer {token}"},
-        json={"interest_ids": tag_ids}
+        json={"interest_ids": tag_ids},
     )
 
     assert response.status_code == 200
@@ -245,7 +245,9 @@ async def test_update_interests_success(client: AsyncClient, user_with_profile: 
 
 
 @pytest.mark.asyncio
-async def test_update_interests_too_few(client: AsyncClient, user_with_profile: dict, test_db: AsyncSession):
+async def test_update_interests_too_few(
+    client: AsyncClient, user_with_profile: dict, test_db: AsyncSession
+):
     """測試興趣標籤數量太少"""
     # 創建測試標籤
     tag = InterestTag(name="興趣1", category="興趣")
@@ -255,9 +257,10 @@ async def test_update_interests_too_few(client: AsyncClient, user_with_profile: 
 
     token = user_with_profile["token"]
 
-    response = await client.put("/api/profile/interests",
+    response = await client.put(
+        "/api/profile/interests",
         headers={"Authorization": f"Bearer {token}"},
-        json={"interest_ids": [str(tag.id)]}  # 只有 1 個，少於 3 個
+        json={"interest_ids": [str(tag.id)]},  # 只有 1 個，少於 3 個
     )
 
     assert response.status_code in [400, 422]
@@ -271,12 +274,14 @@ async def test_update_interests_too_few(client: AsyncClient, user_with_profile: 
 
 
 @pytest.mark.asyncio
-async def test_update_interests_too_many(client: AsyncClient, user_with_profile: dict, test_db: AsyncSession):
+async def test_update_interests_too_many(
+    client: AsyncClient, user_with_profile: dict, test_db: AsyncSession
+):
     """測試興趣標籤數量太多"""
     # 創建 15 個測試標籤
     tags = []
     for i in range(15):
-        tag = InterestTag(name=f"興趣{i+1}", category="興趣")
+        tag = InterestTag(name=f"興趣{i + 1}", category="興趣")
         test_db.add(tag)
         await test_db.flush()
         tags.append(tag)
@@ -285,9 +290,10 @@ async def test_update_interests_too_many(client: AsyncClient, user_with_profile:
     token = user_with_profile["token"]
     tag_ids = [str(tag.id) for tag in tags]  # 全選 15 個
 
-    response = await client.put("/api/profile/interests",
+    response = await client.put(
+        "/api/profile/interests",
         headers={"Authorization": f"Bearer {token}"},
-        json={"interest_ids": tag_ids}
+        json={"interest_ids": tag_ids},
     )
 
     assert response.status_code in [400, 422]
@@ -301,18 +307,26 @@ async def test_update_interests_too_many(client: AsyncClient, user_with_profile:
 
 
 @pytest.mark.asyncio
-async def test_upload_photo_success(client: AsyncClient, user_with_profile: dict, test_db: AsyncSession, sample_image_bytes, temp_upload_dir):
+async def test_upload_photo_success(
+    client: AsyncClient,
+    user_with_profile: dict,
+    test_db: AsyncSession,
+    sample_image_bytes,
+    temp_upload_dir,
+):
     """測試成功上傳照片"""
     token = user_with_profile["token"]
 
     # 使用臨時目錄
-    with patch.object(settings, 'UPLOAD_DIR', temp_upload_dir):
+    with patch.object(settings, "UPLOAD_DIR", temp_upload_dir):
         # 重新初始化 file_storage 以使用新目錄
         from app.services.file_storage import FileStorageService
-        with patch('app.api.profile.file_storage', FileStorageService()):
-            response = await client.post("/api/profile/photos",
+
+        with patch("app.api.profile.file_storage", FileStorageService()):
+            response = await client.post(
+                "/api/profile/photos",
                 headers={"Authorization": f"Bearer {token}"},
-                files={"file": ("test.jpg", io.BytesIO(sample_image_bytes), "image/jpeg")}
+                files={"file": ("test.jpg", io.BytesIO(sample_image_bytes), "image/jpeg")},
             )
 
             assert response.status_code == 201
@@ -331,9 +345,10 @@ async def test_upload_photo_invalid_type(client: AsyncClient, user_with_profile:
     # 上傳文字檔案
     fake_file = io.BytesIO(b"This is not an image")
 
-    response = await client.post("/api/profile/photos",
+    response = await client.post(
+        "/api/profile/photos",
         headers={"Authorization": f"Bearer {token}"},
-        files={"file": ("test.txt", fake_file, "text/plain")}
+        files={"file": ("test.txt", fake_file, "text/plain")},
     )
 
     assert response.status_code == 400
@@ -347,9 +362,10 @@ async def test_upload_photo_empty_file(client: AsyncClient, user_with_profile: d
 
     empty_file = io.BytesIO(b"")
 
-    response = await client.post("/api/profile/photos",
+    response = await client.post(
+        "/api/profile/photos",
         headers={"Authorization": f"Bearer {token}"},
-        files={"file": ("empty.jpg", empty_file, "image/jpeg")}
+        files={"file": ("empty.jpg", empty_file, "image/jpeg")},
     )
 
     assert response.status_code == 400
@@ -357,38 +373,40 @@ async def test_upload_photo_empty_file(client: AsyncClient, user_with_profile: d
 
 
 @pytest.mark.asyncio
-async def test_upload_photo_max_limit(client: AsyncClient, user_with_profile: dict, test_db: AsyncSession, sample_image_bytes, temp_upload_dir):
+async def test_upload_photo_max_limit(
+    client: AsyncClient,
+    user_with_profile: dict,
+    test_db: AsyncSession,
+    sample_image_bytes,
+    temp_upload_dir,
+):
     """測試照片數量上限（最多 6 張）"""
     token = user_with_profile["token"]
 
     # 獲取 profile
-    result = await test_db.execute(
-        select(User).where(User.email == user_with_profile["email"])
-    )
+    result = await test_db.execute(select(User).where(User.email == user_with_profile["email"]))
     user = result.scalar_one()
 
-    result = await test_db.execute(
-        select(Profile).where(Profile.user_id == user.id)
-    )
+    result = await test_db.execute(select(Profile).where(Profile.user_id == user.id))
     profile = result.scalar_one()
 
     # 先在資料庫中創建 6 張照片
     for i in range(6):
         photo = Photo(
-            profile_id=profile.id,
-            url=f"/uploads/test{i}.jpg",
-            is_profile_picture=(i == 0)
+            profile_id=profile.id, url=f"/uploads/test{i}.jpg", is_profile_picture=(i == 0)
         )
         test_db.add(photo)
     await test_db.commit()
 
     # 嘗試上傳第 7 張
-    with patch.object(settings, 'UPLOAD_DIR', temp_upload_dir):
+    with patch.object(settings, "UPLOAD_DIR", temp_upload_dir):
         from app.services.file_storage import FileStorageService
-        with patch('app.api.profile.file_storage', FileStorageService()):
-            response = await client.post("/api/profile/photos",
+
+        with patch("app.api.profile.file_storage", FileStorageService()):
+            response = await client.post(
+                "/api/profile/photos",
                 headers={"Authorization": f"Bearer {token}"},
-                files={"file": ("test7.jpg", io.BytesIO(sample_image_bytes), "image/jpeg")}
+                files={"file": ("test7.jpg", io.BytesIO(sample_image_bytes), "image/jpeg")},
             )
 
             assert response.status_code == 400
@@ -396,20 +414,28 @@ async def test_upload_photo_max_limit(client: AsyncClient, user_with_profile: di
 
 
 @pytest.mark.asyncio
-async def test_delete_photo_success(client: AsyncClient, user_with_profile: dict, test_db: AsyncSession, sample_image_bytes, temp_upload_dir):
+async def test_delete_photo_success(
+    client: AsyncClient,
+    user_with_profile: dict,
+    test_db: AsyncSession,
+    sample_image_bytes,
+    temp_upload_dir,
+):
     """測試成功刪除照片"""
     token = user_with_profile["token"]
 
     # 使用臨時目錄
-    with patch.object(settings, 'UPLOAD_DIR', temp_upload_dir):
+    with patch.object(settings, "UPLOAD_DIR", temp_upload_dir):
         from app.services.file_storage import FileStorageService
+
         storage = FileStorageService()
 
-        with patch('app.api.profile.file_storage', storage):
+        with patch("app.api.profile.file_storage", storage):
             # 先上傳一張照片
-            response = await client.post("/api/profile/photos",
+            response = await client.post(
+                "/api/profile/photos",
                 headers={"Authorization": f"Bearer {token}"},
-                files={"file": ("test.jpg", io.BytesIO(sample_image_bytes), "image/jpeg")}
+                files={"file": ("test.jpg", io.BytesIO(sample_image_bytes), "image/jpeg")},
             )
             assert response.status_code == 201
             photo_id = response.json()["id"]
@@ -424,8 +450,7 @@ async def test_delete_photo_success(client: AsyncClient, user_with_profile: dict
 
             # 刪除照片
             response = await client.delete(
-                f"/api/profile/photos/{photo_id}",
-                headers={"Authorization": f"Bearer {token}"}
+                f"/api/profile/photos/{photo_id}", headers={"Authorization": f"Bearer {token}"}
             )
 
             assert response.status_code == 204
@@ -441,57 +466,46 @@ async def test_delete_nonexistent_photo(client: AsyncClient, user_with_profile: 
     fake_photo_id = "00000000-0000-0000-0000-000000000000"
 
     response = await client.delete(
-        f"/api/profile/photos/{fake_photo_id}",
-        headers={"Authorization": f"Bearer {token}"}
+        f"/api/profile/photos/{fake_photo_id}", headers={"Authorization": f"Bearer {token}"}
     )
 
     assert response.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_cannot_delete_other_users_photo(client: AsyncClient, user_with_profile: dict, test_db: AsyncSession):
+async def test_cannot_delete_other_users_photo(
+    client: AsyncClient, user_with_profile: dict, test_db: AsyncSession
+):
     """測試無法刪除其他用戶的照片"""
     # 創建另一個用戶
-    response = await client.post("/api/auth/register", json={
-        "email": "other@example.com",
-        "password": "Other1234",
-        "date_of_birth": "1990-01-01"
-    })
+    response = await client.post(
+        "/api/auth/register",
+        json={"email": "other@example.com", "password": "Other1234", "date_of_birth": "1990-01-01"},
+    )
     other_token = response.json()["access_token"]
     # 清除 cookies，讓測試使用純 Bearer Token 認證
     client.cookies.clear()
 
     # 為另一個用戶創建檔案和照片
-    await client.post("/api/profile",
+    await client.post(
+        "/api/profile",
         headers={"Authorization": f"Bearer {other_token}"},
         json={
             "display_name": "Other User",
             "gender": "female",
             "bio": "Test",
-            "location": {
-                "latitude": 25.0,
-                "longitude": 121.5,
-                "location_name": "台北市"
-            }
-        }
+            "location": {"latitude": 25.0, "longitude": 121.5, "location_name": "台北市"},
+        },
     )
 
-    result = await test_db.execute(
-        select(User).where(User.email == "other@example.com")
-    )
+    result = await test_db.execute(select(User).where(User.email == "other@example.com"))
     other_user = result.scalar_one()
 
-    result = await test_db.execute(
-        select(Profile).where(Profile.user_id == other_user.id)
-    )
+    result = await test_db.execute(select(Profile).where(Profile.user_id == other_user.id))
     other_profile = result.scalar_one()
 
     # 創建照片
-    photo = Photo(
-        profile_id=other_profile.id,
-        url="/uploads/other.jpg",
-        is_profile_picture=False
-    )
+    photo = Photo(profile_id=other_profile.id, url="/uploads/other.jpg", is_profile_picture=False)
     test_db.add(photo)
     await test_db.commit()
     await test_db.refresh(photo)
@@ -499,77 +513,64 @@ async def test_cannot_delete_other_users_photo(client: AsyncClient, user_with_pr
     # 第一個用戶嘗試刪除其他用戶的照片
     first_token = user_with_profile["token"]
     response = await client.delete(
-        f"/api/profile/photos/{photo.id}",
-        headers={"Authorization": f"Bearer {first_token}"}
+        f"/api/profile/photos/{photo.id}", headers={"Authorization": f"Bearer {first_token}"}
     )
 
     assert response.status_code == 404  # 不應該能找到
 
 
 @pytest.mark.asyncio
-async def test_profile_completeness_check(client: AsyncClient, auth_user: dict, test_db: AsyncSession):
+async def test_profile_completeness_check(
+    client: AsyncClient, auth_user: dict, test_db: AsyncSession
+):
     """測試個人檔案完整度檢查"""
     token = auth_user["token"]
 
     # 1. 創建基本檔案（不完整）
-    await client.post("/api/profile",
+    await client.post(
+        "/api/profile",
         headers={"Authorization": f"Bearer {token}"},
         json={
             "display_name": "Test",
             "gender": "male",
             "bio": "Test bio",
-            "location": {
-                "latitude": 25.0,
-                "longitude": 121.5,
-                "location_name": "台北市"
-            }
-        }
+            "location": {"latitude": 25.0, "longitude": 121.5, "location_name": "台北市"},
+        },
     )
 
     # 檢查完整度 - 應該是不完整
-    response = await client.get("/api/profile",
-        headers={"Authorization": f"Bearer {token}"}
-    )
+    response = await client.get("/api/profile", headers={"Authorization": f"Bearer {token}"})
     assert response.json()["is_complete"] is False
 
     # 2. 添加興趣標籤
     tags = []
     for i in range(3):
-        tag = InterestTag(name=f"興趣{i+1}", category="興趣")
+        tag = InterestTag(name=f"興趣{i + 1}", category="興趣")
         test_db.add(tag)
         await test_db.flush()
         tags.append(tag)
     await test_db.commit()
 
     tag_ids = [str(tag.id) for tag in tags]
-    await client.put("/api/profile/interests",
+    await client.put(
+        "/api/profile/interests",
         headers={"Authorization": f"Bearer {token}"},
-        json={"interest_ids": tag_ids}
+        json={"interest_ids": tag_ids},
     )
 
     # 3. 添加照片
-    result = await test_db.execute(
-        select(User).where(User.email == auth_user["email"])
-    )
+    result = await test_db.execute(select(User).where(User.email == auth_user["email"]))
     user = result.scalar_one()
 
-    result = await test_db.execute(
-        select(Profile).where(Profile.user_id == user.id)
-    )
+    result = await test_db.execute(select(Profile).where(Profile.user_id == user.id))
     profile = result.scalar_one()
 
-    photo = Photo(
-        profile_id=profile.id,
-        url="/uploads/test.jpg",
-        is_profile_picture=True
-    )
+    photo = Photo(profile_id=profile.id, url="/uploads/test.jpg", is_profile_picture=True)
     test_db.add(photo)
     await test_db.commit()
 
     # 重新檢查完整度 - 現在應該是完整
-    response = await client.get("/api/profile",
-        headers={"Authorization": f"Bearer {token}"}
-    )
+    response = await client.get("/api/profile", headers={"Authorization": f"Bearer {token}"})
     # 注意：完整度檢查在 profile.py 中實作，需要照片、興趣和基本資料
     data = response.json()
     assert len(data["interests"]) == 3
@@ -577,28 +578,30 @@ async def test_profile_completeness_check(client: AsyncClient, auth_user: dict, 
 
 
 @pytest.mark.asyncio
-async def test_get_profile_by_user_id(client: AsyncClient, user_with_profile: dict, test_db: AsyncSession):
+async def test_get_profile_by_user_id(
+    client: AsyncClient, user_with_profile: dict, test_db: AsyncSession
+):
     """測試通過用戶 ID 獲取公開檔案"""
     # 創建第二個用戶來查看第一個用戶的檔案
-    response = await client.post("/api/auth/register", json={
-        "email": "viewer@example.com",
-        "password": "Viewer123",
-        "date_of_birth": "1992-01-01"
-    })
+    response = await client.post(
+        "/api/auth/register",
+        json={
+            "email": "viewer@example.com",
+            "password": "Viewer123",
+            "date_of_birth": "1992-01-01",
+        },
+    )
     viewer_token = response.json()["access_token"]
     # 清除 cookies，讓測試使用純 Bearer Token 認證
     client.cookies.clear()
 
     # 獲取第一個用戶的 ID
-    result = await test_db.execute(
-        select(User).where(User.email == user_with_profile["email"])
-    )
+    result = await test_db.execute(select(User).where(User.email == user_with_profile["email"]))
     user = result.scalar_one()
 
     # 第二個用戶查看第一個用戶的公開檔案
     response = await client.get(
-        f"/api/profile/{user.id}",
-        headers={"Authorization": f"Bearer {viewer_token}"}
+        f"/api/profile/{user.id}", headers={"Authorization": f"Bearer {viewer_token}"}
     )
 
     # 注意：如果這個端點不存在，測試會失敗

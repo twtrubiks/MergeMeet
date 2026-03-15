@@ -5,9 +5,7 @@
         <div class="modal-content">
           <!-- 配對成功圖示 -->
           <div class="match-icon">
-            <div class="heart-animation">
-              💕
-            </div>
+            <div class="heart-animation">💕</div>
           </div>
 
           <!-- 標題 -->
@@ -21,7 +19,7 @@
                 v-if="matchedUser.photos?.length"
                 :src="matchedUser.photos[0]"
                 :alt="matchedUser.display_name"
-              >
+              />
               <div v-else class="avatar-placeholder">
                 {{ matchedUser.display_name[0] }}
               </div>
@@ -30,7 +28,10 @@
             <p class="user-age">{{ matchedUser.age }} 歲</p>
 
             <!-- 共同興趣 -->
-            <div v-if="matchedUser.interests && matchedUser.interests.length > 0" class="common-interests">
+            <div
+              v-if="matchedUser.interests && matchedUser.interests.length > 0"
+              class="common-interests"
+            >
               <p class="interests-title">共同興趣</p>
               <div class="interests-tags">
                 <span
@@ -46,12 +47,10 @@
 
           <!-- 操作按鈕 -->
           <div class="modal-actions">
-            <button class="btn-secondary" @click="handleClose" aria-label="繼續探索">
+            <button class="btn-secondary" aria-label="繼續探索" @click="handleClose">
               繼續探索
             </button>
-            <button class="btn-primary" @click="goToMatches" aria-label="查看配對">
-              查看配對
-            </button>
+            <button class="btn-primary" aria-label="查看配對" @click="goToMatches">查看配對</button>
           </div>
         </div>
       </div>
@@ -158,7 +157,8 @@ const goToMatches = () => {
 }
 
 @keyframes heartBeat {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
   25% {
@@ -174,7 +174,8 @@ const goToMatches = () => {
 
 /* 光環脈衝動畫 */
 @keyframes glow-pulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: translate(-50%, -50%) scale(1);
     opacity: 0.6;
     box-shadow: 0 0 20px var(--color-like-alpha-20);
@@ -227,7 +228,7 @@ const goToMatches = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #FF6B6B, #FF8E53);
+  background: linear-gradient(135deg, #ff6b6b, #ff8e53);
   color: white;
   font-size: 48px;
   font-weight: bold;
@@ -313,11 +314,13 @@ const goToMatches = () => {
 }
 
 /* Modal 過渡效果 */
-.modal-enter-active, .modal-leave-active {
+.modal-enter-active,
+.modal-leave-active {
   transition: opacity 0.3s ease;
 }
 
-.modal-enter-from, .modal-leave-to {
+.modal-enter-from,
+.modal-leave-to {
   opacity: 0;
 }
 

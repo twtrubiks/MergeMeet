@@ -20,7 +20,7 @@ export const useProfileStore = defineStore('profile', () => {
   const profileInterests = computed(() => profile.value?.interests || [])
   const profilePicture = computed(() => {
     const photos = profile.value?.photos || []
-    const mainPhoto = photos.find(p => p.is_profile_picture)
+    const mainPhoto = photos.find((p) => p.is_profile_picture)
     return mainPhoto?.url || photos[0]?.url || null
   })
 
@@ -222,7 +222,7 @@ export const useProfileStore = defineStore('profile', () => {
    */
   const getTagsByCategory = computed(() => {
     const grouped = {}
-    interestTags.value.forEach(tag => {
+    interestTags.value.forEach((tag) => {
       if (!grouped[tag.category]) {
         grouped[tag.category] = []
       }

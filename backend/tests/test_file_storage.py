@@ -1,15 +1,17 @@
 """檔案儲存服務測試"""
-import pytest
-import io
+
 import asyncio
-import tempfile
+import io
 import shutil
+import tempfile
 from pathlib import Path
-from PIL import Image
 from unittest.mock import patch
 
-from app.services.file_storage import FileStorageService
+import pytest
+from PIL import Image
+
 from app.core.config import settings
+from app.services.file_storage import FileStorageService
 
 
 @pytest.fixture
@@ -24,7 +26,7 @@ def temp_upload_dir():
 @pytest.fixture
 def storage_service(temp_upload_dir):
     """建立使用臨時目錄的儲存服務"""
-    with patch.object(settings, 'UPLOAD_DIR', temp_upload_dir):
+    with patch.object(settings, "UPLOAD_DIR", temp_upload_dir):
         service = FileStorageService()
         yield service
 
@@ -32,9 +34,9 @@ def storage_service(temp_upload_dir):
 @pytest.fixture
 def sample_image_bytes():
     """產生測試用 JPEG 圖片"""
-    img = Image.new('RGB', (800, 600), color='red')
+    img = Image.new("RGB", (800, 600), color="red")
     buffer = io.BytesIO()
-    img.save(buffer, format='JPEG')
+    img.save(buffer, format="JPEG")
     buffer.seek(0)
     return buffer.read()
 
@@ -42,9 +44,9 @@ def sample_image_bytes():
 @pytest.fixture
 def large_image_bytes():
     """產生大型測試圖片（超過 1200x1200）"""
-    img = Image.new('RGB', (2000, 1500), color='blue')
+    img = Image.new("RGB", (2000, 1500), color="blue")
     buffer = io.BytesIO()
-    img.save(buffer, format='JPEG')
+    img.save(buffer, format="JPEG")
     buffer.seek(0)
     return buffer.read()
 
@@ -52,9 +54,9 @@ def large_image_bytes():
 @pytest.fixture
 def png_image_bytes():
     """產生測試用 PNG 圖片（含透明通道）"""
-    img = Image.new('RGBA', (400, 400), color=(255, 0, 0, 128))
+    img = Image.new("RGBA", (400, 400), color=(255, 0, 0, 128))
     buffer = io.BytesIO()
-    img.save(buffer, format='PNG')
+    img.save(buffer, format="PNG")
     buffer.seek(0)
     return buffer.read()
 
@@ -64,7 +66,7 @@ class TestFileStorageService:
 
     def test_init_creates_directories(self, temp_upload_dir):
         """測試初始化時建立必要目錄"""
-        with patch.object(settings, 'UPLOAD_DIR', temp_upload_dir):
+        with patch.object(settings, "UPLOAD_DIR", temp_upload_dir):
             service = FileStorageService()
 
             assert service.upload_dir.exists()
@@ -183,7 +185,9 @@ class TestSavePhoto:
     """照片儲存測試"""
 
     @pytest.mark.asyncio
-    async def test_save_photo_creates_files(self, storage_service, sample_image_bytes, temp_upload_dir):
+    async def test_save_photo_creates_files(
+        self, storage_service, sample_image_bytes, temp_upload_dir
+    ):
         """測試儲存照片會建立主圖和縮圖"""
         user_id = "user-123"
 
@@ -191,7 +195,7 @@ class TestSavePhoto:
             user_id=user_id,
             file_content=sample_image_bytes,
             filename="test.jpg",
-            content_type="image/jpeg"
+            content_type="image/jpeg",
         )
 
         # 驗證回傳值
@@ -201,8 +205,8 @@ class TestSavePhoto:
         assert "_thumb" in thumbnail_url
 
         # 驗證檔案存在
-        photo_path = Path(temp_upload_dir) / photo_url.lstrip("/uploads/")
-        thumbnail_path = Path(temp_upload_dir) / thumbnail_url.lstrip("/uploads/")
+        photo_path = Path(temp_upload_dir) / photo_url.removeprefix("/uploads/")  # noqa: B005
+        thumbnail_path = Path(temp_upload_dir) / thumbnail_url.removeprefix("/uploads/")  # noqa: B005
 
         # 由於路徑是 /uploads/photos/... 而 temp_dir 不包含 uploads
         # 需要調整路徑
@@ -213,7 +217,9 @@ class TestSavePhoto:
         assert thumbnail_path.exists()
 
     @pytest.mark.asyncio
-    async def test_save_photo_processes_image(self, storage_service, large_image_bytes, temp_upload_dir):
+    async def test_save_photo_processes_image(
+        self, storage_service, large_image_bytes, temp_upload_dir
+    ):
         """測試儲存照片時會處理圖片"""
         user_id = "user-456"
 
@@ -221,7 +227,7 @@ class TestSavePhoto:
             user_id=user_id,
             file_content=large_image_bytes,
             filename="large.jpg",
-            content_type="image/jpeg"
+            content_type="image/jpeg",
         )
 
         # 讀取儲存的主圖
@@ -241,14 +247,14 @@ class TestSavePhoto:
             user_id=user_id,
             file_content=sample_image_bytes,
             filename="test1.jpg",
-            content_type="image/jpeg"
+            content_type="image/jpeg",
         )
 
         id2, _, _ = await storage_service.save_photo(
             user_id=user_id,
             file_content=sample_image_bytes,
             filename="test2.jpg",
-            content_type="image/jpeg"
+            content_type="image/jpeg",
         )
 
         assert id1 != id2
@@ -258,7 +264,9 @@ class TestDeletePhoto:
     """照片刪除測試"""
 
     @pytest.mark.asyncio
-    async def test_delete_photo_removes_files(self, storage_service, sample_image_bytes, temp_upload_dir):
+    async def test_delete_photo_removes_files(
+        self, storage_service, sample_image_bytes, temp_upload_dir
+    ):
         """測試刪除照片會移除檔案"""
         user_id = "user-del-1"
 
@@ -267,7 +275,7 @@ class TestDeletePhoto:
             user_id=user_id,
             file_content=sample_image_bytes,
             filename="to_delete.jpg",
-            content_type="image/jpeg"
+            content_type="image/jpeg",
         )
 
         photo_path = Path(temp_upload_dir) / "photos" / user_id / f"{photo_id}.jpg"
@@ -304,7 +312,9 @@ class TestIntegration:
     """整合測試"""
 
     @pytest.mark.asyncio
-    async def test_full_upload_delete_cycle(self, storage_service, sample_image_bytes, temp_upload_dir):
+    async def test_full_upload_delete_cycle(
+        self, storage_service, sample_image_bytes, temp_upload_dir
+    ):
         """測試完整的上傳-刪除流程"""
         user_id = "integration-user"
 
@@ -313,7 +323,7 @@ class TestIntegration:
             user_id=user_id,
             file_content=sample_image_bytes,
             filename="lifecycle.jpg",
-            content_type="image/jpeg"
+            content_type="image/jpeg",
         )
 
         photo_path = Path(temp_upload_dir) / "photos" / user_id / f"{photo_id}.jpg"
@@ -342,7 +352,9 @@ class TestIntegration:
         assert not thumbnail_path.exists()
 
     @pytest.mark.asyncio
-    async def test_multiple_users_isolation(self, storage_service, sample_image_bytes, temp_upload_dir):
+    async def test_multiple_users_isolation(
+        self, storage_service, sample_image_bytes, temp_upload_dir
+    ):
         """測試多個使用者的檔案隔離"""
         user1 = "user-a"
         user2 = "user-b"
@@ -352,14 +364,14 @@ class TestIntegration:
             user_id=user1,
             file_content=sample_image_bytes,
             filename="photo1.jpg",
-            content_type="image/jpeg"
+            content_type="image/jpeg",
         )
 
         id2, url2, _ = await storage_service.save_photo(
             user_id=user2,
             file_content=sample_image_bytes,
             filename="photo2.jpg",
-            content_type="image/jpeg"
+            content_type="image/jpeg",
         )
 
         # 確認存放在不同目錄
@@ -395,7 +407,7 @@ class TestEdgeCases:
             user_id=user_id,
             file_content=sample_image_bytes,
             filename="test.jpg",
-            content_type="image/jpeg"
+            content_type="image/jpeg",
         )
 
         assert user_id in photo_url
@@ -424,7 +436,7 @@ class TestEdgeCases:
                 user_id=user_id,
                 file_content=sample_image_bytes,
                 filename="concurrent.jpg",
-                content_type="image/jpeg"
+                content_type="image/jpeg",
             )
 
         # 同時上傳 5 張照片

@@ -1,13 +1,16 @@
 """聊天訊息 REST API 測試"""
-import pytest
+
 import uuid
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from datetime import UTC
 from unittest.mock import AsyncMock, patch
 
-from app.models.user import User
+import pytest
+from httpx import AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.match import Match, Message
+from app.models.user import User
 
 
 @pytest.fixture
@@ -17,7 +20,8 @@ async def matched_users(client: AsyncClient, auth_user_pair: dict, test_db: Asyn
     bob_token = auth_user_pair["bob"]["token"]
 
     # 創建 Alice 的檔案（注意：URL 無尾隨斜線）
-    await client.post("/api/profile",
+    await client.post(
+        "/api/profile",
         headers={"Authorization": f"Bearer {alice_token}"},
         json={
             "display_name": "Alice",
@@ -26,13 +30,14 @@ async def matched_users(client: AsyncClient, auth_user_pair: dict, test_db: Asyn
             "location": {
                 "latitude": 25.0330,
                 "longitude": 121.5654,
-                "location_name": "台北市信義區"
-            }
-        }
+                "location_name": "台北市信義區",
+            },
+        },
     )
 
     # 創建 Bob 的檔案（注意：URL 無尾隨斜線）
-    await client.post("/api/profile",
+    await client.post(
+        "/api/profile",
         headers={"Authorization": f"Bearer {bob_token}"},
         json={
             "display_name": "Bob",
@@ -41,13 +46,15 @@ async def matched_users(client: AsyncClient, auth_user_pair: dict, test_db: Asyn
             "location": {
                 "latitude": 25.0500,
                 "longitude": 121.5500,
-                "location_name": "台北市大安區"
-            }
-        }
+                "location_name": "台北市大安區",
+            },
+        },
     )
 
     # 獲取用戶 ID（使用 auth_user_pair 的 email）
-    result = await test_db.execute(select(User).where(User.email == auth_user_pair["alice"]["email"]))
+    result = await test_db.execute(
+        select(User).where(User.email == auth_user_pair["alice"]["email"])
+    )
     alice = result.scalar_one()
 
     result = await test_db.execute(select(User).where(User.email == auth_user_pair["bob"]["email"]))
@@ -55,11 +62,7 @@ async def matched_users(client: AsyncClient, auth_user_pair: dict, test_db: Asyn
 
     # 直接創建配對（確保 user1_id < user2_id）
     user1_id, user2_id = (alice.id, bob.id) if alice.id < bob.id else (bob.id, alice.id)
-    match = Match(
-        user1_id=user1_id,
-        user2_id=user2_id,
-        status="ACTIVE"
-    )
+    match = Match(user1_id=user1_id, user2_id=user2_id, status="ACTIVE")
     test_db.add(match)
     await test_db.commit()
     await test_db.refresh(match)
@@ -67,7 +70,7 @@ async def matched_users(client: AsyncClient, auth_user_pair: dict, test_db: Asyn
     return {
         "alice": {"token": alice_token, "user_id": str(alice.id)},
         "bob": {"token": bob_token, "user_id": str(bob.id)},
-        "match_id": str(match.id)
+        "match_id": str(match.id),
     }
 
 
@@ -79,7 +82,7 @@ async def test_get_chat_history_empty(client: AsyncClient, matched_users: dict):
 
     response = await client.get(
         f"/api/messages/matches/{match_id}/messages",
-        headers={"Authorization": f"Bearer {alice_token}"}
+        headers={"Authorization": f"Bearer {alice_token}"},
     )
 
     assert response.status_code == 200
@@ -91,7 +94,9 @@ async def test_get_chat_history_empty(client: AsyncClient, matched_users: dict):
 
 
 @pytest.mark.asyncio
-async def test_get_chat_history_with_messages(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+async def test_get_chat_history_with_messages(
+    client: AsyncClient, matched_users: dict, test_db: AsyncSession
+):
     """測試取得有訊息的聊天記錄"""
     match_id = matched_users["match_id"]
     alice_token = matched_users["alice"]["token"]
@@ -102,8 +107,8 @@ async def test_get_chat_history_with_messages(client: AsyncClient, matched_users
         message = Message(
             match_id=match_id,
             sender_id=alice_user_id,
-            content=f"Test message {i+1}",
-            message_type="TEXT"
+            content=f"Test message {i + 1}",
+            message_type="TEXT",
         )
         test_db.add(message)
     await test_db.commit()
@@ -111,7 +116,7 @@ async def test_get_chat_history_with_messages(client: AsyncClient, matched_users
     # 取得聊天記錄
     response = await client.get(
         f"/api/messages/matches/{match_id}/messages",
-        headers={"Authorization": f"Bearer {alice_token}"}
+        headers={"Authorization": f"Bearer {alice_token}"},
     )
 
     assert response.status_code == 200
@@ -123,7 +128,9 @@ async def test_get_chat_history_with_messages(client: AsyncClient, matched_users
 
 
 @pytest.mark.asyncio
-async def test_get_chat_history_cursor_pagination(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+async def test_get_chat_history_cursor_pagination(
+    client: AsyncClient, matched_users: dict, test_db: AsyncSession
+):
     """測試 cursor-based 聊天記錄分頁"""
     from datetime import datetime, timedelta
 
@@ -137,8 +144,8 @@ async def test_get_chat_history_cursor_pagination(client: AsyncClient, matched_u
         message = Message(
             match_id=match_id,
             sender_id=alice_user_id,
-            content=f"Test message {i+1}",
-            message_type="TEXT"
+            content=f"Test message {i + 1}",
+            message_type="TEXT",
         )
         # 手動設置 sent_at 確保順序
         message.sent_at = base_time + timedelta(seconds=i)
@@ -149,7 +156,7 @@ async def test_get_chat_history_cursor_pagination(client: AsyncClient, matched_u
     # 初次載入（不傳 before_id）- 取最新 10 條
     response = await client.get(
         f"/api/messages/matches/{match_id}/messages?limit=10",
-        headers={"Authorization": f"Bearer {alice_token}"}
+        headers={"Authorization": f"Bearer {alice_token}"},
     )
 
     assert response.status_code == 200
@@ -167,7 +174,7 @@ async def test_get_chat_history_cursor_pagination(client: AsyncClient, matched_u
     next_cursor = data["next_cursor"]
     response = await client.get(
         f"/api/messages/matches/{match_id}/messages?before_id={next_cursor}&limit=10",
-        headers={"Authorization": f"Bearer {alice_token}"}
+        headers={"Authorization": f"Bearer {alice_token}"},
     )
 
     assert response.status_code == 200
@@ -182,7 +189,9 @@ async def test_get_chat_history_cursor_pagination(client: AsyncClient, matched_u
 
 
 @pytest.mark.asyncio
-async def test_get_chat_history_invalid_cursor(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+async def test_get_chat_history_invalid_cursor(
+    client: AsyncClient, matched_users: dict, test_db: AsyncSession
+):
     """測試無效 cursor 的情況"""
     match_id = matched_users["match_id"]
     alice_token = matched_users["alice"]["token"]
@@ -193,8 +202,8 @@ async def test_get_chat_history_invalid_cursor(client: AsyncClient, matched_user
         message = Message(
             match_id=match_id,
             sender_id=alice_user_id,
-            content=f"Test message {i+1}",
-            message_type="TEXT"
+            content=f"Test message {i + 1}",
+            message_type="TEXT",
         )
         test_db.add(message)
     await test_db.commit()
@@ -203,7 +212,7 @@ async def test_get_chat_history_invalid_cursor(client: AsyncClient, matched_user
     fake_cursor = "00000000-0000-0000-0000-000000000000"
     response = await client.get(
         f"/api/messages/matches/{match_id}/messages?before_id={fake_cursor}",
-        headers={"Authorization": f"Bearer {alice_token}"}
+        headers={"Authorization": f"Bearer {alice_token}"},
     )
 
     # 應該返回最新訊息（cursor 不存在時忽略條件）
@@ -213,7 +222,9 @@ async def test_get_chat_history_invalid_cursor(client: AsyncClient, matched_user
 
 
 @pytest.mark.asyncio
-async def test_get_chat_history_boundary(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+async def test_get_chat_history_boundary(
+    client: AsyncClient, matched_users: dict, test_db: AsyncSession
+):
     """測試邊界條件：訊息數量剛好等於 limit"""
     match_id = matched_users["match_id"]
     alice_token = matched_users["alice"]["token"]
@@ -224,8 +235,8 @@ async def test_get_chat_history_boundary(client: AsyncClient, matched_users: dic
         message = Message(
             match_id=match_id,
             sender_id=alice_user_id,
-            content=f"Test message {i+1}",
-            message_type="TEXT"
+            content=f"Test message {i + 1}",
+            message_type="TEXT",
         )
         test_db.add(message)
     await test_db.commit()
@@ -233,7 +244,7 @@ async def test_get_chat_history_boundary(client: AsyncClient, matched_users: dic
     # 請求 limit=10
     response = await client.get(
         f"/api/messages/matches/{match_id}/messages?limit=10",
-        headers={"Authorization": f"Bearer {alice_token}"}
+        headers={"Authorization": f"Bearer {alice_token}"},
     )
 
     assert response.status_code == 200
@@ -247,11 +258,14 @@ async def test_get_chat_history_boundary(client: AsyncClient, matched_users: dic
 async def test_get_chat_history_unauthorized(client: AsyncClient, matched_users: dict):
     """測試未授權用戶無法查看聊天記錄"""
     # 創建第三個用戶
-    response = await client.post("/api/auth/register", json={
-        "email": "charlie@example.com",
-        "password": "Charlie123",
-        "date_of_birth": "1992-01-01"
-    })
+    response = await client.post(
+        "/api/auth/register",
+        json={
+            "email": "charlie@example.com",
+            "password": "Charlie123",
+            "date_of_birth": "1992-01-01",
+        },
+    )
     charlie_token = response.json()["access_token"]
     # 清除 cookies，讓測試使用純 Bearer Token 認證
     client.cookies.clear()
@@ -261,7 +275,7 @@ async def test_get_chat_history_unauthorized(client: AsyncClient, matched_users:
     # Charlie 嘗試查看 Alice 和 Bob 的聊天記錄
     response = await client.get(
         f"/api/messages/matches/{match_id}/messages",
-        headers={"Authorization": f"Bearer {charlie_token}"}
+        headers={"Authorization": f"Bearer {charlie_token}"},
     )
 
     assert response.status_code == 404
@@ -274,8 +288,7 @@ async def test_get_conversations_empty(client: AsyncClient, matched_users: dict)
     alice_token = matched_users["alice"]["token"]
 
     response = await client.get(
-        "/api/messages/conversations",
-        headers={"Authorization": f"Bearer {alice_token}"}
+        "/api/messages/conversations", headers={"Authorization": f"Bearer {alice_token}"}
     )
 
     assert response.status_code == 200
@@ -286,7 +299,9 @@ async def test_get_conversations_empty(client: AsyncClient, matched_users: dict)
 
 
 @pytest.mark.asyncio
-async def test_get_conversations_with_messages(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+async def test_get_conversations_with_messages(
+    client: AsyncClient, matched_users: dict, test_db: AsyncSession
+):
     """測試取得有訊息的對話列表"""
     match_id = matched_users["match_id"]
     alice_token = matched_users["alice"]["token"]
@@ -294,10 +309,7 @@ async def test_get_conversations_with_messages(client: AsyncClient, matched_user
 
     # Bob 發送訊息給 Alice
     message = Message(
-        match_id=match_id,
-        sender_id=bob_user_id,
-        content="Hello Alice!",
-        message_type="TEXT"
+        match_id=match_id, sender_id=bob_user_id, content="Hello Alice!", message_type="TEXT"
     )
     test_db.add(message)
     await test_db.commit()
@@ -305,8 +317,7 @@ async def test_get_conversations_with_messages(client: AsyncClient, matched_user
 
     # Alice 查看對話列表
     response = await client.get(
-        "/api/messages/conversations",
-        headers={"Authorization": f"Bearer {alice_token}"}
+        "/api/messages/conversations", headers={"Authorization": f"Bearer {alice_token}"}
     )
 
     assert response.status_code == 200
@@ -326,7 +337,9 @@ async def test_get_conversations_with_messages(client: AsyncClient, matched_user
 
 
 @pytest.mark.asyncio
-async def test_get_conversations_unread_count(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+async def test_get_conversations_unread_count(
+    client: AsyncClient, matched_users: dict, test_db: AsyncSession
+):
     """測試對話列表的未讀訊息計數"""
     match_id = matched_users["match_id"]
     alice_token = matched_users["alice"]["token"]
@@ -337,16 +350,15 @@ async def test_get_conversations_unread_count(client: AsyncClient, matched_users
         message = Message(
             match_id=match_id,
             sender_id=bob_user_id,
-            content=f"Message {i+1}",
-            message_type="TEXT"
+            content=f"Message {i + 1}",
+            message_type="TEXT",
         )
         test_db.add(message)
     await test_db.commit()
 
     # Alice 查看對話列表
     response = await client.get(
-        "/api/messages/conversations",
-        headers={"Authorization": f"Bearer {alice_token}"}
+        "/api/messages/conversations", headers={"Authorization": f"Bearer {alice_token}"}
     )
 
     assert response.status_code == 200
@@ -356,7 +368,9 @@ async def test_get_conversations_unread_count(client: AsyncClient, matched_users
 
 
 @pytest.mark.asyncio
-async def test_mark_messages_as_read(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+async def test_mark_messages_as_read(
+    client: AsyncClient, matched_users: dict, test_db: AsyncSession
+):
     """測試標記訊息為已讀"""
     match_id = matched_users["match_id"]
     alice_token = matched_users["alice"]["token"]
@@ -364,10 +378,7 @@ async def test_mark_messages_as_read(client: AsyncClient, matched_users: dict, t
 
     # Bob 發送訊息給 Alice
     message = Message(
-        match_id=match_id,
-        sender_id=bob_user_id,
-        content="Hello Alice!",
-        message_type="TEXT"
+        match_id=match_id, sender_id=bob_user_id, content="Hello Alice!", message_type="TEXT"
     )
     test_db.add(message)
     await test_db.commit()
@@ -380,7 +391,7 @@ async def test_mark_messages_as_read(client: AsyncClient, matched_users: dict, t
     response = await client.post(
         "/api/messages/read",
         headers={"Authorization": f"Bearer {alice_token}"},
-        json={"message_ids": [str(message.id)]}
+        json={"message_ids": [str(message.id)]},
     )
 
     assert response.status_code == 204
@@ -391,7 +402,9 @@ async def test_mark_messages_as_read(client: AsyncClient, matched_users: dict, t
 
 
 @pytest.mark.asyncio
-async def test_mark_multiple_messages_as_read(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+async def test_mark_multiple_messages_as_read(
+    client: AsyncClient, matched_users: dict, test_db: AsyncSession
+):
     """測試批量標記訊息為已讀"""
     match_id = matched_users["match_id"]
     alice_token = matched_users["alice"]["token"]
@@ -403,8 +416,8 @@ async def test_mark_multiple_messages_as_read(client: AsyncClient, matched_users
         message = Message(
             match_id=match_id,
             sender_id=bob_user_id,
-            content=f"Message {i+1}",
-            message_type="TEXT"
+            content=f"Message {i + 1}",
+            message_type="TEXT",
         )
         test_db.add(message)
         await test_db.flush()
@@ -415,14 +428,16 @@ async def test_mark_multiple_messages_as_read(client: AsyncClient, matched_users
     response = await client.post(
         "/api/messages/read",
         headers={"Authorization": f"Bearer {alice_token}"},
-        json={"message_ids": message_ids}
+        json={"message_ids": message_ids},
     )
 
     assert response.status_code == 204
 
 
 @pytest.mark.asyncio
-async def test_cannot_mark_own_messages_as_read(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+async def test_cannot_mark_own_messages_as_read(
+    client: AsyncClient, matched_users: dict, test_db: AsyncSession
+):
     """測試無法標記自己的訊息為已讀"""
     match_id = matched_users["match_id"]
     alice_token = matched_users["alice"]["token"]
@@ -430,10 +445,7 @@ async def test_cannot_mark_own_messages_as_read(client: AsyncClient, matched_use
 
     # Alice 發送訊息
     message = Message(
-        match_id=match_id,
-        sender_id=alice_user_id,
-        content="My message",
-        message_type="TEXT"
+        match_id=match_id, sender_id=alice_user_id, content="My message", message_type="TEXT"
     )
     test_db.add(message)
     await test_db.commit()
@@ -443,7 +455,7 @@ async def test_cannot_mark_own_messages_as_read(client: AsyncClient, matched_use
     response = await client.post(
         "/api/messages/read",
         headers={"Authorization": f"Bearer {alice_token}"},
-        json={"message_ids": [str(message.id)]}
+        json={"message_ids": [str(message.id)]},
     )
 
     # 應該成功但不更新（因為是自己的訊息）
@@ -455,7 +467,9 @@ async def test_cannot_mark_own_messages_as_read(client: AsyncClient, matched_use
 
 
 @pytest.mark.asyncio
-async def test_delete_message_success(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+async def test_delete_message_success(
+    client: AsyncClient, matched_users: dict, test_db: AsyncSession
+):
     """測試成功刪除訊息"""
     match_id = matched_users["match_id"]
     alice_token = matched_users["alice"]["token"]
@@ -463,10 +477,7 @@ async def test_delete_message_success(client: AsyncClient, matched_users: dict, 
 
     # Alice 發送訊息
     message = Message(
-        match_id=match_id,
-        sender_id=alice_user_id,
-        content="Test message",
-        message_type="TEXT"
+        match_id=match_id, sender_id=alice_user_id, content="Test message", message_type="TEXT"
     )
     test_db.add(message)
     await test_db.commit()
@@ -474,8 +485,7 @@ async def test_delete_message_success(client: AsyncClient, matched_users: dict, 
 
     # Alice 刪除訊息
     response = await client.delete(
-        f"/api/messages/messages/{message.id}",
-        headers={"Authorization": f"Bearer {alice_token}"}
+        f"/api/messages/messages/{message.id}", headers={"Authorization": f"Bearer {alice_token}"}
     )
 
     assert response.status_code == 204
@@ -486,19 +496,17 @@ async def test_delete_message_success(client: AsyncClient, matched_users: dict, 
 
 
 @pytest.mark.asyncio
-async def test_delete_message_not_owner(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+async def test_delete_message_not_owner(
+    client: AsyncClient, matched_users: dict, test_db: AsyncSession
+):
     """測試無法刪除他人的訊息"""
     match_id = matched_users["match_id"]
     alice_token = matched_users["alice"]["token"]
-    bob_token = matched_users["bob"]["token"]
     bob_user_id = matched_users["bob"]["user_id"]
 
     # Bob 發送訊息
     message = Message(
-        match_id=match_id,
-        sender_id=bob_user_id,
-        content="Bob's message",
-        message_type="TEXT"
+        match_id=match_id, sender_id=bob_user_id, content="Bob's message", message_type="TEXT"
     )
     test_db.add(message)
     await test_db.commit()
@@ -506,8 +514,7 @@ async def test_delete_message_not_owner(client: AsyncClient, matched_users: dict
 
     # Alice 嘗試刪除 Bob 的訊息
     response = await client.delete(
-        f"/api/messages/messages/{message.id}",
-        headers={"Authorization": f"Bearer {alice_token}"}
+        f"/api/messages/messages/{message.id}", headers={"Authorization": f"Bearer {alice_token}"}
     )
 
     assert response.status_code == 403
@@ -522,7 +529,7 @@ async def test_delete_nonexistent_message(client: AsyncClient, matched_users: di
 
     response = await client.delete(
         f"/api/messages/messages/{fake_message_id}",
-        headers={"Authorization": f"Bearer {alice_token}"}
+        headers={"Authorization": f"Bearer {alice_token}"},
     )
 
     assert response.status_code == 404
@@ -530,7 +537,9 @@ async def test_delete_nonexistent_message(client: AsyncClient, matched_users: di
 
 
 @pytest.mark.asyncio
-async def test_deleted_messages_not_in_history(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+async def test_deleted_messages_not_in_history(
+    client: AsyncClient, matched_users: dict, test_db: AsyncSession
+):
     """測試已刪除的訊息不出現在聊天記錄中"""
     match_id = matched_users["match_id"]
     alice_token = matched_users["alice"]["token"]
@@ -538,16 +547,10 @@ async def test_deleted_messages_not_in_history(client: AsyncClient, matched_user
 
     # 創建兩條訊息
     message1 = Message(
-        match_id=match_id,
-        sender_id=alice_user_id,
-        content="Message 1",
-        message_type="TEXT"
+        match_id=match_id, sender_id=alice_user_id, content="Message 1", message_type="TEXT"
     )
     message2 = Message(
-        match_id=match_id,
-        sender_id=alice_user_id,
-        content="Message 2",
-        message_type="TEXT"
+        match_id=match_id, sender_id=alice_user_id, content="Message 2", message_type="TEXT"
     )
     test_db.add(message1)
     test_db.add(message2)
@@ -556,14 +559,13 @@ async def test_deleted_messages_not_in_history(client: AsyncClient, matched_user
 
     # 刪除第一條訊息
     await client.delete(
-        f"/api/messages/messages/{message1.id}",
-        headers={"Authorization": f"Bearer {alice_token}"}
+        f"/api/messages/messages/{message1.id}", headers={"Authorization": f"Bearer {alice_token}"}
     )
 
     # 查看聊天記錄
     response = await client.get(
         f"/api/messages/matches/{match_id}/messages",
-        headers={"Authorization": f"Bearer {alice_token}"}
+        headers={"Authorization": f"Bearer {alice_token}"},
     )
 
     assert response.status_code == 200
@@ -573,7 +575,9 @@ async def test_deleted_messages_not_in_history(client: AsyncClient, matched_user
 
 
 @pytest.mark.asyncio
-async def test_delete_message_websocket_broadcast(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+async def test_delete_message_websocket_broadcast(
+    client: AsyncClient, matched_users: dict, test_db: AsyncSession
+):
     """測試刪除訊息時 WebSocket 廣播通知"""
 
     match_id = matched_users["match_id"]
@@ -585,7 +589,7 @@ async def test_delete_message_websocket_broadcast(client: AsyncClient, matched_u
         match_id=match_id,
         sender_id=alice_user_id,
         content="Test message to delete",
-        message_type="TEXT"
+        message_type="TEXT",
     )
     test_db.add(message)
     await test_db.commit()
@@ -593,11 +597,11 @@ async def test_delete_message_websocket_broadcast(client: AsyncClient, matched_u
     message_id = str(message.id)
 
     # Mock WebSocket manager 的 send_to_match 方法
-    with patch('app.websocket.manager.manager.send_to_match', new_callable=AsyncMock) as mock_send:
+    with patch("app.websocket.manager.manager.send_to_match", new_callable=AsyncMock) as mock_send:
         # Alice 刪除訊息
         response = await client.delete(
             f"/api/messages/messages/{message_id}",
-            headers={"Authorization": f"Bearer {alice_token}"}
+            headers={"Authorization": f"Bearer {alice_token}"},
         )
 
         assert response.status_code == 204
@@ -620,7 +624,9 @@ async def test_delete_message_websocket_broadcast(client: AsyncClient, matched_u
 
 
 @pytest.mark.asyncio
-async def test_delete_message_websocket_event_format(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+async def test_delete_message_websocket_event_format(
+    client: AsyncClient, matched_users: dict, test_db: AsyncSession
+):
     """測試刪除訊息 WebSocket 事件格式正確性"""
 
     match_id = matched_users["match_id"]
@@ -629,21 +635,17 @@ async def test_delete_message_websocket_event_format(client: AsyncClient, matche
 
     # Bob 發送訊息
     message = Message(
-        match_id=match_id,
-        sender_id=bob_user_id,
-        content="Bob's test message",
-        message_type="TEXT"
+        match_id=match_id, sender_id=bob_user_id, content="Bob's test message", message_type="TEXT"
     )
     test_db.add(message)
     await test_db.commit()
     await test_db.refresh(message)
 
     # Mock WebSocket manager
-    with patch('app.websocket.manager.manager.send_to_match', new_callable=AsyncMock) as mock_send:
+    with patch("app.websocket.manager.manager.send_to_match", new_callable=AsyncMock) as mock_send:
         # Bob 刪除訊息
         await client.delete(
-            f"/api/messages/messages/{message.id}",
-            headers={"Authorization": f"Bearer {bob_token}"}
+            f"/api/messages/messages/{message.id}", headers={"Authorization": f"Bearer {bob_token}"}
         )
 
         # 獲取廣播的事件數據
@@ -667,7 +669,9 @@ async def test_delete_message_websocket_event_format(client: AsyncClient, matche
 
 
 @pytest.mark.asyncio
-async def test_mark_all_messages_as_read_success(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+async def test_mark_all_messages_as_read_success(
+    client: AsyncClient, matched_users: dict, test_db: AsyncSession
+):
     """測試成功標記所有未讀訊息為已讀"""
     match_id = matched_users["match_id"]
     alice_token = matched_users["alice"]["token"]
@@ -678,18 +682,15 @@ async def test_mark_all_messages_as_read_success(client: AsyncClient, matched_us
         message = Message(
             match_id=match_id,
             sender_id=bob_user_id,
-            content=f"Message {i+1}",
-            message_type="TEXT"
+            content=f"Message {i + 1}",
+            message_type="TEXT",
         )
         test_db.add(message)
     await test_db.commit()
 
     # 確認有 5 條未讀訊息
     result = await test_db.execute(
-        select(Message).where(
-            Message.match_id == match_id,
-            Message.is_read.is_(None)
-        )
+        select(Message).where(Message.match_id == match_id, Message.is_read.is_(None))
     )
     unread_before = len(result.scalars().all())
     assert unread_before == 5
@@ -697,17 +698,14 @@ async def test_mark_all_messages_as_read_success(client: AsyncClient, matched_us
     # Alice 調用 read-all API
     response = await client.post(
         f"/api/messages/matches/{match_id}/read-all",
-        headers={"Authorization": f"Bearer {alice_token}"}
+        headers={"Authorization": f"Bearer {alice_token}"},
     )
 
     assert response.status_code == 204
 
     # 驗證所有訊息已標記為已讀
     result = await test_db.execute(
-        select(Message).where(
-            Message.match_id == match_id,
-            Message.is_read.is_(None)
-        )
+        select(Message).where(Message.match_id == match_id, Message.is_read.is_(None))
     )
     unread_after = len(result.scalars().all())
     assert unread_after == 0
@@ -717,11 +715,10 @@ async def test_mark_all_messages_as_read_success(client: AsyncClient, matched_us
 async def test_mark_all_messages_as_read_unauthorized(client: AsyncClient, matched_users: dict):
     """測試未授權用戶無法標記訊息"""
     # 創建第三個用戶
-    response = await client.post("/api/auth/register", json={
-        "email": "eve@example.com",
-        "password": "Eve12345",
-        "date_of_birth": "1993-01-01"
-    })
+    response = await client.post(
+        "/api/auth/register",
+        json={"email": "eve@example.com", "password": "Eve12345", "date_of_birth": "1993-01-01"},
+    )
     eve_token = response.json()["access_token"]
     client.cookies.clear()
 
@@ -730,7 +727,7 @@ async def test_mark_all_messages_as_read_unauthorized(client: AsyncClient, match
     # Eve 嘗試標記 Alice 和 Bob 的對話
     response = await client.post(
         f"/api/messages/matches/{match_id}/read-all",
-        headers={"Authorization": f"Bearer {eve_token}"}
+        headers={"Authorization": f"Bearer {eve_token}"},
     )
 
     assert response.status_code == 404
@@ -738,9 +735,11 @@ async def test_mark_all_messages_as_read_unauthorized(client: AsyncClient, match
 
 
 @pytest.mark.asyncio
-async def test_mark_all_messages_as_read_no_unread(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+async def test_mark_all_messages_as_read_no_unread(
+    client: AsyncClient, matched_users: dict, test_db: AsyncSession
+):
     """測試沒有未讀訊息時也能正常調用（冪等）"""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     match_id = matched_users["match_id"]
     alice_token = matched_users["alice"]["token"]
@@ -752,7 +751,7 @@ async def test_mark_all_messages_as_read_no_unread(client: AsyncClient, matched_
         sender_id=bob_user_id,
         content="Already read message",
         message_type="TEXT",
-        is_read=datetime.now(timezone.utc)  # 已讀
+        is_read=datetime.now(UTC),  # 已讀
     )
     test_db.add(message)
     await test_db.commit()
@@ -760,14 +759,16 @@ async def test_mark_all_messages_as_read_no_unread(client: AsyncClient, matched_
     # Alice 調用 read-all API（應該成功但不做任何更新）
     response = await client.post(
         f"/api/messages/matches/{match_id}/read-all",
-        headers={"Authorization": f"Bearer {alice_token}"}
+        headers={"Authorization": f"Bearer {alice_token}"},
     )
 
     assert response.status_code == 204
 
 
 @pytest.mark.asyncio
-async def test_mark_all_only_marks_others_messages(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+async def test_mark_all_only_marks_others_messages(
+    client: AsyncClient, matched_users: dict, test_db: AsyncSession
+):
     """測試只標記對方的訊息，不標記自己的訊息"""
     match_id = matched_users["match_id"]
     alice_token = matched_users["alice"]["token"]
@@ -776,17 +777,11 @@ async def test_mark_all_only_marks_others_messages(client: AsyncClient, matched_
 
     # Alice 發送訊息
     alice_msg = Message(
-        match_id=match_id,
-        sender_id=alice_user_id,
-        content="Alice's message",
-        message_type="TEXT"
+        match_id=match_id, sender_id=alice_user_id, content="Alice's message", message_type="TEXT"
     )
     # Bob 發送訊息
     bob_msg = Message(
-        match_id=match_id,
-        sender_id=bob_user_id,
-        content="Bob's message",
-        message_type="TEXT"
+        match_id=match_id, sender_id=bob_user_id, content="Bob's message", message_type="TEXT"
     )
     test_db.add(alice_msg)
     test_db.add(bob_msg)
@@ -797,7 +792,7 @@ async def test_mark_all_only_marks_others_messages(client: AsyncClient, matched_
     # Alice 調用 read-all API
     response = await client.post(
         f"/api/messages/matches/{match_id}/read-all",
-        headers={"Authorization": f"Bearer {alice_token}"}
+        headers={"Authorization": f"Bearer {alice_token}"},
     )
 
     assert response.status_code == 204
@@ -811,7 +806,9 @@ async def test_mark_all_only_marks_others_messages(client: AsyncClient, matched_
 
 
 @pytest.mark.asyncio
-async def test_mark_all_clears_unread_count(client: AsyncClient, matched_users: dict, test_db: AsyncSession):
+async def test_mark_all_clears_unread_count(
+    client: AsyncClient, matched_users: dict, test_db: AsyncSession
+):
     """測試標記後 unread_count 歸零"""
     match_id = matched_users["match_id"]
     alice_token = matched_users["alice"]["token"]
@@ -822,16 +819,15 @@ async def test_mark_all_clears_unread_count(client: AsyncClient, matched_users: 
         message = Message(
             match_id=match_id,
             sender_id=bob_user_id,
-            content=f"Message {i+1}",
-            message_type="TEXT"
+            content=f"Message {i + 1}",
+            message_type="TEXT",
         )
         test_db.add(message)
     await test_db.commit()
 
     # 確認 unread_count = 3
     response = await client.get(
-        "/api/messages/conversations",
-        headers={"Authorization": f"Bearer {alice_token}"}
+        "/api/messages/conversations", headers={"Authorization": f"Bearer {alice_token}"}
     )
     assert response.status_code == 200
     conversations = response.json()
@@ -842,13 +838,12 @@ async def test_mark_all_clears_unread_count(client: AsyncClient, matched_users: 
     # Alice 調用 read-all API
     await client.post(
         f"/api/messages/matches/{match_id}/read-all",
-        headers={"Authorization": f"Bearer {alice_token}"}
+        headers={"Authorization": f"Bearer {alice_token}"},
     )
 
     # 確認 unread_count = 0
     response = await client.get(
-        "/api/messages/conversations",
-        headers={"Authorization": f"Bearer {alice_token}"}
+        "/api/messages/conversations", headers={"Authorization": f"Bearer {alice_token}"}
     )
     conversations = response.json()
     conv = next((c for c in conversations if c["match_id"] == match_id), None)
@@ -871,8 +866,8 @@ async def test_mark_all_messages_sends_websocket_notification(
         message = Message(
             match_id=match_id,
             sender_id=bob_user_id,
-            content=f"Message {i+1}",
-            message_type="TEXT"
+            content=f"Message {i + 1}",
+            message_type="TEXT",
         )
         test_db.add(message)
         messages_to_create.append(message)
@@ -884,11 +879,13 @@ async def test_mark_all_messages_sends_websocket_notification(
     message_ids = [str(msg.id) for msg in messages_to_create]
 
     # Mock WebSocket manager
-    with patch('app.api.messages.manager.send_personal_message', new_callable=AsyncMock) as mock_send:
+    with patch(
+        "app.api.messages.manager.send_personal_message", new_callable=AsyncMock
+    ) as mock_send:
         # Alice 調用 read-all API
         response = await client.post(
             f"/api/messages/matches/{match_id}/read-all",
-            headers={"Authorization": f"Bearer {alice_token}"}
+            headers={"Authorization": f"Bearer {alice_token}"},
         )
 
         assert response.status_code == 204
@@ -912,7 +909,7 @@ async def test_mark_all_messages_no_notification_when_no_unread(
     client: AsyncClient, matched_users: dict, test_db: AsyncSession
 ):
     """測試沒有未讀訊息時不發送 WebSocket 通知"""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     match_id = matched_users["match_id"]
     alice_token = matched_users["alice"]["token"]
@@ -924,17 +921,19 @@ async def test_mark_all_messages_no_notification_when_no_unread(
         sender_id=bob_user_id,
         content="Already read message",
         message_type="TEXT",
-        is_read=datetime.now(timezone.utc)  # 已讀
+        is_read=datetime.now(UTC),  # 已讀
     )
     test_db.add(message)
     await test_db.commit()
 
     # Mock WebSocket manager
-    with patch('app.api.messages.manager.send_personal_message', new_callable=AsyncMock) as mock_send:
+    with patch(
+        "app.api.messages.manager.send_personal_message", new_callable=AsyncMock
+    ) as mock_send:
         # Alice 調用 read-all API
         response = await client.post(
             f"/api/messages/matches/{match_id}/read-all",
-            headers={"Authorization": f"Bearer {alice_token}"}
+            headers={"Authorization": f"Bearer {alice_token}"},
         )
 
         assert response.status_code == 204

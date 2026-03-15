@@ -11,15 +11,15 @@ CSRF 防護模組
 - 因此攻擊者無法構造正確的 X-CSRF-Token Header
 - 結合 SameSite Cookie 提供額外保護
 """
-from typing import Optional
-from fastapi import HTTPException, status, Request, Cookie, Header
+
+from fastapi import Cookie, Header, HTTPException, Request, status
 
 
 async def verify_csrf_token(
     request: Request,
-    csrf_token_header: Optional[str] = Header(None, alias="X-CSRF-Token"),
-    csrf_token_cookie: Optional[str] = Cookie(None, alias="csrf_token"),
-    access_token_cookie: Optional[str] = Cookie(None, alias="access_token"),
+    csrf_token_header: str | None = Header(None, alias="X-CSRF-Token"),
+    csrf_token_cookie: str | None = Cookie(None, alias="csrf_token"),
+    access_token_cookie: str | None = Cookie(None, alias="access_token"),
 ) -> bool:
     """驗證 CSRF Token
 
@@ -53,20 +53,17 @@ async def verify_csrf_token(
     # Cookie 認證需要驗證 CSRF Token
     if not csrf_token_header:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="CSRF 驗證失敗：缺少 X-CSRF-Token Header"
+            status_code=status.HTTP_403_FORBIDDEN, detail="CSRF 驗證失敗：缺少 X-CSRF-Token Header"
         )
 
     if not csrf_token_cookie:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="CSRF 驗證失敗：缺少 csrf_token Cookie"
+            status_code=status.HTTP_403_FORBIDDEN, detail="CSRF 驗證失敗：缺少 csrf_token Cookie"
         )
 
     if csrf_token_header != csrf_token_cookie:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="CSRF 驗證失敗：Token 不匹配"
+            status_code=status.HTTP_403_FORBIDDEN, detail="CSRF 驗證失敗：Token 不匹配"
         )
 
     return True
@@ -91,7 +88,4 @@ def is_csrf_exempt(request: Request) -> bool:
 
     # 檢查是否使用 Cookie 認證
     access_token_cookie = request.cookies.get("access_token")
-    if not access_token_cookie:
-        return True
-
-    return False
+    return bool(not access_token_cookie)

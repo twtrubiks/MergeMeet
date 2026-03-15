@@ -1,29 +1,20 @@
 <template>
   <n-modal
     :show="show"
-    @update:show="$emit('update:show', $event)"
     :mask-closable="true"
     class="image-preview-modal"
+    @update:show="$emit('update:show', $event)"
   >
     <div class="image-preview-container" @click="handleBackgroundClick">
       <!-- 關閉按鈕 -->
-      <n-button
-        text
-        class="close-button"
-        @click="$emit('update:show', false)"
-      >
+      <n-button text class="close-button" @click="$emit('update:show', false)">
         <template #icon>
           <Icon name="close-outline" size="lg" label="關閉" />
         </template>
       </n-button>
 
       <!-- 圖片 -->
-      <img
-        :src="imageUrl"
-        alt="圖片預覽"
-        class="preview-image"
-        @click.stop
-      />
+      <img :src="imageUrl" alt="圖片預覽" class="preview-image" @click.stop />
     </div>
   </n-modal>
 </template>

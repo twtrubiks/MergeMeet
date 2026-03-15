@@ -1,31 +1,32 @@
 """個人檔案相關 API"""
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
-from geoalchemy2.functions import ST_MakePoint, ST_SetSRID
-from datetime import date
-from dateutil.relativedelta import relativedelta
-from typing import List
-from PIL import Image
-import uuid
-import logging
-import io
 
-from app.core.database import get_db
-from app.core.dependencies import get_current_user, get_current_admin_user
+import io
+import logging
+import uuid
+from datetime import date
+
+from dateutil.relativedelta import relativedelta
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from geoalchemy2.functions import ST_MakePoint, ST_SetSRID
+from PIL import Image
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
 from app.core.config import settings
+from app.core.database import get_db
+from app.core.dependencies import get_current_admin_user, get_current_user
+from app.models.profile import InterestTag, Photo, Profile
 from app.models.user import User
-from app.models.profile import Profile, Photo, InterestTag
 from app.schemas.profile import (
-    ProfileCreateRequest,
-    ProfileUpdateRequest,
-    ProfileResponse,
-    PhotoResponse,
-    InterestTagResponse,
     InterestTagCreateRequest,
-    UpdateInterestsRequest,
+    InterestTagResponse,
     PhotoOrderRequest,
+    PhotoResponse,
+    ProfileCreateRequest,
+    ProfileResponse,
+    ProfileUpdateRequest,
+    UpdateInterestsRequest,
 )
 from app.services.content_moderation import ContentModerationService
 from app.services.file_storage import file_storage
@@ -50,11 +51,7 @@ def check_profile_completeness(profile: Profile) -> bool:
     - 至少 1 張照片
     - 3-10 個興趣標籤
     """
-    has_basic_info = bool(
-        profile.display_name and
-        profile.gender and
-        profile.bio
-    )
+    has_basic_info = bool(profile.display_name and profile.gender and profile.bio)
     has_photos = len(profile.photos) >= 1
     has_interests = 3 <= len(profile.interests) <= 10
 
@@ -65,7 +62,7 @@ def check_profile_completeness(profile: Profile) -> bool:
 async def create_profile(
     request: ProfileCreateRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     建立個人檔案
@@ -74,23 +71,16 @@ async def create_profile(
     - 可選地理位置
     """
     # 檢查是否已有檔案
-    result = await db.execute(
-        select(Profile).where(Profile.user_id == current_user.id)
-    )
+    result = await db.execute(select(Profile).where(Profile.user_id == current_user.id))
     existing_profile = result.scalar_one_or_none()
 
     if existing_profile:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="個人檔案已存在"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="個人檔案已存在")
 
     # 內容審核：檢查個人簡介
     if request.bio:
         is_approved, violations, action = await ContentModerationService.check_profile_content(
-            db=db,
-            user_id=current_user.id,
-            bio=request.bio
+            db=db, user_id=current_user.id, bio=request.bio
         )
         if not is_approved:
             raise HTTPException(
@@ -98,8 +88,8 @@ async def create_profile(
                 detail={
                     "message": "個人簡介包含不當內容",
                     "violations": violations,
-                    "action": action
-                }
+                    "action": action,
+                },
             )
 
     # 建立檔案
@@ -113,8 +103,7 @@ async def create_profile(
     # 設置地理位置（使用 GeoAlchemy2 函數避免 SQL 注入）
     if request.location:
         new_profile.location = ST_SetSRID(
-            ST_MakePoint(request.location.longitude, request.location.latitude),
-            4326
+            ST_MakePoint(request.location.longitude, request.location.latitude), 4326
         )
         new_profile.location_name = request.location.location_name
 
@@ -148,8 +137,7 @@ async def create_profile(
 
 @router.get("", response_model=ProfileResponse)
 async def get_my_profile(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     """取得自己的個人檔案"""
     result = await db.execute(
@@ -161,8 +149,7 @@ async def get_my_profile(
 
     if not profile:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="個人檔案不存在，請先建立"
+            status_code=status.HTTP_404_NOT_FOUND, detail="個人檔案不存在，請先建立"
         )
 
     age = calculate_age(current_user.date_of_birth)
@@ -192,11 +179,11 @@ async def _validate_bio_content(
         db=db, user_id=user_id, bio=bio
     )
     if not is_approved:
-        return False, status.HTTP_400_BAD_REQUEST, {
-            "message": "個人簡介包含不當內容",
-            "violations": violations,
-            "action": action
-        }
+        return (
+            False,
+            status.HTTP_400_BAD_REQUEST,
+            {"message": "個人簡介包含不當內容", "violations": violations, "action": action},
+        )
     return True, 0, ""
 
 
@@ -215,8 +202,7 @@ def _apply_profile_updates(profile: Profile, request: ProfileUpdateRequest) -> N
         profile.bio = request.bio
     if request.location is not None:
         profile.location = ST_SetSRID(
-            ST_MakePoint(request.location.longitude, request.location.latitude),
-            4326
+            ST_MakePoint(request.location.longitude, request.location.latitude), 4326
         )
         profile.location_name = request.location.location_name
     if request.min_age_preference is not None:
@@ -230,9 +216,7 @@ def _apply_profile_updates(profile: Profile, request: ProfileUpdateRequest) -> N
 
 
 def _build_profile_response(
-    profile: Profile,
-    age: int,
-    include_all_photos: bool = True
+    profile: Profile, age: int, include_all_photos: bool = True
 ) -> ProfileResponse:
     """構建 ProfileResponse（共用輔助函數）
 
@@ -245,10 +229,11 @@ def _build_profile_response(
         ProfileResponse 對象
     """
     # 過濾照片：用戶自己可看到所有照片，其他用戶只能看到已審核的照片
-    filtered_photos = profile.photos if include_all_photos else [
-        photo for photo in profile.photos
-        if photo.moderation_status == "APPROVED"
-    ]
+    filtered_photos = (
+        profile.photos
+        if include_all_photos
+        else [photo for photo in profile.photos if photo.moderation_status == "APPROVED"]
+    )
 
     photos = [
         PhotoResponse(
@@ -259,18 +244,13 @@ def _build_profile_response(
             is_profile_picture=photo.is_profile_picture,
             moderation_status=photo.moderation_status,
             rejection_reason=photo.rejection_reason,
-            created_at=photo.created_at
+            created_at=photo.created_at,
         )
         for photo in filtered_photos
     ]
 
     interests = [
-        InterestTagResponse(
-            id=str(tag.id),
-            name=tag.name,
-            category=tag.category,
-            icon=tag.icon
-        )
+        InterestTagResponse(id=str(tag.id), name=tag.name, category=tag.category, icon=tag.icon)
         for tag in profile.interests
     ]
 
@@ -299,7 +279,7 @@ def _build_profile_response(
 async def update_profile(
     request: ProfileUpdateRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """更新個人檔案"""
     # 1. 取得 profile
@@ -312,14 +292,11 @@ async def update_profile(
 
     if not profile:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="個人檔案不存在，請先建立"
+            status_code=status.HTTP_404_NOT_FOUND, detail="個人檔案不存在，請先建立"
         )
 
     # 2. 內容審核
-    is_valid, status_code, error = await _validate_bio_content(
-        db, current_user.id, request.bio
-    )
+    is_valid, status_code, error = await _validate_bio_content(db, current_user.id, request.bio)
     if not is_valid:
         raise HTTPException(status_code=status_code, detail=error)
 
@@ -340,7 +317,7 @@ async def update_profile(
 async def update_interests(
     request: UpdateInterestsRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """更新興趣標籤（3-10個）"""
     # 取得檔案
@@ -353,24 +330,18 @@ async def update_interests(
 
     if not profile:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="個人檔案不存在，請先建立"
+            status_code=status.HTTP_404_NOT_FOUND, detail="個人檔案不存在，請先建立"
         )
 
     # UUID 格式已在 Schema 層驗證，這裡直接轉換
     interest_uuids = [uuid.UUID(id_str) for id_str in request.interest_ids]
 
     # 驗證所有標籤都存在
-    result = await db.execute(
-        select(InterestTag).where(InterestTag.id.in_(interest_uuids))
-    )
+    result = await db.execute(select(InterestTag).where(InterestTag.id.in_(interest_uuids)))
     tags = result.scalars().all()
 
     if len(tags) != len(request.interest_ids):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="部分興趣標籤不存在"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="部分興趣標籤不存在")
 
     # 更新興趣標籤
     profile.interests = list(tags)
@@ -461,7 +432,7 @@ def _validate_image_format(file_content: bytes) -> tuple[bool, int, str]:
         img.verify()
         if img.format not in ALLOWED_FORMATS:
             return False, status.HTTP_400_BAD_REQUEST, "無效的圖片格式"
-    except (Image.UnidentifiedImageError, IOError, ValueError):
+    except (OSError, Image.UnidentifiedImageError, ValueError):
         return (
             False,
             status.HTTP_400_BAD_REQUEST,
@@ -571,9 +542,7 @@ async def _create_photo_record(
         return True, 0, "", new_photo
     except Exception as e:
         await db.rollback()
-        logger.error(
-            f"Failed to add photo for profile {profile.id}: {e}", exc_info=True
-        )
+        logger.error(f"Failed to add photo for profile {profile.id}: {e}", exc_info=True)
         return (
             False,
             status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -619,9 +588,7 @@ async def upload_photo(
         raise HTTPException(status_code=status_code, detail=error)
 
     # 4. 取得個人檔案並檢查照片數量
-    is_valid, status_code, error, profile = await _get_profile_with_photos(
-        current_user.id, db
-    )
+    is_valid, status_code, error, profile = await _get_profile_with_photos(current_user.id, db)
     if not is_valid:
         raise HTTPException(status_code=status_code, detail=error)
 
@@ -657,25 +624,17 @@ async def upload_photo(
 async def delete_photo(
     photo_id: str,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """刪除照片"""
     # 取得照片
     result = await db.execute(
-        select(Photo)
-        .join(Profile)
-        .where(
-            Photo.id == photo_id,
-            Profile.user_id == current_user.id
-        )
+        select(Photo).join(Profile).where(Photo.id == photo_id, Profile.user_id == current_user.id)
     )
     photo = result.scalar_one_or_none()
 
     if not photo:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="照片不存在"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="照片不存在")
 
     # 取得 profile 以便檢查完整度和重新排序
     profile_id = photo.profile_id
@@ -691,9 +650,8 @@ async def delete_photo(
     except Exception as e:
         logger.error(f"Failed to delete photo files: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="照片檔案刪除失敗"
-        )
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="照片檔案刪除失敗"
+        ) from None
 
     # 檔案刪除成功後，再刪除資料庫記錄
     await db.delete(photo)
@@ -702,10 +660,7 @@ async def delete_photo(
     # 重新載入 profile 及其照片
     result = await db.execute(
         select(Profile)
-        .options(
-            selectinload(Profile.photos),
-            selectinload(Profile.interests)
-        )
+        .options(selectinload(Profile.photos), selectinload(Profile.interests))
         .where(Profile.id == profile_id)
     )
     profile = result.scalar_one_or_none()
@@ -729,11 +684,11 @@ async def delete_photo(
         await db.commit()
 
 
-@router.put("/photos/order", response_model=List[PhotoResponse])
+@router.put("/photos/order", response_model=list[PhotoResponse])
 async def reorder_photos(
     request: PhotoOrderRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """調整照片順序
 
@@ -753,10 +708,7 @@ async def reorder_photos(
     profile = result.scalar_one_or_none()
 
     if not profile:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="個人檔案不存在"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="個人檔案不存在")
 
     existing_photos = {str(photo.id): photo for photo in profile.photos}
     existing_count = len(existing_photos)
@@ -765,7 +717,7 @@ async def reorder_photos(
     if len(request.photo_ids) != existing_count:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"照片數量不符：預期 {existing_count} 張，收到 {len(request.photo_ids)} 張"
+            detail=f"照片數量不符：預期 {existing_count} 張，收到 {len(request.photo_ids)} 張",
         )
 
     # 驗證所有 photo_ids 都屬於該用戶，且無重複
@@ -773,15 +725,14 @@ async def reorder_photos(
     for photo_id in request.photo_ids:
         if photo_id in seen_ids:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"重複的照片 ID：{photo_id}"
+                status_code=status.HTTP_400_BAD_REQUEST, detail=f"重複的照片 ID：{photo_id}"
             )
         seen_ids.add(photo_id)
 
         if photo_id not in existing_photos:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"照片 ID 不存在或不屬於此用戶：{photo_id}"
+                detail=f"照片 ID 不存在或不屬於此用戶：{photo_id}",
             )
 
     # 更新 display_order
@@ -811,7 +762,7 @@ async def reorder_photos(
 async def set_profile_picture(
     photo_id: str,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """設定主頭像
 
@@ -827,10 +778,7 @@ async def set_profile_picture(
     profile = result.scalar_one_or_none()
 
     if not profile:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="個人檔案不存在"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="個人檔案不存在")
 
     # 找到目標照片
     target_photo = None
@@ -841,15 +789,13 @@ async def set_profile_picture(
 
     if not target_photo:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="照片不存在或不屬於此用戶"
+            status_code=status.HTTP_404_NOT_FOUND, detail="照片不存在或不屬於此用戶"
         )
 
     # 檢查審核狀態
     if target_photo.moderation_status != "APPROVED":
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="只有已通過審核的照片可以設為主頭像"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="只有已通過審核的照片可以設為主頭像"
         )
 
     # 更新主頭像標記並重新排序
@@ -880,11 +826,8 @@ async def set_profile_picture(
     )
 
 
-@router.get("/interest-tags", response_model=List[InterestTagResponse])
-async def get_interest_tags(
-    category: str = None,
-    db: AsyncSession = Depends(get_db)
-):
+@router.get("/interest-tags", response_model=list[InterestTagResponse])
+async def get_interest_tags(category: str = None, db: AsyncSession = Depends(get_db)):
     """取得所有興趣標籤"""
     query = select(InterestTag).where(InterestTag.is_active.is_(True))
 
@@ -895,38 +838,26 @@ async def get_interest_tags(
     tags = result.scalars().all()
 
     return [
-        InterestTagResponse(
-            id=str(tag.id),
-            name=tag.name,
-            category=tag.category,
-            icon=tag.icon
-        )
+        InterestTagResponse(id=str(tag.id), name=tag.name, category=tag.category, icon=tag.icon)
         for tag in tags
     ]
 
 
 @router.post(
-    "/interest-tags",
-    response_model=InterestTagResponse,
-    status_code=status.HTTP_201_CREATED
+    "/interest-tags", response_model=InterestTagResponse, status_code=status.HTTP_201_CREATED
 )
 async def create_interest_tag(
     request: InterestTagCreateRequest,
     current_user: User = Depends(get_current_admin_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """建立興趣標籤（僅管理員）"""
     # 檢查標籤是否已存在
-    result = await db.execute(
-        select(InterestTag).where(InterestTag.name == request.name)
-    )
+    result = await db.execute(select(InterestTag).where(InterestTag.name == request.name))
     existing_tag = result.scalar_one_or_none()
 
     if existing_tag:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="標籤已存在"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="標籤已存在")
 
     # 建立標籤
     new_tag = InterestTag(
@@ -940,8 +871,5 @@ async def create_interest_tag(
     await db.refresh(new_tag)
 
     return InterestTagResponse(
-        id=str(new_tag.id),
-        name=new_tag.name,
-        category=new_tag.category,
-        icon=new_tag.icon
+        id=str(new_tag.id), name=new_tag.name, category=new_tag.category, icon=new_tag.icon
     )

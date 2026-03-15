@@ -31,6 +31,10 @@ cd backend
 
 # 安裝依賴（首次）
 pip install -r requirements.txt
+pip install -r requirements-dev.txt   # 開發工具（Ruff, pre-commit）
+
+# 安裝 Git pre-commit hooks（首次）
+pre-commit install
 
 # 啟動 FastAPI
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

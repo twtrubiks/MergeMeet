@@ -1,4 +1,5 @@
 """照片審核 API 測試"""
+
 import io
 import uuid
 from datetime import date
@@ -10,10 +11,9 @@ from httpx import AsyncClient
 from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import create_access_token
 from app.models.profile import Photo, Profile
 from app.models.user import User
-from app.core.security import create_access_token
-
 
 # ========== Fixtures ==========
 
@@ -28,7 +28,7 @@ async def test_user(test_db: AsyncSession):
         date_of_birth=date(1995, 1, 1),
         is_active=True,
         email_verified=True,
-        trust_score=50
+        trust_score=50,
     )
     test_db.add(user)
     await test_db.commit()
@@ -47,7 +47,7 @@ async def admin_user(test_db: AsyncSession):
         is_active=True,
         email_verified=True,
         is_admin=True,
-        trust_score=100
+        trust_score=100,
     )
     test_db.add(admin)
     await test_db.commit()
@@ -63,7 +63,7 @@ async def test_profile(test_db: AsyncSession, test_user: User):
         user_id=test_user.id,
         display_name="測試用戶",
         gender="male",
-        bio="測試簡介"
+        bio="測試簡介",
     )
     test_db.add(profile)
     await test_db.commit()
@@ -85,7 +85,7 @@ async def pending_photo(test_db: AsyncSession, test_profile: Profile):
         file_size=102400,
         width=800,
         height=600,
-        mime_type="image/jpeg"
+        mime_type="image/jpeg",
     )
     test_db.add(photo)
     await test_db.commit()
@@ -108,9 +108,9 @@ def admin_token(admin_user: User):
 @pytest.fixture
 def sample_image_bytes():
     """產生測試用 JPEG 圖片"""
-    img = Image.new('RGB', (800, 600), color='blue')
+    img = Image.new("RGB", (800, 600), color="blue")
     buffer = io.BytesIO()
-    img.save(buffer, format='JPEG')
+    img.save(buffer, format="JPEG")
     buffer.seek(0)
     return buffer.read()
 
@@ -122,19 +122,14 @@ def sample_image_bytes():
 class TestPhotoModerationAPIPermissions:
     """照片審核 API 權限測試"""
 
-    async def test_get_pending_photos_requires_admin(
-        self, client: AsyncClient, user_token: str
-    ):
+    async def test_get_pending_photos_requires_admin(self, client: AsyncClient, user_token: str):
         """測試：一般用戶無法存取待審核照片列表"""
         response = await client.get(
-            "/api/admin/photos/pending",
-            headers={"Authorization": f"Bearer {user_token}"}
+            "/api/admin/photos/pending", headers={"Authorization": f"Bearer {user_token}"}
         )
         assert response.status_code == 403
 
-    async def test_get_pending_photos_requires_auth(
-        self, client: AsyncClient
-    ):
+    async def test_get_pending_photos_requires_auth(self, client: AsyncClient):
         """測試：未認證無法存取待審核照片列表"""
         response = await client.get("/api/admin/photos/pending")
         assert response.status_code == 401
@@ -146,7 +141,7 @@ class TestPhotoModerationAPIPermissions:
         response = await client.post(
             f"/api/admin/photos/{pending_photo.id}/review",
             headers={"Authorization": f"Bearer {user_token}"},
-            json={"status": "APPROVED"}
+            json={"status": "APPROVED"},
         )
         assert response.status_code == 403
 
@@ -160,8 +155,7 @@ class TestGetPendingPhotosAPI:
     ):
         """測試：管理員成功取得待審核照片"""
         response = await client.get(
-            "/api/admin/photos/pending",
-            headers={"Authorization": f"Bearer {admin_token}"}
+            "/api/admin/photos/pending", headers={"Authorization": f"Bearer {admin_token}"}
         )
 
         assert response.status_code == 200
@@ -170,13 +164,11 @@ class TestGetPendingPhotosAPI:
         assert "total" in data
         assert data["total"] >= 1
 
-    async def test_get_pending_photos_with_pagination(
-        self, client: AsyncClient, admin_token: str
-    ):
+    async def test_get_pending_photos_with_pagination(self, client: AsyncClient, admin_token: str):
         """測試：分頁功能"""
         response = await client.get(
             "/api/admin/photos/pending?page=1&page_size=10",
-            headers={"Authorization": f"Bearer {admin_token}"}
+            headers={"Authorization": f"Bearer {admin_token}"},
         )
 
         assert response.status_code == 200
@@ -190,7 +182,7 @@ class TestGetPendingPhotosAPI:
         """測試：狀態篩選"""
         response = await client.get(
             "/api/admin/photos/pending?status=PENDING",
-            headers={"Authorization": f"Bearer {admin_token}"}
+            headers={"Authorization": f"Bearer {admin_token}"},
         )
 
         assert response.status_code == 200
@@ -205,8 +197,7 @@ class TestGetPhotoStatsAPI:
     ):
         """測試：成功取得統計數據"""
         response = await client.get(
-            "/api/admin/photos/stats",
-            headers={"Authorization": f"Bearer {admin_token}"}
+            "/api/admin/photos/stats", headers={"Authorization": f"Bearer {admin_token}"}
         )
 
         assert response.status_code == 200
@@ -229,7 +220,7 @@ class TestGetPhotoDetailAPI:
         """測試：成功取得照片詳情"""
         response = await client.get(
             f"/api/admin/photos/{pending_photo.id}",
-            headers={"Authorization": f"Bearer {admin_token}"}
+            headers={"Authorization": f"Bearer {admin_token}"},
         )
 
         assert response.status_code == 200
@@ -237,25 +228,19 @@ class TestGetPhotoDetailAPI:
         assert data["id"] == str(pending_photo.id)
         assert data["moderation_status"] == "PENDING"
 
-    async def test_get_photo_detail_not_found(
-        self, client: AsyncClient, admin_token: str
-    ):
+    async def test_get_photo_detail_not_found(self, client: AsyncClient, admin_token: str):
         """測試：照片不存在"""
         fake_id = uuid.uuid4()
         response = await client.get(
-            f"/api/admin/photos/{fake_id}",
-            headers={"Authorization": f"Bearer {admin_token}"}
+            f"/api/admin/photos/{fake_id}", headers={"Authorization": f"Bearer {admin_token}"}
         )
 
         assert response.status_code == 404
 
-    async def test_get_photo_detail_invalid_id(
-        self, client: AsyncClient, admin_token: str
-    ):
+    async def test_get_photo_detail_invalid_id(self, client: AsyncClient, admin_token: str):
         """測試：無效照片 ID"""
         response = await client.get(
-            "/api/admin/photos/invalid-uuid",
-            headers={"Authorization": f"Bearer {admin_token}"}
+            "/api/admin/photos/invalid-uuid", headers={"Authorization": f"Bearer {admin_token}"}
         )
 
         # FastAPI 使用 UUID 類型註解，無效 UUID 會返回 422 Validation Error
@@ -273,7 +258,7 @@ class TestReviewPhotoAPI:
         response = await client.post(
             f"/api/admin/photos/{pending_photo.id}/review",
             headers={"Authorization": f"Bearer {admin_token}"},
-            json={"status": "APPROVED"}
+            json={"status": "APPROVED"},
         )
 
         assert response.status_code == 200
@@ -288,10 +273,7 @@ class TestReviewPhotoAPI:
         response = await client.post(
             f"/api/admin/photos/{pending_photo.id}/review",
             headers={"Authorization": f"Bearer {admin_token}"},
-            json={
-                "status": "REJECTED",
-                "rejection_reason": "照片包含不當內容"
-            }
+            json={"status": "REJECTED", "rejection_reason": "照片包含不當內容"},
         )
 
         assert response.status_code == 200
@@ -306,7 +288,7 @@ class TestReviewPhotoAPI:
         response = await client.post(
             f"/api/admin/photos/{pending_photo.id}/review",
             headers={"Authorization": f"Bearer {admin_token}"},
-            json={"status": "REJECTED"}
+            json={"status": "REJECTED"},
         )
 
         assert response.status_code == 400
@@ -318,20 +300,18 @@ class TestReviewPhotoAPI:
         response = await client.post(
             f"/api/admin/photos/{pending_photo.id}/review",
             headers={"Authorization": f"Bearer {admin_token}"},
-            json={"status": "INVALID"}
+            json={"status": "INVALID"},
         )
 
         assert response.status_code == 422  # Pydantic validation error
 
-    async def test_review_nonexistent_photo(
-        self, client: AsyncClient, admin_token: str
-    ):
+    async def test_review_nonexistent_photo(self, client: AsyncClient, admin_token: str):
         """測試：審核不存在的照片"""
         fake_id = uuid.uuid4()
         response = await client.post(
             f"/api/admin/photos/{fake_id}/review",
             headers={"Authorization": f"Bearer {admin_token}"},
-            json={"status": "APPROVED"}
+            json={"status": "APPROVED"},
         )
 
         assert response.status_code == 400
@@ -342,21 +322,25 @@ class TestPhotoUploadWithModeration:
     """照片上傳審核狀態測試"""
 
     async def test_uploaded_photo_has_pending_status(
-        self, client: AsyncClient, test_user: User, test_profile: Profile,
-        user_token: str, sample_image_bytes
+        self,
+        client: AsyncClient,
+        test_user: User,
+        test_profile: Profile,
+        user_token: str,
+        sample_image_bytes,
     ):
         """測試：上傳的照片狀態為 PENDING"""
-        with patch('app.services.file_storage.file_storage.save_photo') as mock_save:
+        with patch("app.services.file_storage.file_storage.save_photo") as mock_save:
             mock_save.return_value = (
                 str(uuid.uuid4()),
                 "/uploads/photos/test/new.jpg",
-                "/uploads/photos/test/new_thumb.jpg"
+                "/uploads/photos/test/new_thumb.jpg",
             )
 
             response = await client.post(
                 "/api/profile/photos",
                 headers={"Authorization": f"Bearer {user_token}"},
-                files={"file": ("test.jpg", io.BytesIO(sample_image_bytes), "image/jpeg")}
+                files={"file": ("test.jpg", io.BytesIO(sample_image_bytes), "image/jpeg")},
             )
 
             assert response.status_code == 201

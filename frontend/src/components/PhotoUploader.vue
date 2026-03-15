@@ -25,22 +25,22 @@
           <img :src="photo.url" :alt="'Photo ' + photo.display_order" />
           <div class="photo-overlay">
             <button
-                @click="handleDelete(photo.id)"
-                class="btn-delete"
-                title="刪除"
-                aria-label="刪除此照片"
-              >
-                <Icon name="trash" size="sm" decorative />
-              </button>
-              <button
-                v-if="!photo.is_profile_picture"
-                @click="handleSetPrimary(photo.id)"
-                class="btn-set-primary"
-                title="設為主頭像"
-                aria-label="將此照片設為主頭像"
-              >
-                <Icon name="star" size="sm" decorative />
-              </button>
+              class="btn-delete"
+              title="刪除"
+              aria-label="刪除此照片"
+              @click="handleDelete(photo.id)"
+            >
+              <Icon name="trash" size="sm" decorative />
+            </button>
+            <button
+              v-if="!photo.is_profile_picture"
+              class="btn-set-primary"
+              title="設為主頭像"
+              aria-label="將此照片設為主頭像"
+              @click="handleSetPrimary(photo.id)"
+            >
+              <Icon name="star" size="sm" decorative />
+            </button>
             <div v-if="photo.is_profile_picture" class="photo-badge">主頭像</div>
           </div>
           <!-- 審核狀態標籤 -->
@@ -60,12 +60,7 @@
           <div v-if="photo.moderation_status === 'REJECTED'" class="rejected-mask">
             <span>❌ 未通過</span>
             <small v-if="photo.rejection_reason">{{ photo.rejection_reason }}</small>
-            <button
-              class="appeal-btn"
-              @click.stop="openAppealModal(photo)"
-            >
-              提出申訴
-            </button>
+            <button class="appeal-btn" @click.stop="openAppealModal(photo)">提出申訴</button>
           </div>
           <!-- 拖拽提示 -->
           <div class="drag-hint">⋮⋮</div>
@@ -74,11 +69,8 @@
     </draggable>
 
     <!-- 上傳按鈕（獨立於 draggable 外部） -->
-    <div class="upload-section" v-if="localPhotos.length < 6">
-      <div
-        class="photo-card upload-card"
-        @click="triggerFileInput"
-      >
+    <div v-if="localPhotos.length < 6" class="upload-section">
+      <div class="photo-card upload-card" @click="triggerFileInput">
         <div class="upload-icon">
           <span v-if="!uploading">📷</span>
           <div v-else class="spinner-small"></div>
@@ -88,8 +80,8 @@
           ref="fileInput"
           type="file"
           accept="image/*"
-          @change="handleFileSelect"
           style="display: none"
+          @change="handleFileSelect"
         />
       </div>
     </div>
@@ -135,8 +127,8 @@
               <button class="btn-cancel" @click="closeAppealModal">取消</button>
               <button
                 class="btn-submit"
-                @click="submitAppeal"
                 :disabled="appealLoading || appealReason.length < 20"
+                @click="submitAppeal"
               >
                 {{ appealLoading ? '提交中...' : '提交申訴' }}
               </button>
@@ -256,8 +248,8 @@ const getModerationStatusClass = (status) => {
  */
 const handleDragEnd = async () => {
   // 檢查順序是否有變化
-  const currentOrder = profileStore.profilePhotos.map(p => p.id)
-  const newOrder = localPhotos.value.map(p => p.id)
+  const currentOrder = profileStore.profilePhotos.map((p) => p.id)
+  const newOrder = localPhotos.value.map((p) => p.id)
 
   // 如果順序相同，不需要更新
   if (JSON.stringify(currentOrder) === JSON.stringify(newOrder)) {
@@ -464,7 +456,9 @@ const submitAppeal = async () => {
   font-size: 1.2rem;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.3s, transform 0.2s;
+  transition:
+    opacity 0.3s,
+    transform 0.2s;
   position: absolute;
   display: flex;
   align-items: center;
@@ -524,7 +518,9 @@ const submitAppeal = async () => {
   justify-content: center;
   border: 2px dashed #ccc;
   background: #fafafa;
-  transition: border-color 0.3s, background 0.3s;
+  transition:
+    border-color 0.3s,
+    background 0.3s;
   cursor: pointer;
 }
 
@@ -554,7 +550,9 @@ const submitAppeal = async () => {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .error-message {

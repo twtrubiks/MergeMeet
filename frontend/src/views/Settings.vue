@@ -25,7 +25,7 @@
               </div>
 
               <!-- 偏好設定表單 -->
-              <form v-else @submit.prevent="handleSavePreferences" class="preference-form">
+              <form v-else class="preference-form" @submit.prevent="handleSavePreferences">
                 <!-- 年齡範圍 -->
                 <div class="form-group">
                   <label class="form-label">年齡範圍</label>
@@ -33,8 +33,8 @@
                     <div class="age-input">
                       <label>最小</label>
                       <input
-                        type="number"
                         v-model.number="preferences.minAge"
+                        type="number"
                         min="18"
                         max="99"
                         :disabled="preferenceSaving"
@@ -44,8 +44,8 @@
                     <div class="age-input">
                       <label>最大</label>
                       <input
-                        type="number"
                         v-model.number="preferences.maxAge"
+                        type="number"
                         min="18"
                         max="99"
                         :disabled="preferenceSaving"
@@ -60,8 +60,8 @@
                   <label class="form-label">最大距離</label>
                   <div class="distance-input">
                     <input
-                      type="range"
                       v-model.number="preferences.maxDistance"
+                      type="range"
                       min="1"
                       max="500"
                       :disabled="preferenceSaving"
@@ -87,12 +87,14 @@
                       :class="{ active: preferences.genderPreference === option.value }"
                     >
                       <input
-                        type="radio"
                         v-model="preferences.genderPreference"
+                        type="radio"
                         :value="option.value"
                         :disabled="preferenceSaving"
                       />
-                      <span class="option-icon"><Icon :name="option.iconName" size="lg" decorative /></span>
+                      <span class="option-icon"
+                        ><Icon :name="option.iconName" size="lg" decorative
+                      /></span>
                       <span class="option-label">{{ option.label }}</span>
                     </label>
                   </div>
@@ -113,7 +115,9 @@
                   :disabled="!isPreferenceValid || preferenceSaving"
                   :loading="preferenceSaving"
                 >
-                  <span v-if="!preferenceSaving"><Icon name="save" size="sm" decorative /> 儲存偏好</span>
+                  <span v-if="!preferenceSaving"
+                    ><Icon name="save" size="sm" decorative /> 儲存偏好</span
+                  >
                 </AnimatedButton>
               </form>
             </div>
@@ -138,13 +142,13 @@
                   <h3>密碼修改成功！</h3>
                   <p class="success-text">已發送通知郵件到您的信箱</p>
                   <p class="redirect-text">{{ redirectCountdown }} 秒後自動跳轉至登入頁...</p>
-                  <AnimatedButton variant="primary" @click="goToLogin" class="action-btn">
+                  <AnimatedButton variant="primary" class="action-btn" @click="goToLogin">
                     立即登入
                   </AnimatedButton>
                 </div>
 
                 <!-- 密碼修改表單 -->
-                <form v-else @submit.prevent="handleChangePassword" class="password-form">
+                <form v-else class="password-form" @submit.prevent="handleChangePassword">
                   <!-- 當前密碼 -->
                   <FloatingInput
                     id="current-password"
@@ -206,7 +210,9 @@
                     :disabled="!isFormValid || isLoading"
                     :loading="isLoading"
                   >
-                    <span v-if="!isLoading"><Icon name="lock" size="sm" decorative /> 修改密碼</span>
+                    <span v-if="!isLoading"
+                      ><Icon name="lock" size="sm" decorative /> 修改密碼</span
+                    >
                   </AnimatedButton>
                 </form>
               </div>
@@ -221,12 +227,16 @@
                   <router-link to="/my-reports" class="link-item">
                     <span class="link-icon"><Icon name="clipboard" size="md" decorative /></span>
                     <span class="link-text">我的舉報記錄</span>
-                    <span class="link-arrow"><Icon name="back" size="sm" decorative class="arrow-icon" /></span>
+                    <span class="link-arrow"
+                      ><Icon name="back" size="sm" decorative class="arrow-icon"
+                    /></span>
                   </router-link>
                   <router-link to="/blocked" class="link-item">
                     <span class="link-icon"><Icon name="shield" size="md" decorative /></span>
                     <span class="link-text">封鎖名單</span>
-                    <span class="link-arrow"><Icon name="back" size="sm" decorative class="arrow-icon" /></span>
+                    <span class="link-arrow"
+                      ><Icon name="back" size="sm" decorative class="arrow-icon"
+                    /></span>
                   </router-link>
                 </div>
               </div>
@@ -237,7 +247,9 @@
 
       <!-- 返回首頁連結 -->
       <div class="settings-footer">
-        <router-link to="/" class="back-link"><Icon name="back" size="sm" decorative /> 返回首頁</router-link>
+        <router-link to="/" class="back-link"
+          ><Icon name="back" size="sm" decorative /> 返回首頁</router-link
+        >
       </div>
     </div>
 
@@ -336,7 +348,6 @@ const handleChangePassword = async () => {
     // 成功
     changeSuccess.value = true
     startRedirectCountdown()
-
   } catch (err) {
     const detail = err.response?.data?.detail || ''
 
@@ -425,11 +436,13 @@ const ageRangeError = computed(() => {
 
 // 偏好設定驗證
 const isPreferenceValid = computed(() => {
-  return !ageRangeError.value &&
+  return (
+    !ageRangeError.value &&
     preferences.value.minAge >= 18 &&
     preferences.value.maxAge <= 99 &&
     preferences.value.maxDistance >= 1 &&
     preferences.value.maxDistance <= 500
+  )
 })
 
 // 載入偏好設定
@@ -556,7 +569,8 @@ onUnmounted(() => {
 }
 
 @keyframes float {
-  0%, 100% {
+  0%,
+  100% {
     transform: translate(0, 0) scale(1);
   }
   33% {
@@ -608,7 +622,8 @@ onUnmounted(() => {
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
   50% {
@@ -710,8 +725,13 @@ onUnmounted(() => {
 }
 
 @keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 .success-state h3 {
@@ -883,7 +903,7 @@ onUnmounted(() => {
   gap: 16px;
 }
 
-.distance-input input[type="range"] {
+.distance-input input[type='range'] {
   flex: 1;
   height: 8px;
   -webkit-appearance: none;
@@ -893,7 +913,7 @@ onUnmounted(() => {
   outline: none;
 }
 
-.distance-input input[type="range"]::-webkit-slider-thumb {
+.distance-input input[type='range']::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 24px;
@@ -906,11 +926,11 @@ onUnmounted(() => {
   transition: transform var(--duration-normal) var(--easing-default);
 }
 
-.distance-input input[type="range"]::-webkit-slider-thumb:hover {
+.distance-input input[type='range']::-webkit-slider-thumb:hover {
   transform: scale(1.1);
 }
 
-.distance-input input[type="range"]::-moz-range-thumb {
+.distance-input input[type='range']::-moz-range-thumb {
   width: 24px;
   height: 24px;
   background: white;
@@ -1007,8 +1027,12 @@ onUnmounted(() => {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .loading-state p {

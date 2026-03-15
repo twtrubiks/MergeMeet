@@ -9,7 +9,8 @@ defineProps({
   variant: {
     type: String,
     default: 'default', // default, primary, success, warning, danger, info
-    validator: (value) => ['default', 'primary', 'success', 'warning', 'danger', 'info'].includes(value)
+    validator: (value) =>
+      ['default', 'primary', 'success', 'warning', 'danger', 'info'].includes(value)
   },
   size: {
     type: String,
@@ -61,25 +62,25 @@ defineProps({
 
 .badge.success {
   background: linear-gradient(135deg, rgba(76, 175, 80, 0.15), rgba(102, 187, 106, 0.15));
-  color: #4CAF50;
+  color: #4caf50;
   border: 1px solid rgba(76, 175, 80, 0.3);
 }
 
 .badge.warning {
   background: linear-gradient(135deg, rgba(255, 152, 0, 0.15), rgba(255, 193, 7, 0.15));
-  color: #FF9800;
+  color: #ff9800;
   border: 1px solid rgba(255, 152, 0, 0.3);
 }
 
 .badge.danger {
   background: linear-gradient(135deg, rgba(244, 67, 54, 0.15), rgba(233, 30, 99, 0.15));
-  color: #F44336;
+  color: #f44336;
   border: 1px solid rgba(244, 67, 54, 0.3);
 }
 
 .badge.info {
   background: linear-gradient(135deg, rgba(33, 150, 243, 0.15), rgba(3, 169, 244, 0.15));
-  color: #2196F3;
+  color: #2196f3;
   border: 1px solid rgba(33, 150, 243, 0.3);
 }
 

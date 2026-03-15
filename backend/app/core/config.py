@@ -1,10 +1,13 @@
 """應用程式配置"""
-from pydantic_settings import BaseSettings, SettingsConfigDict
+
 import os
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """應用程式設定"""
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
     # 專案資訊
@@ -15,7 +18,7 @@ class Settings(BaseSettings):
     # 資料庫（必須從環境變數設定）
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL",
-        "postgresql+asyncpg://mergemeet:YOUR_DB_PASSWORD_HERE@localhost:5432/mergemeet"
+        "postgresql+asyncpg://mergemeet:YOUR_DB_PASSWORD_HERE@localhost:5432/mergemeet",
     )
 
     # Redis（用於 Token 黑名單、登入限制、信任分數、內容審核快取）
@@ -26,8 +29,7 @@ class Settings(BaseSettings):
 
     # JWT（SECRET_KEY 生產環境必須從環境變數設定）
     SECRET_KEY: str = os.getenv(
-        "SECRET_KEY",
-        "dev-secret-key-CHANGE-THIS-IN-PRODUCTION-min-32-chars-required-for-security"
+        "SECRET_KEY", "dev-secret-key-CHANGE-THIS-IN-PRODUCTION-min-32-chars-required-for-security"
     )
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))

@@ -4,7 +4,7 @@
       <div class="modal-content" @click.stop>
         <div class="modal-header">
           <h2>舉報用戶</h2>
-          <button class="close-btn" @click="handleClose" aria-label="關閉舉報視窗">
+          <button class="close-btn" aria-label="關閉舉報視窗" @click="handleClose">
             <Icon name="close" size="md" decorative />
           </button>
         </div>
@@ -15,12 +15,7 @@
           <!-- 舉報類型 -->
           <div class="form-group">
             <label for="report-type">舉報類型 *</label>
-            <select
-              id="report-type"
-              v-model="reportType"
-              class="form-control"
-              :disabled="loading"
-            >
+            <select id="report-type" v-model="reportType" class="form-control" :disabled="loading">
               <option value="">請選擇舉報類型</option>
               <option value="INAPPROPRIATE">不當內容或行為</option>
               <option value="HARASSMENT">騷擾或霸凌</option>
@@ -72,18 +67,8 @@
         </div>
 
         <div class="modal-footer">
-          <button
-            class="btn btn-cancel"
-            @click="handleClose"
-            :disabled="loading"
-          >
-            取消
-          </button>
-          <button
-            class="btn btn-report"
-            @click="handleSubmit"
-            :disabled="!canSubmit || loading"
-          >
+          <button class="btn btn-cancel" :disabled="loading" @click="handleClose">取消</button>
+          <button class="btn btn-report" :disabled="!canSubmit || loading" @click="handleSubmit">
             {{ loading ? '送出中...' : '送出舉報' }}
           </button>
         </div>
@@ -122,10 +107,7 @@ const success = ref(false)
 
 // 表單驗證
 const canSubmit = computed(() => {
-  return reportType.value &&
-         reason.value.length >= 10 &&
-         !loading.value &&
-         !success.value
+  return reportType.value && reason.value.length >= 10 && !loading.value && !success.value
 })
 
 // 處理送出
@@ -173,11 +155,14 @@ const resetForm = () => {
 }
 
 // 監聽 show 變化，重置表單
-watch(() => props.show, (newVal) => {
-  if (newVal) {
-    resetForm()
+watch(
+  () => props.show,
+  (newVal) => {
+    if (newVal) {
+      resetForm()
+    }
   }
-})
+)
 </script>
 
 <style scoped>
@@ -254,8 +239,8 @@ watch(() => props.show, (newVal) => {
   color: #666;
   margin-bottom: 20px;
   padding: 12px;
-  background: #FFF3E0;
-  border-left: 3px solid #FF9800;
+  background: #fff3e0;
+  border-left: 3px solid #ff9800;
   border-radius: 4px;
 }
 
@@ -284,7 +269,7 @@ watch(() => props.show, (newVal) => {
 
 .form-control:focus {
   outline: none;
-  border-color: #FF6B6B;
+  border-color: #ff6b6b;
 }
 
 .form-control:disabled {
@@ -318,15 +303,15 @@ textarea.form-control {
 }
 
 .error-message {
-  background: #FFEBEE;
-  color: #C62828;
-  border-left: 3px solid #C62828;
+  background: #ffebee;
+  color: #c62828;
+  border-left: 3px solid #c62828;
 }
 
 .success-message {
-  background: #E8F5E9;
-  color: #2E7D32;
-  border-left: 3px solid #2E7D32;
+  background: #e8f5e9;
+  color: #2e7d32;
+  border-left: 3px solid #2e7d32;
 }
 
 /* Modal 底部 */
@@ -364,12 +349,12 @@ textarea.form-control {
 }
 
 .btn-report {
-  background: #FF6B6B;
+  background: #ff6b6b;
   color: white;
 }
 
 .btn-report:hover:not(:disabled) {
-  background: #FF5252;
+  background: #ff5252;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
 }

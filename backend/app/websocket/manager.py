@@ -28,11 +28,12 @@ class RedisConnectionManager:
         # 發布到 Redis 頻道，所有實例都會收到
         await redis.publish(f"ws:match:{match_id}", json.dumps(message))
 """
-from fastapi import WebSocket
-from typing import Dict, List, Optional
-import logging
+
 import asyncio
-from datetime import datetime, timezone, timedelta
+import logging
+from datetime import UTC, datetime, timedelta
+
+from fastapi import WebSocket
 
 from app.core.security import decode_token
 from app.services.token_blacklist import token_blacklist
@@ -55,32 +56,28 @@ class ConnectionManager:
 
     # 心跳配置
     HEARTBEAT_INTERVAL = 30  # 發送 ping 的間隔（秒）
-    HEARTBEAT_TIMEOUT = 90   # 無回應超時時間（秒）
+    HEARTBEAT_TIMEOUT = 90  # 無回應超時時間（秒）
 
     def __init__(self):
         # 用戶ID -> WebSocket 連接
-        self.active_connections: Dict[str, WebSocket] = {}
+        self.active_connections: dict[str, WebSocket] = {}
 
         # 配對ID -> 用戶ID列表 (用於聊天室管理)
-        self.match_rooms: Dict[str, List[str]] = {}
+        self.match_rooms: dict[str, list[str]] = {}
 
         # 用戶ID -> 最後心跳時間 (用於檢測異常斷線)
-        self.connection_heartbeats: Dict[str, datetime] = {}
+        self.connection_heartbeats: dict[str, datetime] = {}
 
         # 並發安全鎖
         self._connections_lock = asyncio.Lock()
         self._rooms_lock = asyncio.Lock()
 
         # 定期任務
-        self._cleanup_task: Optional[asyncio.Task] = None
-        self._heartbeat_task: Optional[asyncio.Task] = None
+        self._cleanup_task: asyncio.Task | None = None
+        self._heartbeat_task: asyncio.Task | None = None
 
     async def connect(
-        self,
-        websocket: WebSocket,
-        user_id: str,
-        token: str,
-        already_accepted: bool = False
+        self, websocket: WebSocket, user_id: str, token: str, already_accepted: bool = False
     ) -> bool:
         """建立 WebSocket 連接
 
@@ -112,22 +109,16 @@ class ConnectionManager:
         if payload.get("type") != "access":
             if not already_accepted:
                 await websocket.close(code=1008, reason="Invalid token type")
-            logger.warning(
-                f"WebSocket connection with wrong token type "
-                f"for user {user_id}"
-            )
+            logger.warning(f"WebSocket connection with wrong token type for user {user_id}")
             return False
 
         # 明確檢查 Token 過期時間（雙重保險）
         exp = payload.get("exp")
-        exp_time = datetime.fromtimestamp(exp, tz=timezone.utc) if exp else None
-        if exp_time and exp_time < datetime.now(timezone.utc):
+        exp_time = datetime.fromtimestamp(exp, tz=UTC) if exp else None
+        if exp_time and exp_time < datetime.now(UTC):
             if not already_accepted:
                 await websocket.close(code=1008, reason="Token expired")
-            logger.warning(
-                f"WebSocket connection with expired token "
-                f"for user {user_id}"
-            )
+            logger.warning(f"WebSocket connection with expired token for user {user_id}")
             return False
 
         # 接受連接（如果尚未接受）
@@ -138,7 +129,7 @@ class ConnectionManager:
         async with self._connections_lock:
             self.active_connections[user_id] = websocket
             # 初始化心跳時間（防止異常斷線）
-            self.connection_heartbeats[user_id] = datetime.now(timezone.utc)
+            self.connection_heartbeats[user_id] = datetime.now(UTC)
         logger.info(f"User {user_id} connected via WebSocket")
 
         return True
@@ -185,12 +176,7 @@ class ConnectionManager:
                 logger.error(f"Error sending message to {user_id}: {e}")
                 await self.disconnect(user_id)
 
-    async def send_to_match(
-        self,
-        match_id: str,
-        message: dict,
-        exclude_user: Optional[str] = None
-    ):
+    async def send_to_match(self, match_id: str, message: dict, exclude_user: str | None = None):
         """發送訊息給配對中的所有用戶
 
         Args:
@@ -254,7 +240,7 @@ class ConnectionManager:
         async with self._connections_lock:
             return user_id in self.active_connections
 
-    async def get_online_users(self) -> List[str]:
+    async def get_online_users(self) -> list[str]:
         """獲取所有在線用戶
 
         Returns:
@@ -301,10 +287,7 @@ class ConnectionManager:
         if not user_ids:
             return
 
-        ping_message = {
-            "type": "ping",
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
+        ping_message = {"type": "ping", "timestamp": datetime.now(UTC).isoformat()}
 
         for user_id in user_ids:
             try:
@@ -331,7 +314,7 @@ class ConnectionManager:
 
         檢測並移除異常斷線的 WebSocket 連接，防止資源洩漏
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         stale_users = []
 
         # 找出所有過期的連接（使用鎖保護）
@@ -343,8 +326,7 @@ class ConnectionManager:
         # 斷開過期連接
         for user_id in stale_users:
             logger.warning(
-                f"Cleaning up stale connection for user {user_id} "
-                f"(no heartbeat response)"
+                f"Cleaning up stale connection for user {user_id} (no heartbeat response)"
             )
             await self.disconnect(user_id)
 
@@ -358,7 +340,7 @@ class ConnectionManager:
             user_id: 用戶 ID
         """
         if user_id in self.connection_heartbeats:
-            self.connection_heartbeats[user_id] = datetime.now(timezone.utc)
+            self.connection_heartbeats[user_id] = datetime.now(UTC)
 
 
 # 全局單例實例

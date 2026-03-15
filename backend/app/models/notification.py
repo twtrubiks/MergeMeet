@@ -1,10 +1,12 @@
 """通知模型 - 持久化用戶通知"""
-from sqlalchemy import Column, String, Text, Boolean, DateTime, ForeignKey, Index
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+
+import uuid
+from datetime import UTC, datetime
+
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, String, Text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-import uuid
-from datetime import datetime, timezone
 
 from app.core.database import Base
 
@@ -17,6 +19,7 @@ class Notification(Base):
     - notification_match: 新配對通知
     - notification_liked: 有人喜歡你通知
     """
+
     __tablename__ = "notifications"
 
     # 主鍵
@@ -24,10 +27,7 @@ class Notification(Base):
 
     # 用戶關聯
     user_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
 
     # 通知類型
@@ -48,9 +48,7 @@ class Notification(Base):
 
     # 時間戳記
     created_at = Column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        server_default=func.now()
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), server_default=func.now()
     )
 
     # 關聯
@@ -58,8 +56,8 @@ class Notification(Base):
 
     # 複合索引優化查詢
     __table_args__ = (
-        Index('idx_notifications_user_unread', 'user_id', 'is_read'),
-        Index('idx_notifications_user_created', 'user_id', 'created_at'),
+        Index("idx_notifications_user_unread", "user_id", "is_read"),
+        Index("idx_notifications_user_created", "user_id", "created_at"),
     )
 
     def __repr__(self):

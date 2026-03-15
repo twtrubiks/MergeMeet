@@ -93,21 +93,19 @@
                 <button
                   type="button"
                   class="btn-auto-location"
-                  @click="getAutoLocation"
                   :disabled="gettingLocation"
+                  @click="getAutoLocation"
                 >
-                  <span v-if="!gettingLocation"><Icon name="location" size="sm" decorative /> 自動獲取我的位置</span>
+                  <span v-if="!gettingLocation"
+                    ><Icon name="location" size="sm" decorative /> 自動獲取我的位置</span
+                  >
                   <span v-else><Icon name="sync" size="sm" decorative /> 定位中...</span>
                 </button>
                 <small class="hint">或手動選擇城市</small>
               </div>
 
               <!-- 城市選擇下拉選單 -->
-              <select
-                id="location_name"
-                v-model="formData.location_name"
-                class="location-select"
-              >
+              <select id="location_name" v-model="formData.location_name" class="location-select">
                 <option value="">請選擇城市</option>
                 <optgroup label="北部">
                   <option value="台北市">台北市</option>
@@ -150,12 +148,8 @@
             </div>
 
             <div class="button-group">
-              <AnimatedButton variant="ghost" @click="cancelEdit">
-                取消
-              </AnimatedButton>
-              <AnimatedButton variant="primary" @click="nextStep">
-                下一步 →
-              </AnimatedButton>
+              <AnimatedButton variant="ghost" @click="cancelEdit"> 取消 </AnimatedButton>
+              <AnimatedButton variant="primary" @click="nextStep"> 下一步 → </AnimatedButton>
             </div>
           </div>
 
@@ -164,12 +158,8 @@
             <PhotoUploader @photos-changed="fetchProfileData" />
 
             <div class="button-group">
-              <AnimatedButton variant="ghost" @click="currentStep = 1">
-                ← 上一步
-              </AnimatedButton>
-              <AnimatedButton variant="primary" @click="nextStep">
-                下一步 →
-              </AnimatedButton>
+              <AnimatedButton variant="ghost" @click="currentStep = 1"> ← 上一步 </AnimatedButton>
+              <AnimatedButton variant="primary" @click="nextStep"> 下一步 → </AnimatedButton>
             </div>
           </div>
 
@@ -178,16 +168,16 @@
             <InterestSelector v-model="selectedInterests" />
 
             <div class="button-group">
-              <AnimatedButton variant="ghost" @click="currentStep = 2">
-                ← 上一步
-              </AnimatedButton>
+              <AnimatedButton variant="ghost" @click="currentStep = 2"> ← 上一步 </AnimatedButton>
               <AnimatedButton
                 variant="success"
-                @click="submitProfile"
                 :disabled="profileStore.loading"
                 :loading="profileStore.loading"
+                @click="submitProfile"
               >
-                <span v-if="!profileStore.loading"><Icon name="check" size="sm" decorative /> 完成</span>
+                <span v-if="!profileStore.loading"
+                  ><Icon name="check" size="sm" decorative /> 完成</span
+                >
               </AnimatedButton>
             </div>
           </div>
@@ -216,11 +206,12 @@
             </div>
             <div class="profile-info">
               <h1>{{ profileStore.profile.display_name }}</h1>
-              <p class="profile-age" v-if="profileStore.profile.age">
+              <p v-if="profileStore.profile.age" class="profile-age">
                 {{ profileStore.profile.age }} 歲
               </p>
-              <p class="profile-location" v-if="profileStore.profile.location_name">
-                <Icon name="location" size="sm" decorative /> {{ profileStore.profile.location_name }}
+              <p v-if="profileStore.profile.location_name" class="profile-location">
+                <Icon name="location" size="sm" decorative />
+                {{ profileStore.profile.location_name }}
               </p>
             </div>
             <AnimatedButton variant="primary" @click="startEditing">
@@ -238,11 +229,7 @@
           <div v-if="profileStore.profilePhotos.length > 0" class="profile-section">
             <h3>照片 ({{ profileStore.profilePhotos.length }}/6)</h3>
             <div class="photo-grid">
-              <div
-                v-for="photo in profileStore.profilePhotos"
-                :key="photo.id"
-                class="photo-item"
-              >
+              <div v-for="photo in profileStore.profilePhotos" :key="photo.id" class="photo-item">
                 <img :src="photo.url" :alt="'Photo ' + photo.display_order" />
                 <div v-if="photo.is_profile_picture" class="photo-badge">主頭像</div>
               </div>
@@ -270,7 +257,10 @@
               <div class="pref-item">
                 <span class="pref-label">年齡範圍:</span>
                 <span class="pref-value">
-                  {{ profileStore.profile.min_age_preference }}-{{ profileStore.profile.max_age_preference }} 歲
+                  {{ profileStore.profile.min_age_preference }}-{{
+                    profileStore.profile.max_age_preference
+                  }}
+                  歲
                 </span>
               </div>
               <div class="pref-item">
@@ -279,7 +269,9 @@
               </div>
               <div class="pref-item">
                 <span class="pref-label">性別偏好:</span>
-                <span class="pref-value">{{ getGenderPreferenceText(profileStore.profile.gender_preference) }}</span>
+                <span class="pref-value">{{
+                  getGenderPreferenceText(profileStore.profile.gender_preference)
+                }}</span>
               </div>
             </div>
           </div>
@@ -287,12 +279,23 @@
           <!-- 檔案狀態 -->
           <div class="profile-section">
             <div class="status-badges">
-              <span class="badge" :class="profileStore.isProfileComplete ? 'badge-success' : 'badge-warning'">
-                <Icon v-if="profileStore.isProfileComplete" name="check-circle" size="sm" decorative />
+              <span
+                class="badge"
+                :class="profileStore.isProfileComplete ? 'badge-success' : 'badge-warning'"
+              >
+                <Icon
+                  v-if="profileStore.isProfileComplete"
+                  name="check-circle"
+                  size="sm"
+                  decorative
+                />
                 <Icon v-else name="warning" size="sm" decorative />
                 {{ profileStore.isProfileComplete ? '檔案完整' : '檔案不完整' }}
               </span>
-              <span class="badge" :class="profileStore.profile.is_visible ? 'badge-success' : 'badge-inactive'">
+              <span
+                class="badge"
+                :class="profileStore.profile.is_visible ? 'badge-success' : 'badge-inactive'"
+              >
                 <Icon v-if="profileStore.profile.is_visible" name="eye" size="sm" decorative />
                 <Icon v-else name="lock" size="sm" decorative />
                 {{ profileStore.profile.is_visible ? '公開' : '隱藏' }}
@@ -337,7 +340,7 @@ const formData = ref({
   gender: '',
   bio: '',
   location_name: '',
-  gps_location: null  // 存儲 GPS 定位結果 { latitude, longitude }
+  gps_location: null // 存儲 GPS 定位結果 { latitude, longitude }
 })
 
 // 原始表單資料（用於髒狀態檢測）
@@ -386,7 +389,7 @@ const startEditing = () => {
   formData.value = { ...existingData }
   // 儲存原始資料用於髒狀態檢測
   originalFormData.value = { ...existingData }
-  selectedInterests.value = profileStore.profileInterests.map(i => i.id)
+  selectedInterests.value = profileStore.profileInterests.map((i) => i.id)
 }
 
 /**
@@ -498,15 +501,11 @@ const getAutoLocation = async () => {
 
   try {
     const position = await new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(
-        resolve,
-        reject,
-        {
-          enableHighAccuracy: true,  // 高精度定位
-          timeout: 10000,            // 10 秒超時
-          maximumAge: 0              // 不使用快取位置
-        }
-      )
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true, // 高精度定位
+        timeout: 10000, // 10 秒超時
+        maximumAge: 0 // 不使用快取位置
+      })
     })
 
     const { latitude, longitude } = position.coords
@@ -525,7 +524,6 @@ const getAutoLocation = async () => {
 
     message.success('✅ 定位成功！已自動獲取您的位置')
     logger.log('GPS location obtained:', fuzzyCoords)
-
   } catch (error) {
     logger.error('定位失敗:', error)
 
@@ -551,23 +549,22 @@ const getCityFromCoords = (lat, lng) => {
   // 台灣主要城市的大概範圍（簡化判斷）
   const cityRanges = [
     { name: '台北市', lat: [24.95, 25.25], lng: [121.45, 121.65] },
-    { name: '新北市', lat: [24.80, 25.30], lng: [121.30, 122.00] },
-    { name: '基隆市', lat: [25.08, 25.18], lng: [121.68, 121.80] },
-    { name: '桃園市', lat: [24.80, 25.10], lng: [120.90, 121.50] },
-    { name: '新竹市', lat: [24.75, 24.85], lng: [120.90, 121.00] },
-    { name: '台中市', lat: [24.00, 24.30], lng: [120.50, 120.90] },
-    { name: '台南市', lat: [22.90, 23.10], lng: [120.10, 120.35] },
-    { name: '高雄市', lat: [22.50, 22.80], lng: [120.20, 120.45] },
+    { name: '新北市', lat: [24.8, 25.3], lng: [121.3, 122.0] },
+    { name: '基隆市', lat: [25.08, 25.18], lng: [121.68, 121.8] },
+    { name: '桃園市', lat: [24.8, 25.1], lng: [120.9, 121.5] },
+    { name: '新竹市', lat: [24.75, 24.85], lng: [120.9, 121.0] },
+    { name: '台中市', lat: [24.0, 24.3], lng: [120.5, 120.9] },
+    { name: '台南市', lat: [22.9, 23.1], lng: [120.1, 120.35] },
+    { name: '高雄市', lat: [22.5, 22.8], lng: [120.2, 120.45] }
   ]
 
   for (const city of cityRanges) {
-    if (lat >= city.lat[0] && lat <= city.lat[1] &&
-        lng >= city.lng[0] && lng <= city.lng[1]) {
+    if (lat >= city.lat[0] && lat <= city.lat[1] && lng >= city.lng[0] && lng <= city.lng[1]) {
       return city.name
     }
   }
 
-  return '台灣'  // 預設值
+  return '台灣' // 預設值
 }
 
 /**
@@ -596,32 +593,32 @@ const geocodeLocation = (locationName) => {
   // 台灣所有縣市的經緯度（城市中心點座標）
   const cityCoordinates = {
     // 北部
-    '台北市': { latitude: 25.0330, longitude: 121.5654 },
-    '新北市': { latitude: 25.0120, longitude: 121.4659 },
-    '基隆市': { latitude: 25.1276, longitude: 121.7392 },
-    '桃園市': { latitude: 24.9936, longitude: 121.3010 },
-    '新竹市': { latitude: 24.8138, longitude: 120.9675 },
-    '新竹縣': { latitude: 24.8387, longitude: 121.0177 },
+    台北市: { latitude: 25.033, longitude: 121.5654 },
+    新北市: { latitude: 25.012, longitude: 121.4659 },
+    基隆市: { latitude: 25.1276, longitude: 121.7392 },
+    桃園市: { latitude: 24.9936, longitude: 121.301 },
+    新竹市: { latitude: 24.8138, longitude: 120.9675 },
+    新竹縣: { latitude: 24.8387, longitude: 121.0177 },
     // 中部
-    '苗栗縣': { latitude: 24.5602, longitude: 120.8214 },
-    '台中市': { latitude: 24.1477, longitude: 120.6736 },
-    '彰化縣': { latitude: 24.0518, longitude: 120.5161 },
-    '南投縣': { latitude: 23.9609, longitude: 120.9719 },
-    '雲林縣': { latitude: 23.7092, longitude: 120.4313 },
+    苗栗縣: { latitude: 24.5602, longitude: 120.8214 },
+    台中市: { latitude: 24.1477, longitude: 120.6736 },
+    彰化縣: { latitude: 24.0518, longitude: 120.5161 },
+    南投縣: { latitude: 23.9609, longitude: 120.9719 },
+    雲林縣: { latitude: 23.7092, longitude: 120.4313 },
     // 南部
-    '嘉義市': { latitude: 23.4800, longitude: 120.4491 },
-    '嘉義縣': { latitude: 23.4518, longitude: 120.2554 },
-    '台南市': { latitude: 22.9997, longitude: 120.2270 },
-    '高雄市': { latitude: 22.6273, longitude: 120.3014 },
-    '屏東縣': { latitude: 22.5519, longitude: 120.5487 },
+    嘉義市: { latitude: 23.48, longitude: 120.4491 },
+    嘉義縣: { latitude: 23.4518, longitude: 120.2554 },
+    台南市: { latitude: 22.9997, longitude: 120.227 },
+    高雄市: { latitude: 22.6273, longitude: 120.3014 },
+    屏東縣: { latitude: 22.5519, longitude: 120.5487 },
     // 東部
-    '宜蘭縣': { latitude: 24.7021, longitude: 121.7378 },
-    '花蓮縣': { latitude: 23.9871, longitude: 121.6015 },
-    '台東縣': { latitude: 22.7583, longitude: 121.1444 },
+    宜蘭縣: { latitude: 24.7021, longitude: 121.7378 },
+    花蓮縣: { latitude: 23.9871, longitude: 121.6015 },
+    台東縣: { latitude: 22.7583, longitude: 121.1444 },
     // 離島
-    '澎湖縣': { latitude: 23.5712, longitude: 119.5793 },
-    '金門縣': { latitude: 24.4324, longitude: 118.3170 },
-    '連江縣': { latitude: 26.1605, longitude: 119.9515 }  // 馬祖
+    澎湖縣: { latitude: 23.5712, longitude: 119.5793 },
+    金門縣: { latitude: 24.4324, longitude: 118.317 },
+    連江縣: { latitude: 26.1605, longitude: 119.9515 } // 馬祖
   }
 
   // 直接匹配完整地點名稱
@@ -862,13 +859,16 @@ onMounted(async () => {
 }
 
 @keyframes heartBeat {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
-  10%, 30% {
+  10%,
+  30% {
     transform: scale(1.15);
   }
-  20%, 40% {
+  20%,
+  40% {
     transform: scale(0.95);
   }
 }
@@ -1018,7 +1018,7 @@ onMounted(async () => {
 }
 
 .form-group .success-hint {
-  color: #4CAF50;
+  color: #4caf50;
   font-weight: 500;
   margin-top: 8px;
   display: block;
@@ -1105,9 +1105,16 @@ onMounted(async () => {
 }
 
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-10px); }
-  75% { transform: translateX(10px); }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-10px);
+  }
+  75% {
+    transform: translateX(10px);
+  }
 }
 
 /* 檔案顯示 */

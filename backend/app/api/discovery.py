@@ -25,25 +25,26 @@ TODO [Redis 擴展] 效能優化時可加入 Redis 快取
 - 使用較短的 TTL 確保資料新鮮度
 - 可考慮使用 Redis 的 pub/sub 做跨實例快取失效通知
 """
-from fastapi import APIRouter, Depends, Query, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, func, case, delete
-from sqlalchemy.orm import selectinload
-from sqlalchemy.exc import IntegrityError
-from geoalchemy2.functions import ST_DWithin
-from typing import Optional, List
-from datetime import datetime, timedelta, timezone
-from dateutil.relativedelta import relativedelta
-import uuid
+
 import logging
+import uuid
+from datetime import UTC, datetime, timedelta
+
+from dateutil.relativedelta import relativedelta
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from geoalchemy2.functions import ST_DWithin
+from sqlalchemy import and_, case, delete, func, or_, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
-from app.models.user import User
-from app.models.profile import Profile
-from app.models.match import Like, Match, BlockedUser, Message, Pass
+from app.models.match import BlockedUser, Like, Match, Message, Pass
 from app.models.notification import Notification
-from app.schemas.discovery import ProfileCard, LikeResponse, MatchSummary
+from app.models.profile import Profile
+from app.models.user import User
+from app.schemas.discovery import LikeResponse, MatchSummary, ProfileCard
 from app.services.matching_service import matching_service
 from app.services.trust_score import TrustScoreService
 
@@ -55,11 +56,11 @@ MIN_MATCH_SCORE = 15.0
 router = APIRouter(prefix="/api/discovery", tags=["discovery"])
 
 
-@router.get("/browse", response_model=List[ProfileCard])
+@router.get("/browse", response_model=list[ProfileCard])
 async def browse_users(
     limit: int = Query(20, ge=1, le=50, description="返回數量"),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     瀏覽可配對用戶
@@ -78,16 +79,10 @@ async def browse_users(
     my_profile = result.scalar_one_or_none()
 
     if not my_profile:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="請先完成個人檔案設定"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="請先完成個人檔案設定")
 
     if not my_profile.location:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="請先設定您的位置"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="請先設定您的位置")
 
     # 使用用戶的偏好設定
     min_age = my_profile.min_age_preference or 18
@@ -106,9 +101,10 @@ async def browse_users(
         func.ST_Distance(
             Profile.location,
             my_profile.location,
-            True  # use_spheroid=True
-        ) / 1000  # 轉換為公里
-    ).label('distance_km')
+            True,  # use_spheroid=True
+        )
+        / 1000  # 轉換為公里
+    ).label("distance_km")
 
     query = (
         select(Profile, distance_label)
@@ -116,7 +112,7 @@ async def browse_users(
         .options(
             selectinload(Profile.user),
             selectinload(Profile.photos),
-            selectinload(Profile.interests)
+            selectinload(Profile.interests),
         )
         .where(
             and_(
@@ -132,8 +128,8 @@ async def browse_users(
                     Profile.location,
                     my_profile.location,
                     max_distance_km * 1000,  # 轉換為公尺
-                    True  # use_spheroid=True，使用球面計算
-                )
+                    True,  # use_spheroid=True，使用球面計算
+                ),
             )
         )
     )
@@ -146,23 +142,15 @@ async def browse_users(
             query = query.where(Profile.gender == gender_preference)
 
     # 排除已喜歡的用戶（包括互相喜歡的）
-    liked_users_subquery = select(Like.to_user_id).where(
-        Like.from_user_id == current_user.id
-    )
+    liked_users_subquery = select(Like.to_user_id).where(Like.from_user_id == current_user.id)
     query = query.where(Profile.user_id.notin_(liked_users_subquery))
 
     # 排除已配對的用戶
     matched_users_subquery = select(
-        case(
-            (Match.user1_id == current_user.id, Match.user2_id),
-            else_=Match.user1_id
-        )
+        case((Match.user1_id == current_user.id, Match.user2_id), else_=Match.user1_id)
     ).where(
-        or_(
-            Match.user1_id == current_user.id,
-            Match.user2_id == current_user.id
-        ),
-        Match.status == "ACTIVE"
+        or_(Match.user1_id == current_user.id, Match.user2_id == current_user.id),
+        Match.status == "ACTIVE",
     )
     query = query.where(Profile.user_id.notin_(matched_users_subquery))
 
@@ -182,7 +170,7 @@ async def browse_users(
     pass_cutoff = datetime.now() - timedelta(hours=24)
     passed_users_subquery = select(Pass.to_user_id).where(
         Pass.from_user_id == current_user.id,
-        Pass.passed_at > pass_cutoff  # 只排除 24 小時內跳過的
+        Pass.passed_at > pass_cutoff,  # 只排除 24 小時內跳過的
     )
     query = query.where(Profile.user_id.notin_(passed_users_subquery))
 
@@ -216,7 +204,7 @@ async def browse_users(
             "photo_count": len(photos),
             "bio": profile.bio,
             "age": age,
-            "trust_score": profile.user.trust_score  # 信任分數
+            "trust_score": profile.user.trust_score,  # 信任分數
         }
 
         # 建立用戶偏好資料字典
@@ -225,7 +213,7 @@ async def browse_users(
             "min_age_preference": min_age,
             "max_age_preference": max_age,
             "max_distance_km": max_distance_km,
-            "gender_preference": gender_preference
+            "gender_preference": gender_preference,
         }
 
         # 計算配對分數
@@ -242,7 +230,7 @@ async def browse_users(
             distance_km=round(distance_km, 1) if distance_km else None,
             interests=interests,
             photos=photos,
-            match_score=round(match_score, 1)
+            match_score=round(match_score, 1),
         )
 
         # 過濾低於門檻的用戶
@@ -259,7 +247,7 @@ async def browse_users(
 # ========== like_user 輔助函數 ==========
 
 
-def _get_user_avatar(profile: Profile) -> Optional[str]:
+def _get_user_avatar(profile: Profile) -> str | None:
     """取得用戶頭像 URL
 
     Args:
@@ -279,10 +267,8 @@ def _get_user_avatar(profile: Profile) -> Optional[str]:
 
 
 async def _validate_like_request(
-    user_id: uuid.UUID,
-    current_user: User,
-    db: AsyncSession
-) -> tuple[bool, int, str, Optional[Profile]]:
+    user_id: uuid.UUID, current_user: User, db: AsyncSession
+) -> tuple[bool, int, str, Profile | None]:
     """驗證喜歡請求
 
     驗證:
@@ -304,12 +290,7 @@ async def _validate_like_request(
 
     # 檢查是否已經喜歡
     result = await db.execute(
-        select(Like).where(
-            and_(
-                Like.from_user_id == current_user.id,
-                Like.to_user_id == user_id
-            )
-        )
+        select(Like).where(and_(Like.from_user_id == current_user.id, Like.to_user_id == user_id))
     )
     if result.scalar_one_or_none():
         return False, status.HTTP_400_BAD_REQUEST, "已經喜歡過此用戶", None
@@ -320,7 +301,7 @@ async def _validate_like_request(
             and_(
                 Profile.user_id == user_id,
                 Profile.is_visible.is_(True),
-                Profile.is_complete.is_(True)
+                Profile.is_complete.is_(True),
             )
         )
     )
@@ -332,10 +313,8 @@ async def _validate_like_request(
 
 
 async def _create_like_record(
-    from_user_id: uuid.UUID,
-    to_user_id: uuid.UUID,
-    db: AsyncSession
-) -> tuple[bool, int, str, Optional[Like]]:
+    from_user_id: uuid.UUID, to_user_id: uuid.UUID, db: AsyncSession
+) -> tuple[bool, int, str, Like | None]:
     """創建 Like 記錄（含並發處理）
 
     Args:
@@ -346,10 +325,7 @@ async def _create_like_record(
     Returns:
         (success, status_code, error_detail, like_record)
     """
-    like = Like(
-        from_user_id=from_user_id,
-        to_user_id=to_user_id
-    )
+    like = Like(from_user_id=from_user_id, to_user_id=to_user_id)
     db.add(like)
 
     try:
@@ -362,10 +338,8 @@ async def _create_like_record(
 
 
 async def _check_mutual_like_and_create_match(
-    current_user_id: uuid.UUID,
-    target_user_id: uuid.UUID,
-    db: AsyncSession
-) -> tuple[bool, Optional[uuid.UUID], Optional[str]]:
+    current_user_id: uuid.UUID, target_user_id: uuid.UUID, db: AsyncSession
+) -> tuple[bool, uuid.UUID | None, str | None]:
     """檢查是否互相喜歡並創建配對
 
     Args:
@@ -378,12 +352,9 @@ async def _check_mutual_like_and_create_match(
     """
     # 檢查對方是否也喜歡我（使用 SELECT FOR UPDATE 鎖定，避免競態條件）
     result = await db.execute(
-        select(Like).where(
-            and_(
-                Like.from_user_id == target_user_id,
-                Like.to_user_id == current_user_id
-            )
-        ).with_for_update()
+        select(Like)
+        .where(and_(Like.from_user_id == target_user_id, Like.to_user_id == current_user_id))
+        .with_for_update()
     )
     mutual_like = result.scalar_one_or_none()
 
@@ -397,12 +368,7 @@ async def _check_mutual_like_and_create_match(
 
     # 檢查是否已存在配對
     result = await db.execute(
-        select(Match).where(
-            and_(
-                Match.user1_id == user1_id,
-                Match.user2_id == user2_id
-            )
-        )
+        select(Match).where(and_(Match.user1_id == user1_id, Match.user2_id == user2_id))
     )
     existing_match = result.scalar_one_or_none()
 
@@ -416,11 +382,7 @@ async def _check_mutual_like_and_create_match(
         return True, existing_match.id, None
 
     # 建立新配對
-    match = Match(
-        user1_id=user1_id,
-        user2_id=user2_id,
-        status="ACTIVE"
-    )
+    match = Match(user1_id=user1_id, user2_id=user2_id, status="ACTIVE")
     db.add(match)
 
     try:
@@ -430,12 +392,7 @@ async def _check_mutual_like_and_create_match(
         # 並發情況下，另一個請求已創建了配對
         db.expunge(match)  # 從 session 移除失敗的 match 對象
         result = await db.execute(
-            select(Match).where(
-                and_(
-                    Match.user1_id == user1_id,
-                    Match.user2_id == user2_id
-                )
-            )
+            select(Match).where(and_(Match.user1_id == user1_id, Match.user2_id == user2_id))
         )
         existing_match = result.scalar_one_or_none()
         if existing_match:
@@ -447,10 +404,10 @@ async def _check_mutual_like_and_create_match(
 
 async def _send_like_notifications(
     is_match: bool,
-    match_id: Optional[uuid.UUID],
+    match_id: uuid.UUID | None,
     current_user_id: uuid.UUID,
     target_user_id: uuid.UUID,
-    db: AsyncSession
+    db: AsyncSession,
 ) -> None:
     """發送喜歡/配對通知（含持久化）
 
@@ -497,8 +454,8 @@ async def _send_like_notifications(
                 "match_id": str(match_id),
                 "matched_user_id": str(current_user_id),
                 "matched_user_name": current_name,
-                "matched_user_avatar": current_avatar
-            }
+                "matched_user_avatar": current_avatar,
+            },
         )
         db.add(notification_for_target)
 
@@ -512,12 +469,14 @@ async def _send_like_notifications(
                 "match_id": str(match_id),
                 "matched_user_id": str(target_user_id),
                 "matched_user_name": target_name,
-                "matched_user_avatar": target_avatar
-            }
+                "matched_user_avatar": target_avatar,
+            },
         )
         db.add(notification_for_current)
         await db.commit()
-        logger.info(f"Persisted notification_match for users {target_user_id} and {current_user_id}")
+        logger.info(
+            f"Persisted notification_match for users {target_user_id} and {current_user_id}"
+        )
 
         # 發送 WebSocket 通知給對方（配對成功，包含 notification_id 讓前端可以標記已讀）
         await manager.send_personal_message(
@@ -529,8 +488,8 @@ async def _send_like_notifications(
                 "matched_user_id": str(current_user_id),
                 "matched_user_name": current_name,
                 "matched_user_avatar": current_avatar,
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            }
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
         )
         logger.info(f"Sent notification_match to user {target_user_id} for match {match_id}")
 
@@ -544,8 +503,8 @@ async def _send_like_notifications(
                 "matched_user_id": str(target_user_id),
                 "matched_user_name": target_name,
                 "matched_user_avatar": target_avatar,
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            }
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
         )
         logger.info(f"Sent notification_match to user {current_user_id} for match {match_id}")
     else:
@@ -559,7 +518,7 @@ async def _send_like_notifications(
             type="notification_liked",
             title="有人喜歡你！",
             content="有人對你心動了，快去探索看看吧！",
-            data={}
+            data={},
         )
         db.add(notification_liked)
         await db.commit()
@@ -571,8 +530,8 @@ async def _send_like_notifications(
             {
                 "type": "notification_liked",
                 "notification_id": str(notification_liked.id),
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            }
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
         )
         logger.info(f"Sent notification_liked to user {target_user_id}")
 
@@ -581,7 +540,7 @@ async def _send_like_notifications(
 async def like_user(
     user_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """喜歡用戶 - 協調器
 
@@ -593,16 +552,12 @@ async def like_user(
     5. 發送通知
     """
     # 1. 驗證請求
-    is_valid, status_code, error, _ = await _validate_like_request(
-        user_id, current_user, db
-    )
+    is_valid, status_code, error, _ = await _validate_like_request(user_id, current_user, db)
     if not is_valid:
         raise HTTPException(status_code=status_code, detail=error)
 
     # 2. 創建 Like 記錄
-    success, status_code, error, _ = await _create_like_record(
-        current_user.id, user_id, db
-    )
+    success, status_code, error, _ = await _create_like_record(current_user.id, user_id, db)
     if not success:
         raise HTTPException(status_code=status_code, detail=error)
 
@@ -611,10 +566,7 @@ async def like_user(
         current_user.id, user_id, db
     )
     if error:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=error
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error)
 
     # 4. 提交事務
     try:
@@ -635,22 +587,16 @@ async def like_user(
         logger.info(f"Trust score +2 for users {current_user.id} and {user_id} (match_created)")
 
     # 6. 發送通知
-    await _send_like_notifications(
-        is_match, match_id, current_user.id, user_id, db
-    )
+    await _send_like_notifications(is_match, match_id, current_user.id, user_id, db)
 
-    return LikeResponse(
-        liked=True,
-        is_match=is_match,
-        match_id=match_id
-    )
+    return LikeResponse(liked=True, is_match=is_match, match_id=match_id)
 
 
 @router.post("/pass/{user_id}")
 async def pass_user(
     user_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     跳過用戶
@@ -660,20 +606,12 @@ async def pass_user(
     """
     # 不能跳過自己
     if user_id == current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="不能跳過自己"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不能跳過自己")
 
     # 創建或更新跳過記錄（先查詢再決定）
     # 檢查是否已經跳過過
     result = await db.execute(
-        select(Pass).where(
-            and_(
-                Pass.from_user_id == current_user.id,
-                Pass.to_user_id == user_id
-            )
-        )
+        select(Pass).where(and_(Pass.from_user_id == current_user.id, Pass.to_user_id == user_id))
     )
     existing_pass = result.scalar_one_or_none()
 
@@ -681,28 +619,21 @@ async def pass_user(
         # 已經跳過過，刪除舊記錄
         await db.execute(
             delete(Pass).where(
-                and_(
-                    Pass.from_user_id == current_user.id,
-                    Pass.to_user_id == user_id
-                )
+                and_(Pass.from_user_id == current_user.id, Pass.to_user_id == user_id)
             )
         )
 
     # 創建新記錄（時間會是當前時間）
-    new_pass = Pass(
-        from_user_id=current_user.id,
-        to_user_id=user_id
-    )
+    new_pass = Pass(from_user_id=current_user.id, to_user_id=user_id)
     db.add(new_pass)
     await db.commit()
 
     return {"passed": True, "message": "已跳過此用戶"}
 
 
-@router.get("/matches", response_model=List[MatchSummary])
+@router.get("/matches", response_model=list[MatchSummary])
 async def get_matches(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     """
     取得我的所有配對
@@ -713,15 +644,14 @@ async def get_matches(
     """
     # 查詢所有活躍的配對
     result = await db.execute(
-        select(Match).where(
+        select(Match)
+        .where(
             and_(
-                or_(
-                    Match.user1_id == current_user.id,
-                    Match.user2_id == current_user.id
-                ),
-                Match.status == "ACTIVE"
+                or_(Match.user1_id == current_user.id, Match.user2_id == current_user.id),
+                Match.status == "ACTIVE",
             )
-        ).order_by(Match.matched_at.desc())
+        )
+        .order_by(Match.matched_at.desc())
     )
     matches = result.scalars().all()
 
@@ -731,8 +661,7 @@ async def get_matches(
     # 批次載入：收集所有需要的 ID
     match_ids = [match.id for match in matches]
     matched_user_ids = [
-        match.user2_id if match.user1_id == current_user.id else match.user1_id
-        for match in matches
+        match.user2_id if match.user1_id == current_user.id else match.user1_id for match in matches
     ]
 
     # 批次查詢 1：所有配對用戶的 profiles（1 次查詢取代 N 次）
@@ -741,7 +670,7 @@ async def get_matches(
         .options(
             selectinload(Profile.user),
             selectinload(Profile.photos),
-            selectinload(Profile.interests)
+            selectinload(Profile.interests),
         )
         .where(Profile.user_id.in_(matched_user_ids))
     )
@@ -749,16 +678,13 @@ async def get_matches(
 
     # 批次查詢 2：所有未讀訊息數（1 次查詢取代 N 次）
     unread_counts_result = await db.execute(
-        select(
-            Message.match_id,
-            func.count(Message.id).label('count')
-        )
+        select(Message.match_id, func.count(Message.id).label("count"))
         .where(
             and_(
                 Message.match_id.in_(match_ids),
                 Message.sender_id.in_(matched_user_ids),
                 Message.is_read.is_(None),
-                Message.deleted_at.is_(None)
+                Message.deleted_at.is_(None),
             )
         )
         .group_by(Message.match_id)
@@ -785,10 +711,7 @@ async def get_matches(
         # 取得興趣和照片
         interests = [interest.name for interest in matched_profile.interests]
         photos = [
-            photo.url
-            for photo in sorted(
-                matched_profile.photos, key=lambda p: p.display_order
-            )
+            photo.url for photo in sorted(matched_profile.photos, key=lambda p: p.display_order)
         ]
 
         # 建立 ProfileCard
@@ -800,7 +723,7 @@ async def get_matches(
             bio=matched_profile.bio,
             location_name=matched_profile.location_name,
             interests=interests,
-            photos=photos
+            photos=photos,
         )
 
         # 從批次載入的數據中獲取未讀數
@@ -810,7 +733,7 @@ async def get_matches(
             match_id=match.id,
             matched_user=profile_card,
             matched_at=match.matched_at,
-            unread_count=unread_count
+            unread_count=unread_count,
         )
 
         match_summaries.append(match_summary)
@@ -822,7 +745,7 @@ async def get_matches(
 async def unmatch(
     match_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     取消配對
@@ -835,21 +758,15 @@ async def unmatch(
         select(Match).where(
             and_(
                 Match.id == match_id,
-                or_(
-                    Match.user1_id == current_user.id,
-                    Match.user2_id == current_user.id
-                ),
-                Match.status == "ACTIVE"
+                or_(Match.user1_id == current_user.id, Match.user2_id == current_user.id),
+                Match.status == "ACTIVE",
             )
         )
     )
     match = result.scalar_one_or_none()
 
     if not match:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="配對不存在或已取消"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="配對不存在或已取消")
 
     # 更新配對狀態
     match.status = "UNMATCHED"

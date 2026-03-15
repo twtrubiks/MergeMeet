@@ -8,18 +8,16 @@ Cookie 工具函數
 - Secure: 僅 HTTPS 傳輸（生產環境）
 - SameSite: 防止 CSRF（Strict 或 Lax）
 """
+
 import secrets
-from typing import Optional
+
 from fastapi import Response
 
 from app.core.config import settings
 
 
 def set_auth_cookies(
-    response: Response,
-    access_token: str,
-    refresh_token: str,
-    csrf_token: str
+    response: Response, access_token: str, refresh_token: str, csrf_token: str
 ) -> None:
     """設置認證 Cookie
 
@@ -41,7 +39,7 @@ def set_auth_cookies(
         samesite=settings.COOKIE_SAMESITE,
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path=settings.COOKIE_PATH,
-        domain=domain
+        domain=domain,
     )
 
     # Refresh Token Cookie (HttpOnly，限制路徑)
@@ -53,7 +51,7 @@ def set_auth_cookies(
         samesite=settings.COOKIE_SAMESITE,
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         path="/api/auth",  # 限制只在 auth 路由可用
-        domain=domain
+        domain=domain,
     )
 
     # CSRF Token Cookie (可被 JS 讀取，用於 Double Submit)
@@ -65,7 +63,7 @@ def set_auth_cookies(
         samesite=settings.COOKIE_SAMESITE,
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path=settings.COOKIE_PATH,
-        domain=domain
+        domain=domain,
     )
 
 
@@ -78,25 +76,13 @@ def clear_auth_cookies(response: Response) -> None:
     domain = settings.COOKIE_DOMAIN if settings.COOKIE_DOMAIN else None
 
     # 清除 Access Token
-    response.delete_cookie(
-        key="access_token",
-        path=settings.COOKIE_PATH,
-        domain=domain
-    )
+    response.delete_cookie(key="access_token", path=settings.COOKIE_PATH, domain=domain)
 
     # 清除 Refresh Token
-    response.delete_cookie(
-        key="refresh_token",
-        path="/api/auth",
-        domain=domain
-    )
+    response.delete_cookie(key="refresh_token", path="/api/auth", domain=domain)
 
     # 清除 CSRF Token
-    response.delete_cookie(
-        key="csrf_token",
-        path=settings.COOKIE_PATH,
-        domain=domain
-    )
+    response.delete_cookie(key="csrf_token", path=settings.COOKIE_PATH, domain=domain)
 
 
 def generate_csrf_token() -> str:
@@ -110,7 +96,7 @@ def generate_csrf_token() -> str:
     return secrets.token_urlsafe(settings.CSRF_TOKEN_LENGTH)
 
 
-def get_cookie_value(cookie_string: Optional[str], cookie_name: str) -> Optional[str]:
+def get_cookie_value(cookie_string: str | None, cookie_name: str) -> str | None:
     """從 Cookie 字串中提取特定 Cookie 值
 
     Args:
@@ -126,5 +112,5 @@ def get_cookie_value(cookie_string: Optional[str], cookie_name: str) -> Optional
     cookies = cookie_string.split("; ")
     for cookie in cookies:
         if cookie.startswith(f"{cookie_name}="):
-            return cookie[len(cookie_name) + 1:]
+            return cookie[len(cookie_name) + 1 :]
     return None

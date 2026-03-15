@@ -12,7 +12,7 @@
         <p>開始你的交友之旅</p>
       </div>
 
-      <form @submit.prevent="handleRegister" class="auth-form">
+      <form class="auth-form" @submit.prevent="handleRegister">
         <!-- Email -->
         <FloatingInput
           id="email"
@@ -32,7 +32,7 @@
             type="password"
             :disabled="isLoading"
             :required="true"
-            :showPasswordToggle="true"
+            :show-password-toggle="true"
           />
           <div class="password-strength">
             <div class="strength-bar" :class="passwordStrengthClass"></div>
@@ -49,7 +49,7 @@
           :disabled="isLoading"
           :required="true"
           :error="passwordMismatchError"
-          :showPasswordToggle="true"
+          :show-password-toggle="true"
         />
 
         <!-- 出生日期 -->
@@ -118,7 +118,7 @@ const formData = ref({
   email: '',
   password: '',
   confirmPassword: '',
-  date_of_birth: '',
+  date_of_birth: ''
 })
 
 // 錯誤訊息
@@ -207,7 +207,7 @@ const handleRegister = async () => {
   const success = await userStore.register({
     email: formData.value.email,
     password: formData.value.password,
-    date_of_birth: formData.value.date_of_birth,
+    date_of_birth: formData.value.date_of_birth
   })
 
   if (success) {
@@ -276,7 +276,8 @@ const handleRegister = async () => {
 }
 
 @keyframes float {
-  0%, 100% {
+  0%,
+  100% {
     transform: translate(0, 0) scale(1);
   }
   33% {
@@ -296,8 +297,9 @@ const handleRegister = async () => {
   padding: var(--space-10);
   max-width: 480px;
   width: 100%;
-  box-shadow: var(--shadow-2xl),
-              0 0 0 1px rgba(255, 255, 255, 0.2);
+  box-shadow:
+    var(--shadow-2xl),
+    0 0 0 1px rgba(255, 255, 255, 0.2);
   animation: slideUp var(--duration-slower) var(--easing-out);
   max-height: 90vh;
   overflow-y: auto;
@@ -351,13 +353,16 @@ const handleRegister = async () => {
 }
 
 @keyframes heartBeat {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
-  10%, 30% {
+  10%,
+  30% {
     transform: scale(1.1);
   }
-  20%, 40% {
+  20%,
+  40% {
     transform: scale(0.9);
   }
 }
@@ -476,9 +481,16 @@ const handleRegister = async () => {
 }
 
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-10px); }
-  75% { transform: translateX(10px); }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-10px);
+  }
+  75% {
+    transform: translateX(10px);
+  }
 }
 
 .error-icon {

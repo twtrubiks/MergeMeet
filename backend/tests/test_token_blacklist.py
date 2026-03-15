@@ -1,7 +1,9 @@
 """Token 黑名單測試"""
-import pytest
-from datetime import datetime, timezone, timedelta
+
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
+
+import pytest
 from httpx import AsyncClient
 
 from app.services.token_blacklist import TokenBlacklist
@@ -19,7 +21,7 @@ class TestTokenBlacklist:
     async def test_add_token(self, blacklist):
         """測試將 Token 加入黑名單"""
         token = "test_token_123"
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        expires_at = datetime.now(UTC) + timedelta(hours=1)
 
         await blacklist.add(token, expires_at)
 
@@ -37,7 +39,7 @@ class TestTokenBlacklist:
         """測試過期 Token 自動從黑名單移除"""
         token = "expired_token"
         # 設置已過期的時間
-        expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        expires_at = datetime.now(UTC) - timedelta(seconds=1)
 
         await blacklist.add(token, expires_at)
 
@@ -48,7 +50,7 @@ class TestTokenBlacklist:
     async def test_remove_token(self, blacklist):
         """測試手動移除 Token"""
         token = "to_remove_token"
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        expires_at = datetime.now(UTC) + timedelta(hours=1)
 
         await blacklist.add(token, expires_at)
         assert await blacklist.is_blacklisted(token) is True
@@ -68,11 +70,11 @@ class TestTokenBlacklist:
         """測試清理過期 Token"""
         # 加入即將過期的 Token（直接加入 _fallback 模擬已過期狀態）
         expired_token = "expired_1"
-        blacklist._fallback[expired_token] = datetime.now(timezone.utc) - timedelta(seconds=1)
+        blacklist._fallback[expired_token] = datetime.now(UTC) - timedelta(seconds=1)
 
         # 加入未過期的 Token
         valid_token = "valid_1"
-        await blacklist.add(valid_token, datetime.now(timezone.utc) + timedelta(hours=1))
+        await blacklist.add(valid_token, datetime.now(UTC) + timedelta(hours=1))
 
         # 清理
         cleaned = await blacklist.cleanup_expired()
@@ -87,17 +89,17 @@ class TestTokenBlacklist:
         """測試獲取黑名單大小"""
         assert await blacklist.get_blacklist_size() == 0
 
-        await blacklist.add("token1", datetime.now(timezone.utc) + timedelta(hours=1))
+        await blacklist.add("token1", datetime.now(UTC) + timedelta(hours=1))
         assert await blacklist.get_blacklist_size() == 1
 
-        await blacklist.add("token2", datetime.now(timezone.utc) + timedelta(hours=1))
+        await blacklist.add("token2", datetime.now(UTC) + timedelta(hours=1))
         assert await blacklist.get_blacklist_size() == 2
 
     @pytest.mark.asyncio
     async def test_multiple_tokens(self, blacklist):
         """測試多個 Token"""
         tokens = [f"token_{i}" for i in range(10)]
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        expires_at = datetime.now(UTC) + timedelta(hours=1)
 
         for token in tokens:
             await blacklist.add(token, expires_at)
@@ -115,11 +117,14 @@ class TestLogoutAPI:
     async def test_logout_success(self, client: AsyncClient):
         """測試成功登出"""
         # 先註冊並登入
-        response = await client.post("/api/auth/register", json={
-            "email": "logout_test@example.com",
-            "password": "Test1234",
-            "date_of_birth": "1995-01-01"
-        })
+        response = await client.post(
+            "/api/auth/register",
+            json={
+                "email": "logout_test@example.com",
+                "password": "Test1234",
+                "date_of_birth": "1995-01-01",
+            },
+        )
         assert response.status_code == 201
         token = response.json()["access_token"]
         # 清除 cookies，讓測試使用純 Bearer Token 認證
@@ -127,8 +132,7 @@ class TestLogoutAPI:
 
         # 登出
         response = await client.post(
-            "/api/auth/logout",
-            headers={"Authorization": f"Bearer {token}"}
+            "/api/auth/logout", headers={"Authorization": f"Bearer {token}"}
         )
         assert response.status_code == 200
         assert response.json()["message"] == "登出成功"
@@ -137,11 +141,14 @@ class TestLogoutAPI:
     async def test_token_invalid_after_logout(self, client: AsyncClient):
         """測試登出後 Token 失效"""
         # 先註冊並登入
-        response = await client.post("/api/auth/register", json={
-            "email": "logout_invalid@example.com",
-            "password": "Test1234",
-            "date_of_birth": "1995-01-01"
-        })
+        response = await client.post(
+            "/api/auth/register",
+            json={
+                "email": "logout_invalid@example.com",
+                "password": "Test1234",
+                "date_of_birth": "1995-01-01",
+            },
+        )
         assert response.status_code == 201
         token = response.json()["access_token"]
         # 清除 cookies，讓測試使用純 Bearer Token 認證
@@ -149,16 +156,12 @@ class TestLogoutAPI:
 
         # 登出
         response = await client.post(
-            "/api/auth/logout",
-            headers={"Authorization": f"Bearer {token}"}
+            "/api/auth/logout", headers={"Authorization": f"Bearer {token}"}
         )
         assert response.status_code == 200
 
         # 嘗試使用已登出的 Token 存取 API
-        response = await client.get(
-            "/api/profile",
-            headers={"Authorization": f"Bearer {token}"}
-        )
+        response = await client.get("/api/profile", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 401
         assert "已失效" in response.json()["detail"] or "Token" in response.json()["detail"]
 
@@ -175,11 +178,10 @@ class TestLogoutAPI:
         password = "Test1234"
 
         # 註冊
-        response = await client.post("/api/auth/register", json={
-            "email": email,
-            "password": password,
-            "date_of_birth": "1995-01-01"
-        })
+        response = await client.post(
+            "/api/auth/register",
+            json={"email": email, "password": password, "date_of_birth": "1995-01-01"},
+        )
         assert response.status_code == 201
         old_token = response.json()["access_token"]
         # 清除 cookies，讓測試使用純 Bearer Token 認證
@@ -187,23 +189,18 @@ class TestLogoutAPI:
 
         # 登出
         response = await client.post(
-            "/api/auth/logout",
-            headers={"Authorization": f"Bearer {old_token}"}
+            "/api/auth/logout", headers={"Authorization": f"Bearer {old_token}"}
         )
         assert response.status_code == 200
 
         # 舊 Token 應該失效
         response = await client.get(
-            "/api/profile",
-            headers={"Authorization": f"Bearer {old_token}"}
+            "/api/profile", headers={"Authorization": f"Bearer {old_token}"}
         )
         assert response.status_code == 401
 
         # 重新登入
-        response = await client.post("/api/auth/login", json={
-            "email": email,
-            "password": password
-        })
+        response = await client.post("/api/auth/login", json={"email": email, "password": password})
         assert response.status_code == 200
         new_token = response.json()["access_token"]
         # 清除 cookies，讓測試使用純 Bearer Token 認證
@@ -213,8 +210,7 @@ class TestLogoutAPI:
         # 注意：如果在同一秒內登入，JWT 內容可能相同
         # 但重要的是新 Token 不在黑名單中
         response = await client.post(
-            "/api/auth/logout",
-            headers={"Authorization": f"Bearer {new_token}"}
+            "/api/auth/logout", headers={"Authorization": f"Bearer {new_token}"}
         )
         # 如果新舊 Token 相同，這裡會失敗（401），否則成功（200）
         # 兩種情況都是可接受的行為
@@ -224,11 +220,14 @@ class TestLogoutAPI:
     async def test_multiple_logout_same_token(self, client: AsyncClient):
         """測試同一 Token 多次登出"""
         # 先註冊並登入
-        response = await client.post("/api/auth/register", json={
-            "email": "multi_logout@example.com",
-            "password": "Test1234",
-            "date_of_birth": "1995-01-01"
-        })
+        response = await client.post(
+            "/api/auth/register",
+            json={
+                "email": "multi_logout@example.com",
+                "password": "Test1234",
+                "date_of_birth": "1995-01-01",
+            },
+        )
         assert response.status_code == 201
         token = response.json()["access_token"]
         # 清除 cookies，讓測試使用純 Bearer Token 認證
@@ -236,15 +235,13 @@ class TestLogoutAPI:
 
         # 第一次登出
         response = await client.post(
-            "/api/auth/logout",
-            headers={"Authorization": f"Bearer {token}"}
+            "/api/auth/logout", headers={"Authorization": f"Bearer {token}"}
         )
         assert response.status_code == 200
 
         # 第二次登出應該失敗（Token 已失效）
         response = await client.post(
-            "/api/auth/logout",
-            headers={"Authorization": f"Bearer {token}"}
+            "/api/auth/logout", headers={"Authorization": f"Bearer {token}"}
         )
         assert response.status_code == 401
 
@@ -257,7 +254,7 @@ class TestTokenBlacklistWithRedis:
         """測試：Token 加入 Redis"""
         blacklist = TokenBlacklist(redis_client=mock_redis)
         token = "test_redis_token"
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        expires_at = datetime.now(UTC) + timedelta(hours=1)
 
         await blacklist.add(token, expires_at)
 
@@ -272,7 +269,7 @@ class TestTokenBlacklistWithRedis:
         """測試：從 Redis 檢查黑名單"""
         blacklist = TokenBlacklist(redis_client=mock_redis)
         token = "test_check_token"
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        expires_at = datetime.now(UTC) + timedelta(hours=1)
 
         # 先加入
         await blacklist.add(token, expires_at)
@@ -286,7 +283,7 @@ class TestTokenBlacklistWithRedis:
         """測試：從 Redis 移除 Token"""
         blacklist = TokenBlacklist(redis_client=mock_redis)
         token = "test_remove_token"
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        expires_at = datetime.now(UTC) + timedelta(hours=1)
 
         await blacklist.add(token, expires_at)
         result = await blacklist.remove(token)
@@ -312,7 +309,7 @@ class TestTokenBlacklistFallback:
         """測試：Redis 錯誤時回退到內存（add）"""
         blacklist = TokenBlacklist(redis_client=mock_redis_error)
         token = "fallback_test_token"
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        expires_at = datetime.now(UTC) + timedelta(hours=1)
 
         # 應該不會拋出錯誤，而是回退到內存
         await blacklist.add(token, expires_at)
@@ -327,7 +324,7 @@ class TestTokenBlacklistFallback:
         """測試：Redis 錯誤時回退到內存（check）"""
         blacklist = TokenBlacklist(redis_client=mock_redis_error)
         token = "fallback_check_token"
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        expires_at = datetime.now(UTC) + timedelta(hours=1)
 
         # 先手動加入內存
         blacklist._fallback[token] = expires_at
@@ -355,7 +352,7 @@ class TestTokenBlacklistFallback:
         mock_redis = AsyncMock()
         blacklist = TokenBlacklist(redis_client=mock_redis)
         token = "already_expired"
-        expires_at = datetime.now(timezone.utc) - timedelta(seconds=10)
+        expires_at = datetime.now(UTC) - timedelta(seconds=10)
 
         await blacklist.add(token, expires_at)
 

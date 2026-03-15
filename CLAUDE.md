@@ -98,6 +98,13 @@ docker exec -it mergemeet_postgres psql -U mergemeet -d mergemeet
 # 測試
 cd backend && pytest -v --cov=app
 
+# 程式碼品質（commit 時自動執行）
+pre-commit run --all-files            # 手動執行全部檢查
+ruff check backend/ --fix             # 後端 lint + 自動修復
+ruff format backend/                  # 後端格式化
+cd frontend && npm run lint:fix       # 前端 lint + 自動修復
+cd frontend && npm run format         # 前端格式化
+
 # 重置
 docker compose down -v && docker compose up -d
 ```

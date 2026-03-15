@@ -1,18 +1,20 @@
 """WebSocket 即時通訊測試"""
-import pytest
-import uuid
-import asyncio
-from unittest.mock import AsyncMock
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from datetime import datetime, timezone, timedelta
 
-from app.models.user import User
+import asyncio
+import uuid
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock
+
+import pytest
+from httpx import AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.match import Match, Message
 from app.models.moderation import SensitiveWord
-from app.websocket.manager import manager
+from app.models.user import User
 from app.services.content_moderation import ContentModerationService
+from app.websocket.manager import manager
 
 
 @pytest.fixture
@@ -22,7 +24,8 @@ async def matched_users_for_ws(client: AsyncClient, auth_user_pair: dict, test_d
     bob_token = auth_user_pair["bob"]["token"]
 
     # 創建 Alice 的檔案（注意：URL 無尾隨斜線）
-    await client.post("/api/profile",
+    await client.post(
+        "/api/profile",
         headers={"Authorization": f"Bearer {alice_token}"},
         json={
             "display_name": "Alice",
@@ -31,13 +34,14 @@ async def matched_users_for_ws(client: AsyncClient, auth_user_pair: dict, test_d
             "location": {
                 "latitude": 25.0330,
                 "longitude": 121.5654,
-                "location_name": "台北市信義區"
-            }
-        }
+                "location_name": "台北市信義區",
+            },
+        },
     )
 
     # 創建 Bob 的檔案（注意：URL 無尾隨斜線）
-    await client.post("/api/profile",
+    await client.post(
+        "/api/profile",
         headers={"Authorization": f"Bearer {bob_token}"},
         json={
             "display_name": "Bob",
@@ -46,13 +50,15 @@ async def matched_users_for_ws(client: AsyncClient, auth_user_pair: dict, test_d
             "location": {
                 "latitude": 25.0500,
                 "longitude": 121.5500,
-                "location_name": "台北市大安區"
-            }
-        }
+                "location_name": "台北市大安區",
+            },
+        },
     )
 
     # 獲取用戶 ID（使用 auth_user_pair 的 email）
-    result = await test_db.execute(select(User).where(User.email == auth_user_pair["alice"]["email"]))
+    result = await test_db.execute(
+        select(User).where(User.email == auth_user_pair["alice"]["email"])
+    )
     alice = result.scalar_one()
 
     result = await test_db.execute(select(User).where(User.email == auth_user_pair["bob"]["email"]))
@@ -60,11 +66,7 @@ async def matched_users_for_ws(client: AsyncClient, auth_user_pair: dict, test_d
 
     # 直接創建配對（確保 user1_id < user2_id）
     user1_id, user2_id = (alice.id, bob.id) if alice.id < bob.id else (bob.id, alice.id)
-    match = Match(
-        user1_id=user1_id,
-        user2_id=user2_id,
-        status="ACTIVE"
-    )
+    match = Match(user1_id=user1_id, user2_id=user2_id, status="ACTIVE")
     test_db.add(match)
     await test_db.commit()
     await test_db.refresh(match)
@@ -73,14 +75,14 @@ async def matched_users_for_ws(client: AsyncClient, auth_user_pair: dict, test_d
         "alice": {
             "token": alice_token,
             "user_id": str(alice.id),
-            "email": auth_user_pair["alice"]["email"]
+            "email": auth_user_pair["alice"]["email"],
         },
         "bob": {
             "token": bob_token,
             "user_id": str(bob.id),
-            "email": auth_user_pair["bob"]["email"]
+            "email": auth_user_pair["bob"]["email"],
         },
-        "match_id": str(match.id)
+        "match_id": str(match.id),
     }
 
 
@@ -103,9 +105,7 @@ async def test_websocket_match_rooms():
 
 @pytest.mark.asyncio
 async def test_chat_message_stored_in_database(
-    client: AsyncClient,
-    matched_users_for_ws: dict,
-    test_db: AsyncSession
+    client: AsyncClient, matched_users_for_ws: dict, test_db: AsyncSession
 ):
     """測試聊天訊息是否正確儲存到資料庫"""
     match_id = matched_users_for_ws["match_id"]
@@ -116,16 +116,14 @@ async def test_chat_message_stored_in_database(
         match_id=match_id,
         sender_id=alice_user_id,
         content="Test WebSocket message",
-        message_type="TEXT"
+        message_type="TEXT",
     )
     test_db.add(message)
     await test_db.commit()
     await test_db.refresh(message)
 
     # 驗證訊息已儲存
-    result = await test_db.execute(
-        select(Message).where(Message.id == message.id)
-    )
+    result = await test_db.execute(select(Message).where(Message.id == message.id))
     stored_message = result.scalar_one()
 
     assert stored_message.content == "Test WebSocket message"
@@ -136,32 +134,29 @@ async def test_chat_message_stored_in_database(
 
 @pytest.mark.asyncio
 async def test_message_sender_must_be_match_member(
-    matched_users_for_ws: dict,
-    client: AsyncClient,
-    test_db: AsyncSession
+    matched_users_for_ws: dict, client: AsyncClient, test_db: AsyncSession
 ):
     """測試只有配對成員可以發送訊息"""
     match_id = matched_users_for_ws["match_id"]
 
     # 創建第三個用戶（不在配對中）
-    response = await client.post("/api/auth/register", json={
-        "email": "charlie.ws@example.com",
-        "password": "Charlie123",
-        "date_of_birth": "1992-01-01"
-    })
-    charlie_token = response.json()["access_token"]
+    response = await client.post(
+        "/api/auth/register",
+        json={
+            "email": "charlie.ws@example.com",
+            "password": "Charlie123",
+            "date_of_birth": "1992-01-01",
+        },
+    )
+    response.json()["access_token"]
     # 清除 cookies，讓測試使用純 Bearer Token 認證
     client.cookies.clear()
 
-    result = await test_db.execute(
-        select(User).where(User.email == "charlie.ws@example.com")
-    )
+    result = await test_db.execute(select(User).where(User.email == "charlie.ws@example.com"))
     charlie = result.scalar_one()
 
     # 驗證配對
-    result = await test_db.execute(
-        select(Match).where(Match.id == match_id)
-    )
+    result = await test_db.execute(select(Match).where(Match.id == match_id))
     match = result.scalar_one()
 
     # Charlie 不應該在配對中
@@ -169,10 +164,7 @@ async def test_message_sender_must_be_match_member(
 
 
 @pytest.mark.asyncio
-async def test_message_content_moderation(
-    matched_users_for_ws: dict,
-    test_db: AsyncSession
-):
+async def test_message_content_moderation(matched_users_for_ws: dict, test_db: AsyncSession):
     """測試訊息內容審核"""
     alice_user_id = matched_users_for_ws["alice"]["user_id"]
 
@@ -184,7 +176,7 @@ async def test_message_content_moderation(
         severity="HIGH",
         action="REJECT",
         is_regex=False,
-        is_active=True
+        is_active=True,
     )
     test_db.add(sensitive_word)
     await test_db.commit()
@@ -209,11 +201,9 @@ async def test_message_content_moderation(
 
 @pytest.mark.asyncio
 async def test_message_with_unsafe_content_rejected(
-    matched_users_for_ws: dict,
-    test_db: AsyncSession
+    matched_users_for_ws: dict, test_db: AsyncSession
 ):
     """測試包含不當內容的訊息應被拒絕"""
-    match_id = matched_users_for_ws["match_id"]
     alice_user_id = matched_users_for_ws["alice"]["user_id"]
 
     # 創建敏感詞數據
@@ -224,7 +214,7 @@ async def test_message_with_unsafe_content_rejected(
         severity="MEDIUM",
         action="REJECT",
         is_regex=False,
-        is_active=True
+        is_active=True,
     )
     test_db.add(sensitive_word)
     await test_db.commit()
@@ -245,8 +235,7 @@ async def test_message_with_unsafe_content_rejected(
 
 @pytest.mark.asyncio
 async def test_warning_count_increases_on_violation(
-    matched_users_for_ws: dict,
-    test_db: AsyncSession
+    matched_users_for_ws: dict, test_db: AsyncSession
 ):
     """測試違規時警告次數增加"""
     # 獲取 Alice 的初始警告次數（使用 fixture 的 email）
@@ -267,16 +256,13 @@ async def test_warning_count_increases_on_violation(
 
 @pytest.mark.asyncio
 async def test_message_sent_to_match_members_only(
-    matched_users_for_ws: dict,
-    test_db: AsyncSession
+    matched_users_for_ws: dict, test_db: AsyncSession
 ):
     """測試訊息只發送給配對成員"""
     match_id = matched_users_for_ws["match_id"]
 
     # 獲取配對資料
-    result = await test_db.execute(
-        select(Match).where(Match.id == match_id)
-    )
+    result = await test_db.execute(select(Match).where(Match.id == match_id))
     match = result.scalar_one()
 
     # 驗證配對狀態
@@ -308,10 +294,7 @@ async def test_websocket_connection_cleanup_on_disconnect():
 
 
 @pytest.mark.asyncio
-async def test_multiple_messages_ordering(
-    matched_users_for_ws: dict,
-    test_db: AsyncSession
-):
+async def test_multiple_messages_ordering(matched_users_for_ws: dict, test_db: AsyncSession):
     """測試多條訊息的順序"""
     match_id = matched_users_for_ws["match_id"]
     alice_user_id = matched_users_for_ws["alice"]["user_id"]
@@ -322,8 +305,8 @@ async def test_multiple_messages_ordering(
         message = Message(
             match_id=match_id,
             sender_id=alice_user_id,
-            content=f"Message {i+1}",
-            message_type="TEXT"
+            content=f"Message {i + 1}",
+            message_type="TEXT",
         )
         test_db.add(message)
         await test_db.flush()
@@ -332,10 +315,11 @@ async def test_multiple_messages_ordering(
 
     # 驗證訊息按時間順序儲存
     for i in range(len(messages) - 1):
-        assert messages[i].sent_at <= messages[i+1].sent_at
+        assert messages[i].sent_at <= messages[i + 1].sent_at
 
 
 # ==================== 心跳機制測試 ====================
+
 
 class TestWebSocketHeartbeat:
     """WebSocket 心跳機制測試"""
@@ -344,7 +328,7 @@ class TestWebSocketHeartbeat:
     async def test_heartbeat_config(self):
         """測試心跳配置"""
         assert manager.HEARTBEAT_INTERVAL == 30  # 發送 ping 的間隔（秒）
-        assert manager.HEARTBEAT_TIMEOUT == 90   # 無回應超時時間（秒）
+        assert manager.HEARTBEAT_TIMEOUT == 90  # 無回應超時時間（秒）
 
     @pytest.mark.asyncio
     async def test_update_heartbeat(self):
@@ -352,7 +336,7 @@ class TestWebSocketHeartbeat:
         user_id = "test-heartbeat-user"
 
         # 設置初始心跳（舊時間）
-        old_time = datetime.now(timezone.utc) - timedelta(minutes=5)
+        old_time = datetime.now(UTC) - timedelta(minutes=5)
         manager.connection_heartbeats[user_id] = old_time
 
         # 更新心跳
@@ -386,11 +370,11 @@ class TestWebSocketHeartbeat:
         user_id = "test-stale-user"
 
         # 設置一個過期的心跳時間（超過 90 秒）
-        stale_time = datetime.now(timezone.utc) - timedelta(seconds=100)
+        stale_time = datetime.now(UTC) - timedelta(seconds=100)
         manager.connection_heartbeats[user_id] = stale_time
 
         # 計算是否過期
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         is_stale = now - stale_time > timedelta(seconds=manager.HEARTBEAT_TIMEOUT)
 
         assert is_stale is True
@@ -405,11 +389,11 @@ class TestWebSocketHeartbeat:
         user_id = "test-active-user"
 
         # 設置一個最近的心跳時間（10 秒前）
-        recent_time = datetime.now(timezone.utc) - timedelta(seconds=10)
+        recent_time = datetime.now(UTC) - timedelta(seconds=10)
         manager.connection_heartbeats[user_id] = recent_time
 
         # 計算是否過期
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         is_stale = now - recent_time > timedelta(seconds=manager.HEARTBEAT_TIMEOUT)
 
         assert is_stale is False
@@ -424,7 +408,7 @@ class TestWebSocketHeartbeat:
         user_id = "test-disconnect-heartbeat"
 
         # 模擬連接（直接添加心跳，因為沒有真正的 WebSocket）
-        manager.connection_heartbeats[user_id] = datetime.now(timezone.utc)
+        manager.connection_heartbeats[user_id] = datetime.now(UTC)
 
         # 確保心跳存在
         assert user_id in manager.connection_heartbeats
@@ -443,8 +427,8 @@ class TestWebSocketHeartbeat:
         stale_user = "test-stale-cleanup"
         active_user = "test-active-cleanup"
 
-        manager.connection_heartbeats[stale_user] = datetime.now(timezone.utc) - timedelta(seconds=100)
-        manager.connection_heartbeats[active_user] = datetime.now(timezone.utc) - timedelta(seconds=10)
+        manager.connection_heartbeats[stale_user] = datetime.now(UTC) - timedelta(seconds=100)
+        manager.connection_heartbeats[active_user] = datetime.now(UTC) - timedelta(seconds=10)
 
         # 執行清理
         await manager._cleanup_stale_connections()
@@ -512,14 +496,11 @@ def mock_redis(mock_redis_data):
 class TestPositiveInteractionMatchLimit:
     """測試正向互動配對每日限制（每配對每日 3 次）"""
 
-    async def test_match_allows_three_daily_rewards(
-        self,
-        mock_redis
-    ):
+    async def test_match_allows_three_daily_rewards(self, mock_redis):
         """測試：同一配對每日可獲得 3 次獎勵"""
         redis_mock, redis_data = mock_redis
         match_id = str(uuid.uuid4())
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
 
         match_key = f"trust:positive_interaction:{match_id}:{today}"
 
@@ -533,14 +514,11 @@ class TestPositiveInteractionMatchLimit:
         assert count3 == 3  # 第 3 次
         # 所有 3 次都應該獲得獎勵（count <= 3）
 
-    async def test_match_blocks_fourth_reward(
-        self,
-        mock_redis
-    ):
+    async def test_match_blocks_fourth_reward(self, mock_redis):
         """測試：同一配對第 4 次互動不獎勵"""
         redis_mock, redis_data = mock_redis
         match_id = str(uuid.uuid4())
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
 
         match_key = f"trust:positive_interaction:{match_id}:{today}"
 
@@ -553,13 +531,10 @@ class TestPositiveInteractionMatchLimit:
         assert count4 == 4
         # count4 > 3，應該被阻擋，不獎勵
 
-    async def test_different_matches_have_separate_limits(
-        self,
-        mock_redis
-    ):
+    async def test_different_matches_have_separate_limits(self, mock_redis):
         """測試：不同配對各自獨立計算限制"""
         redis_mock, redis_data = mock_redis
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
 
         match1_id = str(uuid.uuid4())
         match2_id = str(uuid.uuid4())
@@ -576,13 +551,10 @@ class TestPositiveInteractionMatchLimit:
         assert count_m1 == 4  # Match 1 超過上限
         assert count_m2 == 1  # Match 2 第 1 次
 
-    async def test_incr_returns_unique_values_concurrently(
-        self,
-        mock_redis
-    ):
+    async def test_incr_returns_unique_values_concurrently(self, mock_redis):
         """測試：併發請求下 INCR 返回唯一值"""
         redis_mock, redis_data = mock_redis
-        match_key = f"trust:positive_interaction:test:{datetime.now(timezone.utc).strftime('%Y-%m-%d')}"
+        match_key = f"trust:positive_interaction:test:{datetime.now(UTC).strftime('%Y-%m-%d')}"
 
         # 模擬 5 個併發請求
         async def increment():
@@ -593,5 +565,3 @@ class TestPositiveInteractionMatchLimit:
         # 應該得到 [1, 2, 3, 4, 5]（順序可能不同）
         assert sorted(results) == [1, 2, 3, 4, 5]
         # 只有前 3 個應該獲得獎勵
-
-

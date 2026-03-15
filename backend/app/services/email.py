@@ -13,12 +13,13 @@
         reset_token="abc123..."
     )
 """
-import aiosmtplib
-from datetime import datetime
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from typing import Optional
+
 import logging
+from datetime import datetime
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
+import aiosmtplib
 
 from app.core.config import settings
 
@@ -30,10 +31,7 @@ class EmailService:
 
     @staticmethod
     async def send_email(
-        to_email: str,
-        subject: str,
-        html_content: str,
-        text_content: Optional[str] = None
+        to_email: str, subject: str, html_content: str, text_content: str | None = None
     ) -> bool:
         """
         發送郵件
@@ -84,11 +82,7 @@ class EmailService:
             return False
 
     @staticmethod
-    async def send_password_reset_email(
-        to_email: str,
-        username: str,
-        reset_token: str
-    ) -> bool:
+    async def send_password_reset_email(to_email: str, username: str, reset_token: str) -> bool:
         """
         發送密碼重置郵件
 
@@ -180,15 +174,11 @@ Hi {username},
             to_email=to_email,
             subject="🔐 MergeMeet - 密碼重置請求",
             html_content=html_content,
-            text_content=text_content
+            text_content=text_content,
         )
 
     @staticmethod
-    async def send_verification_email(
-        to_email: str,
-        username: str,
-        verification_code: str
-    ) -> bool:
+    async def send_verification_email(to_email: str, username: str, verification_code: str) -> bool:
         """
         發送 Email 驗證郵件
 
@@ -255,14 +245,11 @@ Hi {username},
             to_email=to_email,
             subject="✉️ MergeMeet - Email 驗證碼",
             html_content=html_content,
-            text_content=text_content
+            text_content=text_content,
         )
 
     @staticmethod
-    async def send_password_changed_email(
-        to_email: str,
-        username: str
-    ) -> bool:
+    async def send_password_changed_email(to_email: str, username: str) -> bool:
         """
         發送密碼變更通知郵件
 
@@ -345,5 +332,5 @@ Hi {username},
             to_email=to_email,
             subject="🔒 MergeMeet - 密碼變更通知",
             html_content=html_content,
-            text_content=text_content
+            text_content=text_content,
         )

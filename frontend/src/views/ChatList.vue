@@ -13,82 +13,78 @@
       <div class="header-spacer"></div>
     </div>
 
-      <!-- 載入中 - 使用 Skeleton Loader -->
-      <div v-if="chatStore.loading" class="loading-skeleton">
-        <div class="conversation-list skeleton-list">
-          <SkeletonListItem variant="chat" v-for="i in 5" :key="i" />
+    <!-- 載入中 - 使用 Skeleton Loader -->
+    <div v-if="chatStore.loading" class="loading-skeleton">
+      <div class="conversation-list skeleton-list">
+        <SkeletonListItem v-for="i in 5" :key="i" variant="chat" />
+      </div>
+    </div>
+
+    <div v-else class="chat-list-container">
+      <!-- 空狀態 -->
+      <div v-if="chatStore.conversations.length === 0" class="empty-state">
+        <div class="empty-animation">
+          <span class="empty-chat">💬</span>
         </div>
+        <h2>還沒有對話</h2>
+        <p>開始探索並配對來開啟對話！</p>
+        <AnimatedButton variant="primary" @click="goToDiscovery">
+          <Icon name="search" size="sm" decorative /> 開始探索
+        </AnimatedButton>
       </div>
 
-      <div v-else class="chat-list-container">
-        <!-- 空狀態 -->
-        <div v-if="chatStore.conversations.length === 0" class="empty-state">
-          <div class="empty-animation">
-            <span class="empty-chat">💬</span>
-          </div>
-          <h2>還沒有對話</h2>
-          <p>開始探索並配對來開啟對話！</p>
-          <AnimatedButton variant="primary" @click="goToDiscovery">
-            <Icon name="search" size="sm" decorative /> 開始探索
-          </AnimatedButton>
-        </div>
-
-        <!-- 對話列表 -->
-        <div v-else class="conversation-list">
-          <div
-            v-for="conversation in chatStore.conversations"
-            :key="conversation.match_id"
-            class="conversation-item"
-            @click="openChat(conversation.match_id)"
+      <!-- 對話列表 -->
+      <div v-else class="conversation-list">
+        <div
+          v-for="conversation in chatStore.conversations"
+          :key="conversation.match_id"
+          class="conversation-item"
+          @click="openChat(conversation.match_id)"
+        >
+          <!-- 用戶頭像 -->
+          <n-badge
+            :value="conversation.unread_count"
+            :max="99"
+            :show="conversation.unread_count > 0"
+            class="avatar-badge"
           >
-            <!-- 用戶頭像 -->
-            <n-badge
-              :value="conversation.unread_count"
-              :max="99"
-              :show="conversation.unread_count > 0"
-              class="avatar-badge"
-            >
-              <n-avatar
-                :src="conversation.other_user_avatar"
-                :fallback-src="defaultAvatar"
-                size="large"
-                round
-              />
-            </n-badge>
+            <n-avatar
+              :src="conversation.other_user_avatar"
+              :fallback-src="defaultAvatar"
+              size="large"
+              round
+            />
+          </n-badge>
 
-            <!-- 對話資訊 -->
-            <div class="conversation-info">
-              <div class="conversation-header">
-                <span class="user-name">{{ conversation.other_user_name }}</span>
-                <span v-if="conversation.last_message" class="message-time">
-                  {{ formatTime(conversation.last_message.sent_at) }}
-                </span>
-              </div>
-
-              <div class="conversation-preview">
-                <span
-                  v-if="conversation.last_message"
-                  :class="['last-message', { 'unread': conversation.unread_count > 0 }]"
-                >
-                  {{ getMessagePreview(conversation.last_message) }}
-                </span>
-                <span v-else class="no-message">
-                  開始聊天吧！
-                </span>
-              </div>
+          <!-- 對話資訊 -->
+          <div class="conversation-info">
+            <div class="conversation-header">
+              <span class="user-name">{{ conversation.other_user_name }}</span>
+              <span v-if="conversation.last_message" class="message-time">
+                {{ formatTime(conversation.last_message.sent_at) }}
+              </span>
             </div>
 
-            <!-- 箭頭圖示 -->
-            <Icon name="chevron-forward" size="sm" decorative class="arrow-icon" />
+            <div class="conversation-preview">
+              <span
+                v-if="conversation.last_message"
+                :class="['last-message', { unread: conversation.unread_count > 0 }]"
+              >
+                {{ getMessagePreview(conversation.last_message) }}
+              </span>
+              <span v-else class="no-message"> 開始聊天吧！ </span>
+            </div>
           </div>
+
+          <!-- 箭頭圖示 -->
+          <Icon name="chevron-forward" size="sm" decorative class="arrow-icon" />
         </div>
       </div>
+    </div>
 
     <!-- WebSocket 連接狀態 -->
     <div v-if="!wsStore.isConnected" class="connection-warning">
-      <n-alert type="warning" :show-icon="false" size="small">
-        連接已斷開
-      </n-alert>
+      <n-alert type="warning" :show-icon="false" size="small"> 連接已斷開 </n-alert>
     </div>
   </div>
 </template>
@@ -177,7 +173,7 @@ onUnmounted(() => {
 <style scoped>
 .chat-list-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #FFF5F5 0%, #FFE5E5 100%);
+  background: linear-gradient(135deg, #fff5f5 0%, #ffe5e5 100%);
 }
 
 /* 載入中 - Skeleton */
@@ -288,7 +284,8 @@ onUnmounted(() => {
 }
 
 @keyframes float {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0);
   }
   50% {

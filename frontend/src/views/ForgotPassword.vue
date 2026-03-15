@@ -13,25 +13,19 @@
       <div v-if="emailSent" class="success-message">
         <div class="success-icon"><Icon name="check-circle" size="xl" decorative /></div>
         <h2>郵件已發送！</h2>
-        <p class="success-text">
-          我們已發送密碼重置郵件到
-        </p>
+        <p class="success-text">我們已發送密碼重置郵件到</p>
         <p class="email-display">{{ formData.email }}</p>
         <p class="hint-text">
-          請查看您的收件匣（包括垃圾郵件）。<br>
+          請查看您的收件匣（包括垃圾郵件）。<br />
           重置鏈接將在 <strong>30 分鐘</strong>後失效。
         </p>
-        <AnimatedButton
-          variant="primary"
-          @click="goToLogin"
-          class="return-btn"
-        >
+        <AnimatedButton variant="primary" class="return-btn" @click="goToLogin">
           返回登入
         </AnimatedButton>
       </div>
 
       <!-- 表單 -->
-      <form v-else @submit.prevent="handleSubmit" class="auth-form">
+      <form v-else class="auth-form" @submit.prevent="handleSubmit">
         <FloatingInput
           id="email"
           v-model="formData.email"
@@ -192,7 +186,8 @@ const goToLogin = () => {
 }
 
 @keyframes float {
-  0%, 100% {
+  0%,
+  100% {
     transform: translate(0, 0) scale(1);
   }
   33% {
@@ -212,8 +207,9 @@ const goToLogin = () => {
   padding: 48px;
   max-width: 450px;
   width: 100%;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3),
-              0 0 0 1px rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.2);
   animation: slideUp 0.5s ease-out;
 }
 
@@ -245,7 +241,8 @@ const goToLogin = () => {
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
   50% {
@@ -297,7 +294,8 @@ const goToLogin = () => {
 }
 
 @keyframes bounce {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0);
   }
   50% {

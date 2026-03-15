@@ -6,20 +6,20 @@
 Redis Key 設計：
 - moderation:words - 敏感詞列表 (value: JSON 序列化, TTL: 300 秒)
 """
-from typing import Tuple, List, Optional, Dict
-from collections import OrderedDict
-import re
-from datetime import datetime
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from sqlalchemy import select
-import uuid
-import json
+
 import asyncio
+import json
 import logging
+import re
+import uuid
+from collections import OrderedDict
+from datetime import datetime
 
 import redis.asyncio as aioredis
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.models.moderation import SensitiveWord, ModerationLog
+from app.models.moderation import ModerationLog, SensitiveWord
 
 logger = logging.getLogger(__name__)
 
@@ -35,26 +35,26 @@ class ContentModerationService:
     """
 
     # Redis 連線
-    _redis: Optional[aioredis.Redis] = None
+    _redis: aioredis.Redis | None = None
     _use_redis: bool = False
 
     # 內存回退快取
     _cache: OrderedDict = OrderedDict()  # 使用 OrderedDict 支持 LRU 策略
-    _cache_time: Dict[str, datetime] = {}  # 每個快取項的時間戳
+    _cache_time: dict[str, datetime] = {}  # 每個快取項的時間戳
     _cache_ttl: int = 300  # 快取 5 分鐘
     _max_cache_size: int = 500  # 最大快取項數
-    _cache_lock: Optional[asyncio.Lock] = None  # 快取鎖（延遲初始化）
+    _cache_lock: asyncio.Lock | None = None  # 快取鎖（延遲初始化）
 
     # Session factory（供測試注入）
-    _session_factory: Optional[async_sessionmaker] = None
+    _session_factory: async_sessionmaker | None = None
 
     # 可疑模式（正則表達式）- 保留靜態模式
     SUSPICIOUS_PATTERNS = [
-        r'\b\d{10,16}\b',  # 可能的信用卡號或手機號碼
-        r'line\s*[:：]?\s*\w+',  # LINE ID
-        r'wechat\s*[:：]?\s*\w+',  # WeChat ID
-        r'(?:http|https)://\S+',  # URL 連結
-        r'\$\d+|NT\$?\d+|USD?\d+',  # 金額
+        r"\b\d{10,16}\b",  # 可能的信用卡號或手機號碼
+        r"line\s*[:：]?\s*\w+",  # LINE ID
+        r"wechat\s*[:：]?\s*\w+",  # WeChat ID
+        r"(?:http|https)://\S+",  # URL 連結
+        r"\$\d+|NT\$?\d+|USD?\d+",  # 金額
     ]
 
     @classmethod
@@ -88,6 +88,7 @@ class ContentModerationService:
         if cls._session_factory is not None:
             return cls._session_factory
         from app.core.database import AsyncSessionLocal
+
         return AsyncSessionLocal
 
     @classmethod
@@ -111,7 +112,7 @@ class ContentModerationService:
         return cls._use_redis and cls._redis is not None
 
     @classmethod
-    async def _try_load_from_redis(cls) -> Optional[List[Dict]]:
+    async def _try_load_from_redis(cls) -> list[dict] | None:
         """嘗試從 Redis 載入敏感詞
 
         Returns:
@@ -126,16 +127,13 @@ class ContentModerationService:
                 logger.debug("Sensitive words loaded from Redis cache")
                 return json.loads(cached)
         except aioredis.RedisError as e:
-            logger.warning(
-                f"Redis unavailable for sensitive words, "
-                f"falling back to memory: {e}"
-            )
+            logger.warning(f"Redis unavailable for sensitive words, falling back to memory: {e}")
             cls._use_redis = False
 
         return None
 
     @classmethod
-    def _try_load_from_memory_cache(cls, cache_key: str) -> Optional[List[Dict]]:
+    def _try_load_from_memory_cache(cls, cache_key: str) -> list[dict] | None:
         """嘗試從內存快取載入敏感詞
 
         Args:
@@ -162,7 +160,7 @@ class ContentModerationService:
         return None
 
     @classmethod
-    async def _cache_to_redis(cls, words_data: List[Dict]) -> None:
+    async def _cache_to_redis(cls, words_data: list[dict]) -> None:
         """將敏感詞快取到 Redis
 
         Args:
@@ -175,14 +173,14 @@ class ContentModerationService:
             await cls._redis.setex(
                 REDIS_KEY_SENSITIVE_WORDS,
                 cls._cache_ttl,
-                json.dumps(words_data, ensure_ascii=False)
+                json.dumps(words_data, ensure_ascii=False),
             )
             logger.info(f"Sensitive words cached to Redis ({len(words_data)} words)")
         except aioredis.RedisError as e:
             logger.warning(f"Failed to cache sensitive words to Redis: {e}")
 
     @classmethod
-    def _cache_to_memory(cls, cache_key: str, words_data: List[Dict]) -> None:
+    def _cache_to_memory(cls, cache_key: str, words_data: list[dict]) -> None:
         """將敏感詞快取到內存
 
         Args:
@@ -200,7 +198,7 @@ class ContentModerationService:
         logger.info(f"Sensitive words cached to memory ({len(words_data)} words)")
 
     @classmethod
-    async def _load_sensitive_words(cls, db: AsyncSession) -> List[Dict]:
+    async def _load_sensitive_words(cls, db: AsyncSession) -> list[dict]:
         """
         從 Redis 或資料庫載入敏感詞（協調器函數）
 
@@ -243,7 +241,7 @@ class ContentModerationService:
                     "severity": w.severity,
                     "action": w.action,
                     "is_regex": w.is_regex,
-                    "description": w.description
+                    "description": w.description,
                 }
                 for w in words
             ]
@@ -274,12 +272,7 @@ class ContentModerationService:
             logger.info("Memory cache cleared")
 
     @classmethod
-    def _match_sensitive_word(
-        cls,
-        word_obj: Dict,
-        content: str,
-        content_lower: str
-    ) -> bool:
+    def _match_sensitive_word(cls, word_obj: dict, content: str, content_lower: str) -> bool:
         """匹配單個敏感詞
 
         Args:
@@ -300,11 +293,8 @@ class ContentModerationService:
 
     @classmethod
     def _check_sensitive_words(
-        cls,
-        sensitive_words: List[Dict],
-        content: str,
-        content_lower: str
-    ) -> Tuple[List[str], List[uuid.UUID], Optional[str], str]:
+        cls, sensitive_words: list[dict], content: str, content_lower: str
+    ) -> tuple[list[str], list[uuid.UUID], str | None, str]:
         """檢查所有敏感詞
 
         Args:
@@ -330,9 +320,7 @@ class ContentModerationService:
 
             # 更新最高嚴重程度
             current_severity = severity_order.get(word_obj["severity"], 0)
-            max_severity_value = (
-                severity_order.get(max_severity, 0) if max_severity else 0
-            )
+            max_severity_value = severity_order.get(max_severity, 0) if max_severity else 0
 
             if current_severity > max_severity_value:
                 max_severity = word_obj["severity"]
@@ -342,11 +330,8 @@ class ContentModerationService:
 
     @classmethod
     def _check_suspicious_patterns(
-        cls,
-        content: str,
-        current_violations: List[str],
-        current_action: str
-    ) -> Tuple[List[str], str]:
+        cls, content: str, current_violations: list[str], current_action: str
+    ) -> tuple[list[str], str]:
         """檢查可疑模式
 
         Args:
@@ -371,9 +356,7 @@ class ContentModerationService:
 
     @staticmethod
     def _should_log_moderation(
-        user_id: Optional[uuid.UUID],
-        violations: List[str],
-        is_approved: bool
+        user_id: uuid.UUID | None, violations: list[str], is_approved: bool
     ) -> bool:
         """判斷是否需要記錄審核日誌
 
@@ -392,9 +375,9 @@ class ContentModerationService:
         cls,
         content: str,
         db: AsyncSession,
-        user_id: Optional[uuid.UUID] = None,
-        content_type: str = "TEXT"
-    ) -> Tuple[bool, List[str], List[uuid.UUID], str]:
+        user_id: uuid.UUID | None = None,
+        content_type: str = "TEXT",
+    ) -> tuple[bool, list[str], list[uuid.UUID], str]:
         """
         檢查內容是否包含敏感詞或不當內容（協調器函數）
 
@@ -440,7 +423,7 @@ class ContentModerationService:
                 is_approved=is_approved,
                 violations=violations,
                 triggered_word_ids=triggered_word_ids,
-                action_taken=action_to_take
+                action_taken=action_to_take,
             )
 
         return is_approved, violations, triggered_word_ids, action_to_take
@@ -453,9 +436,9 @@ class ContentModerationService:
         content_type: str,
         content: str,
         is_approved: bool,
-        violations: List[str],
-        triggered_word_ids: List[uuid.UUID],
-        action_taken: str
+        violations: list[str],
+        triggered_word_ids: list[uuid.UUID],
+        action_taken: str,
     ):
         """
         記錄審核日誌（獨立事務，確保日誌永久保存）
@@ -481,15 +464,13 @@ class ContentModerationService:
                     content_type=content_type,
                     original_content=content,
                     is_approved=is_approved,
-                    violations=(
-                        json.dumps(violations, ensure_ascii=False)
-                        if violations else None
-                    ),
+                    violations=(json.dumps(violations, ensure_ascii=False) if violations else None),
                     triggered_word_ids=(
                         json.dumps([str(wid) for wid in triggered_word_ids])
-                        if triggered_word_ids else None
+                        if triggered_word_ids
+                        else None
                     ),
-                    action_taken=action_taken
+                    action_taken=action_taken,
                 )
 
                 log_db.add(log)
@@ -524,26 +505,22 @@ class ContentModerationService:
             if word_obj["is_regex"]:
                 try:
                     pattern = re.compile(word_obj["word"], re.IGNORECASE)
-                    sanitized = pattern.sub('***', sanitized)
+                    sanitized = pattern.sub("***", sanitized)
                 except re.error:
                     continue
             else:
                 pattern = re.compile(re.escape(word_obj["word"]), re.IGNORECASE)
-                sanitized = pattern.sub('***', sanitized)
+                sanitized = pattern.sub("***", sanitized)
 
         # 移除可疑的 URL
-        sanitized = re.sub(r'(?:http|https)://\S+', '[已移除連結]', sanitized)
+        sanitized = re.sub(r"(?:http|https)://\S+", "[已移除連結]", sanitized)
 
         return sanitized
 
     @classmethod
     async def check_profile_content(
-        cls,
-        db: AsyncSession,
-        user_id: uuid.UUID,
-        bio: str = None,
-        interests: List[str] = None
-    ) -> Tuple[bool, List[str], str]:
+        cls, db: AsyncSession, user_id: uuid.UUID, bio: str = None, interests: list[str] = None
+    ) -> tuple[bool, list[str], str]:
         """
         檢查個人檔案內容
 
@@ -592,11 +569,8 @@ class ContentModerationService:
 
     @classmethod
     async def check_message_content(
-        cls,
-        message: str,
-        db: AsyncSession,
-        user_id: uuid.UUID
-    ) -> Tuple[bool, List[str], str]:
+        cls, message: str, db: AsyncSession, user_id: uuid.UUID
+    ) -> tuple[bool, list[str], str]:
         """
         檢查聊天訊息內容
 

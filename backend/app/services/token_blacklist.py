@@ -8,11 +8,12 @@ Redis Key 設計：
 - blacklist:{token_hash} - Token 黑名單標記 (value: "1", TTL: Token 剩餘有效期)
 - 使用 SHA256 hash 縮短 Key（原始 JWT 約 300+ 字元）
 """
+
 import asyncio
+import contextlib
 import hashlib
-from datetime import datetime, timezone
-from typing import Dict, Optional
 import logging
+from datetime import UTC, datetime
 
 import redis.asyncio as aioredis
 
@@ -32,18 +33,18 @@ class TokenBlacklist:
         _lock: 並發安全鎖
     """
 
-    def __init__(self, redis_client: Optional[aioredis.Redis] = None):
+    def __init__(self, redis_client: aioredis.Redis | None = None):
         """初始化 Token 黑名單管理器
 
         Args:
             redis_client: Redis 連線（可選，不提供時使用純內存模式）
         """
-        self._redis: Optional[aioredis.Redis] = redis_client
+        self._redis: aioredis.Redis | None = redis_client
         self._use_redis: bool = redis_client is not None
         # 內存回退存儲: token -> 過期時間
-        self._fallback: Dict[str, datetime] = {}
+        self._fallback: dict[str, datetime] = {}
         self._lock = asyncio.Lock()
-        self._cleanup_task: Optional[asyncio.Task] = None
+        self._cleanup_task: asyncio.Task | None = None
 
     async def set_redis(self, redis_client: aioredis.Redis) -> None:
         """設置或更新 Redis 連線
@@ -75,7 +76,7 @@ class TokenBlacklist:
             expires_at: Token 的原始過期時間（用於計算 TTL）
         """
         # 計算 TTL（秒）
-        ttl = int((expires_at - datetime.now(timezone.utc)).total_seconds())
+        ttl = int((expires_at - datetime.now(UTC)).total_seconds())
         if ttl <= 0:
             # Token 已過期，無需加入黑名單
             logger.debug("Token already expired, skipping blacklist")
@@ -116,8 +117,7 @@ class TokenBlacklist:
                 return result > 0
             except aioredis.RedisError as e:
                 logger.warning(
-                    f"Redis unavailable for blacklist check, "
-                    f"falling back to memory: {e}"
+                    f"Redis unavailable for blacklist check, falling back to memory: {e}"
                 )
                 self._use_redis = False
 
@@ -125,7 +125,7 @@ class TokenBlacklist:
         async with self._lock:
             if token in self._fallback:
                 expires_at = self._fallback[token]
-                if expires_at < datetime.now(timezone.utc):
+                if expires_at < datetime.now(UTC):
                     # Token 已過期，從內存移除
                     del self._fallback[token]
                     return False
@@ -167,10 +167,9 @@ class TokenBlacklist:
             int: 清理的 Token 數量
         """
         async with self._lock:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             expired_tokens = [
-                token for token, expires_at in self._fallback.items()
-                if expires_at < now
+                token for token, expires_at in self._fallback.items() if expires_at < now
             ]
 
             for token in expired_tokens:
@@ -178,8 +177,7 @@ class TokenBlacklist:
 
             if expired_tokens:
                 logger.info(
-                    f"Cleaned up {len(expired_tokens)} expired tokens "
-                    f"from memory blacklist"
+                    f"Cleaned up {len(expired_tokens)} expired tokens from memory blacklist"
                 )
 
             return len(expired_tokens)
@@ -194,10 +192,8 @@ class TokenBlacklist:
         """停止定期清理任務"""
         if self._cleanup_task:
             self._cleanup_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._cleanup_task
-            except asyncio.CancelledError:
-                pass
             self._cleanup_task = None
             logger.info("Stopped token blacklist cleanup task")
 

@@ -1,35 +1,34 @@
 """配對相關資料模型"""
-from sqlalchemy import Column, String, DateTime, ForeignKey, CheckConstraint, UniqueConstraint, Text
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
+
 import uuid
+
+from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 from app.core.database import Base
 
 
 class Like(Base):
     """喜歡記錄"""
+
     __tablename__ = "likes"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     from_user_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     to_user_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 約束：不能喜歡自己，且同一對用戶只能有一個喜歡記錄
     __table_args__ = (
-        CheckConstraint('from_user_id != to_user_id', name='no_self_like'),
-        UniqueConstraint('from_user_id', 'to_user_id', name='unique_like'),
+        CheckConstraint("from_user_id != to_user_id", name="no_self_like"),
+        UniqueConstraint("from_user_id", "to_user_id", name="unique_like"),
     )
 
     def __repr__(self):
@@ -64,29 +63,22 @@ class Pass(Base):
 
     目前簡化版無背景清理，資料表會持續增長但影響不大（索引已優化查詢）。
     """
+
     __tablename__ = "passes"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     from_user_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     to_user_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    passed_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        index=True
-    )
+    passed_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     # 約束：不能跳過自己
     __table_args__ = (
-        CheckConstraint('from_user_id != to_user_id', name='no_self_pass'),
-        UniqueConstraint('from_user_id', 'to_user_id', name='unique_pass'),
+        CheckConstraint("from_user_id != to_user_id", name="no_self_pass"),
+        UniqueConstraint("from_user_id", "to_user_id", name="unique_pass"),
     )
 
     def __repr__(self):
@@ -95,20 +87,17 @@ class Pass(Base):
 
 class Match(Base):
     """配對記錄"""
+
     __tablename__ = "matches"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # 用戶 ID（保證 user1_id < user2_id，避免重複）
     user1_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     user2_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
 
     # 配對狀態: ACTIVE(活躍), UNMATCHED(已取消)
@@ -124,8 +113,8 @@ class Match(Base):
 
     # 約束：保證 user1_id < user2_id，避免重複配對
     __table_args__ = (
-        CheckConstraint('user1_id < user2_id', name='user_order'),
-        UniqueConstraint('user1_id', 'user2_id', name='unique_match'),
+        CheckConstraint("user1_id < user2_id", name="user_order"),
+        UniqueConstraint("user1_id", "user2_id", name="unique_match"),
     )
 
     def __repr__(self):
@@ -134,19 +123,15 @@ class Match(Base):
 
 class Message(Base):
     """聊天訊息"""
+
     __tablename__ = "messages"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     match_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("matches.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True
+        UUID(as_uuid=True), ForeignKey("matches.id", ondelete="CASCADE"), nullable=False, index=True
     )
     sender_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
 
     # 訊息內容
@@ -169,18 +154,15 @@ class Message(Base):
 
 class BlockedUser(Base):
     """封鎖用戶記錄"""
+
     __tablename__ = "blocked_users"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     blocker_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     blocked_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
 
     reason = Column(Text, nullable=True)
@@ -188,8 +170,8 @@ class BlockedUser(Base):
 
     # 約束：不能封鎖自己，且同一對用戶只能有一個封鎖記錄
     __table_args__ = (
-        CheckConstraint('blocker_id != blocked_id', name='no_self_block'),
-        UniqueConstraint('blocker_id', 'blocked_id', name='unique_block'),
+        CheckConstraint("blocker_id != blocked_id", name="no_self_block"),
+        UniqueConstraint("blocker_id", "blocked_id", name="unique_block"),
     )
 
     def __repr__(self):

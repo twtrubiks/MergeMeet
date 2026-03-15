@@ -51,7 +51,7 @@ export const authAPI = {
    */
   async refreshToken(refreshToken) {
     const response = await apiClient.post('/auth/refresh', {
-      refresh_token: refreshToken,
+      refresh_token: refreshToken
     })
     return response.data
   },
@@ -75,7 +75,7 @@ export const authAPI = {
    */
   async resendVerification(email) {
     const response = await apiClient.post('/auth/resend-verification', null, {
-      params: { email },
+      params: { email }
     })
     return response.data
   },
@@ -102,5 +102,5 @@ export const authAPI = {
   async logout() {
     const response = await apiClient.post('/auth/logout')
     return response.data
-  },
+  }
 }

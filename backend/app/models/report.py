@@ -1,14 +1,17 @@
 """舉報相關資料模型"""
-from sqlalchemy import Column, String, DateTime, Text, ForeignKey, CheckConstraint
+
+import uuid
+
+from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
-import uuid
 
 from app.core.database import Base
 
 
 class Report(Base):
     """舉報記錄模型"""
+
     __tablename__ = "reports"
 
     # 主鍵
@@ -16,16 +19,10 @@ class Report(Base):
 
     # 舉報關係
     reporter_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     reported_user_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
 
     # 舉報內容 (INAPPROPRIATE, HARASSMENT, FAKE, SCAM, OTHER)
@@ -39,9 +36,7 @@ class Report(Base):
     # 管理員備註
     admin_notes = Column(Text, nullable=True)
     reviewed_by = Column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
 
@@ -50,9 +45,7 @@ class Report(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # 資料庫約束：不能舉報自己
-    __table_args__ = (
-        CheckConstraint('reporter_id != reported_user_id', name='no_self_report'),
-    )
+    __table_args__ = (CheckConstraint("reporter_id != reported_user_id", name="no_self_report"),)
 
     def __repr__(self):
         return f"<Report {self.id} by {self.reporter_id} against {self.reported_user_id}>"

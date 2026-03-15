@@ -131,7 +131,7 @@ export const useDiscoveryStore = defineStore('discovery', () => {
       await apiClient.delete(`/discovery/unmatch/${matchId}`)
 
       // 從列表中移除
-      matches.value = matches.value.filter(m => m.match_id !== matchId)
+      matches.value = matches.value.filter((m) => m.match_id !== matchId)
 
       return true
     } catch (err) {

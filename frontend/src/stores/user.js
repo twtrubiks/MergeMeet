@@ -174,7 +174,7 @@ export const useUserStore = defineStore('user', () => {
     try {
       await authAPI.verifyEmail({
         email: user.value.email,
-        verification_code: verificationCode,
+        verification_code: verificationCode
       })
 
       // 更新用戶狀態
@@ -319,6 +319,6 @@ export const useUserStore = defineStore('user', () => {
     saveTokens,
     clearTokens,
     initializeFromToken,
-    resetLoginLimitInfo,
+    resetLoginLimitInfo
   }
 })

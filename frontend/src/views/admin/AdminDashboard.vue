@@ -17,128 +17,141 @@
             <span class="tab-label"><Icon name="stats" size="sm" decorative /> 儀表板</span>
           </template>
           <div class="tab-content">
-      <!-- 統計卡片 -->
-      <div class="stats-section">
-        <h2>系統統計</h2>
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-icon">
-              <Icon name="people" size="lg" decorative />
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ stats.total_users }}</div>
-              <div class="stat-label">總用戶數</div>
-            </div>
-          </div>
+            <!-- 統計卡片 -->
+            <div class="stats-section">
+              <h2>系統統計</h2>
+              <div class="stats-grid">
+                <div class="stat-card">
+                  <div class="stat-icon">
+                    <Icon name="people" size="lg" decorative />
+                  </div>
+                  <div class="stat-info">
+                    <div class="stat-value">{{ stats.total_users }}</div>
+                    <div class="stat-label">總用戶數</div>
+                  </div>
+                </div>
 
-          <div class="stat-card">
-            <div class="stat-icon">
-              <Icon name="checkmark-done" size="lg" decorative />
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ stats.active_users }}</div>
-              <div class="stat-label">活躍用戶</div>
-            </div>
-          </div>
+                <div class="stat-card">
+                  <div class="stat-icon">
+                    <Icon name="checkmark-done" size="lg" decorative />
+                  </div>
+                  <div class="stat-info">
+                    <div class="stat-value">{{ stats.active_users }}</div>
+                    <div class="stat-label">活躍用戶</div>
+                  </div>
+                </div>
 
-          <div class="stat-card">
-            <div class="stat-icon">
-              <Icon name="heart-half" size="lg" decorative />
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ stats.active_matches }}</div>
-              <div class="stat-label">活躍配對</div>
-            </div>
-          </div>
+                <div class="stat-card">
+                  <div class="stat-icon">
+                    <Icon name="heart-half" size="lg" decorative />
+                  </div>
+                  <div class="stat-info">
+                    <div class="stat-value">{{ stats.active_matches }}</div>
+                    <div class="stat-label">活躍配對</div>
+                  </div>
+                </div>
 
-          <div class="stat-card">
-            <div class="stat-icon">
-              <Icon name="chatbubbles" size="lg" decorative />
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ stats.total_messages }}</div>
-              <div class="stat-label">訊息總數</div>
-            </div>
-          </div>
+                <div class="stat-card">
+                  <div class="stat-icon">
+                    <Icon name="chatbubbles" size="lg" decorative />
+                  </div>
+                  <div class="stat-info">
+                    <div class="stat-value">{{ stats.total_messages }}</div>
+                    <div class="stat-label">訊息總數</div>
+                  </div>
+                </div>
 
-          <div class="stat-card warning">
-            <div class="stat-icon">
-              <Icon name="flag" size="lg" decorative />
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ stats.pending_reports }}</div>
-              <div class="stat-label">待處理舉報</div>
-            </div>
-          </div>
+                <div class="stat-card warning">
+                  <div class="stat-icon">
+                    <Icon name="flag" size="lg" decorative />
+                  </div>
+                  <div class="stat-info">
+                    <div class="stat-value">{{ stats.pending_reports }}</div>
+                    <div class="stat-label">待處理舉報</div>
+                  </div>
+                </div>
 
-          <div class="stat-card danger">
-            <div class="stat-icon">
-              <Icon name="ban" size="lg" decorative />
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ stats.banned_users }}</div>
-              <div class="stat-label">被封禁用戶</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 舉報管理 -->
-      <div class="reports-section">
-        <div class="section-header">
-          <h2>舉報管理</h2>
-          <n-button @click="loadReports">刷新</n-button>
-        </div>
-
-        <n-spin :show="loading">
-          <ErrorState
-            v-if="reports.length === 0"
-            variant="info"
-            title="暫無待處理舉報"
-            message="目前沒有需要處理的舉報，系統運作正常"
-            :show-retry="false"
-            :icon-size="48"
-          />
-
-          <div v-else class="reports-list">
-            <div v-for="report in reports" :key="report.id" class="report-item">
-              <div class="report-header">
-                <n-tag :type="getReportTypeColor(report.report_type)">
-                  {{ formatReportType(report.report_type) }}
-                </n-tag>
-                <n-tag :type="getStatusColor(report.status)">
-                  {{ formatStatus(report.status) }}
-                </n-tag>
-              </div>
-
-              <div class="report-body">
-                <p><strong>舉報者:</strong> {{ report.reporter_email }}</p>
-                <p><strong>被舉報:</strong> {{ report.reported_user_email }}</p>
-                <p><strong>原因:</strong> {{ report.reason }}</p>
-                <p class="report-time">{{ formatDate(report.created_at) }}</p>
-              </div>
-
-              <div class="report-actions" v-if="report.status === 'PENDING'">
-                <n-button size="small" type="success" @click="() => reviewReport(report.id, 'APPROVED', 'WARNING')">
-                  批准 (警告)
-                </n-button>
-                <n-button size="small" type="error" @click="() => reviewReport(report.id, 'APPROVED', 'BAN_USER')">
-                  批准 (封禁)
-                </n-button>
-                <n-button size="small" @click="() => reviewReport(report.id, 'REJECTED', 'NO_ACTION')">
-                  拒絕
-                </n-button>
+                <div class="stat-card danger">
+                  <div class="stat-icon">
+                    <Icon name="ban" size="lg" decorative />
+                  </div>
+                  <div class="stat-info">
+                    <div class="stat-value">{{ stats.banned_users }}</div>
+                    <div class="stat-label">被封禁用戶</div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </n-spin>
-      </div>
+
+            <!-- 舉報管理 -->
+            <div class="reports-section">
+              <div class="section-header">
+                <h2>舉報管理</h2>
+                <n-button @click="loadReports">刷新</n-button>
+              </div>
+
+              <n-spin :show="loading">
+                <ErrorState
+                  v-if="reports.length === 0"
+                  variant="info"
+                  title="暫無待處理舉報"
+                  message="目前沒有需要處理的舉報，系統運作正常"
+                  :show-retry="false"
+                  :icon-size="48"
+                />
+
+                <div v-else class="reports-list">
+                  <div v-for="report in reports" :key="report.id" class="report-item">
+                    <div class="report-header">
+                      <n-tag :type="getReportTypeColor(report.report_type)">
+                        {{ formatReportType(report.report_type) }}
+                      </n-tag>
+                      <n-tag :type="getStatusColor(report.status)">
+                        {{ formatStatus(report.status) }}
+                      </n-tag>
+                    </div>
+
+                    <div class="report-body">
+                      <p><strong>舉報者:</strong> {{ report.reporter_email }}</p>
+                      <p><strong>被舉報:</strong> {{ report.reported_user_email }}</p>
+                      <p><strong>原因:</strong> {{ report.reason }}</p>
+                      <p class="report-time">{{ formatDate(report.created_at) }}</p>
+                    </div>
+
+                    <div v-if="report.status === 'PENDING'" class="report-actions">
+                      <n-button
+                        size="small"
+                        type="success"
+                        @click="() => reviewReport(report.id, 'APPROVED', 'WARNING')"
+                      >
+                        批准 (警告)
+                      </n-button>
+                      <n-button
+                        size="small"
+                        type="error"
+                        @click="() => reviewReport(report.id, 'APPROVED', 'BAN_USER')"
+                      >
+                        批准 (封禁)
+                      </n-button>
+                      <n-button
+                        size="small"
+                        @click="() => reviewReport(report.id, 'REJECTED', 'NO_ACTION')"
+                      >
+                        拒絕
+                      </n-button>
+                    </div>
+                  </div>
+                </div>
+              </n-spin>
+            </div>
           </div>
         </n-tab-pane>
 
         <n-tab-pane name="moderation">
           <template #tab>
-            <span class="tab-label"><Icon name="shield-check" size="sm" decorative /> 內容審核</span>
+            <span class="tab-label"
+              ><Icon name="shield-check" size="sm" decorative /> 內容審核</span
+            >
           </template>
           <div class="tab-content">
             <!-- 審核統計 -->
@@ -257,7 +270,7 @@
                       <p class="appeal-time">{{ formatDate(appeal.created_at) }}</p>
                     </div>
 
-                    <div class="appeal-actions" v-if="appeal.status === 'PENDING'">
+                    <div v-if="appeal.status === 'PENDING'" class="appeal-actions">
                       <n-input
                         v-model:value="appealResponses[appeal.id]"
                         type="textarea"
@@ -283,7 +296,10 @@
                       </div>
                     </div>
 
-                    <div v-if="appeal.status !== 'PENDING' && appeal.admin_response" class="admin-response">
+                    <div
+                      v-if="appeal.status !== 'PENDING' && appeal.admin_response"
+                      class="admin-response"
+                    >
                       <p><strong>管理員回覆:</strong> {{ appeal.admin_response }}</p>
                       <p class="response-time">{{ formatDate(appeal.reviewed_at) }}</p>
                     </div>
@@ -440,16 +456,14 @@
                 />
 
                 <div v-else class="photos-grid">
-                  <div
-                    v-for="photo in pendingPhotos"
-                    :key="photo.id"
-                    class="photo-card"
-                  >
+                  <div v-for="photo in pendingPhotos" :key="photo.id" class="photo-card">
                     <div class="photo-image" @click="showPhotoDetail(photo)">
                       <img :src="getPhotoUrl(photo.url)" :alt="photo.display_name" />
                     </div>
                     <div class="photo-info">
-                      <p class="photo-name"><strong>{{ photo.display_name }}</strong></p>
+                      <p class="photo-name">
+                        <strong>{{ photo.display_name }}</strong>
+                      </p>
                       <p class="photo-email">{{ photo.user_email }}</p>
                       <p class="photo-time">{{ formatDate(photo.created_at) }}</p>
                     </div>
@@ -461,11 +475,7 @@
                       >
                         通過
                       </n-button>
-                      <n-button
-                        size="small"
-                        type="error"
-                        @click="showRejectModal(photo)"
-                      >
+                      <n-button size="small" type="error" @click="showRejectModal(photo)">
                         拒絕
                       </n-button>
                     </div>
@@ -478,8 +488,8 @@
                 v-if="photoTotal > photoPageSize"
                 v-model:page="photoPage"
                 :page-count="Math.ceil(photoTotal / photoPageSize)"
+                style="margin-top: 20px; justify-content: center"
                 @update:page="handlePhotoPageChange"
-                style="margin-top: 20px; justify-content: center;"
               />
             </div>
           </div>
@@ -489,7 +499,7 @@
 
     <!-- 封禁用戶 Modal -->
     <n-modal v-model:show="showBanUserModal" preset="dialog" title="封禁用戶">
-      <div v-if="banningUser" style="margin-bottom: 16px;">
+      <div v-if="banningUser" style="margin-bottom: 16px">
         <p><strong>用戶:</strong> {{ banningUser.email }}</p>
         <p><strong>信任分數:</strong> {{ banningUser.trust_score }}</p>
       </div>
@@ -510,7 +520,7 @@
             style="width: 100%"
           />
           <template #feedback>
-            <span style="color: #999; font-size: 12px;">留空或設為 0 表示永久封禁</span>
+            <span style="color: #999; font-size: 12px">留空或設為 0 表示永久封禁</span>
           </template>
         </n-form-item>
       </n-form>
@@ -546,9 +556,14 @@
     </n-modal>
 
     <!-- 照片詳情 Modal -->
-    <n-modal v-model:show="showPhotoDetailModal" preset="card" title="照片詳情" style="width: 600px">
+    <n-modal
+      v-model:show="showPhotoDetailModal"
+      preset="card"
+      title="照片詳情"
+      style="width: 600px"
+    >
       <div v-if="selectedPhoto" class="photo-detail">
-        <img :src="getPhotoUrl(selectedPhoto.url)" style="max-width: 100%; border-radius: 8px;" />
+        <img :src="getPhotoUrl(selectedPhoto.url)" style="max-width: 100%; border-radius: 8px" />
         <div class="detail-info">
           <p><strong>用戶:</strong> {{ selectedPhoto.display_name }}</p>
           <p><strong>Email:</strong> {{ selectedPhoto.user_email }}</p>
@@ -556,11 +571,23 @@
           <p><strong>大小:</strong> {{ formatFileSize(selectedPhoto.file_size) }}</p>
           <p><strong>上傳時間:</strong> {{ formatDate(selectedPhoto.created_at) }}</p>
         </div>
-        <div class="detail-actions" style="margin-top: 16px; display: flex; gap: 8px;">
-          <n-button type="success" @click="reviewPhoto(selectedPhoto.id, 'APPROVED'); showPhotoDetailModal = false">
+        <div class="detail-actions" style="margin-top: 16px; display: flex; gap: 8px">
+          <n-button
+            type="success"
+            @click="
+              reviewPhoto(selectedPhoto.id, 'APPROVED')
+              showPhotoDetailModal = false
+            "
+          >
             通過
           </n-button>
-          <n-button type="error" @click="showRejectModal(selectedPhoto); showPhotoDetailModal = false">
+          <n-button
+            type="error"
+            @click="
+              showRejectModal(selectedPhoto)
+              showPhotoDetailModal = false
+            "
+          >
             拒絕
           </n-button>
         </div>
@@ -655,10 +682,22 @@
 import { ref, onMounted, h } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  NButton, NTag, NSpin, NTabs, NTabPane, NDataTable,
-  NSelect, NModal, NForm, NFormItem, NInput, NCheckbox,
-  NPagination, NInputNumber,
-  useMessage, useDialog
+  NButton,
+  NTag,
+  NSpin,
+  NTabs,
+  NTabPane,
+  NDataTable,
+  NSelect,
+  NModal,
+  NForm,
+  NFormItem,
+  NInput,
+  NCheckbox,
+  NPagination,
+  NInputNumber,
+  useMessage,
+  useDialog
 } from 'naive-ui'
 import apiClient from '@/api/client'
 import { useUserStore } from '@/stores/user'
@@ -838,9 +877,13 @@ const userColumns = [
     key: 'is_active',
     width: 100,
     render: (row) => {
-      return h(NTag, {
-        type: row.is_active ? 'success' : 'error'
-      }, { default: () => row.is_active ? '活躍' : '已封禁' })
+      return h(
+        NTag,
+        {
+          type: row.is_active ? 'success' : 'error'
+        },
+        { default: () => (row.is_active ? '活躍' : '已封禁') }
+      )
     }
   },
   {
@@ -865,10 +908,14 @@ const userColumns = [
     key: 'email_verified',
     width: 100,
     render: (row) => {
-      return h(NTag, {
-        type: row.email_verified ? 'success' : 'error',
-        size: 'small'
-      }, { default: () => row.email_verified ? '已驗證' : '未驗證' })
+      return h(
+        NTag,
+        {
+          type: row.email_verified ? 'success' : 'error',
+          size: 'small'
+        },
+        { default: () => (row.email_verified ? '已驗證' : '未驗證') }
+      )
     }
   },
   {
@@ -904,17 +951,25 @@ const userColumns = [
         return h('span', { style: 'color: #999;' }, '管理員')
       }
       if (row.is_active) {
-        return h(NButton, {
-          size: 'small',
-          type: 'error',
-          onClick: () => showBanModal(row)
-        }, { default: () => '封禁' })
+        return h(
+          NButton,
+          {
+            size: 'small',
+            type: 'error',
+            onClick: () => showBanModal(row)
+          },
+          { default: () => '封禁' }
+        )
       } else {
-        return h(NButton, {
-          size: 'small',
-          type: 'success',
-          onClick: () => handleUnbanUser(row)
-        }, { default: () => '解封' })
+        return h(
+          NButton,
+          {
+            size: 'small',
+            type: 'success',
+            onClick: () => handleUnbanUser(row)
+          },
+          { default: () => '解封' }
+        )
       }
     }
   }
@@ -932,7 +987,7 @@ const wordColumns = [
     key: 'category',
     width: 120,
     render: (row) => {
-      const cat = categoryOptions.find(o => o.value === row.category)
+      const cat = categoryOptions.find((o) => o.value === row.category)
       return cat ? cat.label : row.category
     }
   },
@@ -941,10 +996,15 @@ const wordColumns = [
     key: 'severity',
     width: 100,
     render: (row) => {
-      const sev = severityOptions.find(o => o.value === row.severity)
-      return h(NTag, {
-        type: row.severity === 'CRITICAL' ? 'error' : row.severity === 'HIGH' ? 'warning' : 'default'
-      }, { default: () => sev ? sev.label : row.severity })
+      const sev = severityOptions.find((o) => o.value === row.severity)
+      return h(
+        NTag,
+        {
+          type:
+            row.severity === 'CRITICAL' ? 'error' : row.severity === 'HIGH' ? 'warning' : 'default'
+        },
+        { default: () => (sev ? sev.label : row.severity) }
+      )
     }
   },
   {
@@ -952,7 +1012,7 @@ const wordColumns = [
     key: 'action',
     width: 100,
     render: (row) => {
-      const act = actionOptions.find(o => o.value === row.action)
+      const act = actionOptions.find((o) => o.value === row.action)
       return act ? act.label : row.action
     }
   },
@@ -960,16 +1020,20 @@ const wordColumns = [
     title: '正則',
     key: 'is_regex',
     width: 80,
-    render: (row) => row.is_regex ? '是' : '否'
+    render: (row) => (row.is_regex ? '是' : '否')
   },
   {
     title: '狀態',
     key: 'is_active',
     width: 80,
     render: (row) => {
-      return h(NTag, {
-        type: row.is_active ? 'success' : 'default'
-      }, { default: () => row.is_active ? '啟用' : '停用' })
+      return h(
+        NTag,
+        {
+          type: row.is_active ? 'success' : 'default'
+        },
+        { default: () => (row.is_active ? '啟用' : '停用') }
+      )
     }
   },
   {
@@ -985,15 +1049,23 @@ const wordColumns = [
     width: 150,
     render: (row) => {
       return h('div', { style: 'display: flex; gap: 8px;' }, [
-        h(NButton, {
-          size: 'small',
-          onClick: () => handleEditWord(row)
-        }, { default: () => '編輯' }),
-        h(NButton, {
-          size: 'small',
-          type: 'error',
-          onClick: () => handleDeleteWord(row.id)
-        }, { default: () => '刪除' })
+        h(
+          NButton,
+          {
+            size: 'small',
+            onClick: () => handleEditWord(row)
+          },
+          { default: () => '編輯' }
+        ),
+        h(
+          NButton,
+          {
+            size: 'small',
+            type: 'error',
+            onClick: () => handleDeleteWord(row.id)
+          },
+          { default: () => '刪除' }
+        )
       ])
     }
   }
@@ -1347,7 +1419,8 @@ const confirmRejectPhoto = async () => {
     return
   }
 
-  let reason = rejectReasonOptions.find(o => o.value === rejectReason.value)?.label || rejectReason.value
+  let reason =
+    rejectReasonOptions.find((o) => o.value === rejectReason.value)?.label || rejectReason.value
   if (rejectReason.value === 'OTHER') {
     if (!customRejectReason.value.trim()) {
       message.error('請輸入拒絕原因')
@@ -1596,7 +1669,9 @@ onMounted(() => {
   gap: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   border: 1px solid rgba(0, 0, 0, 0.05);
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
 }
 
 .stat-card:hover {
@@ -1853,7 +1928,9 @@ onMounted(() => {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
 }
 
 .photo-card:hover {

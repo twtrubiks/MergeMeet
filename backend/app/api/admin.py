@@ -1,25 +1,26 @@
 """管理後台 API"""
+
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from typing import List
-from datetime import datetime, timedelta, timezone
 import re
+from datetime import UTC, datetime, timedelta
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_admin_user
 from app.core.utils import mask_email
-from app.models.user import User
-from app.models.match import Match, BlockedUser, Message
+from app.models.match import BlockedUser, Match, Message
 from app.models.report import Report
+from app.models.user import User
 from app.schemas.admin import (
+    BanUserRequest,
     DashboardStatsResponse,
     ReportDetailResponse,
     ReviewReportRequest,
+    UnbanUserRequest,
     UserManagementResponse,
-    BanUserRequest,
-    UnbanUserRequest
 )
 from app.services.trust_score import TrustScoreService
 
@@ -30,8 +31,7 @@ router = APIRouter()
 
 @router.get("/stats", response_model=DashboardStatsResponse)
 async def get_dashboard_stats(
-    current_admin: User = Depends(get_current_admin_user),
-    db: AsyncSession = Depends(get_db)
+    current_admin: User = Depends(get_current_admin_user), db: AsyncSession = Depends(get_db)
 ):
     """
     取得管理後台統計數據
@@ -92,17 +92,17 @@ async def get_dashboard_stats(
         total_messages=total_messages,
         total_reports=total_reports,
         pending_reports=pending_reports,
-        total_blocked_users=total_blocked_users
+        total_blocked_users=total_blocked_users,
     )
 
 
-@router.get("/reports", response_model=List[ReportDetailResponse])
+@router.get("/reports", response_model=list[ReportDetailResponse])
 async def get_all_reports(
     status_filter: str = Query(None, description="篩選狀態: PENDING, APPROVED, REJECTED"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     current_admin: User = Depends(get_current_admin_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     取得所有舉報記錄
@@ -137,9 +137,7 @@ async def get_all_reports(
         user_ids.add(report.reported_user_id)
 
     # 批次查詢所有用戶（1 次查詢取代 2N 次）
-    users_result = await db.execute(
-        select(User).where(User.id.in_(user_ids))
-    )
+    users_result = await db.execute(select(User).where(User.id.in_(user_ids)))
     users_by_id = {u.id: u for u in users_result.scalars().all()}
 
     # 組裝響應
@@ -149,21 +147,23 @@ async def get_all_reports(
         reported_user = users_by_id.get(report.reported_user_id)
 
         if reporter and reported_user:
-            response.append(ReportDetailResponse(
-                id=str(report.id),
-                reporter_id=str(report.reporter_id),
-                reporter_email=mask_email(reporter.email),  # 脫敏處理保護隱私
-                reported_user_id=str(report.reported_user_id),
-                reported_user_email=mask_email(reported_user.email),  # 脫敏處理保護隱私
-                report_type=report.report_type,
-                reason=report.reason,
-                evidence=report.evidence,
-                status=report.status,
-                admin_notes=report.admin_notes,
-                created_at=report.created_at,
-                reviewed_at=report.reviewed_at,
-                reviewed_by=str(report.reviewed_by) if report.reviewed_by else None
-            ))
+            response.append(
+                ReportDetailResponse(
+                    id=str(report.id),
+                    reporter_id=str(report.reporter_id),
+                    reporter_email=mask_email(reporter.email),  # 脫敏處理保護隱私
+                    reported_user_id=str(report.reported_user_id),
+                    reported_user_email=mask_email(reported_user.email),  # 脫敏處理保護隱私
+                    report_type=report.report_type,
+                    reason=report.reason,
+                    evidence=report.evidence,
+                    status=report.status,
+                    admin_notes=report.admin_notes,
+                    created_at=report.created_at,
+                    reviewed_at=report.reviewed_at,
+                    reviewed_by=str(report.reviewed_by) if report.reviewed_by else None,
+                )
+            )
 
     return response
 
@@ -173,7 +173,7 @@ async def review_report(
     report_id: str,
     request: ReviewReportRequest,
     current_admin: User = Depends(get_current_admin_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     處理舉報
@@ -185,16 +185,11 @@ async def review_report(
     - 對被舉報用戶採取行動（警告、封禁）
     """
     # 取得舉報
-    result = await db.execute(
-        select(Report).where(Report.id == report_id)
-    )
+    result = await db.execute(select(Report).where(Report.id == report_id))
     report = result.scalar_one_or_none()
 
     if not report:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="舉報不存在"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="舉報不存在")
 
     # 更新舉報狀態
     report.status = request.status
@@ -205,9 +200,7 @@ async def review_report(
     # 根據處理結果採取行動
     if request.action:
         # 取得被舉報用戶
-        user_result = await db.execute(
-            select(User).where(User.id == report.reported_user_id)
-        )
+        user_result = await db.execute(select(User).where(User.id == report.reported_user_id))
         user = user_result.scalar_one_or_none()
 
         if user:
@@ -221,18 +214,14 @@ async def review_report(
 
     # 舉報被確認時（APPROVED），額外扣分 -10
     if request.status == "APPROVED":
-        await TrustScoreService.adjust_score(
-            db, report.reported_user_id, "report_confirmed"
-        )
-        logger.info(
-            f"Trust score -10 for user {report.reported_user_id} (report_confirmed)"
-        )
+        await TrustScoreService.adjust_score(db, report.reported_user_id, "report_confirmed")
+        logger.info(f"Trust score -10 for user {report.reported_user_id} (report_confirmed)")
 
     return {
         "success": True,
         "message": "舉報已處理",
         "report_id": str(report.id),
-        "status": report.status
+        "status": report.status,
     }
 
 
@@ -258,14 +247,14 @@ def escape_like_pattern(pattern: str) -> str:
     return pattern
 
 
-@router.get("/users", response_model=List[UserManagementResponse])
+@router.get("/users", response_model=list[UserManagementResponse])
 async def get_all_users(
     search: str = Query(None, description="搜尋 email", max_length=100),
     is_active: bool = Query(None, description="篩選啟用狀態"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     current_admin: User = Depends(get_current_admin_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     取得所有用戶列表
@@ -280,7 +269,7 @@ async def get_all_users(
     # 搜尋（修復：多層安全防護）
     if search:
         # 1. 只允許安全字符：字母、數字、@、.、-（移除 _ 因為它是 LIKE 特殊字符）
-        safe_search = re.sub(r'[^\w@.\-]', '', search)
+        safe_search = re.sub(r"[^\w@.\-]", "", search)
         if safe_search:
             # 2. 轉義 LIKE 特殊字符（防止 LIKE 注入）
             escaped_search = escape_like_pattern(safe_search)
@@ -312,7 +301,7 @@ async def get_all_users(
             ban_reason=user.ban_reason,
             banned_until=user.banned_until,
             created_at=user.created_at,
-            email_verified=user.email_verified
+            email_verified=user.email_verified,
         )
         for user in users
     ]
@@ -322,7 +311,7 @@ async def get_all_users(
 async def ban_user(
     request: BanUserRequest,
     current_admin: User = Depends(get_current_admin_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     封禁用戶
@@ -330,30 +319,22 @@ async def ban_user(
     可設定封禁期限，或永久封禁
     """
     # 取得用戶
-    result = await db.execute(
-        select(User).where(User.id == request.user_id)
-    )
+    result = await db.execute(select(User).where(User.id == request.user_id))
     user = result.scalar_one_or_none()
 
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="用戶不存在"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用戶不存在")
 
     # 不能封禁管理員
     if user.is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="不能封禁管理員"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不能封禁管理員")
 
     # 設定封禁
     user.is_active = False
     user.ban_reason = request.reason
 
     if request.duration_days:
-        user.banned_until = datetime.now(timezone.utc) + timedelta(days=request.duration_days)
+        user.banned_until = datetime.now(UTC) + timedelta(days=request.duration_days)
     else:
         user.banned_until = None  # 永久封禁
 
@@ -363,7 +344,7 @@ async def ban_user(
         "success": True,
         "message": "用戶已被封禁",
         "user_id": str(user.id),
-        "banned_until": user.banned_until.isoformat() if user.banned_until else "永久"
+        "banned_until": user.banned_until.isoformat() if user.banned_until else "永久",
     }
 
 
@@ -371,22 +352,17 @@ async def ban_user(
 async def unban_user(
     request: UnbanUserRequest,
     current_admin: User = Depends(get_current_admin_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     解封用戶
     """
     # 取得用戶
-    result = await db.execute(
-        select(User).where(User.id == request.user_id)
-    )
+    result = await db.execute(select(User).where(User.id == request.user_id))
     user = result.scalar_one_or_none()
 
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="用戶不存在"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用戶不存在")
 
     # 解封
     user.is_active = True
@@ -395,8 +371,4 @@ async def unban_user(
 
     await db.commit()
 
-    return {
-        "success": True,
-        "message": "用戶已解封",
-        "user_id": str(user.id)
-    }
+    return {"success": True, "message": "用戶已解封", "user_id": str(user.id)}

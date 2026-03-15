@@ -1,18 +1,8 @@
 <template>
-  <div
-    :class="[
-      'message-bubble',
-      isOwn ? 'message-own' : 'message-other'
-    ]"
-  >
+  <div :class="['message-bubble', isOwn ? 'message-own' : 'message-other']">
     <!-- 對方頭像 (只在對方訊息顯示) -->
     <div v-if="!isOwn && showAvatar" class="message-avatar">
-      <n-avatar
-        :src="otherUserAvatar"
-        :fallback-src="defaultAvatar"
-        size="small"
-        round
-      />
+      <n-avatar :src="otherUserAvatar" :fallback-src="defaultAvatar" size="small" round />
     </div>
 
     <!-- 訊息內容 -->
@@ -65,26 +55,14 @@
             @click="handleImageClick"
             @contextmenu.prevent="handleContextMenu"
           >
-            <img
-              :src="imageContent.thumbnail_url"
-              :alt="isGif ? 'GIF' : '圖片'"
-              loading="lazy"
-            />
+            <img :src="imageContent.thumbnail_url" :alt="isGif ? 'GIF' : '圖片'" loading="lazy" />
             <div v-if="isGif" class="gif-badge">GIF</div>
           </div>
         </n-dropdown>
 
         <!-- 對方的圖片（不可刪除） -->
-        <div
-          v-else
-          class="message-image"
-          @click="handleImageClick"
-        >
-          <img
-            :src="imageContent.thumbnail_url"
-            :alt="isGif ? 'GIF' : '圖片'"
-            loading="lazy"
-          />
+        <div v-else class="message-image" @click="handleImageClick">
+          <img :src="imageContent.thumbnail_url" :alt="isGif ? 'GIF' : '圖片'" loading="lazy" />
           <div v-if="isGif" class="gif-badge">GIF</div>
         </div>
       </template>
@@ -92,12 +70,8 @@
       <!-- 訊息資訊 (時間、已讀狀態) -->
       <div class="message-info">
         <span class="message-time">{{ formattedTime }}</span>
-        <span v-if="isOwn && message.is_read" class="message-status">
-          ✓✓ 已讀
-        </span>
-        <span v-else-if="isOwn" class="message-status">
-          ✓ 已送達
-        </span>
+        <span v-if="isOwn && message.is_read" class="message-status"> ✓✓ 已讀 </span>
+        <span v-else-if="isOwn" class="message-status"> ✓ 已送達 </span>
       </div>
     </div>
 

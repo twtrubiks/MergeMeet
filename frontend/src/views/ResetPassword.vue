@@ -20,11 +20,7 @@
         <div class="error-icon"><Icon name="close" size="xl" decorative /></div>
         <h2>鏈接無效</h2>
         <p class="error-text">{{ tokenError }}</p>
-        <AnimatedButton
-          variant="primary"
-          @click="goToForgotPassword"
-          class="action-btn"
-        >
+        <AnimatedButton variant="primary" class="action-btn" @click="goToForgotPassword">
           重新申請
         </AnimatedButton>
         <div class="auth-footer">
@@ -39,17 +35,13 @@
         <div class="success-icon"><Icon name="check-circle" size="xl" decorative /></div>
         <h2>密碼重置成功！</h2>
         <p class="success-text">您的密碼已更新，請使用新密碼登入。</p>
-        <AnimatedButton
-          variant="primary"
-          @click="goToLogin"
-          class="action-btn"
-        >
+        <AnimatedButton variant="primary" class="action-btn" @click="goToLogin">
           前往登入
         </AnimatedButton>
       </div>
 
       <!-- 重置表單 -->
-      <form v-else @submit.prevent="handleSubmit" class="auth-form">
+      <form v-else class="auth-form" @submit.prevent="handleSubmit">
         <p v-if="userEmail" class="user-info">
           正在為 <strong>{{ userEmail }}</strong> 重置密碼
         </p>
@@ -303,7 +295,8 @@ onMounted(() => {
 }
 
 @keyframes float {
-  0%, 100% {
+  0%,
+  100% {
     transform: translate(0, 0) scale(1);
   }
   33% {
@@ -323,8 +316,9 @@ onMounted(() => {
   padding: 48px;
   max-width: 480px;
   width: 100%;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3),
-              0 0 0 1px rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.2);
   animation: slideUp 0.5s ease-out;
 }
 
@@ -356,7 +350,8 @@ onMounted(() => {
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
   50% {
@@ -396,7 +391,9 @@ onMounted(() => {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .loading-state p {
@@ -417,9 +414,16 @@ onMounted(() => {
 }
 
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-10px); }
-  75% { transform: translateX(10px); }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-10px);
+  }
+  75% {
+    transform: translateX(10px);
+  }
 }
 
 .error-state h2 {
@@ -448,8 +452,13 @@ onMounted(() => {
 }
 
 @keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 .success-state h2 {

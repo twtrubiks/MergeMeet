@@ -1,23 +1,24 @@
 """Schemas module"""
+
 from app.schemas.auth import (
-    RegisterRequest,
-    LoginRequest,
-    TokenResponse,
-    RefreshTokenRequest,
-    UserResponse,
     EmailVerificationRequest,
+    LoginRequest,
+    RefreshTokenRequest,
+    RegisterRequest,
+    TokenResponse,
+    UserResponse,
 )
 from app.schemas.profile import (
-    ProfileCreateRequest,
-    ProfileUpdateRequest,
-    ProfileResponse,
-    PhotoResponse,
-    InterestTagResponse,
-    InterestTagCreateRequest,
-    UpdateInterestsRequest,
-    LocationRequest,
     GenderEnum,
     GenderPreferenceEnum,
+    InterestTagCreateRequest,
+    InterestTagResponse,
+    LocationRequest,
+    PhotoResponse,
+    ProfileCreateRequest,
+    ProfileResponse,
+    ProfileUpdateRequest,
+    UpdateInterestsRequest,
 )
 
 __all__ = [

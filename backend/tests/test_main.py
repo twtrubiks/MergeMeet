@@ -1,4 +1,5 @@
 """主應用測試"""
+
 import pytest
 from httpx import AsyncClient
 

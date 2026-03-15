@@ -1,15 +1,18 @@
 """用戶相關資料模型"""
-from sqlalchemy import Column, String, Boolean, DateTime, Date, Text, Integer
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
+
 import uuid
+
+from sqlalchemy import Boolean, Column, Date, DateTime, Integer, String, Text
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 from app.core.database import Base
 
 
 class User(Base):
     """用戶模型"""
+
     __tablename__ = "users"
 
     # 主鍵
@@ -46,16 +49,13 @@ class User(Base):
 
     # 關聯
     profile = relationship(
-        "Profile",
-        back_populates="user",
-        uselist=False,
-        cascade="all, delete-orphan"
+        "Profile", back_populates="user", uselist=False, cascade="all, delete-orphan"
     )
     notifications = relationship(
         "Notification",
         back_populates="user",
         cascade="all, delete-orphan",
-        order_by="desc(Notification.created_at)"
+        order_by="desc(Notification.created_at)",
     )
 
     def __repr__(self):

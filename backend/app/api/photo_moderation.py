@@ -2,7 +2,7 @@
 
 管理員用於審核用戶上傳的照片。
 """
-from typing import Optional
+
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -22,20 +22,16 @@ router = APIRouter()
 
 class PhotoReviewRequest(BaseModel):
     """照片審核請求"""
-    status: str = Field(
-        ...,
-        description="審核結果",
-        pattern="^(APPROVED|REJECTED)$"
-    )
-    rejection_reason: Optional[str] = Field(
-        None,
-        max_length=500,
-        description="拒絕原因（REJECTED 時必填）"
+
+    status: str = Field(..., description="審核結果", pattern="^(APPROVED|REJECTED)$")
+    rejection_reason: str | None = Field(
+        None, max_length=500, description="拒絕原因（REJECTED 時必填）"
     )
 
 
 class PhotoReviewResponse(BaseModel):
     """照片審核回應"""
+
     success: bool
     message: str
     photo_id: str
@@ -44,22 +40,24 @@ class PhotoReviewResponse(BaseModel):
 
 class PendingPhotoResponse(BaseModel):
     """待審核照片回應"""
+
     id: str
     url: str
-    thumbnail_url: Optional[str]
+    thumbnail_url: str | None
     profile_id: str
     user_id: str
     user_email: str
     display_name: str
     moderation_status: str
-    created_at: Optional[str]
-    file_size: Optional[int]
-    width: Optional[int]
-    height: Optional[int]
+    created_at: str | None
+    file_size: int | None
+    width: int | None
+    height: int | None
 
 
 class PendingPhotosListResponse(BaseModel):
     """待審核照片列表回應"""
+
     photos: list[PendingPhotoResponse]
     total: int
     page: int
@@ -68,6 +66,7 @@ class PendingPhotosListResponse(BaseModel):
 
 class PhotoStatsResponse(BaseModel):
     """照片審核統計回應"""
+
     total_photos: int
     pending_photos: int
     approved_photos: int
@@ -83,13 +82,11 @@ class PhotoStatsResponse(BaseModel):
 async def get_pending_photos(
     page: int = Query(1, ge=1, description="頁碼"),
     page_size: int = Query(20, ge=1, le=100, description="每頁數量"),
-    status: Optional[str] = Query(
-        None,
-        pattern="^(PENDING|APPROVED|REJECTED)$",
-        description="篩選狀態"
+    status: str | None = Query(
+        None, pattern="^(PENDING|APPROVED|REJECTED)$", description="篩選狀態"
     ),
     current_admin: User = Depends(get_current_admin_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     取得待審核照片列表
@@ -99,24 +96,20 @@ async def get_pending_photos(
     - 按上傳時間排序（最舊優先）
     """
     photos, total = await PhotoModerationService.get_pending_photos(
-        db=db,
-        page=page,
-        page_size=page_size,
-        status=status
+        db=db, page=page, page_size=page_size, status=status
     )
 
     return PendingPhotosListResponse(
         photos=[PendingPhotoResponse(**photo) for photo in photos],
         total=total,
         page=page,
-        page_size=page_size
+        page_size=page_size,
     )
 
 
 @router.get("/stats", response_model=PhotoStatsResponse)
 async def get_photo_stats(
-    current_admin: User = Depends(get_current_admin_user),
-    db: AsyncSession = Depends(get_db)
+    current_admin: User = Depends(get_current_admin_user), db: AsyncSession = Depends(get_db)
 ):
     """
     取得照片審核統計
@@ -137,7 +130,7 @@ async def get_photo_stats(
 async def get_photo_detail(
     photo_id: UUID,
     current_admin: User = Depends(get_current_admin_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     取得照片詳情
@@ -148,10 +141,7 @@ async def get_photo_detail(
     photo_detail = await PhotoModerationService.get_photo_detail(db, photo_id)
 
     if not photo_detail:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="照片不存在"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="照片不存在")
 
     return photo_detail
 
@@ -161,7 +151,7 @@ async def review_photo(
     photo_id: UUID,
     request: PhotoReviewRequest,
     current_admin: User = Depends(get_current_admin_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     審核照片
@@ -174,8 +164,7 @@ async def review_photo(
     # 驗證拒絕時必須提供原因
     if request.status == "REJECTED" and not request.rejection_reason:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="拒絕照片時必須提供原因"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="拒絕照片時必須提供原因"
         )
 
     success, message = await PhotoModerationService.review_photo(
@@ -183,18 +172,12 @@ async def review_photo(
         photo_id=photo_id,
         admin_id=current_admin.id,
         status=request.status,
-        rejection_reason=request.rejection_reason
+        rejection_reason=request.rejection_reason,
     )
 
     if not success:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=message
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
 
     return PhotoReviewResponse(
-        success=True,
-        message=message,
-        photo_id=str(photo_id),
-        status=request.status
+        success=True, message=message, photo_id=str(photo_id), status=request.status
     )

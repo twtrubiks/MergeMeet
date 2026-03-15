@@ -97,6 +97,8 @@
 | **Mailpit** | latest | Email 測試工具（開發） | ✅ |
 | **Alembic** | 1.13+ | 資料庫遷移 | ✅ |
 | **pytest** | 7.4+ | 測試框架 | ✅ |
+| **Ruff** | 0.15+ | Linter + Formatter | ✅ |
+| **pre-commit** | 4.0+ | Git Hook 管理 | ✅ |
 
 #### 前端技術棧
 
@@ -108,6 +110,8 @@
 | **Vue Router** | 4.x | 路由管理 | ✅ |
 | **Axios** | 1.x | HTTP 客戶端 | ✅ |
 | **WebSocket API** | 原生 | 即時通訊 | ✅ |
+| **ESLint** | 10.x | Linter | ✅ |
+| **Prettier** | 3.x | Formatter | ✅ |
 
 ### 2.3 資料庫架構
 

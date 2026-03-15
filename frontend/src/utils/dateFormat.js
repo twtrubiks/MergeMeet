@@ -19,7 +19,7 @@ export function safeFormatDate(dateString) {
   }
 
   const now = new Date()
-  const diffInMs = Math.max(0, now - date)  // 避免負數 (服務器時間比客戶端快的情況)
+  const diffInMs = Math.max(0, now - date) // 避免負數 (服務器時間比客戶端快的情況)
   const diffMins = Math.floor(diffInMs / (1000 * 60))
   const diffHours = Math.floor(diffInMs / (1000 * 60 * 60))
   const diffDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24))

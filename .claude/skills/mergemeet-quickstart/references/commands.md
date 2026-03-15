@@ -66,12 +66,12 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 # 依賴
 pip install -r requirements.txt
+pip install -r requirements-dev.txt   # 開發工具（Ruff, pre-commit）
 
 # 程式碼品質
-black app/
-flake8 app/
-mypy app/
-isort app/
+ruff check app/                       # lint
+ruff check app/ --fix                 # lint + 自動修復
+ruff format app/                      # 格式化
 ```
 
 ---
@@ -93,8 +93,10 @@ npm install
 rm -rf node_modules package-lock.json && npm install  # 清理重裝
 
 # 程式碼品質
-npm run lint
-npm run lint:fix
+npm run lint                          # ESLint 檢查
+npm run lint:fix                      # ESLint 自動修復
+npm run format                        # Prettier 格式化
+npm run format:check                  # Prettier 檢查（不修改）
 ```
 
 ---

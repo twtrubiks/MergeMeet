@@ -1,15 +1,17 @@
 """聊天圖片上傳功能測試"""
-import pytest
-import uuid
+
 import io
 import json
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from PIL import Image
+import uuid
 
-from app.models.user import User
+import pytest
+from httpx import AsyncClient
+from PIL import Image
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.match import Match, Message
+from app.models.user import User
 
 
 def create_test_image(width: int = 100, height: int = 100, format: str = "JPEG") -> bytes:
@@ -30,12 +32,7 @@ def create_test_gif() -> bytes:
 
     buffer = io.BytesIO()
     frames[0].save(
-        buffer,
-        format="GIF",
-        save_all=True,
-        append_images=frames[1:],
-        duration=100,
-        loop=0
+        buffer, format="GIF", save_all=True, append_images=frames[1:], duration=100, loop=0
     )
     buffer.seek(0)
     return buffer.read()
@@ -48,37 +45,33 @@ async def matched_users_for_image(client: AsyncClient, auth_user_pair: dict, tes
     bob_token = auth_user_pair["bob"]["token"]
 
     # 創建 Alice 的檔案（注意：URL 無尾隨斜線）
-    await client.post("/api/profile",
+    await client.post(
+        "/api/profile",
         headers={"Authorization": f"Bearer {alice_token}"},
         json={
             "display_name": "Alice",
             "gender": "female",
             "bio": "測試用戶",
-            "location": {
-                "latitude": 25.0330,
-                "longitude": 121.5654,
-                "location_name": "台北市"
-            }
-        }
+            "location": {"latitude": 25.0330, "longitude": 121.5654, "location_name": "台北市"},
+        },
     )
 
     # 創建 Bob 的檔案（注意：URL 無尾隨斜線）
-    await client.post("/api/profile",
+    await client.post(
+        "/api/profile",
         headers={"Authorization": f"Bearer {bob_token}"},
         json={
             "display_name": "Bob",
             "gender": "male",
             "bio": "測試用戶",
-            "location": {
-                "latitude": 25.0500,
-                "longitude": 121.5500,
-                "location_name": "台北市"
-            }
-        }
+            "location": {"latitude": 25.0500, "longitude": 121.5500, "location_name": "台北市"},
+        },
     )
 
     # 獲取用戶 ID（使用 auth_user_pair 的 email）
-    result = await test_db.execute(select(User).where(User.email == auth_user_pair["alice"]["email"]))
+    result = await test_db.execute(
+        select(User).where(User.email == auth_user_pair["alice"]["email"])
+    )
     alice = result.scalar_one()
 
     result = await test_db.execute(select(User).where(User.email == auth_user_pair["bob"]["email"]))
@@ -86,11 +79,7 @@ async def matched_users_for_image(client: AsyncClient, auth_user_pair: dict, tes
 
     # 直接創建配對
     user1_id, user2_id = (alice.id, bob.id) if alice.id < bob.id else (bob.id, alice.id)
-    match = Match(
-        user1_id=user1_id,
-        user2_id=user2_id,
-        status="ACTIVE"
-    )
+    match = Match(user1_id=user1_id, user2_id=user2_id, status="ACTIVE")
     test_db.add(match)
     await test_db.commit()
     await test_db.refresh(match)
@@ -98,7 +87,7 @@ async def matched_users_for_image(client: AsyncClient, auth_user_pair: dict, tes
     return {
         "alice": {"token": alice_token, "user_id": str(alice.id)},
         "bob": {"token": bob_token, "user_id": str(bob.id)},
-        "match_id": str(match.id)
+        "match_id": str(match.id),
     }
 
 
@@ -114,7 +103,7 @@ async def test_upload_image_success(client: AsyncClient, matched_users_for_image
     response = await client.post(
         f"/api/messages/matches/{match_id}/upload-image",
         headers={"Authorization": f"Bearer {alice_token}"},
-        files={"file": ("test.jpg", image_content, "image/jpeg")}
+        files={"file": ("test.jpg", image_content, "image/jpeg")},
     )
 
     assert response.status_code == 200
@@ -141,7 +130,7 @@ async def test_upload_gif_success(client: AsyncClient, matched_users_for_image: 
     response = await client.post(
         f"/api/messages/matches/{match_id}/upload-image",
         headers={"Authorization": f"Bearer {alice_token}"},
-        files={"file": ("test.gif", gif_content, "image/gif")}
+        files={"file": ("test.gif", gif_content, "image/gif")},
     )
 
     assert response.status_code == 200
@@ -157,29 +146,29 @@ async def test_upload_image_unauthorized(client: AsyncClient, matched_users_for_
     match_id = matched_users_for_image["match_id"]
 
     # 註冊新用戶 Charlie（不在配對中）
-    response_c = await client.post("/api/auth/register", json={
-        "email": "charlie_img@example.com",
-        "password": "Charlie123",
-        "date_of_birth": "1988-01-01"
-    })
+    response_c = await client.post(
+        "/api/auth/register",
+        json={
+            "email": "charlie_img@example.com",
+            "password": "Charlie123",
+            "date_of_birth": "1988-01-01",
+        },
+    )
     assert response_c.status_code == 201
     charlie_token = response_c.json()["access_token"]
     # 清除 cookies，讓測試使用純 Bearer Token 認證
     client.cookies.clear()
 
     # 創建 Charlie 的檔案（注意：URL 無尾隨斜線）
-    await client.post("/api/profile",
+    await client.post(
+        "/api/profile",
         headers={"Authorization": f"Bearer {charlie_token}"},
         json={
             "display_name": "Charlie",
             "gender": "male",
             "bio": "測試用戶",
-            "location": {
-                "latitude": 25.0,
-                "longitude": 121.5,
-                "location_name": "台北市"
-            }
-        }
+            "location": {"latitude": 25.0, "longitude": 121.5, "location_name": "台北市"},
+        },
     )
 
     # 嘗試上傳到別人的配對
@@ -187,7 +176,7 @@ async def test_upload_image_unauthorized(client: AsyncClient, matched_users_for_
     response = await client.post(
         f"/api/messages/matches/{match_id}/upload-image",
         headers={"Authorization": f"Bearer {charlie_token}"},
-        files={"file": ("test.jpg", image_content, "image/jpeg")}
+        files={"file": ("test.jpg", image_content, "image/jpeg")},
     )
 
     assert response.status_code == 404
@@ -205,7 +194,7 @@ async def test_upload_image_invalid_format(client: AsyncClient, matched_users_fo
     response = await client.post(
         f"/api/messages/matches/{match_id}/upload-image",
         headers={"Authorization": f"Bearer {alice_token}"},
-        files={"file": ("test.txt", text_content, "text/plain")}
+        files={"file": ("test.txt", text_content, "text/plain")},
     )
 
     assert response.status_code == 400
@@ -221,7 +210,7 @@ async def test_upload_image_empty_file(client: AsyncClient, matched_users_for_im
     response = await client.post(
         f"/api/messages/matches/{match_id}/upload-image",
         headers={"Authorization": f"Bearer {alice_token}"},
-        files={"file": ("test.jpg", b"", "image/jpeg")}
+        files={"file": ("test.jpg", b"", "image/jpeg")},
     )
 
     assert response.status_code == 400
@@ -229,7 +218,9 @@ async def test_upload_image_empty_file(client: AsyncClient, matched_users_for_im
 
 
 @pytest.mark.asyncio
-async def test_upload_image_to_inactive_match(client: AsyncClient, matched_users_for_image: dict, test_db: AsyncSession):
+async def test_upload_image_to_inactive_match(
+    client: AsyncClient, matched_users_for_image: dict, test_db: AsyncSession
+):
     """測試上傳到已解除配對"""
     match_id = matched_users_for_image["match_id"]
     alice_token = matched_users_for_image["alice"]["token"]
@@ -245,7 +236,7 @@ async def test_upload_image_to_inactive_match(client: AsyncClient, matched_users
     response = await client.post(
         f"/api/messages/matches/{match_id}/upload-image",
         headers={"Authorization": f"Bearer {alice_token}"},
-        files={"file": ("test.jpg", image_content, "image/jpeg")}
+        files={"file": ("test.jpg", image_content, "image/jpeg")},
     )
 
     assert response.status_code == 404
@@ -253,7 +244,9 @@ async def test_upload_image_to_inactive_match(client: AsyncClient, matched_users
 
 
 @pytest.mark.asyncio
-async def test_upload_image_to_nonexistent_match(client: AsyncClient, matched_users_for_image: dict):
+async def test_upload_image_to_nonexistent_match(
+    client: AsyncClient, matched_users_for_image: dict
+):
     """測試上傳到不存在的配對"""
     alice_token = matched_users_for_image["alice"]["token"]
     fake_match_id = str(uuid.uuid4())
@@ -262,14 +255,16 @@ async def test_upload_image_to_nonexistent_match(client: AsyncClient, matched_us
     response = await client.post(
         f"/api/messages/matches/{fake_match_id}/upload-image",
         headers={"Authorization": f"Bearer {alice_token}"},
-        files={"file": ("test.jpg", image_content, "image/jpeg")}
+        files={"file": ("test.jpg", image_content, "image/jpeg")},
     )
 
     assert response.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_image_message_in_chat_history(client: AsyncClient, matched_users_for_image: dict, test_db: AsyncSession):
+async def test_image_message_in_chat_history(
+    client: AsyncClient, matched_users_for_image: dict, test_db: AsyncSession
+):
     """測試圖片訊息出現在聊天記錄"""
     match_id = matched_users_for_image["match_id"]
     alice_token = matched_users_for_image["alice"]["token"]
@@ -280,24 +275,26 @@ async def test_image_message_in_chat_history(client: AsyncClient, matched_users_
     upload_response = await client.post(
         f"/api/messages/matches/{match_id}/upload-image",
         headers={"Authorization": f"Bearer {alice_token}"},
-        files={"file": ("test.jpg", image_content, "image/jpeg")}
+        files={"file": ("test.jpg", image_content, "image/jpeg")},
     )
     assert upload_response.status_code == 200
     upload_data = upload_response.json()
 
     # 直接在資料庫中創建圖片訊息（模擬 WebSocket 發送）
-    image_message_content = json.dumps({
-        "image_url": upload_data["image_url"],
-        "thumbnail_url": upload_data["thumbnail_url"],
-        "width": upload_data["width"],
-        "height": upload_data["height"]
-    })
+    image_message_content = json.dumps(
+        {
+            "image_url": upload_data["image_url"],
+            "thumbnail_url": upload_data["thumbnail_url"],
+            "width": upload_data["width"],
+            "height": upload_data["height"],
+        }
+    )
 
     message = Message(
         match_id=match_id,
         sender_id=alice_user_id,
         content=image_message_content,
-        message_type="IMAGE"
+        message_type="IMAGE",
     )
     test_db.add(message)
     await test_db.commit()
@@ -305,7 +302,7 @@ async def test_image_message_in_chat_history(client: AsyncClient, matched_users_
     # 查詢聊天記錄
     history_response = await client.get(
         f"/api/messages/matches/{match_id}/messages",
-        headers={"Authorization": f"Bearer {alice_token}"}
+        headers={"Authorization": f"Bearer {alice_token}"},
     )
 
     assert history_response.status_code == 200
@@ -331,7 +328,7 @@ async def test_upload_png_success(client: AsyncClient, matched_users_for_image: 
     response = await client.post(
         f"/api/messages/matches/{match_id}/upload-image",
         headers={"Authorization": f"Bearer {alice_token}"},
-        files={"file": ("test.png", image_content, "image/png")}
+        files={"file": ("test.png", image_content, "image/png")},
     )
 
     assert response.status_code == 200

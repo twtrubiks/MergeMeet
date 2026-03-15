@@ -32,13 +32,7 @@
           />
         </n-form-item>
 
-        <n-button
-          type="primary"
-          block
-          size="large"
-          :loading="loading"
-          @click="handleLogin"
-        >
+        <n-button type="primary" block size="large" :loading="loading" @click="handleLogin">
           登入管理後台
         </n-button>
       </n-form>

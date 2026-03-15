@@ -8,24 +8,26 @@
 3. 伺服器驗證 Token 並標記連接為已認證
 4. 認證成功後才允許其他操作
 """
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from sqlalchemy import select, and_
-from datetime import datetime, timezone
+
+import asyncio
 import json
 import logging
 import uuid
-import asyncio
+from datetime import UTC, datetime
 
-from app.core.database import AsyncSessionLocal
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from sqlalchemy import and_, select
+
 from app.core.config import settings
-from app.websocket.manager import manager
-from app.models.match import Message, Match
-from app.models.user import User
-from app.models.profile import Profile
+from app.core.database import AsyncSessionLocal
+from app.models.match import Match, Message
 from app.models.notification import Notification
+from app.models.profile import Profile
+from app.models.user import User
 from app.services.content_moderation import ContentModerationService
-from app.services.trust_score import TrustScoreService
 from app.services.redis_client import redis_client
+from app.services.trust_score import TrustScoreService
+from app.websocket.manager import manager
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -55,15 +57,10 @@ def validate_uuid(value: str, field_name: str = "ID") -> uuid.UUID | None:
 
 async def _send_error(sender_id: uuid.UUID, message: str) -> None:
     """發送錯誤訊息給用戶"""
-    await manager.send_personal_message(
-        str(sender_id),
-        {"type": "error", "message": message}
-    )
+    await manager.send_personal_message(str(sender_id), {"type": "error", "message": message})
 
 
-def _validate_chat_input(
-    data: dict, sender_id: uuid.UUID
-) -> tuple[bool, str | None, dict | None]:
+def _validate_chat_input(data: dict, sender_id: uuid.UUID) -> tuple[bool, str | None, dict | None]:
     """驗證聊天訊息輸入
 
     Args:
@@ -88,11 +85,7 @@ def _validate_chat_input(
         logger.warning(f"Invalid message data from {sender_id}: {data}")
         return False, "無效的配對 ID 或訊息內容", None
 
-    return True, None, {
-        "match_id": match_id,
-        "content": content,
-        "message_type": message_type
-    }
+    return True, None, {"match_id": match_id, "content": content, "message_type": message_type}
 
 
 def _validate_image_content(content: str, sender_id: uuid.UUID) -> tuple[bool, str | None]:
@@ -116,9 +109,7 @@ def _validate_image_content(content: str, sender_id: uuid.UUID) -> tuple[bool, s
 
 
 async def _validate_text_content(
-    content: str,
-    sender_id: uuid.UUID,
-    db
+    content: str, sender_id: uuid.UUID, db
 ) -> tuple[bool, str | None, list | None]:
     """驗證文字訊息（長度和內容審核）
 
@@ -147,9 +138,7 @@ async def _validate_text_content(
 
 
 async def _validate_match_access(
-    match_id: uuid.UUID,
-    sender_id: uuid.UUID,
-    db
+    match_id: uuid.UUID, sender_id: uuid.UUID, db
 ) -> tuple[bool, str | None, Match | None]:
     """驗證配對存在且發送者是成員
 
@@ -162,12 +151,7 @@ async def _validate_match_access(
         (is_valid, error_message, match_object)
     """
     result = await db.execute(
-        select(Match).where(
-            and_(
-                Match.id == match_id,
-                Match.status == "ACTIVE"
-            )
-        )
+        select(Match).where(and_(Match.id == match_id, Match.status == "ACTIVE"))
     )
     match = result.scalar_one_or_none()
 
@@ -185,16 +169,12 @@ async def _validate_match_access(
 async def _record_content_violation(sender_id: uuid.UUID, db) -> None:
     """記錄用戶內容違規"""
     try:
-        result = await db.execute(
-            select(User).where(User.id == sender_id)
-        )
+        result = await db.execute(select(User).where(User.id == sender_id))
         user = result.scalar_one_or_none()
         if user:
             user.warning_count += 1
             await db.commit()
-            logger.info(
-                f"User {sender_id} warning count increased to {user.warning_count}"
-            )
+            logger.info(f"User {sender_id} warning count increased to {user.warning_count}")
 
             # 信任分數減分：內容違規 -3 分
             await TrustScoreService.adjust_score(db, sender_id, "content_violation")
@@ -204,9 +184,7 @@ async def _record_content_violation(sender_id: uuid.UUID, db) -> None:
         logger.error(f"Failed to update warning count: {e}")
 
 
-async def _check_message_rate_limit(
-    sender_id: uuid.UUID, db
-) -> tuple[bool, str | None]:
+async def _check_message_rate_limit(sender_id: uuid.UUID, db) -> tuple[bool, str | None]:
     """檢查低信任用戶的訊息發送限制
 
     Args:
@@ -218,9 +196,7 @@ async def _check_message_rate_limit(
     """
     try:
         # 獲取用戶信任分數
-        result = await db.execute(
-            select(User.trust_score).where(User.id == sender_id)
-        )
+        result = await db.execute(select(User.trust_score).where(User.id == sender_id))
         trust_score = result.scalar_one_or_none()
 
         if trust_score is None:
@@ -238,16 +214,12 @@ async def _check_message_rate_limit(
 
         if not can_send:
             return False, (
-                f"訊息發送限制：您今日已達上限 "
-                f"({TrustScoreService.LOW_TRUST_MESSAGE_LIMIT} 則)"
+                f"訊息發送限制：您今日已達上限 ({TrustScoreService.LOW_TRUST_MESSAGE_LIMIT} 則)"
             )
 
         # 記錄訊息發送
         await TrustScoreService.record_message_sent(sender_id, redis)
-        logger.info(
-            f"Low trust user {sender_id} sent message, "
-            f"remaining: {remaining - 1}"
-        )
+        logger.info(f"Low trust user {sender_id} sent message, remaining: {remaining - 1}")
         return True, None
 
     except Exception as e:
@@ -256,10 +228,7 @@ async def _check_message_rate_limit(
 
 
 async def _save_and_broadcast_message(
-    match: Match,
-    sender_id: uuid.UUID,
-    parsed: dict,
-    db
+    match: Match, sender_id: uuid.UUID, parsed: dict, db
 ) -> Message:
     """儲存訊息到資料庫並廣播
 
@@ -276,7 +245,7 @@ async def _save_and_broadcast_message(
         match_id=parsed["match_id"],
         sender_id=sender_id,
         content=parsed["content"],
-        message_type=parsed["message_type"]
+        message_type=parsed["message_type"],
     )
     db.add(message)
     await db.commit()
@@ -291,8 +260,8 @@ async def _save_and_broadcast_message(
             "content": message.content,
             "message_type": message.message_type,
             "sent_at": message.sent_at.isoformat(),
-            "is_read": message.is_read.isoformat() if message.is_read else None
-        }
+            "is_read": message.is_read.isoformat() if message.is_read else None,
+        },
     }
 
     logger.info(f"Preparing to send message {message.id} to match {parsed['match_id']}")
@@ -304,11 +273,7 @@ async def _save_and_broadcast_message(
     return message
 
 
-async def _check_and_reward_positive_interaction(
-    match: Match,
-    sender_id: uuid.UUID,
-    db
-) -> None:
+async def _check_and_reward_positive_interaction(match: Match, sender_id: uuid.UUID, db) -> None:
     """檢查並獎勵正向互動
 
     當發送者與上一個發送者不同時，視為「回應」，
@@ -327,7 +292,7 @@ async def _check_and_reward_positive_interaction(
         redis = await redis_client.get_connection()
         match_id_str = str(match.id)
         sender_id_str = str(sender_id)
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
 
         # Redis Key 定義
         last_sender_key = f"chat:last_sender:{match_id_str}"
@@ -354,14 +319,12 @@ async def _check_and_reward_positive_interaction(
         # 6. 檢查是否超過配對每日上限（3 次）
         if match_count > 3:
             logger.debug(
-                f"Match {match_id_str} reached daily limit (3), "
-                f"current count: {match_count}"
+                f"Match {match_id_str} reached daily limit (3), current count: {match_count}"
             )
             return
 
         # 7. 獎勵雙方（檢查每日上限）
         previous_sender_id = uuid.UUID(last_sender)
-        receiver_id = match.user2_id if match.user1_id == sender_id else match.user1_id
         previous_daily_key = f"trust:positive_daily_total:{last_sender}:{today}"
 
         # 檢查並獎勵被回應者（上一個發送者）
@@ -372,7 +335,7 @@ async def _check_and_reward_positive_interaction(
                 db,
                 previous_sender_id,
                 "positive_interaction",
-                reason=f"Received response in match {match_id_str}"
+                reason=f"Received response in match {match_id_str}",
             )
             await redis.setex(previous_daily_key, 86400, str(previous_count + 1))
             logger.debug(
@@ -385,10 +348,7 @@ async def _check_and_reward_positive_interaction(
         sender_count = int(sender_daily_count) if sender_daily_count else 0
         if sender_count < 3:
             await TrustScoreService.adjust_score(
-                db,
-                sender_id,
-                "positive_interaction",
-                reason=f"Responded in match {match_id_str}"
+                db, sender_id, "positive_interaction", reason=f"Responded in match {match_id_str}"
             )
             await redis.setex(sender_daily_key, 86400, str(sender_count + 1))
             logger.debug(
@@ -402,10 +362,7 @@ async def _check_and_reward_positive_interaction(
 
 
 async def _send_message_notification(
-    match: Match,
-    sender_id: uuid.UUID,
-    message: Message,
-    db
+    match: Match, sender_id: uuid.UUID, message: Message, db
 ) -> None:
     """如果接收者不在聊天室，發送通知（含持久化）
 
@@ -424,9 +381,7 @@ async def _send_message_notification(
         return
 
     # 查詢發送者 Profile
-    sender_profile_result = await db.execute(
-        select(Profile).where(Profile.user_id == sender_id)
-    )
+    sender_profile_result = await db.execute(select(Profile).where(Profile.user_id == sender_id))
     sender_profile = sender_profile_result.scalar_one_or_none()
     sender_name = sender_profile.display_name if sender_profile else "用戶"
 
@@ -448,8 +403,8 @@ async def _send_message_notification(
             "match_id": str(match.id),
             "sender_id": str(sender_id),
             "sender_name": sender_name,
-            "message_id": str(message.id)
-        }
+            "message_id": str(message.id),
+        },
     )
     db.add(notification)
     await db.commit()
@@ -465,8 +420,8 @@ async def _send_message_notification(
             "sender_id": str(sender_id),
             "sender_name": sender_name,
             "preview": preview,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
+            "timestamp": datetime.now(UTC).isoformat(),
+        },
     )
     logger.info(f"Sent notification_message to user {receiver_id_str} (not in chat room)")
 
@@ -474,9 +429,7 @@ async def _send_message_notification(
 # ========== websocket_endpoint 輔助函數 ==========
 
 
-async def _authenticate_websocket(
-    websocket: WebSocket
-) -> tuple[str | None, uuid.UUID | None]:
+async def _authenticate_websocket(websocket: WebSocket) -> tuple[str | None, uuid.UUID | None]:
     """處理 WebSocket 認證流程
 
     認證步驟：
@@ -495,7 +448,7 @@ async def _authenticate_websocket(
     # 等待首次認證訊息（5 秒超時）
     try:
         auth_data = await asyncio.wait_for(websocket.receive_json(), timeout=5.0)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         await websocket.close(code=1008, reason="Authentication timeout")
         logger.warning("WebSocket authentication timeout")
         return None, None
@@ -527,11 +480,9 @@ async def _authenticate_websocket(
         return None, None
 
     # 發送認證成功回應
-    await websocket.send_json({
-        "type": "auth_success",
-        "message": "Authentication successful",
-        "user_id": user_id_str
-    })
+    await websocket.send_json(
+        {"type": "auth_success", "message": "Authentication successful", "user_id": user_id_str}
+    )
     logger.info(f"WebSocket authenticated successfully for user {user_id_str}")
 
     return user_id_str, user_uuid
@@ -602,11 +553,7 @@ def _init_message_handlers() -> None:
     }
 
 
-async def _process_messages(
-    websocket: WebSocket,
-    user_id: str,
-    user_uuid: uuid.UUID
-) -> None:
+async def _process_messages(websocket: WebSocket, user_id: str, user_uuid: uuid.UUID) -> None:
     """處理 WebSocket 訊息循環
 
     使用字典分發模式處理不同類型的訊息。
@@ -696,9 +643,7 @@ async def handle_chat_message(data: dict, sender_id: uuid.UUID):
 
             # 3. 內容驗證（根據類型）
             if parsed["message_type"] in ("IMAGE", "GIF"):
-                is_valid, error = _validate_image_content(
-                    parsed["content"], sender_id
-                )
+                is_valid, error = _validate_image_content(parsed["content"], sender_id)
                 if not is_valid:
                     await _send_error(sender_id, error)
                     return
@@ -713,17 +658,13 @@ async def handle_chat_message(data: dict, sender_id: uuid.UUID):
                     return
 
             # 4. 配對驗證
-            is_valid, error, match = await _validate_match_access(
-                parsed["match_id"], sender_id, db
-            )
+            is_valid, error, match = await _validate_match_access(parsed["match_id"], sender_id, db)
             if not is_valid:
                 await _send_error(sender_id, error)
                 return
 
             # 5. 存儲並發送
-            message = await _save_and_broadcast_message(
-                match, sender_id, parsed, db
-            )
+            message = await _save_and_broadcast_message(match, sender_id, parsed, db)
 
             # 5.5 正向互動檢查與獎勵
             await _check_and_reward_positive_interaction(match, sender_id, db)
@@ -754,13 +695,8 @@ async def handle_typing_indicator(data: dict, user_id: str):
     # 發送打字狀態給配對中的其他用戶
     await manager.send_to_match(
         str(match_id),
-        {
-            "type": "typing",
-            "user_id": user_id,
-            "is_typing": is_typing,
-            "match_id": str(match_id)
-        },
-        exclude_user=user_id
+        {"type": "typing", "user_id": user_id, "is_typing": is_typing, "match_id": str(match_id)},
+        exclude_user=user_id,
     )
 
 
@@ -781,9 +717,7 @@ async def handle_read_receipt(data: dict, user_id: str):
                 return
 
             # 查詢訊息
-            result = await db.execute(
-                select(Message).where(Message.id == message_id)
-            )
+            result = await db.execute(select(Message).where(Message.id == message_id))
             message = result.scalar_one_or_none()
 
             if not message:
@@ -796,7 +730,7 @@ async def handle_read_receipt(data: dict, user_id: str):
 
             # 標記為已讀（如果尚未標記）
             if not message.is_read:
-                read_time = datetime.now(timezone.utc)
+                read_time = datetime.now(UTC)
                 message.is_read = read_time
                 await db.commit()
 
@@ -807,8 +741,8 @@ async def handle_read_receipt(data: dict, user_id: str):
                         "type": "read_receipt",
                         "message_id": str(message.id),
                         "read_by": user_id,
-                        "read_at": read_time.isoformat()
-                    }
+                        "read_at": read_time.isoformat(),
+                    },
                 )
 
                 logger.info(f"Message {message_id} marked as read by {user_id} via WebSocket")
@@ -837,11 +771,7 @@ async def handle_join_match(data: dict, user_id: str):
 
     # 通知用戶已加入聊天室
     await manager.send_personal_message(
-        user_id,
-        {
-            "type": "joined_match",
-            "match_id": str(match_id)
-        }
+        user_id, {"type": "joined_match", "match_id": str(match_id)}
     )
 
 

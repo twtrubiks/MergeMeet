@@ -44,11 +44,7 @@
 
         <!-- 舉報列表 -->
         <div v-else class="reports-list">
-          <div
-            v-for="report in safetyStore.myReports"
-            :key="report.id"
-            class="report-item"
-          >
+          <div v-for="report in safetyStore.myReports" :key="report.id" class="report-item">
             <!-- 舉報頭部 -->
             <div class="report-header">
               <span class="report-type" :class="getTypeClass(report.report_type)">
@@ -83,11 +79,7 @@
 
         <!-- 申訴列表 -->
         <div v-else class="reports-list">
-          <div
-            v-for="appeal in safetyStore.myAppeals"
-            :key="appeal.id"
-            class="report-item"
-          >
+          <div v-for="appeal in safetyStore.myAppeals" :key="appeal.id" class="report-item">
             <!-- 申訴頭部 -->
             <div class="report-header">
               <span class="report-type type-photo">
@@ -255,7 +247,7 @@ onMounted(() => {
 <style scoped>
 .my-reports-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #FFF5F5 0%, #FFE5E5 100%);
+  background: linear-gradient(135deg, #fff5f5 0%, #ffe5e5 100%);
   padding: 20px;
 }
 
@@ -340,15 +332,19 @@ onMounted(() => {
   width: 40px;
   height: 40px;
   border: 4px solid #f3f3f3;
-  border-top: 4px solid #FF6B6B;
+  border-top: 4px solid #ff6b6b;
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 16px;
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* 空狀態 */
@@ -488,7 +484,7 @@ onMounted(() => {
   border-radius: 12px;
   padding: 12px;
   margin-bottom: 12px;
-  border-left: 3px solid #FF6B6B;
+  border-left: 3px solid #ff6b6b;
 }
 
 .response-content {

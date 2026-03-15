@@ -3,19 +3,21 @@
 測試敏感詞管理 API 的序列化和權限控制。
 確保 Schema 中的 UUID 類型正確序列化。
 """
-import pytest
-import pytest_asyncio
+
 import uuid
 from datetime import date
+
+import pytest
+import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.user import User
-from app.models.moderation import SensitiveWord
 from app.core.security import get_password_hash
-
+from app.models.moderation import SensitiveWord
+from app.models.user import User
 
 # ==================== Fixtures ====================
+
 
 @pytest_asyncio.fixture
 async def admin_user(test_db: AsyncSession) -> User:
@@ -26,7 +28,7 @@ async def admin_user(test_db: AsyncSession) -> User:
         password_hash=get_password_hash("Admin123"),
         date_of_birth=date(1990, 1, 1),
         is_active=True,
-        is_admin=True
+        is_admin=True,
     )
     test_db.add(user)
     await test_db.commit()
@@ -43,7 +45,7 @@ async def normal_user(test_db: AsyncSession) -> User:
         password_hash=get_password_hash("Normal123"),
         date_of_birth=date(1990, 1, 1),
         is_active=True,
-        is_admin=False
+        is_admin=False,
     )
     test_db.add(user)
     await test_db.commit()
@@ -54,10 +56,9 @@ async def normal_user(test_db: AsyncSession) -> User:
 @pytest_asyncio.fixture
 async def admin_headers(client: AsyncClient, admin_user: User) -> dict:
     """獲取管理員認證 Headers"""
-    response = await client.post("/api/auth/admin-login", json={
-        "email": "admin_test@example.com",
-        "password": "Admin123"
-    })
+    response = await client.post(
+        "/api/auth/admin-login", json={"email": "admin_test@example.com", "password": "Admin123"}
+    )
     token = response.json()["access_token"]
     # 清除 cookies，讓測試使用純 Bearer Token 認證
     client.cookies.clear()
@@ -67,10 +68,9 @@ async def admin_headers(client: AsyncClient, admin_user: User) -> dict:
 @pytest_asyncio.fixture
 async def normal_headers(client: AsyncClient, normal_user: User) -> dict:
     """獲取一般用戶認證 Headers"""
-    response = await client.post("/api/auth/login", json={
-        "email": "normal_test@example.com",
-        "password": "Normal123"
-    })
+    response = await client.post(
+        "/api/auth/login", json={"email": "normal_test@example.com", "password": "Normal123"}
+    )
     token = response.json()["access_token"]
     # 清除 cookies，讓測試使用純 Bearer Token 認證
     client.cookies.clear()
@@ -88,7 +88,7 @@ async def sensitive_words(test_db: AsyncSession) -> list:
             severity="HIGH",
             action="REJECT",
             is_regex=False,
-            is_active=True
+            is_active=True,
         ),
         SensitiveWord(
             id=uuid.uuid4(),
@@ -97,7 +97,7 @@ async def sensitive_words(test_db: AsyncSession) -> list:
             severity="MEDIUM",
             action="WARN",
             is_regex=False,
-            is_active=True
+            is_active=True,
         ),
     ]
     for word in words:
@@ -108,21 +108,16 @@ async def sensitive_words(test_db: AsyncSession) -> list:
 
 # ==================== 敏感詞列表 API 測試 ====================
 
+
 @pytest.mark.asyncio
 class TestGetSensitiveWords:
     """GET /api/moderation/sensitive-words 測試"""
 
     async def test_get_sensitive_words_success(
-        self,
-        client: AsyncClient,
-        admin_headers: dict,
-        sensitive_words: list
+        self, client: AsyncClient, admin_headers: dict, sensitive_words: list
     ):
         """測試：管理員成功獲取敏感詞列表"""
-        response = await client.get(
-            "/api/moderation/sensitive-words",
-            headers=admin_headers
-        )
+        response = await client.get("/api/moderation/sensitive-words", headers=admin_headers)
 
         assert response.status_code == 200
         data = response.json()
@@ -144,43 +139,31 @@ class TestGetSensitiveWords:
 
         assert response.status_code == 401
 
-    async def test_get_sensitive_words_forbidden(
-        self,
-        client: AsyncClient,
-        normal_headers: dict
-    ):
+    async def test_get_sensitive_words_forbidden(self, client: AsyncClient, normal_headers: dict):
         """測試：非管理員返回 403"""
-        response = await client.get(
-            "/api/moderation/sensitive-words",
-            headers=normal_headers
-        )
+        response = await client.get("/api/moderation/sensitive-words", headers=normal_headers)
 
         assert response.status_code == 403
 
 
 # ==================== 新增敏感詞 API 測試 ====================
 
+
 @pytest.mark.asyncio
 class TestCreateSensitiveWord:
     """POST /api/moderation/sensitive-words 測試"""
 
-    async def test_create_sensitive_word_success(
-        self,
-        client: AsyncClient,
-        admin_headers: dict
-    ):
+    async def test_create_sensitive_word_success(self, client: AsyncClient, admin_headers: dict):
         """測試：管理員成功新增敏感詞"""
         new_word = {
             "word": "新測試敏感詞",
             "category": "HARASSMENT",
             "severity": "HIGH",
-            "action": "REJECT"
+            "action": "REJECT",
         }
 
         response = await client.post(
-            "/api/moderation/sensitive-words",
-            json=new_word,
-            headers=admin_headers
+            "/api/moderation/sensitive-words", json=new_word, headers=admin_headers
         )
 
         assert response.status_code == 201
@@ -195,23 +178,18 @@ class TestCreateSensitiveWord:
         assert data["category"] == "HARASSMENT"
 
     async def test_create_sensitive_word_duplicate(
-        self,
-        client: AsyncClient,
-        admin_headers: dict,
-        sensitive_words: list
+        self, client: AsyncClient, admin_headers: dict, sensitive_words: list
     ):
         """測試：重複敏感詞返回 400"""
         duplicate_word = {
             "word": "測試敏感詞1",  # 已存在
             "category": "SEXUAL",
             "severity": "HIGH",
-            "action": "REJECT"
+            "action": "REJECT",
         }
 
         response = await client.post(
-            "/api/moderation/sensitive-words",
-            json=duplicate_word,
-            headers=admin_headers
+            "/api/moderation/sensitive-words", json=duplicate_word, headers=admin_headers
         )
 
         assert response.status_code == 400
@@ -220,21 +198,16 @@ class TestCreateSensitiveWord:
 
 # ==================== 統計 API 測試 ====================
 
+
 @pytest.mark.asyncio
 class TestModerationStats:
     """GET /api/moderation/stats 測試"""
 
     async def test_get_moderation_stats_success(
-        self,
-        client: AsyncClient,
-        admin_headers: dict,
-        sensitive_words: list
+        self, client: AsyncClient, admin_headers: dict, sensitive_words: list
     ):
         """測試：管理員成功獲取統計數據"""
-        response = await client.get(
-            "/api/moderation/stats",
-            headers=admin_headers
-        )
+        response = await client.get("/api/moderation/stats", headers=admin_headers)
 
         assert response.status_code == 200
         data = response.json()

@@ -137,10 +137,12 @@ router.beforeEach(async (to, from, next) => {
   }
 
   // 檢查是否需要 Email 驗證（已登入但未驗證）
-  if (to.meta.requiresAuth &&
-      userStore.isAuthenticated &&
-      !userStore.user?.email_verified &&
-      to.path !== '/verify-email') {
+  if (
+    to.meta.requiresAuth &&
+    userStore.isAuthenticated &&
+    !userStore.user?.email_verified &&
+    to.path !== '/verify-email'
+  ) {
     // 已登入但未驗證 Email，導向驗證頁面
     next('/verify-email')
     return

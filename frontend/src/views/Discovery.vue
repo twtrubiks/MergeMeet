@@ -29,7 +29,7 @@
         </div>
         <h2>沒有更多候選人了</h2>
         <p>請稍後再回來查看</p>
-        <button @click="loadCandidates" class="btn-refresh">重新整理</button>
+        <button class="btn-refresh" @click="loadCandidates">重新整理</button>
       </div>
 
       <!-- 卡片堆疊區域 -->
@@ -48,8 +48,8 @@
               v-if="candidate.photos?.length"
               :src="candidate.photos[0]"
               :alt="candidate.display_name"
-              @error="(e) => e.target.src = defaultAvatar"
-            >
+              @error="(e) => (e.target.src = defaultAvatar)"
+            />
             <div v-else class="image-placeholder">
               <span>{{ candidate.display_name[0] }}</span>
             </div>
@@ -64,19 +64,16 @@
             <button
               v-if="index === 0"
               class="report-btn"
-              @click.stop="handleOpenReportModal(candidate)"
               title="舉報此用戶"
               aria-label="舉報此用戶"
+              @click.stop="handleOpenReportModal(candidate)"
             >
               <Icon name="alert-outline" size="sm" decorative />
             </button>
           </div>
 
           <!-- 卡片資訊 -->
-          <div
-            class="card-info"
-            @click.stop="index === 0 ? openUserDetail(candidate) : null"
-          >
+          <div class="card-info" @click.stop="index === 0 ? openUserDetail(candidate) : null">
             <div class="card-header">
               <h2 class="card-name">{{ candidate.display_name }}</h2>
               <span class="card-age">{{ candidate.age }}</span>
@@ -89,7 +86,10 @@
             </p>
 
             <!-- 興趣標籤 -->
-            <div v-if="candidate.interests && candidate.interests.length > 0" class="card-interests">
+            <div
+              v-if="candidate.interests && candidate.interests.length > 0"
+              class="card-interests"
+            >
               <span
                 v-for="interest in candidate.interests.slice(0, 5)"
                 :key="interest"
@@ -110,17 +110,11 @@
 
           <!-- 滑動提示覆蓋層 -->
           <div v-if="index === 0" class="swipe-overlay" aria-hidden="true">
-            <div
-              class="swipe-indicator like"
-              :style="{ opacity: likeOpacity }"
-            >
+            <div class="swipe-indicator like" :style="{ opacity: likeOpacity }">
               <Icon name="heart" size="lg" decorative class="indicator-icon" />
               <span class="indicator-text">喜歡</span>
             </div>
-            <div
-              class="swipe-indicator pass"
-              :style="{ opacity: passOpacity }"
-            >
+            <div class="swipe-indicator pass" :style="{ opacity: passOpacity }">
               <Icon name="close-outline" size="lg" decorative class="indicator-icon" />
               <span class="indicator-text">跳過</span>
             </div>
@@ -129,12 +123,17 @@
       </div>
 
       <!-- 操作按鈕 -->
-      <div v-if="discoveryStore.hasCandidates" class="action-buttons" role="group" aria-label="配對操作">
+      <div
+        v-if="discoveryStore.hasCandidates"
+        class="action-buttons"
+        role="group"
+        aria-label="配對操作"
+      >
         <button
-          @click="handlePass"
           class="action-btn pass-btn"
           :disabled="isAnimating"
           aria-label="跳過此用戶"
+          @click="handlePass"
         >
           <Icon name="close-outline" size="lg" decorative class="btn-icon" />
           <span class="btn-text">跳過</span>
@@ -142,10 +141,10 @@
         </button>
 
         <button
-          @click="handleLike"
           class="action-btn like-btn"
           :disabled="isAnimating"
           aria-label="喜歡此用戶"
+          @click="handleLike"
         >
           <Icon name="heart" size="lg" decorative class="btn-icon" />
           <span class="btn-text">喜歡</span>
@@ -170,11 +169,7 @@
     />
 
     <!-- 用戶詳情彈窗 -->
-    <UserDetailModal
-      :show="showUserDetail"
-      :user="selectedUser || {}"
-      @close="closeUserDetail"
-    />
+    <UserDetailModal :show="showUserDetail" :user="selectedUser || {}" @close="closeUserDetail" />
   </div>
 </template>
 
@@ -616,7 +611,10 @@ onUnmounted(() => {
   border-radius: 20px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
   overflow: hidden;
-  transition: transform 0.3s ease, opacity 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    opacity 0.3s ease,
+    box-shadow 0.3s ease;
   border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
@@ -665,7 +663,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #FF6B6B, #FF8E53);
+  background: linear-gradient(135deg, #ff6b6b, #ff8e53);
   color: white;
   font-size: 120px;
   font-weight: bold;
@@ -717,7 +715,7 @@ onUnmounted(() => {
 }
 
 .report-btn:hover {
-  background: #FFF;
+  background: #fff;
   transform: scale(1.1);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
 }
@@ -734,7 +732,7 @@ onUnmounted(() => {
 }
 
 .top-card .card-info:hover {
-  background-color: #FFFAF0;
+  background-color: #fffaf0;
 }
 
 .card-header {
@@ -888,13 +886,17 @@ onUnmounted(() => {
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.3);
   transform: translate(-50%, -50%);
-  transition: width 0.6s, height 0.6s;
+  transition:
+    width 0.6s,
+    height 0.6s;
 }
 
 .action-btn:active::before {
   width: 300px;
   height: 300px;
-  transition: width 0s, height 0s;
+  transition:
+    width 0s,
+    height 0s;
 }
 
 .action-btn:hover:not(:disabled) {

@@ -39,8 +39,8 @@ const apiClient = axios.create({
   timeout: 10000,
   withCredentials: true, // 允許 Cookie 跨域傳送
   headers: {
-    'Content-Type': 'application/json',
-  },
+    'Content-Type': 'application/json'
+  }
 })
 
 // 請求攔截器：自動注入 Token
@@ -76,7 +76,7 @@ apiClient.interceptors.response.use(
 
     // 登入相關 API 不需要 Token 刷新（這些 API 本身就是獲取 Token 的）
     const authEndpoints = ['/auth/login', '/auth/register', '/auth/admin-login']
-    const isAuthEndpoint = authEndpoints.some(endpoint => originalRequest.url?.includes(endpoint))
+    const isAuthEndpoint = authEndpoints.some((endpoint) => originalRequest.url?.includes(endpoint))
 
     // 如果是 401 且還沒重試過，且不是登入相關 API，嘗試刷新 Token
     if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
@@ -86,12 +86,18 @@ apiClient.interceptors.response.use(
         // Mutex：如果已經有刷新請求在進行，等待它完成
         // 這樣可以避免多個請求同時刷新導致 Token Rotation 失敗
         if (!refreshPromise) {
-          refreshPromise = axios.post('/api/auth/refresh', {}, {
-            withCredentials: true,
-          }).finally(() => {
-            // 刷新完成後清除 Promise，允許下次刷新
-            refreshPromise = null
-          })
+          refreshPromise = axios
+            .post(
+              '/api/auth/refresh',
+              {},
+              {
+                withCredentials: true
+              }
+            )
+            .finally(() => {
+              // 刷新完成後清除 Promise，允許下次刷新
+              refreshPromise = null
+            })
         }
 
         const response = await refreshPromise
@@ -106,12 +112,14 @@ apiClient.interceptors.response.use(
         }
 
         // 通知 Pinia Store 更新狀態（避免循環依賴，使用 CustomEvent）
-        window.dispatchEvent(new CustomEvent('token-refreshed', {
-          detail: {
-            access_token: response.data.access_token,
-            refresh_token: response.data.refresh_token
-          }
-        }))
+        window.dispatchEvent(
+          new CustomEvent('token-refreshed', {
+            detail: {
+              access_token: response.data.access_token,
+              refresh_token: response.data.refresh_token
+            }
+          })
+        )
 
         // 重新發送原本的請求
         return apiClient(originalRequest)

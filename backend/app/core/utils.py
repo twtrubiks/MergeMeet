@@ -16,17 +16,15 @@ def mask_email(email: str) -> str:
     Returns:
         脫敏後的 email 地址
     """
-    if not email or '@' not in email:
-        return '***@***'
+    if not email or "@" not in email:
+        return "***@***"
 
-    local, domain = email.split('@', 1)
+    local, domain = email.split("@", 1)
 
-    if len(local) <= 1:
-        masked_local = local[0] + '***'
-    elif len(local) <= 3:
-        masked_local = local[0] + '***'
+    if len(local) <= 1 or len(local) <= 3:
+        masked_local = local[0] + "***"
     else:
         # 保留前兩個和最後一個字符，中間替換為 ***
-        masked_local = local[:2] + '***' + local[-1]
+        masked_local = local[:2] + "***" + local[-1]
 
     return f"{masked_local}@{domain}"

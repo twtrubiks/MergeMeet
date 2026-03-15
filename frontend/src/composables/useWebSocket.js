@@ -27,9 +27,10 @@ export function useWebSocket() {
 
   // Getters
   const isConnected = computed(() => connectionState.value === ConnectionState.CONNECTED)
-  const isConnecting = computed(() =>
-    connectionState.value === ConnectionState.CONNECTING ||
-    connectionState.value === ConnectionState.RECONNECTING
+  const isConnecting = computed(
+    () =>
+      connectionState.value === ConnectionState.CONNECTING ||
+      connectionState.value === ConnectionState.RECONNECTING
   )
 
   // 儲存正在進行的連接 Promise（避免重複連接）
@@ -50,8 +51,11 @@ export function useWebSocket() {
     }
 
     // 正在連接中，返回現有的 Promise（避免重複連接）
-    if (connectingPromise && (connectionState.value === ConnectionState.CONNECTING ||
-        connectionState.value === ConnectionState.RECONNECTING)) {
+    if (
+      connectingPromise &&
+      (connectionState.value === ConnectionState.CONNECTING ||
+        connectionState.value === ConnectionState.RECONNECTING)
+    ) {
       logger.log('WebSocket connection in progress, waiting...')
       return connectingPromise
     }
@@ -61,9 +65,8 @@ export function useWebSocket() {
       return Promise.reject(new Error('User not authenticated'))
     }
 
-    connectionState.value = reconnectAttempts.value > 0
-      ? ConnectionState.RECONNECTING
-      : ConnectionState.CONNECTING
+    connectionState.value =
+      reconnectAttempts.value > 0 ? ConnectionState.RECONNECTING : ConnectionState.CONNECTING
 
     connectingPromise = new Promise((resolve, reject) => {
       try {
@@ -90,11 +93,13 @@ export function useWebSocket() {
           }
 
           // 發送認證訊息（Token 安全地通過 WebSocket 訊息傳遞）
-          socket.value.send(JSON.stringify({
-            type: 'auth',
-            token: token,
-            user_id: userId
-          }))
+          socket.value.send(
+            JSON.stringify({
+              type: 'auth',
+              token: token,
+              user_id: userId
+            })
+          )
 
           // 等待認證成功回應
           const authTimeout = setTimeout(() => {
@@ -163,7 +168,6 @@ export function useWebSocket() {
           connectingPromise = null
           reject(error)
         }
-
       } catch (error) {
         logger.error('Error creating WebSocket:', error)
         connectionState.value = ConnectionState.DISCONNECTED
@@ -315,7 +319,7 @@ export function useWebSocket() {
 
     // 執行已註冊的處理器
     const handlers = messageHandlers.value.get(type) || []
-    handlers.forEach(handler => {
+    handlers.forEach((handler) => {
       try {
         handler(data)
       } catch (error) {

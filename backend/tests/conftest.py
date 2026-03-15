@@ -1,30 +1,32 @@
 """測試配置與 Fixtures"""
-import pytest
-import pytest_asyncio
+
 import asyncio
 import os
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.pool import NullPool
-from sqlalchemy import text
+
+import pytest
+import pytest_asyncio
 from dotenv import load_dotenv
+from httpx import AsyncClient
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 # 載入 .env 檔案（讓 os.getenv 可以讀取）
 load_dotenv()
 
-from app.main import app
-from app.core.database import Base, get_db
-from app.services.content_moderation import ContentModerationService
-from app.services.photo_moderation import PhotoModerationService
-from app.middleware.last_active import set_session_factory, reset_session_factory
+from app.core.database import Base, get_db  # noqa: E402
+from app.main import app  # noqa: E402
+from app.middleware.last_active import reset_session_factory, set_session_factory  # noqa: E402
+from app.services.content_moderation import ContentModerationService  # noqa: E402
+from app.services.photo_moderation import PhotoModerationService  # noqa: E402
 
 # 測試資料庫 URL（使用獨立的 PostgreSQL 測試資料庫）
 # 優先從環境變數讀取，預設值僅作為提醒
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql+asyncpg://mergemeet:YOUR_DB_PASSWORD_HERE@localhost:5432/mergemeet_test"
+    "postgresql+asyncpg://mergemeet:YOUR_DB_PASSWORD_HERE@localhost:5432/mergemeet_test",
 )
 
 
@@ -98,14 +100,11 @@ async def client(test_db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 @pytest.fixture
 def sample_user_data():
     """範例用戶資料"""
-    return {
-        "email": "test@example.com",
-        "password": "Test1234!",
-        "date_of_birth": "1995-01-01"
-    }
+    return {"email": "test@example.com", "password": "Test1234!", "date_of_birth": "1995-01-01"}
 
 
 # ==================== Redis Mock Fixtures ====================
+
 
 @pytest.fixture
 def mock_redis():
@@ -209,7 +208,7 @@ async def auth_user(client: AsyncClient, sample_user_data: dict) -> dict:
     return {
         "token": token,
         "email": sample_user_data["email"],
-        "headers": {"Authorization": f"Bearer {token}"}
+        "headers": {"Authorization": f"Bearer {token}"},
     }
 
 
@@ -223,13 +222,9 @@ async def auth_user_pair(client: AsyncClient) -> dict:
     alice_data = {
         "email": "alice@example.com",
         "password": "Alice1234!",
-        "date_of_birth": "1995-01-01"
+        "date_of_birth": "1995-01-01",
     }
-    bob_data = {
-        "email": "bob@example.com",
-        "password": "Bob12345!",
-        "date_of_birth": "1996-06-15"
-    }
+    bob_data = {"email": "bob@example.com", "password": "Bob12345!", "date_of_birth": "1996-06-15"}
 
     # 註冊 Alice
     resp_a = await client.post("/api/auth/register", json=alice_data)
@@ -247,13 +242,13 @@ async def auth_user_pair(client: AsyncClient) -> dict:
         "alice": {
             "token": token_a,
             "email": alice_data["email"],
-            "headers": {"Authorization": f"Bearer {token_a}"}
+            "headers": {"Authorization": f"Bearer {token_a}"},
         },
         "bob": {
             "token": token_b,
             "email": bob_data["email"],
-            "headers": {"Authorization": f"Bearer {token_b}"}
-        }
+            "headers": {"Authorization": f"Bearer {token_b}"},
+        },
     }
 
 
@@ -273,7 +268,7 @@ async def auth_user_trio(client: AsyncClient) -> dict:
     ]
 
     result = {}
-    for user_data, name in zip(users_data, ["alice", "bob", "charlie"]):
+    for user_data, name in zip(users_data, ["alice", "bob", "charlie"], strict=True):
         resp = await client.post("/api/auth/register", json=user_data)
         assert resp.status_code == 201
         token = resp.json()["access_token"]
@@ -281,7 +276,7 @@ async def auth_user_trio(client: AsyncClient) -> dict:
         result[name] = {
             "token": token,
             "email": user_data["email"],
-            "headers": {"Authorization": f"Bearer {token}"}
+            "headers": {"Authorization": f"Bearer {token}"},
         }
 
     return result

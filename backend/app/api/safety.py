@@ -1,21 +1,22 @@
 """安全功能 API - 封鎖與舉報"""
+
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, func
-from typing import List
 import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
-from app.models.user import User
 from app.models.match import BlockedUser, Match
 from app.models.report import Report
+from app.models.user import User
 from app.schemas.safety import (
-    BlockUserRequest,
     BlockedUserResponse,
-    ReportUserRequest,
+    BlockUserRequest,
     ReportResponse,
+    ReportUserRequest,
 )
 from app.services.trust_score import TrustScoreService
 
@@ -29,7 +30,7 @@ async def block_user(
     user_id: uuid.UUID,
     request: BlockUserRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     封鎖用戶
@@ -40,46 +41,28 @@ async def block_user(
     """
     # 驗證不能封鎖自己
     if current_user.id == user_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="無法封鎖自己"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="無法封鎖自己")
 
     # 檢查用戶是否存在
-    result = await db.execute(
-        select(User).where(User.id == user_id)
-    )
+    result = await db.execute(select(User).where(User.id == user_id))
     target_user = result.scalar_one_or_none()
 
     if not target_user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="用戶不存在"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用戶不存在")
 
     # 檢查是否已經封鎖
     result = await db.execute(
         select(BlockedUser).where(
-            and_(
-                BlockedUser.blocker_id == current_user.id,
-                BlockedUser.blocked_id == user_id
-            )
+            and_(BlockedUser.blocker_id == current_user.id, BlockedUser.blocked_id == user_id)
         )
     )
     existing_block = result.scalar_one_or_none()
 
     if existing_block:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="已經封鎖此用戶"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="已經封鎖此用戶")
 
     # 創建封鎖記錄
-    new_block = BlockedUser(
-        blocker_id=current_user.id,
-        blocked_id=user_id,
-        reason=request.reason
-    )
+    new_block = BlockedUser(blocker_id=current_user.id, blocked_id=user_id, reason=request.reason)
     db.add(new_block)
 
     # 如果有配對，自動取消
@@ -89,8 +72,8 @@ async def block_user(
                 Match.status == "ACTIVE",
                 or_(
                     and_(Match.user1_id == current_user.id, Match.user2_id == user_id),
-                    and_(Match.user1_id == user_id, Match.user2_id == current_user.id)
-                )
+                    and_(Match.user1_id == user_id, Match.user2_id == current_user.id),
+                ),
             )
         )
     )
@@ -107,50 +90,36 @@ async def block_user(
     await TrustScoreService.adjust_score(db, user_id, "blocked")
     logger.info(f"Trust score -2 for user {user_id} (blocked)")
 
-    return {
-        "blocked": True,
-        "message": "已封鎖用戶",
-        "match_cancelled": match is not None
-    }
+    return {"blocked": True, "message": "已封鎖用戶", "match_cancelled": match is not None}
 
 
 @router.delete("/block/{user_id}")
 async def unblock_user(
     user_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """解除封鎖用戶"""
     # 查找封鎖記錄
     result = await db.execute(
         select(BlockedUser).where(
-            and_(
-                BlockedUser.blocker_id == current_user.id,
-                BlockedUser.blocked_id == user_id
-            )
+            and_(BlockedUser.blocker_id == current_user.id, BlockedUser.blocked_id == user_id)
         )
     )
     block = result.scalar_one_or_none()
 
     if not block:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="未封鎖此用戶"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="未封鎖此用戶")
 
     await db.delete(block)
     await db.commit()
 
-    return {
-        "unblocked": True,
-        "message": "已解除封鎖"
-    }
+    return {"unblocked": True, "message": "已解除封鎖"}
 
 
-@router.get("/blocked", response_model=List[BlockedUserResponse])
+@router.get("/blocked", response_model=list[BlockedUserResponse])
 async def get_blocked_users(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     """
     取得封鎖列表
@@ -171,9 +140,7 @@ async def get_blocked_users(
     blocked_user_ids = [block.blocked_id for block in blocked_users]
 
     # 批次查詢所有被封鎖的用戶（1 次查詢取代 N 次）
-    users_result = await db.execute(
-        select(User).where(User.id.in_(blocked_user_ids))
-    )
+    users_result = await db.execute(select(User).where(User.id.in_(blocked_user_ids)))
     users_by_id = {u.id: u for u in users_result.scalars().all()}
 
     # 組裝回應
@@ -181,13 +148,15 @@ async def get_blocked_users(
     for block in blocked_users:
         user = users_by_id.get(block.blocked_id)
         if user:
-            response.append(BlockedUserResponse(
-                id=str(block.id),
-                blocked_user_id=str(user.id),
-                blocked_user_email=user.email,
-                reason=block.reason,
-                created_at=block.created_at
-            ))
+            response.append(
+                BlockedUserResponse(
+                    id=str(block.id),
+                    blocked_user_id=str(user.id),
+                    blocked_user_email=user.email,
+                    reason=block.reason,
+                    created_at=block.created_at,
+                )
+            )
 
     return response
 
@@ -196,7 +165,7 @@ async def get_blocked_users(
 async def report_user(
     request: ReportUserRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     舉報用戶
@@ -210,29 +179,21 @@ async def report_user(
 
     # 驗證不能舉報自己（使用統一的 UUID 類型）
     if current_user.id == reported_user_uuid:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="無法舉報自己"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="無法舉報自己")
 
     # 檢查被舉報用戶是否存在（使用統一的 UUID 類型）
-    result = await db.execute(
-        select(User).where(User.id == reported_user_uuid)
-    )
+    result = await db.execute(select(User).where(User.id == reported_user_uuid))
     reported_user = result.scalar_one_or_none()
 
     if not reported_user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="被舉報用戶不存在"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="被舉報用戶不存在")
 
     # 驗證舉報類型
     valid_types = ["INAPPROPRIATE", "HARASSMENT", "FAKE", "SCAM", "OTHER"]
     if request.report_type not in valid_types:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"無效的舉報類型。有效類型：{', '.join(valid_types)}"
+            detail=f"無效的舉報類型。有效類型：{', '.join(valid_types)}",
         )
 
     # 創建舉報記錄（使用統一的 UUID 對象）
@@ -242,7 +203,7 @@ async def report_user(
         report_type=request.report_type,
         reason=request.reason,
         evidence=request.evidence,
-        status="PENDING"
+        status="PENDING",
     )
     db.add(new_report)
 
@@ -262,14 +223,13 @@ async def report_user(
         report_type=new_report.report_type,
         reason=new_report.reason,
         status=new_report.status,
-        created_at=new_report.created_at
+        created_at=new_report.created_at,
     )
 
 
-@router.get("/reports", response_model=List[ReportResponse])
+@router.get("/reports", response_model=list[ReportResponse])
 async def get_my_reports(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     """取得我的舉報記錄"""
     result = await db.execute(
@@ -286,7 +246,7 @@ async def get_my_reports(
             report_type=report.report_type,
             reason=report.reason,
             status=report.status,
-            created_at=report.created_at
+            created_at=report.created_at,
         )
         for report in reports
     ]

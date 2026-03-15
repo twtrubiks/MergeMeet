@@ -1,9 +1,9 @@
 """依賴注入函數"""
-from typing import Optional
-from fastapi import Depends, HTTPException, status, Cookie, Header
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
+
+from fastapi import Cookie, Depends, Header, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import decode_token
@@ -16,9 +16,7 @@ security = HTTPBearer(auto_error=False)
 
 
 def _extract_token_from_cookie(
-    access_token_cookie: Optional[str],
-    csrf_token_header: Optional[str],
-    csrf_token_cookie: Optional[str]
+    access_token_cookie: str | None, csrf_token_header: str | None, csrf_token_cookie: str | None
 ) -> str:
     """從 Cookie 提取並驗證 Token
 
@@ -35,18 +33,16 @@ def _extract_token_from_cookie(
     """
     if not csrf_token_header or not csrf_token_cookie:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="CSRF 驗證失敗：缺少 CSRF Token"
+            status_code=status.HTTP_403_FORBIDDEN, detail="CSRF 驗證失敗：缺少 CSRF Token"
         )
     if csrf_token_header != csrf_token_cookie:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="CSRF 驗證失敗：Token 不匹配"
+            status_code=status.HTTP_403_FORBIDDEN, detail="CSRF 驗證失敗：Token 不匹配"
         )
     return access_token_cookie
 
 
-def _validate_token_payload(payload: Optional[dict]) -> str:
+def _validate_token_payload(payload: dict | None) -> str:
     """驗證 Token payload 並返回 user_id
 
     Args:
@@ -84,11 +80,11 @@ def _validate_token_payload(payload: Optional[dict]) -> str:
 
 
 async def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    access_token_cookie: Optional[str] = Cookie(None, alias="access_token"),
-    csrf_token_header: Optional[str] = Header(None, alias="X-CSRF-Token"),
-    csrf_token_cookie: Optional[str] = Cookie(None, alias="csrf_token"),
-    db: AsyncSession = Depends(get_db)
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    access_token_cookie: str | None = Cookie(None, alias="access_token"),
+    csrf_token_header: str | None = Header(None, alias="X-CSRF-Token"),
+    csrf_token_cookie: str | None = Cookie(None, alias="csrf_token"),
+    db: AsyncSession = Depends(get_db),
 ) -> User:
     """
     取得當前登入用戶（支援雙模式認證）
@@ -143,9 +139,7 @@ async def get_current_user(
         )
 
     # 從資料庫查詢用戶
-    result = await db.execute(
-        select(User).where(User.id == user_id)
-    )
+    result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
 
     if not user:
@@ -156,17 +150,12 @@ async def get_current_user(
         )
 
     if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="帳號已被停用"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="帳號已被停用")
 
     return user
 
 
-async def get_current_active_user(
-    current_user: User = Depends(get_current_user)
-) -> User:
+async def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
     """
     取得當前啟用的用戶
 
@@ -175,9 +164,7 @@ async def get_current_active_user(
     return current_user
 
 
-async def get_current_admin_user(
-    current_user: User = Depends(get_current_user)
-) -> User:
+async def get_current_admin_user(current_user: User = Depends(get_current_user)) -> User:
     """
     取得當前管理員用戶
 
@@ -187,9 +174,6 @@ async def get_current_admin_user(
         HTTPException: 如果用戶不是管理員
     """
     if not current_user.is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="需要管理員權限"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="需要管理員權限")
 
     return current_user

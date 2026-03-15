@@ -16,12 +16,10 @@
       <div v-if="isLocked" class="lockout-warning">
         <div class="lockout-icon"><Icon name="lock" size="xl" decorative /></div>
         <div class="lockout-message">帳號已暫時鎖定</div>
-        <div class="lockout-countdown">
-          請於 {{ formatCountdown(lockoutCountdown) }} 後再試
-        </div>
+        <div class="lockout-countdown">請於 {{ formatCountdown(lockoutCountdown) }} 後再試</div>
       </div>
 
-      <form v-else @submit.prevent="handleLogin" class="auth-form">
+      <form v-else class="auth-form" @submit.prevent="handleLogin">
         <!-- Email -->
         <FloatingInput
           id="email"
@@ -43,12 +41,13 @@
           :disabled="isLoading"
           :required="true"
           :error="error"
-          :showPasswordToggle="true"
+          :show-password-toggle="true"
         />
 
         <!-- 剩餘嘗試次數警告 -->
         <div v-if="showAttemptsWarning" class="attempts-warning">
-          <Icon name="warning" size="sm" decorative /> 剩餘 {{ loginLimitInfo.remainingAttempts }} 次嘗試機會
+          <Icon name="warning" size="sm" decorative /> 剩餘
+          {{ loginLimitInfo.remainingAttempts }} 次嘗試機會
         </div>
 
         <!-- 忘記密碼連結 -->
@@ -99,7 +98,7 @@ const userStore = useUserStore()
 // 表單資料
 const formData = ref({
   email: '',
-  password: '',
+  password: ''
 })
 
 // 錯誤訊息
@@ -145,11 +144,14 @@ const startCountdown = (seconds) => {
 }
 
 // 監聽鎖定狀態變化
-watch(() => loginLimitInfo.value.lockoutSeconds, (newVal) => {
-  if (newVal > 0) {
-    startCountdown(newVal)
+watch(
+  () => loginLimitInfo.value.lockoutSeconds,
+  (newVal) => {
+    if (newVal > 0) {
+      startCountdown(newVal)
+    }
   }
-})
+)
 
 // 清理定時器
 onUnmounted(() => {
@@ -170,7 +172,7 @@ const handleLogin = async () => {
   // 呼叫 API
   const success = await userStore.login({
     email: formData.value.email,
-    password: formData.value.password,
+    password: formData.value.password
   })
 
   if (success) {
@@ -239,7 +241,8 @@ const handleLogin = async () => {
 }
 
 @keyframes float {
-  0%, 100% {
+  0%,
+  100% {
     transform: translate(0, 0) scale(1);
   }
   33% {
@@ -259,8 +262,9 @@ const handleLogin = async () => {
   padding: var(--space-12);
   max-width: 450px;
   width: 100%;
-  box-shadow: var(--shadow-2xl),
-              0 0 0 1px rgba(255, 255, 255, 0.2);
+  box-shadow:
+    var(--shadow-2xl),
+    0 0 0 1px rgba(255, 255, 255, 0.2);
   animation: slideUp var(--duration-slower) var(--easing-out);
 }
 
@@ -312,13 +316,16 @@ const handleLogin = async () => {
 }
 
 @keyframes heartBeat {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
-  10%, 30% {
+  10%,
+  30% {
     transform: scale(1.1);
   }
-  20%, 40% {
+  20%,
+  40% {
     transform: scale(0.9);
   }
 }

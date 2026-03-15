@@ -5,16 +5,17 @@
 - Bearer Token 向後兼容
 - 登出後 Token 黑名單化
 """
+
 import base64
 import json
-import pytest
 from datetime import date
+
+import pytest
 from httpx import AsyncClient
 
+from app.core.security import get_password_hash
 from app.main import app
 from app.models.user import User
-from app.core.security import get_password_hash
-
 
 # ==================== 登入 Cookie 測試 ====================
 
@@ -23,17 +24,19 @@ from app.core.security import get_password_hash
 async def test_login_sets_cookies(client: AsyncClient):
     """測試登入設置 HttpOnly Cookie"""
     # 先註冊
-    await client.post("/api/auth/register", json={
-        "email": "cookie_login@example.com",
-        "password": "Password123",
-        "date_of_birth": "1995-01-01"
-    })
+    await client.post(
+        "/api/auth/register",
+        json={
+            "email": "cookie_login@example.com",
+            "password": "Password123",
+            "date_of_birth": "1995-01-01",
+        },
+    )
 
     # 登入
-    response = await client.post("/api/auth/login", json={
-        "email": "cookie_login@example.com",
-        "password": "Password123"
-    })
+    response = await client.post(
+        "/api/auth/login", json={"email": "cookie_login@example.com", "password": "Password123"}
+    )
 
     assert response.status_code == 200
 
@@ -52,11 +55,14 @@ async def test_login_sets_cookies(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_register_sets_cookies(client: AsyncClient):
     """測試註冊設置 HttpOnly Cookie"""
-    response = await client.post("/api/auth/register", json={
-        "email": "cookie_register@example.com",
-        "password": "Password123",
-        "date_of_birth": "1995-01-01"
-    })
+    response = await client.post(
+        "/api/auth/register",
+        json={
+            "email": "cookie_register@example.com",
+            "password": "Password123",
+            "date_of_birth": "1995-01-01",
+        },
+    )
 
     assert response.status_code == 201
 
@@ -74,11 +80,14 @@ async def test_register_sets_cookies(client: AsyncClient):
 async def test_cookie_auth_with_csrf_success(client: AsyncClient):
     """測試 Cookie + CSRF Token 認證成功"""
     # 註冊並獲取 Cookie
-    register_response = await client.post("/api/auth/register", json={
-        "email": "cookie_csrf@example.com",
-        "password": "Password123",
-        "date_of_birth": "1995-01-01"
-    })
+    register_response = await client.post(
+        "/api/auth/register",
+        json={
+            "email": "cookie_csrf@example.com",
+            "password": "Password123",
+            "date_of_birth": "1995-01-01",
+        },
+    )
 
     # 取得 CSRF Token
     csrf_token = register_response.cookies.get("csrf_token")
@@ -86,10 +95,7 @@ async def test_cookie_auth_with_csrf_success(client: AsyncClient):
 
     # 使用 Cookie + CSRF Token 存取 API
     # httpx 客戶端會自動帶上之前設置的 Cookie
-    response = await client.get(
-        "/api/profile",
-        headers={"X-CSRF-Token": csrf_token}
-    )
+    response = await client.get("/api/profile", headers={"X-CSRF-Token": csrf_token})
 
     # 應該返回 200 或 404（用戶存在但沒有 profile）
     assert response.status_code in [200, 404]
@@ -99,11 +105,14 @@ async def test_cookie_auth_with_csrf_success(client: AsyncClient):
 async def test_cookie_auth_without_csrf_fails(client: AsyncClient):
     """測試使用 Cookie 但缺少 CSRF Token 失敗"""
     # 註冊並獲取 Cookie
-    await client.post("/api/auth/register", json={
-        "email": "cookie_no_csrf@example.com",
-        "password": "Password123",
-        "date_of_birth": "1995-01-01"
-    })
+    await client.post(
+        "/api/auth/register",
+        json={
+            "email": "cookie_no_csrf@example.com",
+            "password": "Password123",
+            "date_of_birth": "1995-01-01",
+        },
+    )
 
     # 僅使用 Cookie（不帶 CSRF Token）存取需要認證的 API
     # 注意：不傳 X-CSRF-Token header
@@ -118,17 +127,17 @@ async def test_cookie_auth_without_csrf_fails(client: AsyncClient):
 async def test_cookie_auth_wrong_csrf_fails(client: AsyncClient):
     """測試 CSRF Token 不匹配失敗"""
     # 註冊並獲取 Cookie
-    await client.post("/api/auth/register", json={
-        "email": "cookie_wrong_csrf@example.com",
-        "password": "Password123",
-        "date_of_birth": "1995-01-01"
-    })
+    await client.post(
+        "/api/auth/register",
+        json={
+            "email": "cookie_wrong_csrf@example.com",
+            "password": "Password123",
+            "date_of_birth": "1995-01-01",
+        },
+    )
 
     # 使用錯誤的 CSRF Token
-    response = await client.get(
-        "/api/profile",
-        headers={"X-CSRF-Token": "wrong_csrf_token"}
-    )
+    response = await client.get("/api/profile", headers={"X-CSRF-Token": "wrong_csrf_token"})
 
     # 應該返回 403 CSRF 驗證失敗
     assert response.status_code == 403
@@ -142,11 +151,14 @@ async def test_cookie_auth_wrong_csrf_fails(client: AsyncClient):
 async def test_bearer_token_still_works(client: AsyncClient):
     """測試 Bearer Token 向後兼容"""
     # 註冊獲取 Token
-    register_response = await client.post("/api/auth/register", json={
-        "email": "bearer_compat@example.com",
-        "password": "Password123",
-        "date_of_birth": "1995-01-01"
-    })
+    register_response = await client.post(
+        "/api/auth/register",
+        json={
+            "email": "bearer_compat@example.com",
+            "password": "Password123",
+            "date_of_birth": "1995-01-01",
+        },
+    )
 
     access_token = register_response.json()["access_token"]
 
@@ -154,8 +166,7 @@ async def test_bearer_token_still_works(client: AsyncClient):
     # 使用 Bearer Token 存取 API
     async with AsyncClient(app=app, base_url="http://test") as new_client:
         response = await new_client.get(
-            "/api/profile",
-            headers={"Authorization": f"Bearer {access_token}"}
+            "/api/profile", headers={"Authorization": f"Bearer {access_token}"}
         )
 
         # 應該成功（返回 200 或 404）
@@ -169,19 +180,19 @@ async def test_bearer_token_still_works(client: AsyncClient):
 async def test_logout_clears_cookies(client: AsyncClient):
     """測試登出清除 Cookie"""
     # 註冊
-    register_response = await client.post("/api/auth/register", json={
-        "email": "logout_cookies@example.com",
-        "password": "Password123",
-        "date_of_birth": "1995-01-01"
-    })
+    register_response = await client.post(
+        "/api/auth/register",
+        json={
+            "email": "logout_cookies@example.com",
+            "password": "Password123",
+            "date_of_birth": "1995-01-01",
+        },
+    )
 
     csrf_token = register_response.cookies.get("csrf_token")
 
     # 登出
-    response = await client.post(
-        "/api/auth/logout",
-        headers={"X-CSRF-Token": csrf_token}
-    )
+    response = await client.post("/api/auth/logout", headers={"X-CSRF-Token": csrf_token})
 
     assert response.status_code == 200
     data = response.json()
@@ -196,26 +207,25 @@ async def test_logout_clears_cookies(client: AsyncClient):
 async def test_logout_blacklists_access_token(client: AsyncClient):
     """測試登出後 Access Token 被加入黑名單"""
     # 註冊
-    register_response = await client.post("/api/auth/register", json={
-        "email": "logout_blacklist@example.com",
-        "password": "Password123",
-        "date_of_birth": "1995-01-01"
-    })
+    register_response = await client.post(
+        "/api/auth/register",
+        json={
+            "email": "logout_blacklist@example.com",
+            "password": "Password123",
+            "date_of_birth": "1995-01-01",
+        },
+    )
 
     access_token = register_response.json()["access_token"]
     csrf_token = register_response.cookies.get("csrf_token")
 
     # 登出
-    await client.post(
-        "/api/auth/logout",
-        headers={"X-CSRF-Token": csrf_token}
-    )
+    await client.post("/api/auth/logout", headers={"X-CSRF-Token": csrf_token})
 
     # 建立新的 AsyncClient 測試舊 Token（不帶 Cookie）
     async with AsyncClient(app=app, base_url="http://test") as new_client:
         response = await new_client.get(
-            "/api/profile",
-            headers={"Authorization": f"Bearer {access_token}"}
+            "/api/profile", headers={"Authorization": f"Bearer {access_token}"}
         )
 
         assert response.status_code == 401
@@ -226,20 +236,20 @@ async def test_logout_blacklists_access_token(client: AsyncClient):
 async def test_logout_blacklists_both_tokens(client: AsyncClient):
     """測試登出同時黑名單化 Access Token 和 Refresh Token"""
     # 註冊
-    register_response = await client.post("/api/auth/register", json={
-        "email": "logout_both@example.com",
-        "password": "Password123",
-        "date_of_birth": "1995-01-01"
-    })
+    register_response = await client.post(
+        "/api/auth/register",
+        json={
+            "email": "logout_both@example.com",
+            "password": "Password123",
+            "date_of_birth": "1995-01-01",
+        },
+    )
 
     refresh_token = register_response.json()["refresh_token"]
     csrf_token = register_response.cookies.get("csrf_token")
 
     # 登出
-    logout_response = await client.post(
-        "/api/auth/logout",
-        headers={"X-CSRF-Token": csrf_token}
-    )
+    logout_response = await client.post("/api/auth/logout", headers={"X-CSRF-Token": csrf_token})
 
     assert logout_response.status_code == 200
     data = logout_response.json()
@@ -248,9 +258,7 @@ async def test_logout_blacklists_both_tokens(client: AsyncClient):
     assert "refresh_token" in data["tokens_invalidated"]
 
     # 嘗試使用舊 Refresh Token 刷新（應該失敗）
-    response = await client.post("/api/auth/refresh", json={
-        "refresh_token": refresh_token
-    })
+    response = await client.post("/api/auth/refresh", json={"refresh_token": refresh_token})
 
     assert response.status_code == 401
 
@@ -262,11 +270,14 @@ async def test_logout_blacklists_both_tokens(client: AsyncClient):
 async def test_refresh_from_cookie(client: AsyncClient):
     """測試從 Cookie 刷新 Token"""
     # 註冊
-    await client.post("/api/auth/register", json={
-        "email": "refresh_cookie@example.com",
-        "password": "Password123",
-        "date_of_birth": "1995-01-01"
-    })
+    await client.post(
+        "/api/auth/register",
+        json={
+            "email": "refresh_cookie@example.com",
+            "password": "Password123",
+            "date_of_birth": "1995-01-01",
+        },
+    )
 
     # 刷新 Token（Cookie 會自動帶上）
     response = await client.post("/api/auth/refresh")
@@ -291,11 +302,14 @@ async def test_refresh_with_empty_body(client: AsyncClient):
     回歸測試：修復 commit 598c2d0
     """
     # 註冊（Cookie 會自動設置）
-    await client.post("/api/auth/register", json={
-        "email": "empty_body_refresh@example.com",
-        "password": "Password123",
-        "date_of_birth": "1995-01-01"
-    })
+    await client.post(
+        "/api/auth/register",
+        json={
+            "email": "empty_body_refresh@example.com",
+            "password": "Password123",
+            "date_of_birth": "1995-01-01",
+        },
+    )
 
     # 發送空 body {}（模擬前端 axios 行為）
     response = await client.post("/api/auth/refresh", json={})
@@ -314,11 +328,14 @@ async def test_refresh_with_empty_body(client: AsyncClient):
 async def test_refresh_rotates_token(client: AsyncClient):
     """測試 Refresh Token 輪換（舊 Token 失效）"""
     # 註冊
-    register_response = await client.post("/api/auth/register", json={
-        "email": "refresh_rotate@example.com",
-        "password": "Password123",
-        "date_of_birth": "1995-01-01"
-    })
+    register_response = await client.post(
+        "/api/auth/register",
+        json={
+            "email": "refresh_rotate@example.com",
+            "password": "Password123",
+            "date_of_birth": "1995-01-01",
+        },
+    )
 
     old_refresh_token = register_response.json()["refresh_token"]
 
@@ -326,9 +343,7 @@ async def test_refresh_rotates_token(client: AsyncClient):
     await client.post("/api/auth/refresh")
 
     # 嘗試使用舊 Refresh Token（應該失敗）
-    response = await client.post("/api/auth/refresh", json={
-        "refresh_token": old_refresh_token
-    })
+    response = await client.post("/api/auth/refresh", json={"refresh_token": old_refresh_token})
 
     assert response.status_code == 401
     assert "失效" in response.json()["detail"]
@@ -347,16 +362,16 @@ async def test_admin_login_sets_cookies(client: AsyncClient, test_db):
         date_of_birth=date(1990, 1, 1),
         is_admin=True,
         is_active=True,
-        email_verified=True
+        email_verified=True,
     )
     test_db.add(admin_user)
     await test_db.commit()
 
     # 管理員登入
-    response = await client.post("/api/auth/admin-login", json={
-        "email": "admin_cookie@example.com",
-        "password": "AdminPass123"
-    })
+    response = await client.post(
+        "/api/auth/admin-login",
+        json={"email": "admin_cookie@example.com", "password": "AdminPass123"},
+    )
 
     assert response.status_code == 200
 
@@ -378,22 +393,22 @@ async def test_admin_refresh_preserves_is_admin(client: AsyncClient, test_db):
         date_of_birth=date(1990, 1, 1),
         is_admin=True,
         is_active=True,
-        email_verified=True
+        email_verified=True,
     )
     test_db.add(admin_user)
     await test_db.commit()
 
     # 管理員登入
-    login_response = await client.post("/api/auth/admin-login", json={
-        "email": "admin_refresh@example.com",
-        "password": "AdminPass123"
-    })
+    login_response = await client.post(
+        "/api/auth/admin-login",
+        json={"email": "admin_refresh@example.com", "password": "AdminPass123"},
+    )
 
     assert login_response.status_code == 200
     old_token = login_response.json()["access_token"]
 
     # 解析舊 Token，確認有 is_admin
-    old_payload = json.loads(base64.urlsafe_b64decode(old_token.split('.')[1] + '=='))
+    old_payload = json.loads(base64.urlsafe_b64decode(old_token.split(".")[1] + "=="))
     assert old_payload.get("is_admin") is True
 
     # 刷新 Token
@@ -403,7 +418,7 @@ async def test_admin_refresh_preserves_is_admin(client: AsyncClient, test_db):
     new_token = refresh_response.json()["access_token"]
 
     # 解析新 Token，確認 is_admin 仍然存在
-    new_payload = json.loads(base64.urlsafe_b64decode(new_token.split('.')[1] + '=='))
+    new_payload = json.loads(base64.urlsafe_b64decode(new_token.split(".")[1] + "=="))
     assert new_payload.get("is_admin") is True, "刷新後的 Token 應該保留 is_admin=True"
 
 
@@ -426,11 +441,14 @@ async def test_expired_access_token_triggers_refresh(client: AsyncClient):
     """測試 Access Token 過期時自動刷新"""
     # 這個測試需要模擬過期的 Token，在實際環境中較難測試
     # 這裡僅驗證 refresh 端點可用
-    await client.post("/api/auth/register", json={
-        "email": "auto_refresh@example.com",
-        "password": "Password123",
-        "date_of_birth": "1995-01-01"
-    })
+    await client.post(
+        "/api/auth/register",
+        json={
+            "email": "auto_refresh@example.com",
+            "password": "Password123",
+            "date_of_birth": "1995-01-01",
+        },
+    )
 
     # 驗證 refresh 端點可用
     response = await client.post("/api/auth/refresh")

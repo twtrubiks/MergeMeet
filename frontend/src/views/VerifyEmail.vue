@@ -18,7 +18,7 @@
       </div>
 
       <!-- 驗證碼輸入表單 -->
-      <form v-else @submit.prevent="handleVerify" class="auth-form">
+      <form v-else class="auth-form" @submit.prevent="handleVerify">
         <p class="instruction">請輸入 6 位數驗證碼</p>
 
         <!-- 6 位數驗證碼輸入框 -->
@@ -26,18 +26,22 @@
           <input
             v-for="i in 6"
             :key="i"
-            :ref="el => { if (el) codeInputs[i-1] = el }"
+            :ref="
+              (el) => {
+                if (el) codeInputs[i - 1] = el
+              }
+            "
+            v-model="codeDigits[i - 1]"
             type="text"
             inputmode="numeric"
             maxlength="1"
-            v-model="codeDigits[i-1]"
-            @input="handleCodeInput(i-1, $event)"
-            @keydown="handleKeyDown(i-1, $event)"
-            @paste="handlePaste"
-            @focus="handleFocus(i-1)"
             :disabled="isLoading"
             class="code-input"
-            :class="{ 'has-value': codeDigits[i-1] }"
+            :class="{ 'has-value': codeDigits[i - 1] }"
+            @input="handleCodeInput(i - 1, $event)"
+            @keydown="handleKeyDown(i - 1, $event)"
+            @paste="handlePaste"
+            @focus="handleFocus(i - 1)"
           />
         </div>
 
@@ -62,15 +66,13 @@
           <button
             v-else
             type="button"
-            @click="handleResend"
             :disabled="isResending"
             class="resend-btn"
+            @click="handleResend"
           >
             {{ isResending ? '發送中...' : '重新發送驗證碼' }}
           </button>
-          <p v-if="resendSuccess" class="resend-success">
-            驗證碼已重新發送，請查收郵件
-          </p>
+          <p v-if="resendSuccess" class="resend-success">驗證碼已重新發送，請查收郵件</p>
         </div>
 
         <!-- 提示 -->
@@ -116,12 +118,8 @@ let cooldownTimer = null
 
 // 計算屬性
 const userEmail = computed(() => userStore.user?.email || '您的郵箱')
-const isCodeComplete = computed(() =>
-  codeDigits.value.every(d => d !== '')
-)
-const verificationCode = computed(() =>
-  codeDigits.value.join('')
-)
+const isCodeComplete = computed(() => codeDigits.value.every((d) => d !== ''))
+const verificationCode = computed(() => codeDigits.value.join(''))
 
 // 處理驗證碼輸入
 const handleCodeInput = (index, event) => {
@@ -322,7 +320,8 @@ onUnmounted(() => {
 }
 
 @keyframes float {
-  0%, 100% {
+  0%,
+  100% {
     transform: translate(0, 0) scale(1);
   }
   33% {
@@ -342,8 +341,9 @@ onUnmounted(() => {
   padding: 48px;
   max-width: 480px;
   width: 100%;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3),
-              0 0 0 1px rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.2);
   animation: slideUp 0.5s ease-out;
 }
 
@@ -375,7 +375,8 @@ onUnmounted(() => {
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
   50% {
@@ -418,8 +419,13 @@ onUnmounted(() => {
 }
 
 @keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 .success-state h2 {
@@ -535,8 +541,12 @@ onUnmounted(() => {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* 提示區塊 */

@@ -123,8 +123,9 @@ const stackedStyle = computed(() => {
   position: absolute;
   width: 100%;
   height: 100%;
-  transition: transform var(--duration-slow) var(--easing-default),
-              opacity var(--duration-slow) var(--easing-default);
+  transition:
+    transform var(--duration-slow) var(--easing-default),
+    opacity var(--duration-slow) var(--easing-default);
 }
 
 /* 圖片骨架 */

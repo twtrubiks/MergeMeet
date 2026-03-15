@@ -22,7 +22,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
   const socket = ref(null)
   const connectionState = ref(ConnectionState.DISCONNECTED)
   const reconnectAttempts = ref(0)
-  const maxReconnectAttempts = 10  // 增加重試次數
+  const maxReconnectAttempts = 10 // 增加重試次數
   const baseReconnectDelay = 1000
 
   // 使用普通 Map（不用 ref 包裹，避免序列化問題）
@@ -35,9 +35,10 @@ export const useWebSocketStore = defineStore('websocket', () => {
 
   // Getters
   const isConnected = computed(() => connectionState.value === ConnectionState.CONNECTED)
-  const isConnecting = computed(() =>
-    connectionState.value === ConnectionState.CONNECTING ||
-    connectionState.value === ConnectionState.RECONNECTING
+  const isConnecting = computed(
+    () =>
+      connectionState.value === ConnectionState.CONNECTING ||
+      connectionState.value === ConnectionState.RECONNECTING
   )
 
   /**
@@ -62,8 +63,11 @@ export const useWebSocketStore = defineStore('websocket', () => {
     }
 
     // 正在連接中，返回現有的 Promise
-    if (connectingPromise && (connectionState.value === ConnectionState.CONNECTING ||
-        connectionState.value === ConnectionState.RECONNECTING)) {
+    if (
+      connectingPromise &&
+      (connectionState.value === ConnectionState.CONNECTING ||
+        connectionState.value === ConnectionState.RECONNECTING)
+    ) {
       logger.log('[GlobalWS] Connection in progress, waiting...')
       return connectingPromise
     }
@@ -73,9 +77,8 @@ export const useWebSocketStore = defineStore('websocket', () => {
       return Promise.reject(new Error('User not authenticated'))
     }
 
-    connectionState.value = reconnectAttempts.value > 0
-      ? ConnectionState.RECONNECTING
-      : ConnectionState.CONNECTING
+    connectionState.value =
+      reconnectAttempts.value > 0 ? ConnectionState.RECONNECTING : ConnectionState.CONNECTING
 
     connectingPromise = new Promise((resolve, reject) => {
       try {
@@ -101,11 +104,13 @@ export const useWebSocketStore = defineStore('websocket', () => {
           }
 
           // 發送認證訊息
-          socket.value.send(JSON.stringify({
-            type: 'auth',
-            token: token,
-            user_id: userId
-          }))
+          socket.value.send(
+            JSON.stringify({
+              type: 'auth',
+              token: token,
+              user_id: userId
+            })
+          )
 
           // 等待認證成功回應
           const authTimeout = setTimeout(() => {
@@ -174,7 +179,6 @@ export const useWebSocketStore = defineStore('websocket', () => {
           connectingPromise = null
           reject(error)
         }
-
       } catch (error) {
         logger.error('[GlobalWS] Error creating WebSocket:', error)
         connectionState.value = ConnectionState.DISCONNECTED
@@ -199,7 +203,9 @@ export const useWebSocketStore = defineStore('websocket', () => {
 
     reconnectAttempts.value++
     const delay = getReconnectDelay()
-    logger.log(`[GlobalWS] Reconnecting in ${delay}ms... (${reconnectAttempts.value}/${maxReconnectAttempts})`)
+    logger.log(
+      `[GlobalWS] Reconnecting in ${delay}ms... (${reconnectAttempts.value}/${maxReconnectAttempts})`
+    )
 
     reconnectTimer = setTimeout(() => {
       if (userStore.isAuthenticated) {
@@ -346,7 +352,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
 
     // 執行已註冊的處理器
     const handlers = messageHandlers.get(type) || []
-    handlers.forEach(handler => {
+    handlers.forEach((handler) => {
       try {
         handler(data)
       } catch (error) {
@@ -380,7 +386,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
       (isAuth) => {
         if (isAuth) {
           logger.log('[GlobalWS] User authenticated, connecting...')
-          connect().catch(err => {
+          connect().catch((err) => {
             logger.error('[GlobalWS] Auto-connect failed:', err)
           })
         } else {

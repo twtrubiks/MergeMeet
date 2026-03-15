@@ -1,27 +1,28 @@
 """聊天訊息 REST API"""
-from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, func, desc
-from sqlalchemy.orm import selectinload
-from typing import List
-import logging
 
+import logging
+from datetime import UTC, datetime
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from sqlalchemy import and_, desc, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
-from app.models.user import User
 from app.models.match import Match, Message
 from app.models.profile import Profile
+from app.models.user import User
 from app.schemas.message import (
     ChatHistoryResponse,
-    MessageResponse,
-    MatchWithLastMessageResponse,
+    ChatImageUploadResponse,
     MarkAsReadRequest,
-    ChatImageUploadResponse
+    MatchWithLastMessageResponse,
+    MessageResponse,
 )
-from app.websocket.manager import manager
 from app.services.file_storage import file_storage
-from app.core.config import settings
+from app.websocket.manager import manager
 
 router = APIRouter(prefix="/api/messages")
 logger = logging.getLogger(__name__)
@@ -33,7 +34,7 @@ async def get_chat_history(
     before_id: str = Query(None, description="Cursor: 載入比此訊息 ID 更早的訊息"),
     limit: int = Query(50, ge=1, le=100, description="每次載入訊息數"),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     取得配對的聊天記錄 (Cursor-based pagination)
@@ -49,44 +50,30 @@ async def get_chat_history(
             and_(
                 Match.id == match_id,
                 Match.status == "ACTIVE",
-                or_(
-                    Match.user1_id == current_user.id,
-                    Match.user2_id == current_user.id
-                )
+                or_(Match.user1_id == current_user.id, Match.user2_id == current_user.id),
             )
         )
     )
     match = result.scalar_one_or_none()
 
     if not match:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="配對不存在或您無權查看"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="配對不存在或您無權查看")
 
     # 計算總訊息數
     count_result = await db.execute(
         select(func.count(Message.id)).where(
-            and_(
-                Message.match_id == match_id,
-                Message.deleted_at.is_(None)
-            )
+            and_(Message.match_id == match_id, Message.deleted_at.is_(None))
         )
     )
     total = count_result.scalar()
 
     # 構建查詢條件
-    conditions = [
-        Message.match_id == match_id,
-        Message.deleted_at.is_(None)
-    ]
+    conditions = [Message.match_id == match_id, Message.deleted_at.is_(None)]
 
     # 如果有 cursor，添加 before 條件
     if before_id:
         # 先查詢 cursor 訊息的 sent_at
-        cursor_result = await db.execute(
-            select(Message.sent_at).where(Message.id == before_id)
-        )
+        cursor_result = await db.execute(select(Message.sent_at).where(Message.id == before_id))
         cursor_sent_at = cursor_result.scalar_one_or_none()
 
         if cursor_sent_at:
@@ -95,10 +82,7 @@ async def get_chat_history(
             conditions.append(
                 or_(
                     Message.sent_at < cursor_sent_at,
-                    and_(
-                        Message.sent_at == cursor_sent_at,
-                        Message.id < before_id
-                    )
+                    and_(Message.sent_at == cursor_sent_at, Message.id < before_id),
                 )
             )
 
@@ -126,14 +110,13 @@ async def get_chat_history(
         messages=[MessageResponse.model_validate(msg) for msg in messages],
         has_more=has_more,
         next_cursor=next_cursor,
-        total=total
+        total=total,
     )
 
 
-@router.get("/conversations", response_model=List[MatchWithLastMessageResponse])
+@router.get("/conversations", response_model=list[MatchWithLastMessageResponse])
 async def get_conversations(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     """
     取得所有對話列表
@@ -151,10 +134,7 @@ async def get_conversations(
         .where(
             and_(
                 Match.status == "ACTIVE",
-                or_(
-                    Match.user1_id == current_user.id,
-                    Match.user2_id == current_user.id
-                )
+                or_(Match.user1_id == current_user.id, Match.user2_id == current_user.id),
             )
         )
         .order_by(desc(Match.matched_at))
@@ -167,8 +147,7 @@ async def get_conversations(
     # 批次載入：收集所有需要的 ID
     match_ids = [match.id for match in matches]
     other_user_ids = [
-        match.user2_id if match.user1_id == current_user.id else match.user1_id
-        for match in matches
+        match.user2_id if match.user1_id == current_user.id else match.user1_id for match in matches
     ]
 
     # 批次查詢 1：所有對方的個人資料（1 次查詢取代 N 次）
@@ -182,12 +161,7 @@ async def get_conversations(
     # 批次查詢 2：所有訊息（用於找最後一條訊息）
     messages_result = await db.execute(
         select(Message)
-        .where(
-            and_(
-                Message.match_id.in_(match_ids),
-                Message.deleted_at.is_(None)
-            )
-        )
+        .where(and_(Message.match_id.in_(match_ids), Message.deleted_at.is_(None)))
         .order_by(Message.match_id, desc(Message.sent_at))
     )
     all_messages = messages_result.scalars().all()
@@ -200,16 +174,13 @@ async def get_conversations(
 
     # 批次查詢 3：所有未讀訊息數（1 次查詢取代 N 次）
     unread_counts_result = await db.execute(
-        select(
-            Message.match_id,
-            func.count(Message.id).label('count')
-        )
+        select(Message.match_id, func.count(Message.id).label("count"))
         .where(
             and_(
                 Message.match_id.in_(match_ids),
                 Message.sender_id.in_(other_user_ids),
                 Message.is_read.is_(None),
-                Message.deleted_at.is_(None)
+                Message.deleted_at.is_(None),
             )
         )
         .group_by(Message.match_id)
@@ -244,14 +215,13 @@ async def get_conversations(
                 other_user_avatar=other_user_avatar,
                 last_message=MessageResponse.model_validate(last_message) if last_message else None,
                 unread_count=unread_count,
-                matched_at=match.matched_at
+                matched_at=match.matched_at,
             )
         )
 
     # 按最後訊息時間排序 (有訊息的在前)
     conversations.sort(
-        key=lambda x: x.last_message.sent_at if x.last_message else x.matched_at,
-        reverse=True
+        key=lambda x: x.last_message.sent_at if x.last_message else x.matched_at, reverse=True
     )
 
     return conversations
@@ -261,7 +231,7 @@ async def get_conversations(
 async def mark_messages_as_read(
     request: MarkAsReadRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     標記訊息為已讀
@@ -271,12 +241,8 @@ async def mark_messages_as_read(
     """
     # 查詢訊息並驗證權限
     result = await db.execute(
-        select(Message)
-        .where(
-            and_(
-                Message.id.in_(request.message_ids),
-                Message.deleted_at.is_(None)
-            )
+        select(Message).where(
+            and_(Message.id.in_(request.message_ids), Message.deleted_at.is_(None))
         )
     )
     messages = result.scalars().all()
@@ -284,15 +250,11 @@ async def mark_messages_as_read(
     # 獲取這些訊息所屬的配對
     match_ids = list(set([msg.match_id for msg in messages]))
     matches_result = await db.execute(
-        select(Match)
-        .where(
+        select(Match).where(
             and_(
                 Match.id.in_(match_ids),
                 Match.status == "ACTIVE",
-                or_(
-                    Match.user1_id == current_user.id,
-                    Match.user2_id == current_user.id
-                )
+                or_(Match.user1_id == current_user.id, Match.user2_id == current_user.id),
             )
         )
     )
@@ -302,11 +264,14 @@ async def mark_messages_as_read(
     updated_count = 0
 
     for message in messages:
-        # 驗證：訊息必須屬於用戶的配對，且不是自己發送的
-        if message.match_id in user_matches and message.sender_id != current_user.id:
-            if not message.is_read:
-                message.is_read = func.now()
-                updated_count += 1
+        # 驗證：訊息必須屬於用戶的配對，且不是自己發送的，且未讀
+        if (  # noqa: SIM102
+            message.match_id in user_matches
+            and message.sender_id != current_user.id
+            and not message.is_read
+        ):
+            message.is_read = func.now()
+            updated_count += 1
 
     if updated_count > 0:
         await db.commit()
@@ -318,7 +283,7 @@ async def mark_messages_as_read(
 async def mark_all_messages_as_read(
     match_id: str,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     標記該對話中所有未讀訊息為已讀
@@ -331,42 +296,34 @@ async def mark_all_messages_as_read(
     """
     # 驗證用戶屬於該配對
     match_result = await db.execute(
-        select(Match)
-        .where(
+        select(Match).where(
             and_(
                 Match.id == match_id,
                 Match.status == "ACTIVE",
-                or_(
-                    Match.user1_id == current_user.id,
-                    Match.user2_id == current_user.id
-                )
+                or_(Match.user1_id == current_user.id, Match.user2_id == current_user.id),
             )
         )
     )
     match = match_result.scalar_one_or_none()
 
     if not match:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="配對不存在或您無權操作"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="配對不存在或您無權操作")
 
     # 1. 先查詢待標記的訊息（取得 id 和 sender_id，用於發送 WebSocket 通知）
     unread_result = await db.execute(
-        select(Message.id, Message.sender_id)
-        .where(
+        select(Message.id, Message.sender_id).where(
             and_(
                 Message.match_id == match_id,
                 Message.sender_id != current_user.id,  # 對方發送的
                 Message.is_read.is_(None),  # 未讀
-                Message.deleted_at.is_(None)  # 未刪除
+                Message.deleted_at.is_(None),  # 未刪除
             )
         )
     )
     unread_messages = unread_result.all()
 
     # 2. 批量更新所有未讀訊息
-    read_time = datetime.now(timezone.utc)
+    read_time = datetime.now(UTC)
     if unread_messages:
         await db.execute(
             Message.__table__.update()
@@ -375,7 +332,7 @@ async def mark_all_messages_as_read(
                     Message.match_id == match_id,
                     Message.sender_id != current_user.id,
                     Message.is_read.is_(None),
-                    Message.deleted_at.is_(None)
+                    Message.deleted_at.is_(None),
                 )
             )
             .values(is_read=read_time)
@@ -390,8 +347,8 @@ async def mark_all_messages_as_read(
                     "type": "read_receipt",
                     "message_id": str(msg_id),
                     "read_by": str(current_user.id),
-                    "read_at": read_time.isoformat()
-                }
+                    "read_at": read_time.isoformat(),
+                },
             )
 
         logger.info(
@@ -406,7 +363,7 @@ async def mark_all_messages_as_read(
 async def delete_message(
     message_id: str,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     刪除訊息 (軟刪除)
@@ -416,23 +373,15 @@ async def delete_message(
     - 通過 WebSocket 即時通知配對中的另一方
     """
     # 查詢訊息
-    result = await db.execute(
-        select(Message).where(Message.id == message_id)
-    )
+    result = await db.execute(select(Message).where(Message.id == message_id))
     message = result.scalar_one_or_none()
 
     if not message:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="訊息不存在"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="訊息不存在")
 
     # 驗證是否為發送者
     if message.sender_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="您只能刪除自己的訊息"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="您只能刪除自己的訊息")
 
     # 保存 match_id 用於 WebSocket 廣播
     match_id = str(message.match_id)
@@ -445,9 +394,8 @@ async def delete_message(
         await db.rollback()
         logger.error(f"Failed to delete message {message_id}: {e}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="訊息刪除失敗，請稍後再試"
-        )
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="訊息刪除失敗，請稍後再試"
+        ) from None
 
     # 通過 WebSocket 通知配對中的另一方
     await manager.send_to_match(
@@ -456,9 +404,9 @@ async def delete_message(
             "type": "message_deleted",
             "message_id": message_id,
             "match_id": match_id,
-            "deleted_by": str(current_user.id)
+            "deleted_by": str(current_user.id),
         },
-        exclude_user=str(current_user.id)  # 排除刪除者本人
+        exclude_user=str(current_user.id),  # 排除刪除者本人
     )
 
     return None
@@ -469,7 +417,7 @@ async def upload_chat_image(
     match_id: str,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     上傳聊天圖片
@@ -485,27 +433,21 @@ async def upload_chat_image(
             and_(
                 Match.id == match_id,
                 Match.status == "ACTIVE",
-                or_(
-                    Match.user1_id == current_user.id,
-                    Match.user2_id == current_user.id
-                )
+                or_(Match.user1_id == current_user.id, Match.user2_id == current_user.id),
             )
         )
     )
     match = result.scalar_one_or_none()
 
     if not match:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="配對不存在或您無權上傳"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="配對不存在或您無權上傳")
 
     # 驗證 MIME 類型
     content_type = file.content_type
     if content_type not in {"image/jpeg", "image/png", "image/gif", "image/webp"}:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="不支援的圖片格式，僅支援 JPEG, PNG, GIF, WebP"
+            detail="不支援的圖片格式，僅支援 JPEG, PNG, GIF, WebP",
         )
 
     # 讀取檔案內容（流式讀取防止 DoS）
@@ -521,32 +463,33 @@ async def upload_chat_image(
         if len(file_content) > max_size:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail=f"檔案過大，最大允許 {max_size // 1024 // 1024}MB"
+                detail=f"檔案過大，最大允許 {max_size // 1024 // 1024}MB",
             )
 
     if len(file_content) == 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="檔案不能為空"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="檔案不能為空")
 
     # 儲存圖片
     try:
         (
-            image_id, image_url, thumbnail_url, width, height, is_gif
+            image_id,
+            image_url,
+            thumbnail_url,
+            width,
+            height,
+            is_gif,
         ) = await file_storage.save_chat_image(
             match_id=match_id,
             user_id=str(current_user.id),
             file_content=file_content,
             filename=file.filename or "image",
-            content_type=content_type
+            content_type=content_type,
         )
     except Exception as e:
         logger.error(f"Failed to save chat image: {e}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="圖片儲存失敗，請稍後再試"
-        )
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="圖片儲存失敗，請稍後再試"
+        ) from None
 
     return ChatImageUploadResponse(
         image_id=image_id,
@@ -554,5 +497,5 @@ async def upload_chat_image(
         thumbnail_url=thumbnail_url,
         width=width,
         height=height,
-        is_gif=is_gif
+        is_gif=is_gif,
     )

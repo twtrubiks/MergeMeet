@@ -8,15 +8,16 @@
 
 注意：這些測試需要 Redis 服務運行在 localhost:6379
 """
+
+from datetime import UTC, datetime, timedelta
+
 import pytest
-from datetime import datetime, timezone, timedelta
 from httpx import AsyncClient
 
+from app.api.auth import VerificationCodeStore
+from app.services.content_moderation import ContentModerationService
 from app.services.redis_client import get_redis
 from app.services.token_blacklist import TokenBlacklist
-from app.services.content_moderation import ContentModerationService
-from app.api.auth import VerificationCodeStore
-
 
 # 標記所有測試為整合測試
 pytestmark = pytest.mark.integration
@@ -47,7 +48,7 @@ class TestTokenBlacklistRedisIntegration:
             blacklist = TokenBlacklist(redis_client=redis)
 
             token = f"integration_test_token_{datetime.now().timestamp()}"
-            expires_at = datetime.now(timezone.utc) + timedelta(minutes=1)
+            expires_at = datetime.now(UTC) + timedelta(minutes=1)
 
             # 加入黑名單
             await blacklist.add(token, expires_at)
@@ -71,7 +72,7 @@ class TestTokenBlacklistRedisIntegration:
 
             token = f"ttl_test_token_{datetime.now().timestamp()}"
             # 設置 2 秒後過期
-            expires_at = datetime.now(timezone.utc) + timedelta(seconds=2)
+            expires_at = datetime.now(UTC) + timedelta(seconds=2)
 
             await blacklist.add(token, expires_at)
 
@@ -80,6 +81,7 @@ class TestTokenBlacklistRedisIntegration:
 
             # 等待過期
             import asyncio
+
             await asyncio.sleep(3)
 
             # 過期後應該不在黑名單中
@@ -131,7 +133,7 @@ class TestContentModerationRedisIntegration:
             await ContentModerationService.clear_cache()
 
             # 載入敏感詞（會觸發快取）
-            words = await ContentModerationService._load_sensitive_words(test_db)
+            await ContentModerationService._load_sensitive_words(test_db)
 
             # 驗證快取到 Redis
             cached = await redis.get("moderation:words")
@@ -157,11 +159,10 @@ class TestLogoutEndToEnd:
 
             # 註冊並登入
             email = f"e2e_redis_{datetime.now().timestamp()}@test.com"
-            response = await client.post("/api/auth/register", json={
-                "email": email,
-                "password": "Test1234",
-                "date_of_birth": "1995-01-01"
-            })
+            response = await client.post(
+                "/api/auth/register",
+                json={"email": email, "password": "Test1234", "date_of_birth": "1995-01-01"},
+            )
 
             if response.status_code != 201:
                 pytest.skip(f"註冊失敗: {response.json()}")
@@ -172,15 +173,13 @@ class TestLogoutEndToEnd:
 
             # 登出
             response = await client.post(
-                "/api/auth/logout",
-                headers={"Authorization": f"Bearer {token}"}
+                "/api/auth/logout", headers={"Authorization": f"Bearer {token}"}
             )
             assert response.status_code == 200
 
             # 驗證 Token 已失效
             response = await client.get(
-                "/api/profile",
-                headers={"Authorization": f"Bearer {token}"}
+                "/api/profile", headers={"Authorization": f"Bearer {token}"}
             )
             assert response.status_code == 401
 

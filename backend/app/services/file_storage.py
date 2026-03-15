@@ -1,10 +1,11 @@
 """本地檔案儲存服務"""
-import uuid
-import logging
-from pathlib import Path
-from typing import Optional, Tuple
-from PIL import Image
+
 import io
+import logging
+import uuid
+from pathlib import Path
+
+from PIL import Image
 
 from app.core.config import settings
 
@@ -69,9 +70,7 @@ class FileStorageService:
         # 預設使用 jpg
         return "jpg"
 
-    def _process_image(
-        self, file_content: bytes, max_size: Tuple[int, int]
-    ) -> bytes:
+    def _process_image(self, file_content: bytes, max_size: tuple[int, int]) -> bytes:
         """
         處理圖片：調整大小並壓縮
 
@@ -140,7 +139,7 @@ class FileStorageService:
         file_content: bytes,
         filename: str,
         content_type: str,
-    ) -> Tuple[str, str, str]:
+    ) -> tuple[str, str, str]:
         """
         儲存照片及縮圖
 
@@ -240,7 +239,7 @@ class FileStorageService:
             logger.error(f"Failed to delete photo {photo_url}: {e}")
             return False
 
-    def validate_image(self, content_type: str, file_size: int) -> Optional[str]:
+    def validate_image(self, content_type: str, file_size: int) -> str | None:
         """
         驗證圖片
 
@@ -310,7 +309,7 @@ class FileStorageService:
         file_content: bytes,
         filename: str,
         content_type: str,
-    ) -> Tuple[str, str, str, int, int, bool]:
+    ) -> tuple[str, str, str, int, int, bool]:
         """
         儲存聊天圖片及縮圖
 

@@ -1,7 +1,8 @@
 """照片審核功能測試"""
+
 import io
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import pytest
 import pytest_asyncio
@@ -11,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.profile import Photo, Profile
 from app.models.user import User
 from app.services.photo_moderation import PhotoModerationService
-
 
 # ========== Fixtures ==========
 
@@ -26,7 +26,7 @@ async def test_user(test_db: AsyncSession):
         date_of_birth=date(1995, 1, 1),
         is_active=True,
         email_verified=True,
-        trust_score=50
+        trust_score=50,
     )
     test_db.add(user)
     await test_db.commit()
@@ -42,7 +42,7 @@ async def test_profile(test_db: AsyncSession, test_user: User):
         user_id=test_user.id,
         display_name="測試用戶",
         gender="male",
-        bio="這是測試簡介"
+        bio="這是測試簡介",
     )
     test_db.add(profile)
     await test_db.commit()
@@ -61,7 +61,7 @@ async def admin_user(test_db: AsyncSession):
         is_active=True,
         email_verified=True,
         is_admin=True,
-        trust_score=100
+        trust_score=100,
     )
     test_db.add(admin)
     await test_db.commit()
@@ -83,7 +83,7 @@ async def pending_photo(test_db: AsyncSession, test_profile: Profile):
         file_size=102400,
         width=800,
         height=600,
-        mime_type="image/jpeg"
+        mime_type="image/jpeg",
     )
     test_db.add(photo)
     await test_db.commit()
@@ -102,11 +102,11 @@ async def approved_photo(test_db: AsyncSession, test_profile: Profile):
         display_order=1,
         is_profile_picture=False,
         moderation_status="APPROVED",
-        reviewed_at=datetime.now(timezone.utc),
+        reviewed_at=datetime.now(UTC),
         file_size=204800,
         width=1200,
         height=900,
-        mime_type="image/jpeg"
+        mime_type="image/jpeg",
     )
     test_db.add(photo)
     await test_db.commit()
@@ -117,9 +117,9 @@ async def approved_photo(test_db: AsyncSession, test_profile: Profile):
 @pytest.fixture
 def sample_image_bytes():
     """產生測試用 JPEG 圖片"""
-    img = Image.new('RGB', (800, 600), color='blue')
+    img = Image.new("RGB", (800, 600), color="blue")
     buffer = io.BytesIO()
-    img.save(buffer, format='JPEG')
+    img.save(buffer, format="JPEG")
     buffer.seek(0)
     return buffer.read()
 
@@ -131,14 +131,10 @@ def sample_image_bytes():
 class TestPhotoModerationService:
     """PhotoModerationService 測試"""
 
-    async def test_get_pending_photos_success(
-        self, test_db: AsyncSession, pending_photo: Photo
-    ):
+    async def test_get_pending_photos_success(self, test_db: AsyncSession, pending_photo: Photo):
         """測試：成功取得待審核照片列表"""
         photos, total = await PhotoModerationService.get_pending_photos(
-            db=test_db,
-            page=1,
-            page_size=20
+            db=test_db, page=1, page_size=20
         )
 
         assert total >= 1
@@ -148,9 +144,7 @@ class TestPhotoModerationService:
         self, test_db: AsyncSession, approved_photo: Photo
     ):
         """測試：已審核照片不在待審核列表中"""
-        photos, total = await PhotoModerationService.get_pending_photos(
-            db=test_db
-        )
+        photos, total = await PhotoModerationService.get_pending_photos(db=test_db)
 
         # 已審核照片不應出現在待審核列表
         assert not any(p["id"] == str(approved_photo.id) for p in photos)
@@ -160,8 +154,7 @@ class TestPhotoModerationService:
     ):
         """測試：使用狀態篩選"""
         photos, total = await PhotoModerationService.get_pending_photos(
-            db=test_db,
-            status="APPROVED"
+            db=test_db, status="APPROVED"
         )
 
         assert any(p["id"] == str(approved_photo.id) for p in photos)
@@ -171,10 +164,7 @@ class TestPhotoModerationService:
     ):
         """測試：成功批准照片"""
         success, message = await PhotoModerationService.review_photo(
-            db=test_db,
-            photo_id=pending_photo.id,
-            admin_id=admin_user.id,
-            status="APPROVED"
+            db=test_db, photo_id=pending_photo.id, admin_id=admin_user.id, status="APPROVED"
         )
 
         assert success is True
@@ -195,7 +185,7 @@ class TestPhotoModerationService:
             photo_id=pending_photo.id,
             admin_id=admin_user.id,
             status="REJECTED",
-            rejection_reason="包含不當內容"
+            rejection_reason="包含不當內容",
         )
 
         assert success is True
@@ -212,7 +202,7 @@ class TestPhotoModerationService:
             db=test_db,
             photo_id=pending_photo.id,
             admin_id=admin_user.id,
-            status="REJECTED"
+            status="REJECTED",
             # 缺少 rejection_reason
         )
 
@@ -224,25 +214,17 @@ class TestPhotoModerationService:
     ):
         """測試：無效狀態應失敗"""
         success, message = await PhotoModerationService.review_photo(
-            db=test_db,
-            photo_id=pending_photo.id,
-            admin_id=admin_user.id,
-            status="INVALID"
+            db=test_db, photo_id=pending_photo.id, admin_id=admin_user.id, status="INVALID"
         )
 
         assert success is False
         assert "無效" in message
 
-    async def test_review_nonexistent_photo_fails(
-        self, test_db: AsyncSession, admin_user: User
-    ):
+    async def test_review_nonexistent_photo_fails(self, test_db: AsyncSession, admin_user: User):
         """測試：審核不存在的照片應失敗"""
         fake_id = uuid.uuid4()
         success, message = await PhotoModerationService.review_photo(
-            db=test_db,
-            photo_id=fake_id,
-            admin_id=admin_user.id,
-            status="APPROVED"
+            db=test_db, photo_id=fake_id, admin_id=admin_user.id, status="APPROVED"
         )
 
         assert success is False
@@ -260,13 +242,9 @@ class TestPhotoModerationService:
         assert stats["pending_photos"] >= 1
         assert stats["approved_photos"] >= 1
 
-    async def test_get_photo_detail(
-        self, test_db: AsyncSession, pending_photo: Photo
-    ):
+    async def test_get_photo_detail(self, test_db: AsyncSession, pending_photo: Photo):
         """測試：取得照片詳情"""
-        detail = await PhotoModerationService.get_photo_detail(
-            test_db, pending_photo.id
-        )
+        detail = await PhotoModerationService.get_photo_detail(test_db, pending_photo.id)
 
         assert detail is not None
         assert detail["id"] == str(pending_photo.id)
@@ -292,11 +270,7 @@ class TestTrustScoreIntegration:
     """信任分數整合測試"""
 
     async def test_rejected_photo_decreases_trust_score(
-        self,
-        test_db: AsyncSession,
-        pending_photo: Photo,
-        admin_user: User,
-        test_user: User
+        self, test_db: AsyncSession, pending_photo: Photo, admin_user: User, test_user: User
     ):
         """測試：照片被拒絕時扣除信任分數"""
         initial_score = test_user.trust_score
@@ -306,7 +280,7 @@ class TestTrustScoreIntegration:
             photo_id=pending_photo.id,
             admin_id=admin_user.id,
             status="REJECTED",
-            rejection_reason="違規內容"
+            rejection_reason="違規內容",
         )
 
         await test_db.refresh(test_user)
@@ -314,20 +288,13 @@ class TestTrustScoreIntegration:
         assert test_user.trust_score == initial_score - 3
 
     async def test_approved_photo_does_not_change_trust_score(
-        self,
-        test_db: AsyncSession,
-        pending_photo: Photo,
-        admin_user: User,
-        test_user: User
+        self, test_db: AsyncSession, pending_photo: Photo, admin_user: User, test_user: User
     ):
         """測試：照片通過審核不影響信任分數"""
         initial_score = test_user.trust_score
 
         await PhotoModerationService.review_photo(
-            db=test_db,
-            photo_id=pending_photo.id,
-            admin_id=admin_user.id,
-            status="APPROVED"
+            db=test_db, photo_id=pending_photo.id, admin_id=admin_user.id, status="APPROVED"
         )
 
         await test_db.refresh(test_user)
@@ -348,7 +315,7 @@ class TestPhotoModel:
         photo = Photo(
             profile_id=test_profile.id,
             url="/uploads/test.jpg",
-            thumbnail_url="/uploads/test_thumb.jpg"
+            thumbnail_url="/uploads/test_thumb.jpg",
         )
         test_db.add(photo)
         await test_db.commit()
@@ -367,7 +334,7 @@ class TestPhotoModel:
             profile_id=test_profile.id,
             url="/uploads/test.jpg",
             auto_moderation_score=85,
-            auto_moderation_labels='["safe", "portrait"]'
+            auto_moderation_labels='["safe", "portrait"]',
         )
         test_db.add(photo)
         await test_db.commit()

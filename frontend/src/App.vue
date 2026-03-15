@@ -59,7 +59,7 @@ watch(
         profileStore.fetchProfile().catch(() => {
           // Profile 不存在是正常情況（新用戶）
         }),
-        notificationStore.fetchNotifications().catch(err => {
+        notificationStore.fetchNotifications().catch((err) => {
           console.error('Failed to fetch notifications:', err)
         })
       ])
@@ -70,7 +70,7 @@ watch(
       chatStore.$reset()
     }
   },
-  { immediate: true }  // 頁面載入時立即執行，處理刷新情況
+  { immediate: true } // 頁面載入時立即執行，處理刷新情況
 )
 </script>
 
@@ -92,7 +92,7 @@ body {
 
 /* 有導航欄時，主要內容區域需要留出頂部空間 */
 main.with-navbar {
-  padding-top: 56px;  /* NavBar 高度 */
+  padding-top: 56px; /* NavBar 高度 */
 }
 
 /* 尊重用戶的減少動畫偏好設置 (可訪問性) */

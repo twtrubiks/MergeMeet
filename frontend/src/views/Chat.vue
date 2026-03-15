@@ -3,7 +3,7 @@
     <n-spin :show="chatStore.loading">
       <!-- 聊天室頭部 -->
       <div class="chat-header">
-        <n-button text @click="goBack" class="back-button">
+        <n-button text class="back-button" @click="goBack">
           <template #icon>
             <Icon name="back" size="md" label="返回" />
           </template>
@@ -12,8 +12,8 @@
         <div
           v-if="currentConversation"
           class="chat-user-info clickable"
-          @click="openUserDetail"
           title="點擊查看詳情"
+          @click="openUserDetail"
         >
           <n-avatar
             :src="currentConversation.other_user_avatar"
@@ -31,8 +31,8 @@
         <n-dropdown
           v-if="currentConversation"
           :options="moreOptions"
-          @select="handleMoreAction"
           trigger="click"
+          @select="handleMoreAction"
         >
           <n-button text class="more-button">
             <template #icon>
@@ -98,15 +98,15 @@
             minRows: 1,
             maxRows: 4
           }"
+          :disabled="!wsStore.isConnected"
           @keydown.enter.exact="handleSendMessage"
           @input="handleTyping"
-          :disabled="!wsStore.isConnected"
         />
         <n-button
           type="primary"
           :disabled="!messageInput.trim() || !wsStore.isConnected"
-          @click="handleSendMessage"
           class="send-button"
+          @click="handleSendMessage"
         >
           <template #icon>
             <Icon name="send" size="sm" decorative />
@@ -117,9 +117,7 @@
 
       <!-- WebSocket 連接狀態提示（只在初始化完成後顯示，避免初始連接時閃現） -->
       <div v-if="!isInitializing && !wsStore.isConnected" class="connection-warning">
-        <n-alert type="warning" :show-icon="false">
-          連接已斷開，正在重新連接...
-        </n-alert>
+        <n-alert type="warning" :show-icon="false"> 連接已斷開，正在重新連接... </n-alert>
       </div>
     </n-spin>
 
@@ -132,24 +130,28 @@
     />
 
     <!-- 圖片預覽燈箱 -->
-    <ImagePreviewModal
-      v-model:show="showImagePreview"
-      :image-url="previewImageUrl"
-    />
+    <ImagePreviewModal v-model:show="showImagePreview" :image-url="previewImageUrl" />
 
     <!-- 用戶詳情彈窗 -->
-    <UserDetailModal
-      :show="showUserDetail"
-      :user="matchedUser || {}"
-      @close="closeUserDetail"
-    />
+    <UserDetailModal :show="showUserDetail" :user="matchedUser || {}" @close="closeUserDetail" />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NButton, NIcon, NAvatar, NInput, NEmpty, NSpin, NAlert, NDropdown, useMessage, useDialog } from 'naive-ui'
+import {
+  NButton,
+  NIcon,
+  NAvatar,
+  NInput,
+  NEmpty,
+  NSpin,
+  NAlert,
+  NDropdown,
+  useMessage,
+  useDialog
+} from 'naive-ui'
 // 保留 NIcon 和圖標導入用於 h() 渲染 dropdown 選項（n-dropdown API 要求）
 import { BanOutline, AlertCircleOutline } from '@vicons/ionicons5'
 import { useChatStore } from '@/stores/chat'
@@ -246,9 +248,7 @@ const openUserDetail = async () => {
     }
 
     // 從配對列表中找到對應的用戶資料
-    const match = discoveryStore.matches.find(
-      m => m.match_id === matchId.value
-    )
+    const match = discoveryStore.matches.find((m) => m.match_id === matchId.value)
 
     if (match) {
       matchedUser.value = match.matched_user
@@ -357,10 +357,12 @@ const handleWebSocketError = (data) => {
   const errorMessage = data.message || '操作失敗'
 
   // 檢查是否為內容審核相關錯誤
-  if (errorMessage.includes('不當內容') ||
-      errorMessage.includes('已被系統拒絕') ||
-      errorMessage.includes('內容違規') ||
-      errorMessage.includes('審核')) {
+  if (
+    errorMessage.includes('不當內容') ||
+    errorMessage.includes('已被系統拒絕') ||
+    errorMessage.includes('內容違規') ||
+    errorMessage.includes('審核')
+  ) {
     message.warning(errorMessage, { duration: 5000 })
     logger.warn('[Chat.vue] Content moderation error:', errorMessage)
   } else {
@@ -667,7 +669,9 @@ onUnmounted(() => {
 }
 
 @keyframes typing {
-  0%, 60%, 100% {
+  0%,
+  60%,
+  100% {
     transform: translateY(0);
     opacity: 0.7;
   }

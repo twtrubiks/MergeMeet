@@ -1,0 +1,39 @@
+repos:
+  # 通用檢查
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+
+  # 後端 - Ruff linter + formatter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.6
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^backend/
+      - id: ruff-format
+        files: ^backend/
+
+  # 前端 - ESLint + Prettier
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint
+        entry: bash -c 'cd frontend; args=(); for f; do args+=("${f#frontend/}"); done; npx eslint --fix "${args[@]}"' --
+        language: system
+        files: ^frontend/src/.*\.(js|vue)$
+        types: [file]
+
+      - id: prettier
+        name: prettier
+        entry: bash -c 'cd frontend; args=(); for f; do args+=("${f#frontend/}"); done; npx prettier --write "${args[@]}"' --
+        language: system
+        files: ^frontend/src/.*\.(js|vue|css|json)$
+        types: [file]

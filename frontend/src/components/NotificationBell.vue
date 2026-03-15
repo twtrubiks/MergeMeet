@@ -13,8 +13,8 @@
     trigger="click"
     placement="bottom-end"
     :show="showDropdown"
-    @update:show="showDropdown = $event"
     :style="{ maxWidth: '360px' }"
+    @update:show="showDropdown = $event"
   >
     <template #trigger>
       <n-badge
@@ -35,11 +35,11 @@
       <div class="notification-header">
         <span class="header-title">通知</span>
         <n-button
+          v-if="notificationStore.unreadCount > 0"
           text
           size="small"
-          @click="markAllRead"
-          v-if="notificationStore.unreadCount > 0"
           class="mark-all-btn"
+          @click="markAllRead"
         >
           全部已讀
         </n-button>

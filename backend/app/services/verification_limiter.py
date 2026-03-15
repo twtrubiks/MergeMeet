@@ -6,16 +6,18 @@ Redis Key 設計：
 - verify_attempts:{email} - 失敗次數 (integer, TTL: 15分鐘)
 - verify_lockout:{email} - 鎖定標記 (存在即鎖定, TTL: 15分鐘)
 """
-import redis.asyncio as redis
-from dataclasses import dataclass
+
 import logging
+from dataclasses import dataclass
+
+import redis.asyncio as redis
 
 logger = logging.getLogger(__name__)
 
 # 配置常量
-MAX_VERIFY_ATTEMPTS = 5    # 最大嘗試次數
-LOCKOUT_SECONDS = 900      # 鎖定時間（15 分鐘）
-ATTEMPT_WINDOW = 900       # 嘗試計數窗口（15 分鐘）
+MAX_VERIFY_ATTEMPTS = 5  # 最大嘗試次數
+LOCKOUT_SECONDS = 900  # 鎖定時間（15 分鐘）
+ATTEMPT_WINDOW = 900  # 嘗試計數窗口（15 分鐘）
 
 
 @dataclass
@@ -27,6 +29,7 @@ class VerifyAttemptResult:
         remaining_attempts: 剩餘嘗試次數（鎖定時為 0）
         lockout_seconds: 鎖定剩餘秒數（未鎖定時為 0）
     """
+
     is_locked: bool
     remaining_attempts: int
     lockout_seconds: int
@@ -62,9 +65,7 @@ class VerificationLimiter:
         lockout_ttl = await self._redis.ttl(lockout_key)
         if lockout_ttl > 0:
             return VerifyAttemptResult(
-                is_locked=True,
-                remaining_attempts=0,
-                lockout_seconds=lockout_ttl
+                is_locked=True, remaining_attempts=0, lockout_seconds=lockout_ttl
             )
 
         # 獲取當前嘗試次數
@@ -72,11 +73,7 @@ class VerificationLimiter:
         current_attempts = int(attempts) if attempts else 0
         remaining = max(0, MAX_VERIFY_ATTEMPTS - current_attempts)
 
-        return VerifyAttemptResult(
-            is_locked=False,
-            remaining_attempts=remaining,
-            lockout_seconds=0
-        )
+        return VerifyAttemptResult(is_locked=False, remaining_attempts=remaining, lockout_seconds=0)
 
     async def record_failure(self, email: str) -> VerifyAttemptResult:
         """記錄驗證失敗
@@ -97,7 +94,9 @@ class VerificationLimiter:
         if new_count == 1:
             await self._redis.expire(attempts_key, ATTEMPT_WINDOW)
 
-        logger.info(f"Verification failure recorded for {email}, attempt {new_count}/{MAX_VERIFY_ATTEMPTS}")
+        logger.info(
+            f"Verification failure recorded for {email}, attempt {new_count}/{MAX_VERIFY_ATTEMPTS}"
+        )
 
         # 達到上限，觸發鎖定
         if new_count >= MAX_VERIFY_ATTEMPTS:
@@ -107,15 +106,11 @@ class VerificationLimiter:
             logger.warning(f"Verification locked for {email} due to {new_count} failed attempts")
 
             return VerifyAttemptResult(
-                is_locked=True,
-                remaining_attempts=0,
-                lockout_seconds=LOCKOUT_SECONDS
+                is_locked=True, remaining_attempts=0, lockout_seconds=LOCKOUT_SECONDS
             )
 
         return VerifyAttemptResult(
-            is_locked=False,
-            remaining_attempts=MAX_VERIFY_ATTEMPTS - new_count,
-            lockout_seconds=0
+            is_locked=False, remaining_attempts=MAX_VERIFY_ATTEMPTS - new_count, lockout_seconds=0
         )
 
     async def clear_attempts(self, email: str) -> None:

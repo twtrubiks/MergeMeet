@@ -12,7 +12,7 @@
       <!-- 錯誤訊息 -->
       <div v-else-if="safetyStore.error" class="error-message">
         <p><Icon name="close" size="sm" decorative /> {{ safetyStore.error }}</p>
-        <button @click="loadBlockedUsers" class="btn-retry">重試</button>
+        <button class="btn-retry" @click="loadBlockedUsers">重試</button>
       </div>
 
       <!-- 空狀態 -->
@@ -37,9 +37,7 @@
               <div class="blocked-icon"><Icon name="shield" size="md" decorative /></div>
               <div class="blocked-details">
                 <h3 class="blocked-email">{{ blockedUser.blocked_user_email }}</h3>
-                <p class="blocked-date">
-                  封鎖於 {{ formatDate(blockedUser.created_at) }}
-                </p>
+                <p class="blocked-date">封鎖於 {{ formatDate(blockedUser.created_at) }}</p>
               </div>
             </div>
 
@@ -51,9 +49,9 @@
 
           <div class="blocked-actions">
             <button
-              @click="showUnblockConfirm(blockedUser)"
               class="btn-unblock"
               :disabled="isUnblocking"
+              @click="showUnblockConfirm(blockedUser)"
             >
               {{ isUnblocking === blockedUser.blocked_user_id ? '處理中...' : '解除封鎖' }}
             </button>
@@ -69,14 +67,10 @@
           <div class="modal-content">
             <div class="modal-icon">❓</div>
             <h2 class="modal-title">確定要解除封鎖？</h2>
-            <p class="modal-subtitle">
-              解除封鎖後，此用戶可能會再次出現在您的探索頁面中。
-            </p>
+            <p class="modal-subtitle">解除封鎖後，此用戶可能會再次出現在您的探索頁面中。</p>
             <div class="modal-actions">
-              <button @click="cancelUnblock" class="btn-cancel">
-                取消
-              </button>
-              <button @click="confirmUnblock" class="btn-confirm" :disabled="!!isUnblocking">
+              <button class="btn-cancel" @click="cancelUnblock">取消</button>
+              <button class="btn-confirm" :disabled="!!isUnblocking" @click="confirmUnblock">
                 {{ isUnblocking ? '處理中...' : '確定解除' }}
               </button>
             </div>
@@ -163,7 +157,7 @@ onMounted(() => {
 <style scoped>
 .blocked {
   min-height: 100vh;
-  background: linear-gradient(135deg, #FFF5F5 0%, #FFE5E5 100%);
+  background: linear-gradient(135deg, #fff5f5 0%, #ffe5e5 100%);
   padding: 20px;
 }
 
@@ -191,14 +185,18 @@ onMounted(() => {
   height: 50px;
   margin: 0 auto 20px;
   border: 4px solid #f3f3f3;
-  border-top: 4px solid #FF6B6B;
+  border-top: 4px solid #ff6b6b;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* 錯誤訊息 */
@@ -215,7 +213,7 @@ onMounted(() => {
 
 .btn-retry {
   padding: 12px 30px;
-  background: #FF6B6B;
+  background: #ff6b6b;
   color: white;
   border: none;
   border-radius: 25px;
@@ -226,7 +224,7 @@ onMounted(() => {
 }
 
 .btn-retry:hover {
-  background: #FF5252;
+  background: #ff5252;
   transform: translateY(-2px);
 }
 
@@ -256,7 +254,7 @@ onMounted(() => {
 .btn-discover {
   display: inline-block;
   padding: 14px 30px;
-  background: linear-gradient(135deg, #FF6B6B, #FF8E53);
+  background: linear-gradient(135deg, #ff6b6b, #ff8e53);
   color: white;
   text-decoration: none;
   border-radius: 25px;
@@ -327,7 +325,7 @@ onMounted(() => {
   padding: 12px;
   background: #f5f5f5;
   border-radius: 8px;
-  border-left: 4px solid #FF6B6B;
+  border-left: 4px solid #ff6b6b;
 }
 
 .reason-label {
@@ -350,7 +348,7 @@ onMounted(() => {
 
 .btn-unblock {
   padding: 10px 24px;
-  background: #4CAF50;
+  background: #4caf50;
   color: white;
   border: none;
   border-radius: 8px;
@@ -458,7 +456,7 @@ onMounted(() => {
 }
 
 .btn-confirm {
-  background: #4CAF50;
+  background: #4caf50;
   color: white;
 }
 
@@ -472,11 +470,13 @@ onMounted(() => {
 }
 
 /* Modal 過渡效果 */
-.modal-enter-active, .modal-leave-active {
+.modal-enter-active,
+.modal-leave-active {
   transition: opacity 0.3s ease;
 }
 
-.modal-enter-from, .modal-leave-to {
+.modal-enter-from,
+.modal-leave-to {
   opacity: 0;
 }
 

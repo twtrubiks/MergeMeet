@@ -1,16 +1,19 @@
 """個人檔案相關資料模型"""
-from sqlalchemy import Column, String, Text, Integer, Boolean, ForeignKey, DateTime, Table
-from sqlalchemy.dialects.postgresql import UUID
-from geoalchemy2 import Geography
-from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
+
 import uuid
+
+from geoalchemy2 import Geography
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table, Text
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 from app.core.database import Base
 
 
 class Profile(Base):
     """個人檔案模型"""
+
     __tablename__ = "profiles"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -19,7 +22,7 @@ class Profile(Base):
         ForeignKey("users.id", ondelete="CASCADE"),
         unique=True,
         nullable=False,
-        index=True
+        index=True,
     )
 
     # 基本資訊
@@ -28,7 +31,7 @@ class Profile(Base):
     bio = Column(Text)
 
     # 地理位置 (PostGIS)
-    location = Column(Geography(geometry_type='POINT', srid=4326))
+    location = Column(Geography(geometry_type="POINT", srid=4326))
     location_name = Column(String(255))
 
     # 搜尋偏好
@@ -52,12 +55,10 @@ class Profile(Base):
         "Photo",
         back_populates="profile",
         cascade="all, delete-orphan",
-        order_by="Photo.display_order"
+        order_by="Photo.display_order",
     )
     interests = relationship(
-        "InterestTag",
-        secondary="profile_interests",
-        back_populates="profiles"
+        "InterestTag", secondary="profile_interests", back_populates="profiles"
     )
 
     def __repr__(self):
@@ -66,6 +67,7 @@ class Profile(Base):
 
 class Photo(Base):
     """照片模型"""
+
     __tablename__ = "photos"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -73,7 +75,7 @@ class Photo(Base):
         UUID(as_uuid=True),
         ForeignKey("profiles.id", ondelete="CASCADE"),
         nullable=False,
-        index=True
+        index=True,
     )
 
     url = Column(String(500), nullable=False)
@@ -89,16 +91,11 @@ class Photo(Base):
 
     # 審核相關欄位
     moderation_status = Column(
-        String(20),
-        default="PENDING",
-        nullable=False,
-        index=True
+        String(20), default="PENDING", nullable=False, index=True
     )  # PENDING, APPROVED, REJECTED
     rejection_reason = Column(Text, nullable=True)
     reviewed_by = Column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
 
@@ -118,6 +115,7 @@ class Photo(Base):
 
 class InterestTag(Base):
     """興趣標籤模型"""
+
     __tablename__ = "interest_tags"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -130,11 +128,7 @@ class InterestTag(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 關聯
-    profiles = relationship(
-        "Profile",
-        secondary="profile_interests",
-        back_populates="interests"
-    )
+    profiles = relationship("Profile", secondary="profile_interests", back_populates="interests")
 
     def __repr__(self):
         return f"<InterestTag {self.name}>"
@@ -142,19 +136,19 @@ class InterestTag(Base):
 
 # 多對多關聯表：Profile <-> InterestTag
 profile_interests = Table(
-    'profile_interests',
+    "profile_interests",
     Base.metadata,
     Column(
-        'profile_id',
+        "profile_id",
         UUID(as_uuid=True),
-        ForeignKey('profiles.id', ondelete="CASCADE"),
-        primary_key=True
+        ForeignKey("profiles.id", ondelete="CASCADE"),
+        primary_key=True,
     ),
     Column(
-        'interest_id',
+        "interest_id",
         UUID(as_uuid=True),
-        ForeignKey('interest_tags.id', ondelete="CASCADE"),
-        primary_key=True
+        ForeignKey("interest_tags.id", ondelete="CASCADE"),
+        primary_key=True,
     ),
-    Column('created_at', DateTime(timezone=True), server_default=func.now())
+    Column("created_at", DateTime(timezone=True), server_default=func.now()),
 )

@@ -86,6 +86,10 @@ source venv/bin/activate
 # 安裝依賴
 pip install -r requirements.txt
 pip install -r requirements-test.txt
+pip install -r requirements-dev.txt   # 開發工具（Ruff, pre-commit）
+
+# 安裝 Git pre-commit hooks（首次設置）
+pre-commit install
 
 # 複製環境變數（已預設開發環境密碼 mergemeet123）
 cp .env.example .env
@@ -167,6 +171,27 @@ mergemeet/
 | Mailpit | http://localhost:8025 | Email 測試工具（查看驗證碼、密碼重置連結等） |
 
 **pgAdmin（資料庫管理）**：預設未啟用，需在 `docker-compose.yml` 中取消 pgadmin 服務的註解後執行 `docker compose up -d`
+
+### 程式碼品質工具
+
+commit 時會透過 pre-commit 自動執行以下檢查：
+
+| 工具 | 範圍 | 功能 |
+|------|------|------|
+| [Ruff](https://docs.astral.sh/ruff/) | 後端 | Python linter + formatter（取代 flake8/black/isort） |
+| [ESLint](https://eslint.org/) | 前端 | Vue/JS 程式碼品質檢查 |
+| [Prettier](https://prettier.io/) | 前端 | 程式碼格式化 |
+
+```bash
+# 手動執行全部檢查
+pre-commit run --all-files
+
+# 單獨執行
+ruff check backend/             # 後端 lint
+ruff format backend/             # 後端 format
+cd frontend && npx eslint src/   # 前端 lint
+cd frontend && npx prettier --write src/  # 前端 format
+```
 
 ## 🤖 AI 輔助開發
 
