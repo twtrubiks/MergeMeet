@@ -302,14 +302,14 @@ const waitForExitAnimation = () => {
     if (!card) return resolve()
 
     const cleanup = () => {
-      card.removeEventListener('transitionend', onEnd)
+      card.removeEventListener('animationend', onEnd)
       clearTimeout(timer)
       resolve()
     }
     const onEnd = () => cleanup()
-    card.addEventListener('transitionend', onEnd)
-    // 安全逾時：避免 transitionend 未觸發時卡住
-    const timer = setTimeout(cleanup, 350)
+    card.addEventListener('animationend', onEnd, { once: true })
+    // 安全逾時：與動畫時長 0.35s 匹配，加上緩衝
+    const timer = setTimeout(cleanup, 400)
   })
 }
 
@@ -589,8 +589,7 @@ onUnmounted(() => {
   overflow: hidden;
   transition:
     transform 0.3s ease,
-    opacity 0.3s ease,
-    box-shadow 0.3s ease;
+    opacity 0.3s ease;
   border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
@@ -608,27 +607,42 @@ onUnmounted(() => {
 
 .top-card {
   z-index: 10;
+  will-change: transform, opacity;
 }
 
 .top-card:hover {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
 }
 
-/* 卡片退場動畫 */
+/* 卡片退場動畫 — 使用 @keyframes 取代 transition，更流暢 */
 .candidate-card.exit-right {
-  transform: translateX(1000px) rotate(20deg);
-  opacity: 0;
-  transition:
-    transform 0.3s ease-out,
-    opacity 0.3s ease-out;
+  animation: exit-right 0.35s var(--easing-default) forwards;
 }
 
 .candidate-card.exit-left {
-  transform: translateX(-1000px) rotate(-20deg);
-  opacity: 0;
-  transition:
-    transform 0.3s ease-out,
-    opacity 0.3s ease-out;
+  animation: exit-left 0.35s var(--easing-default) forwards;
+}
+
+@keyframes exit-right {
+  0% {
+    transform: translateX(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(120%) rotate(15deg);
+    opacity: 0;
+  }
+}
+
+@keyframes exit-left {
+  0% {
+    transform: translateX(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-120%) rotate(-15deg);
+    opacity: 0;
+  }
 }
 
 /* 卡片圖片 */
@@ -928,6 +942,18 @@ onUnmounted(() => {
 
   .btn-icon {
     font-size: 32px;
+  }
+}
+
+/* 功能性動畫：卡片退場與晉升需要視覺回饋，在減少動態偏好下保留但用更柔和的效果 */
+@media (prefers-reduced-motion: reduce) {
+  .candidate-card.exit-right,
+  .candidate-card.exit-left {
+    animation-duration: 0.3s !important;
+  }
+
+  .candidate-card {
+    transition-duration: 0.25s !important;
   }
 }
 </style>
