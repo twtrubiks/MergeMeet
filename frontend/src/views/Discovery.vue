@@ -33,7 +33,7 @@
       </div>
 
       <!-- 卡片堆疊區域 -->
-      <div v-else class="cards-container">
+      <div v-else class="cards-container" role="application" :aria-label="currentCandidateAria">
         <!-- 候選人卡片 -->
         <div
           v-for="(candidate, index) in visibleCandidates"
@@ -41,6 +41,8 @@
           class="candidate-card"
           :class="{ 'top-card': index === 0 }"
           :style="index === 0 ? cardStyle : {}"
+          @mousedown="index === 0 ? handlePointerDown($event) : null"
+          @touchstart="index === 0 ? handlePointerDown($event) : null"
         >
           <!-- 照片 -->
           <div class="card-image">
@@ -122,6 +124,20 @@
         </div>
       </div>
 
+      <!-- 螢幕閱讀器播報區域 -->
+      <div aria-live="polite" class="sr-only" role="status">
+        {{ srAnnouncement }}
+      </div>
+
+      <!-- 鍵盤操作提示 -->
+      <div v-if="discoveryStore.hasCandidates" class="keyboard-hint" aria-hidden="true">
+        <span class="hint-key">←</span> 跳過
+        <span class="hint-separator">|</span>
+        <span class="hint-key">→</span> 喜歡
+        <span class="hint-separator">|</span>
+        <span class="hint-key">Enter</span> 查看詳情
+      </div>
+
       <!-- 操作按鈕 -->
       <div
         v-if="discoveryStore.hasCandidates"
@@ -174,7 +190,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import { useDiscoveryStore } from '@/stores/discovery'
 import Icon from '@/components/ui/Icon.vue'
@@ -191,6 +207,9 @@ const discoveryStore = useDiscoveryStore()
 
 // 預設頭像（圖片加載失敗時使用）
 const defaultAvatar = '/default-avatar.svg'
+
+// 螢幕閱讀器播報文字
+const srAnnouncement = ref('')
 
 // 卡片拖拽狀態
 const dragStartX = ref(0)
@@ -254,6 +273,56 @@ const formatDistance = (km) => {
     return `${km.toFixed(1)}km`
   } else {
     return `${Math.round(km)}km`
+  }
+}
+
+// 當前候選人的 aria-label
+const currentCandidateAria = computed(() => {
+  const c = discoveryStore.currentCandidate
+  if (!c) return '沒有候選人'
+  const parts = [`候選人：${c.display_name}，${c.age}歲`]
+  if (c.distance_km) parts.push(`距離${formatDistance(c.distance_km)}`)
+  if (c.match_score) parts.push(`配對分數${c.match_score}%`)
+  parts.push('按左方向鍵跳過，右方向鍵喜歡，Enter查看詳情')
+  return parts.join('，')
+})
+
+/**
+ * 播報螢幕閱讀器訊息
+ */
+const announce = (text) => {
+  // 先清空再設值，確保相同文字也能重新播報
+  srAnnouncement.value = ''
+  nextTick(() => {
+    srAnnouncement.value = text
+  })
+}
+
+/**
+ * 鍵盤事件處理
+ */
+const handleKeydown = (event) => {
+  // 在輸入框內不攔截方向鍵
+  const tag = event.target.tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || event.target.isContentEditable) return
+
+  if (isAnimating.value || !discoveryStore.currentCandidate) return
+
+  switch (event.key) {
+    case 'ArrowLeft':
+      event.preventDefault()
+      handlePass()
+      if (isAnimating.value) announce('已跳過')
+      break
+    case 'ArrowRight':
+      event.preventDefault()
+      handleLike()
+      if (isAnimating.value) announce('已喜歡')
+      break
+    case 'Enter':
+      event.preventDefault()
+      openUserDetail(discoveryStore.currentCandidate)
+      break
   }
 }
 
@@ -443,13 +512,14 @@ const handlePointerUp = () => {
 }
 
 // 綁定全域事件監聽器
-onMounted(() => {
-  loadCandidates()
-
+onMounted(async () => {
   document.addEventListener('mousemove', handlePointerMove)
   document.addEventListener('mouseup', handlePointerUp)
   document.addEventListener('touchmove', handlePointerMove)
   document.addEventListener('touchend', handlePointerUp)
+  document.addEventListener('keydown', handleKeydown)
+
+  await loadCandidates()
 })
 
 onUnmounted(() => {
@@ -457,6 +527,7 @@ onUnmounted(() => {
   document.removeEventListener('mouseup', handlePointerUp)
   document.removeEventListener('touchmove', handlePointerMove)
   document.removeEventListener('touchend', handlePointerUp)
+  document.removeEventListener('keydown', handleKeydown)
 })
 </script>
 
@@ -592,6 +663,31 @@ onUnmounted(() => {
 .btn-refresh:hover {
   background: var(--color-like-hover);
   transform: translateY(-2px);
+}
+
+/* 鍵盤操作提示 */
+.keyboard-hint {
+  text-align: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.hint-key {
+  display: inline-block;
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid #ccc;
+  border-radius: var(--radius-sm);
+  font-family: monospace;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.hint-separator {
+  margin: 0 var(--space-2);
+  color: #ccc;
 }
 
 /* 卡片容器 */
