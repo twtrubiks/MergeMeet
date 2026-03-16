@@ -73,7 +73,12 @@ export const useDiscoveryStore = defineStore('discovery', () => {
 
       return result
     } catch (err) {
-      error.value = err.response?.data?.detail || '操作失敗'
+      const detail = err.response?.data?.detail
+      if (err.response?.status === 429 && typeof detail === 'object') {
+        error.value = detail.message || '今日喜歡次數已達上限'
+      } else {
+        error.value = typeof detail === 'string' ? detail : '操作失敗'
+      }
       throw err
     } finally {
       loading.value = false

@@ -3,6 +3,7 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
 from io import BytesIO
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
@@ -10,6 +11,7 @@ from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.discovery import FREE_DAILY_LIKE_LIMIT
 from app.models.match import Pass
 from app.models.profile import InterestTag
 from app.models.user import User
@@ -631,3 +633,144 @@ async def test_unmatch(client: AsyncClient, completed_profiles: dict):
     matches = response.json()
     bob_matches = [m for m in matches if m["matched_user"]["display_name"] == "Bob"]
     assert len(bob_matches) == 0
+
+
+# ==================== 每日喜歡次數限制測試 ====================
+
+
+def _make_mock_redis(initial_count: int = 0):
+    """建立支援 incr/decr/expire 的 Mock Redis（原子性 INCR-then-check 模式）"""
+    _storage: dict[str, int] = {}
+    mock_conn = AsyncMock()
+
+    async def mock_incr(key: str):
+        _storage[key] = _storage.get(key, initial_count) + 1
+        return _storage[key]
+
+    async def mock_decr(key: str):
+        _storage[key] = _storage.get(key, 0) - 1
+        return _storage[key]
+
+    async def mock_expire(key: str, ttl: int):
+        return True
+
+    mock_conn.incr = AsyncMock(side_effect=mock_incr)
+    mock_conn.decr = AsyncMock(side_effect=mock_decr)
+    mock_conn.expire = AsyncMock(side_effect=mock_expire)
+    return mock_conn
+
+
+@pytest.mark.asyncio
+async def test_like_within_daily_limit(client: AsyncClient, completed_profiles: dict):
+    """測試：每日限制內正常 like 成功"""
+    response = await client.get(
+        "/api/discovery/browse?limit=1",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+    )
+    candidates = response.json()
+
+    if len(candidates) == 0:
+        pytest.skip("沒有可配對的候選人")
+
+    bob_user_id = candidates[0]["user_id"]
+
+    # 初始計數為 0，INCR 後變 1，未超限
+    mock_conn = _make_mock_redis(initial_count=0)
+
+    with patch("app.api.discovery.redis_client.get_connection", return_value=mock_conn):
+        response = await client.post(
+            f"/api/discovery/like/{bob_user_id}",
+            headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["liked"] is True
+
+
+@pytest.mark.asyncio
+async def test_like_exceeds_daily_limit(client: AsyncClient, completed_profiles: dict):
+    """測試：超過每日限制回傳 429"""
+    response = await client.get(
+        "/api/discovery/browse?limit=1",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+    )
+    candidates = response.json()
+
+    if len(candidates) == 0:
+        pytest.skip("沒有可配對的候選人")
+
+    bob_user_id = candidates[0]["user_id"]
+
+    # 初始計數為 50，INCR 後變 51 > 50，觸發限制並 DECR 回滾
+    mock_conn = _make_mock_redis(initial_count=FREE_DAILY_LIKE_LIMIT)
+
+    with patch("app.api.discovery.redis_client.get_connection", return_value=mock_conn):
+        response = await client.post(
+            f"/api/discovery/like/{bob_user_id}",
+            headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+        )
+
+    assert response.status_code == 429
+    data = response.json()["detail"]
+    assert data["message"] == "今日喜歡次數已達上限"
+    assert data["daily_limit"] == FREE_DAILY_LIKE_LIMIT
+    assert data["remaining"] == 0
+    assert "reset_at" in data
+
+
+@pytest.mark.asyncio
+async def test_like_limit_resets_next_day(client: AsyncClient, completed_profiles: dict):
+    """測試：跨天後計數歸零（新 key），可再次 like"""
+    response = await client.get(
+        "/api/discovery/browse?limit=1",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+    )
+    candidates = response.json()
+
+    if len(candidates) == 0:
+        pytest.skip("沒有可配對的候選人")
+
+    bob_user_id = candidates[0]["user_id"]
+
+    # 初始計數為 0（模擬跨天後新 key），INCR 後變 1，未超限
+    mock_conn = _make_mock_redis(initial_count=0)
+
+    with patch("app.api.discovery.redis_client.get_connection", return_value=mock_conn):
+        response = await client.post(
+            f"/api/discovery/like/{bob_user_id}",
+            headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["liked"] is True
+
+
+@pytest.mark.asyncio
+async def test_like_redis_unavailable_fallback(client: AsyncClient, completed_profiles: dict):
+    """測試：Redis 不可用時放行，不阻斷核心功能"""
+    response = await client.get(
+        "/api/discovery/browse?limit=1",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+    )
+    candidates = response.json()
+
+    if len(candidates) == 0:
+        pytest.skip("沒有可配對的候選人")
+
+    bob_user_id = candidates[0]["user_id"]
+
+    # Mock Redis 連線拋出 RedisError
+    import redis.asyncio as aioredis
+
+    mock_conn = AsyncMock()
+    mock_conn.incr = AsyncMock(side_effect=aioredis.RedisError("Connection refused"))
+
+    with patch("app.api.discovery.redis_client.get_connection", return_value=mock_conn):
+        response = await client.post(
+            f"/api/discovery/like/{bob_user_id}",
+            headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+        )
+
+    # Redis 掛掉時應放行，不阻斷 like
+    assert response.status_code == 200
+    assert response.json()["liked"] is True

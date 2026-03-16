@@ -190,6 +190,12 @@ MergeMeet 支援兩種認證方式，優先使用 HttpOnly Cookie 提供更高�
 3. **低信任用戶訊息限制**
    - 見「信任分數系統」章節
 
+4. **每日喜歡次數限制**
+   - 使用 Redis 追蹤每日喜歡次數（`like:daily:{user_id}:{date}`，TTL 24h）
+   - 免費用戶 50 次/日，超限回傳 429 Too Many Requests
+   - Redis 不可用時放行（不阻斷核心功能）
+   - 文件: `backend/app/api/discovery.py`
+
 ---
 
 ## 信任分數系統

@@ -30,6 +30,7 @@ import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 
+import redis.asyncio as redis
 from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from geoalchemy2.functions import ST_DWithin
@@ -52,12 +53,16 @@ from app.schemas.discovery import (
     UnmatchResponse,
 )
 from app.services.matching_service import matching_service
+from app.services.redis_client import redis_client
 from app.services.trust_score import TrustScoreService
 
 logger = logging.getLogger(__name__)
 
 # 配對分數最低門檻（低於此分數的用戶不會出現在探索列表）
 MIN_MATCH_SCORE = 15.0
+
+# 每日喜歡次數限制
+FREE_DAILY_LIKE_LIMIT = 50
 
 router = APIRouter(prefix="/api/discovery", tags=["discovery"])
 
@@ -542,6 +547,31 @@ async def _send_like_notifications(
         logger.info(f"Sent notification_liked to user {target_user_id}")
 
 
+async def _check_and_increment_daily_like(user_id: uuid.UUID) -> tuple[bool, int]:
+    """原子性檢查並增加每日喜歡計數
+
+    使用 INCR-then-check 避免 GET+INCR 的 TOCTOU 競態條件。
+
+    Returns:
+        (allowed, count): 是否允許喜歡，以及當前計數。
+        Redis 不可用時回傳 (True, -1) 放行。
+    """
+    try:
+        conn = await redis_client.get_connection()
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
+        key = f"like:daily:{user_id}:{today}"
+        new_count = await conn.incr(key)
+        if new_count == 1:
+            await conn.expire(key, 86400)
+        if new_count > FREE_DAILY_LIKE_LIMIT:
+            await conn.decr(key)
+            return False, new_count - 1
+        return True, new_count
+    except (ConnectionError, redis.RedisError):
+        logger.warning(f"Redis unavailable, skipping daily like limit for user {user_id}")
+        return True, -1
+
+
 @router.post("/like/{user_id}", response_model=LikeResponse)
 async def like_user(
     user_id: uuid.UUID,
@@ -551,12 +581,29 @@ async def like_user(
     """喜歡用戶 - 協調器
 
     流程：
+    0. 檢查每日喜歡次數限制
     1. 驗證請求（不能喜歡自己、已喜歡、對方存在）
     2. 創建 Like 記錄
     3. 檢查互相喜歡並創建配對
     4. 提交事務
     5. 發送通知
     """
+    # 0. 檢查每日喜歡次數限制（原子性 INCR-then-check）
+    allowed, _count = await _check_and_increment_daily_like(current_user.id)
+    if not allowed:
+        tomorrow = (datetime.now(UTC) + timedelta(days=1)).replace(
+            hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "message": "今日喜歡次數已達上限",
+                "daily_limit": FREE_DAILY_LIKE_LIMIT,
+                "remaining": 0,
+                "reset_at": tomorrow.isoformat(),
+            },
+        )
+
     # 1. 驗證請求
     is_valid, status_code, error, _ = await _validate_like_request(user_id, current_user, db)
     if not is_valid:
