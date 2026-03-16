@@ -219,7 +219,7 @@ const handleLogin = async () => {
   position: absolute;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.1);
-  animation: float 20s infinite ease-in-out;
+  animation: float 60s infinite ease-in-out;
 }
 
 .circle-1 {
@@ -249,13 +249,10 @@ const handleLogin = async () => {
 @keyframes float {
   0%,
   100% {
-    transform: translate(0, 0) scale(1);
+    transform: translate(0, 0);
   }
-  33% {
-    transform: translate(30px, -30px) scale(1.1);
-  }
-  66% {
-    transform: translate(-20px, 20px) scale(0.9);
+  50% {
+    transform: translate(10px, -10px);
   }
 }
 
@@ -347,7 +344,7 @@ const handleLogin = async () => {
 }
 
 .auth-header p {
-  color: #555;
+  color: var(--color-text-secondary);
   font-size: 1rem;
   font-weight: 500;
 }
@@ -424,7 +421,7 @@ const handleLogin = async () => {
 }
 
 .auth-footer p {
-  color: #555;
+  color: var(--color-text-secondary);
   font-size: 0.95rem;
 }
 

@@ -765,7 +765,7 @@ onMounted(async () => {
 <style scoped>
 .profile-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-primary-gradient);
   padding: 20px;
 }
 
@@ -781,7 +781,7 @@ onMounted(async () => {
   gap: 8px;
   padding: 10px 20px;
   background: rgba(255, 255, 255, 0.95);
-  color: #667eea;
+  color: var(--color-primary-500);
   text-decoration: none;
   border-radius: 25px;
   font-weight: 600;
@@ -794,7 +794,7 @@ onMounted(async () => {
 .back-home-btn:hover {
   background: white;
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 6px 20px var(--color-primary-alpha-30);
 }
 
 .back-home-btn .btn-icon {
@@ -867,14 +867,14 @@ onMounted(async () => {
   font-size: 2.5rem;
   margin-bottom: 1rem;
   font-weight: 800;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: var(--color-primary-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .subtitle {
-  color: #666;
+  color: var(--color-text-muted);
   font-size: 1.2rem;
   margin-bottom: 2rem;
   font-weight: 500;
@@ -886,7 +886,7 @@ onMounted(async () => {
   justify-content: space-between;
   margin-bottom: 2rem;
   padding-bottom: 2rem;
-  border-bottom: 2px solid #f0f0f0;
+  border-bottom: 2px solid var(--color-border-light);
   position: relative;
 }
 
@@ -897,7 +897,7 @@ onMounted(async () => {
   left: 20%;
   right: 20%;
   height: 2px;
-  background: #e0e0e0;
+  background: var(--color-border);
   z-index: 0;
 }
 
@@ -921,7 +921,7 @@ onMounted(async () => {
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  background: #e0e0e0;
+  background: var(--color-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -933,20 +933,20 @@ onMounted(async () => {
 }
 
 .step.active .step-number {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-primary-gradient);
   color: white;
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 6px 20px rgba(225, 29, 72, 0.4);
   transform: scale(1.1);
 }
 
 .step-label {
   font-size: 0.95rem;
-  color: #666;
+  color: var(--color-text-muted);
   font-weight: 600;
 }
 
 .step.active .step-label {
-  color: #667eea;
+  color: var(--color-primary-500);
 }
 
 /* 表單 */
@@ -958,7 +958,7 @@ onMounted(async () => {
   display: block;
   font-weight: 700;
   margin-bottom: 0.75rem;
-  color: #333;
+  color: var(--color-text-primary);
   font-size: 0.95rem;
 }
 
@@ -967,7 +967,7 @@ onMounted(async () => {
 .form-group textarea {
   width: 100%;
   padding: 14px 16px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--color-border);
   border-radius: 12px;
   font-size: 1rem;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -978,8 +978,8 @@ onMounted(async () => {
 .form-group select:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px var(--color-primary-alpha-10);
   transform: translateY(-2px);
 }
 
@@ -1024,7 +1024,7 @@ onMounted(async () => {
 
 .btn-auto-location {
   padding: 12px 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-primary-gradient);
   color: white;
   border: none;
   border-radius: 12px;
@@ -1032,12 +1032,12 @@ onMounted(async () => {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 15px var(--color-primary-alpha-30);
 }
 
 .btn-auto-location:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 6px 20px rgba(225, 29, 72, 0.4);
 }
 
 .btn-auto-location:active:not(:disabled) {
@@ -1052,7 +1052,7 @@ onMounted(async () => {
 .location-select {
   width: 100%;
   padding: 12px 16px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--color-border);
   border-radius: 12px;
   font-size: 15px;
   transition: all 0.3s ease;
@@ -1062,8 +1062,8 @@ onMounted(async () => {
 
 .location-select:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px var(--color-primary-alpha-10);
 }
 
 .location-select option {
@@ -1072,7 +1072,7 @@ onMounted(async () => {
 
 .location-select optgroup {
   font-weight: 600;
-  color: #667eea;
+  color: var(--color-primary-500);
 }
 
 /* 按鈕 */
@@ -1114,7 +1114,7 @@ onMounted(async () => {
   gap: 2rem;
   margin-bottom: 2rem;
   padding-bottom: 2rem;
-  border-bottom: 2px solid #f0f0f0;
+  border-bottom: 2px solid var(--color-border-light);
   position: relative;
 }
 
@@ -1134,7 +1134,7 @@ onMounted(async () => {
 }
 
 .avatar-placeholder {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-primary-gradient);
   color: white;
   display: flex;
   align-items: center;
@@ -1151,7 +1151,7 @@ onMounted(async () => {
   margin: 0 0 0.75rem 0;
   font-size: 2rem;
   font-weight: 800;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: var(--color-primary-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -1160,7 +1160,7 @@ onMounted(async () => {
 .profile-age,
 .profile-location {
   margin: 0.5rem 0;
-  color: #666;
+  color: var(--color-text-muted);
   font-size: 1.05rem;
   font-weight: 500;
 }
@@ -1185,11 +1185,11 @@ onMounted(async () => {
   margin-bottom: 1.25rem;
   font-size: 1.3rem;
   font-weight: 800;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .bio {
-  color: #666;
+  color: var(--color-text-muted);
   line-height: 1.8;
   font-size: 1.05rem;
   font-weight: 400;
@@ -1231,13 +1231,13 @@ onMounted(async () => {
   position: absolute;
   top: 10px;
   right: 10px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: var(--color-primary-gradient);
   color: white;
   padding: 6px 12px;
   border-radius: 8px;
   font-size: 0.75rem;
   font-weight: 700;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 2px 8px rgba(225, 29, 72, 0.4);
 }
 
 /* 興趣標籤 */
@@ -1249,18 +1249,18 @@ onMounted(async () => {
 
 .interest-tag {
   padding: 10px 18px;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
-  border: 1px solid rgba(102, 126, 234, 0.3);
+  background: linear-gradient(135deg, var(--color-primary-alpha-10), var(--color-primary-alpha-10));
+  border: 1px solid var(--color-primary-alpha-30);
   border-radius: 20px;
   font-size: 0.95rem;
-  color: #667eea;
+  color: var(--color-primary-500);
   font-weight: 600;
   transition: all 0.2s ease;
 }
 
 .interest-tag:hover {
   transform: scale(1.05);
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.15));
+  background: linear-gradient(135deg, rgba(225, 29, 72, 0.15), rgba(225, 29, 72, 0.15));
 }
 
 /* 偏好設定 */
@@ -1274,25 +1274,25 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   padding: 12px 16px;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
+  background: linear-gradient(135deg, rgba(225, 29, 72, 0.05), rgba(225, 29, 72, 0.05));
   border-radius: 12px;
-  border: 1px solid rgba(102, 126, 234, 0.15);
+  border: 1px solid rgba(225, 29, 72, 0.15);
   transition: all 0.2s ease;
 }
 
 .pref-item:hover {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.08));
+  background: linear-gradient(135deg, rgba(225, 29, 72, 0.08), rgba(225, 29, 72, 0.08));
   transform: translateX(4px);
 }
 
 .pref-label {
   font-weight: 700;
-  color: #666;
+  color: var(--color-text-muted);
   font-size: 0.95rem;
 }
 
 .pref-value {
-  color: #333;
+  color: var(--color-text-primary);
   font-weight: 600;
   font-size: 0.95rem;
 }
@@ -1330,7 +1330,7 @@ onMounted(async () => {
 
 .badge-inactive {
   background: rgba(0, 0, 0, 0.05);
-  color: #666;
+  color: var(--color-text-muted);
   border: 2px solid rgba(0, 0, 0, 0.1);
 }
 

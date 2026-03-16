@@ -618,7 +618,7 @@ onUnmounted(() => {
   display: inline-block;
   font-size: 4rem;
   animation: pulse 2s infinite;
-  filter: drop-shadow(0 4px 8px rgba(102, 126, 234, 0.3));
+  filter: drop-shadow(0 4px 8px var(--color-primary-alpha-30));
 }
 
 @keyframes pulse {

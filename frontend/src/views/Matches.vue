@@ -509,14 +509,14 @@ onUnmounted(() => {
 
 .empty-state h2 {
   font-size: 2rem;
-  color: #333;
+  color: var(--color-text-primary);
   margin-bottom: 16px;
   font-weight: 700;
 }
 
 .empty-state p {
   font-size: 1.1rem;
-  color: #666;
+  color: var(--color-text-muted);
   margin-bottom: 32px;
   max-width: 400px;
   margin-left: auto;
@@ -632,7 +632,7 @@ onUnmounted(() => {
   position: relative;
   padding: 4px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #f5f5f5, #e0e0e0);
+  background: linear-gradient(135deg, var(--color-background-light), var(--color-border));
   transition: all 0.3s ease;
 }
 
@@ -704,7 +704,7 @@ onUnmounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: var(--color-primary-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -745,9 +745,9 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   padding: 6px 14px;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
-  color: #667eea;
-  border: 1px solid rgba(102, 126, 234, 0.3);
+  background: linear-gradient(135deg, var(--color-primary-alpha-10), var(--color-primary-alpha-10));
+  color: var(--color-primary-500);
+  border: 1px solid var(--color-primary-alpha-30);
   border-radius: 16px;
   font-size: 0.8rem;
   font-weight: 600;
@@ -756,7 +756,7 @@ onUnmounted(() => {
 
 .interest-tag:hover {
   transform: scale(1.05);
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.15));
+  background: linear-gradient(135deg, rgba(225, 29, 72, 0.15), rgba(225, 29, 72, 0.15));
 }
 
 .interest-more {
@@ -905,7 +905,7 @@ onUnmounted(() => {
 .modal-title {
   font-size: 1.8rem;
   font-weight: 800;
-  background: linear-gradient(135deg, #333, #666);
+  background: linear-gradient(135deg, var(--color-text-primary), var(--color-text-muted));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -914,7 +914,7 @@ onUnmounted(() => {
 
 .modal-subtitle {
   font-size: 1.05rem;
-  color: #666;
+  color: var(--color-text-muted);
   line-height: 1.6;
   margin: 0 0 32px;
   font-weight: 500;

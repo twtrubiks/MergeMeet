@@ -137,7 +137,7 @@ const goToLogin = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-primary-gradient);
   padding: 20px;
   overflow: hidden;
 }
@@ -237,7 +237,7 @@ const goToLogin = () => {
   display: inline-block;
   font-size: 4rem;
   animation: pulse 2s infinite;
-  filter: drop-shadow(0 4px 8px rgba(102, 126, 234, 0.3));
+  filter: drop-shadow(0 4px 8px var(--color-primary-alpha-30));
 }
 
 @keyframes pulse {
@@ -253,7 +253,7 @@ const goToLogin = () => {
 .auth-header h1 {
   font-size: 2.2rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-primary-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -261,7 +261,7 @@ const goToLogin = () => {
 }
 
 .auth-header p {
-  color: #555;
+  color: var(--color-text-secondary);
   font-size: 1rem;
   font-weight: 500;
 }
@@ -311,13 +311,13 @@ const goToLogin = () => {
 }
 
 .success-text {
-  color: #555;
+  color: var(--color-text-secondary);
   margin-bottom: 8px;
   font-size: 1rem;
 }
 
 .email-display {
-  color: #667eea;
+  color: var(--color-primary-500);
   font-weight: 600;
   font-size: 1.1rem;
   margin-bottom: 16px;
@@ -325,7 +325,7 @@ const goToLogin = () => {
 }
 
 .hint-text {
-  color: #666;
+  color: var(--color-text-muted);
   font-size: 0.9rem;
   font-weight: 500;
   line-height: 1.6;
@@ -344,12 +344,12 @@ const goToLogin = () => {
 }
 
 .auth-footer p {
-  color: #555;
+  color: var(--color-text-secondary);
   font-size: 0.95rem;
 }
 
 .login-link {
-  color: #667eea;
+  color: var(--color-primary-500);
   text-decoration: none;
   font-weight: 600;
   transition: all 0.3s ease;
@@ -359,7 +359,7 @@ const goToLogin = () => {
 }
 
 .login-link:hover {
-  color: #764ba2;
+  color: var(--color-primary-700);
   gap: 8px;
 }
 

@@ -187,7 +187,7 @@ onMounted(async () => {
   gap: 8px;
   padding: 10px 20px;
   background: rgba(255, 255, 255, 0.95);
-  color: #667eea;
+  color: var(--color-primary-500);
   text-decoration: none;
   border-radius: 25px;
   font-weight: 600;
@@ -200,7 +200,7 @@ onMounted(async () => {
 .back-home-btn:hover {
   background: white;
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 6px 20px var(--color-primary-alpha-30);
 }
 
 .page-header {
@@ -209,7 +209,7 @@ onMounted(async () => {
   align-items: center;
   padding: 20px;
   background: white;
-  border-bottom: 2px solid #f0f0f0;
+  border-bottom: 2px solid var(--color-border-light);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   gap: 16px;
   position: sticky;
@@ -221,7 +221,7 @@ onMounted(async () => {
   font-size: 1.75rem;
   font-weight: 800;
   margin: 0;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: var(--color-primary-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -274,7 +274,7 @@ onMounted(async () => {
   display: inline-block;
   font-size: 6rem;
   animation: float 3s ease-in-out infinite;
-  filter: drop-shadow(0 8px 16px rgba(102, 126, 234, 0.3));
+  filter: drop-shadow(0 8px 16px var(--color-primary-alpha-30));
 }
 
 @keyframes float {
@@ -290,13 +290,13 @@ onMounted(async () => {
 .empty-state h2 {
   font-size: 2rem;
   font-weight: 800;
-  color: #333;
+  color: var(--color-text-primary);
   margin: 0 0 16px;
 }
 
 .empty-state p {
   font-size: 1.1rem;
-  color: #666;
+  color: var(--color-text-muted);
   margin: 0 0 32px;
   font-weight: 500;
 }
@@ -314,7 +314,7 @@ onMounted(async () => {
   padding: 18px 24px;
   gap: 16px;
   cursor: pointer;
-  border-bottom: 2px solid #f0f0f0;
+  border-bottom: 2px solid var(--color-border-light);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
@@ -327,7 +327,7 @@ onMounted(async () => {
   top: 0;
   width: 4px;
   height: 100%;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: var(--color-primary-gradient);
   transform: scaleY(0);
   transition: transform 0.3s ease;
 }
@@ -337,13 +337,13 @@ onMounted(async () => {
 }
 
 .conversation-item:hover {
-  background: linear-gradient(90deg, rgba(102, 126, 234, 0.05), transparent);
+  background: linear-gradient(90deg, rgba(225, 29, 72, 0.05), transparent);
   transform: translateX(4px);
 }
 
 .conversation-item:active {
   transform: translateX(2px);
-  background: linear-gradient(90deg, rgba(102, 126, 234, 0.08), transparent);
+  background: linear-gradient(90deg, rgba(225, 29, 72, 0.08), transparent);
 }
 
 .avatar-badge {
@@ -368,7 +368,7 @@ onMounted(async () => {
 .user-name {
   font-size: 1.05rem;
   font-weight: 700;
-  color: #333;
+  color: var(--color-text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -389,7 +389,7 @@ onMounted(async () => {
 
 .last-message {
   font-size: 0.95rem;
-  color: #666;
+  color: var(--color-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -397,9 +397,9 @@ onMounted(async () => {
 }
 
 .last-message.unread {
-  color: #333;
+  color: var(--color-text-primary);
   font-weight: 700;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: var(--color-primary-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -414,12 +414,12 @@ onMounted(async () => {
 
 .arrow-icon {
   flex-shrink: 0;
-  color: #ccc;
+  color: var(--color-border);
   transition: all 0.3s ease;
 }
 
 .conversation-item:hover .arrow-icon {
-  color: #667eea;
+  color: var(--color-primary-500);
   transform: translateX(4px);
 }
 

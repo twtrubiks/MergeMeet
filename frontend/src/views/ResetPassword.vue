@@ -246,7 +246,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-primary-gradient);
   padding: 20px;
   overflow: hidden;
 }
@@ -346,7 +346,7 @@ onMounted(() => {
   display: inline-block;
   font-size: 4rem;
   animation: pulse 2s infinite;
-  filter: drop-shadow(0 4px 8px rgba(102, 126, 234, 0.3));
+  filter: drop-shadow(0 4px 8px var(--color-primary-alpha-30));
 }
 
 @keyframes pulse {
@@ -362,7 +362,7 @@ onMounted(() => {
 .auth-header h1 {
   font-size: 2.2rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-primary-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -370,7 +370,7 @@ onMounted(() => {
 }
 
 .auth-header p {
-  color: #666;
+  color: var(--color-text-muted);
   font-size: 1rem;
 }
 
@@ -384,7 +384,7 @@ onMounted(() => {
   width: 48px;
   height: 48px;
   border: 4px solid #f0f0f0;
-  border-top-color: #667eea;
+  border-top-color: var(--color-primary-500);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 20px;
@@ -397,7 +397,7 @@ onMounted(() => {
 }
 
 .loading-state p {
-  color: #666;
+  color: var(--color-text-muted);
   font-size: 1rem;
 }
 
@@ -434,7 +434,7 @@ onMounted(() => {
 }
 
 .error-text {
-  color: #666;
+  color: var(--color-text-muted);
   margin-bottom: 24px;
   line-height: 1.6;
 }
@@ -469,7 +469,7 @@ onMounted(() => {
 }
 
 .success-text {
-  color: #666;
+  color: var(--color-text-muted);
   margin-bottom: 24px;
   font-size: 1.1rem;
 }
@@ -486,14 +486,14 @@ onMounted(() => {
 }
 
 .user-info {
-  color: #666;
+  color: var(--color-text-muted);
   text-align: center;
   margin-bottom: 16px;
   font-size: 0.95rem;
 }
 
 .user-info strong {
-  color: #667eea;
+  color: var(--color-primary-500);
 }
 
 /* 密碼強度指示器 */
@@ -548,19 +548,19 @@ onMounted(() => {
 }
 
 .auth-footer p {
-  color: #666;
+  color: var(--color-text-muted);
   font-size: 0.95rem;
 }
 
 .login-link {
-  color: #667eea;
+  color: var(--color-primary-500);
   text-decoration: none;
   font-weight: 600;
   transition: all 0.3s ease;
 }
 
 .login-link:hover {
-  color: #764ba2;
+  color: var(--color-primary-700);
 }
 
 /* 響應式設計 */

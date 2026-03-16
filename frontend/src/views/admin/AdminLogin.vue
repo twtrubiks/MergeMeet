@@ -108,7 +108,7 @@ const handleLogin = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-primary-gradient);
   padding: 20px;
 }
 
@@ -129,12 +129,12 @@ const handleLogin = async () => {
 .login-header h1 {
   font-size: 28px;
   font-weight: 700;
-  color: #333;
+  color: var(--color-text-primary);
   margin-bottom: 8px;
 }
 
 .login-header p {
   font-size: 16px;
-  color: #666;
+  color: var(--color-text-muted);
 }
 </style>

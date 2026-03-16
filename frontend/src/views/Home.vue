@@ -10,7 +10,7 @@
           </div>
         </div>
         <h1>歡迎使用 MergeMeet</h1>
-        <p class="subtitle">現代化交友平台 - 完整功能版本</p>
+        <p class="subtitle">遇見對的人，從這裡開始</p>
       </div>
 
       <!-- 認證狀態卡片 -->
@@ -184,40 +184,48 @@ const handleLogout = () => {
   margin-bottom: 24px;
 }
 
+/* 品牌視覺簽名：雙心交疊 */
 .logo-hearts {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  height: 64px;
 }
 
 .heart-icon {
   color: white;
-  filter: drop-shadow(0 8px 16px var(--color-like-alpha-40));
-  animation: heartBeat 2s ease-in-out infinite;
+  filter: drop-shadow(0 4px 12px var(--color-like-alpha-40));
 }
 
 .heart-left {
-  transform: rotate(-15deg);
+  transform: rotate(-12deg) translateX(6px);
+  animation: gentle-beat 3s ease-in-out infinite;
 }
 
 .heart-right {
-  transform: rotate(15deg);
+  transform: rotate(12deg) translateX(-6px);
+  animation: gentle-beat 3s 0.3s ease-in-out infinite;
 }
 
-@keyframes heartBeat {
+@keyframes gentle-beat {
   0%,
   100% {
-    transform: scale(1);
+    transform: rotate(var(--rotate, -12deg)) translateX(var(--tx, 6px)) scale(1);
   }
-  10%,
-  30% {
-    transform: scale(1.15);
+  50% {
+    transform: rotate(var(--rotate, -12deg)) translateX(var(--tx, 6px)) scale(1.08);
   }
-  20%,
-  40% {
-    transform: scale(0.95);
-  }
+}
+
+.heart-left {
+  --rotate: -12deg;
+  --tx: 6px;
+}
+
+.heart-right {
+  --rotate: 12deg;
+  --tx: -6px;
 }
 
 h1 {

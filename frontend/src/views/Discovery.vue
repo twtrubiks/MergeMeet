@@ -15,7 +15,7 @@
         class="loading"
         aria-busy="true"
       >
-        <HeartLoader text="尋找你的真命天子..." />
+        <HeartLoader text="正在為你探索附近的人..." />
       </div>
 
       <!-- 錯誤訊息 -->
