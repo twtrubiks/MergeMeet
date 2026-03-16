@@ -31,7 +31,7 @@ class User(Base):
     # 信任機制（已實現：TrustScoreService）
     # 功能：
     # - 提高分數：Email 驗證 +5、被喜歡 +1、配對成功 +2
-    # - 降低分數：被舉報 -5、舉報確認 -10、違規內容 -3、被封鎖 -2
+    # - 降低分數：舉報確認 -10、違規內容 -3、被封鎖 -2
     # - 影響：低分用戶在探索中排序靠後（配對算法 5 分權重）
     # - 限制：< 20 分用戶每日訊息上限 20 則
     trust_score = Column(Integer, default=50, server_default="50", nullable=False)

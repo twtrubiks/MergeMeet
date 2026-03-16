@@ -96,16 +96,6 @@ class TestTrustScoreAdjustments:
         assert new_score == initial_score + 2
         assert test_user.trust_score == initial_score + 2
 
-    async def test_reported_decreases_score(self, test_db: AsyncSession, test_user: User):
-        """測試：被舉報減少 5 分"""
-        initial_score = test_user.trust_score
-
-        new_score = await TrustScoreService.adjust_score(test_db, test_user.id, "reported")
-
-        await test_db.refresh(test_user)
-        assert new_score == initial_score - 5
-        assert test_user.trust_score == initial_score - 5
-
     async def test_report_confirmed_decreases_score(self, test_db: AsyncSession, test_user: User):
         """測試：舉報確認減少 10 分"""
         initial_score = test_user.trust_score
@@ -163,8 +153,8 @@ class TestScoreBoundaries:
         test_user.trust_score = 3
         await test_db.commit()
 
-        # 嘗試減少 5 分（reported）
-        new_score = await TrustScoreService.adjust_score(test_db, test_user.id, "reported")
+        # 嘗試減少 10 分（report_confirmed）
+        new_score = await TrustScoreService.adjust_score(test_db, test_user.id, "report_confirmed")
 
         await test_db.refresh(test_user)
         assert new_score == TrustScoreService.MIN_SCORE
@@ -299,11 +289,11 @@ class TestMultipleAdjustments:
         initial_score = test_user.trust_score
 
         # 連續負向行為
-        await TrustScoreService.adjust_score(test_db, test_user.id, "reported")
+        await TrustScoreService.adjust_score(test_db, test_user.id, "report_confirmed")
         await TrustScoreService.adjust_score(test_db, test_user.id, "blocked")
 
         await test_db.refresh(test_user)
-        expected_score = initial_score - 5 - 2
+        expected_score = initial_score - 10 - 2
         assert test_user.trust_score == expected_score
 
     async def test_mixed_adjustments(self, test_db: AsyncSession, test_user: User):
@@ -313,10 +303,10 @@ class TestMultipleAdjustments:
         # 正向
         await TrustScoreService.adjust_score(test_db, test_user.id, "received_like")
         # 負向
-        await TrustScoreService.adjust_score(test_db, test_user.id, "reported")
+        await TrustScoreService.adjust_score(test_db, test_user.id, "report_confirmed")
 
         await test_db.refresh(test_user)
-        expected_score = initial_score + 1 - 5
+        expected_score = initial_score + 1 - 10
         assert test_user.trust_score == expected_score
 
 

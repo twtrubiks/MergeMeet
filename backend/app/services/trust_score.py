@@ -46,8 +46,7 @@ class TrustScoreService:
         "received_like": +1,
         "match_created": +2,
         "positive_interaction": +1,  # 預留：未來正常互動使用
-        # 負向行為
-        "reported": -5,
+        # 負向行為（舉報需管理員確認後才扣分）
         "report_confirmed": -10,
         "content_violation": -3,
         "blocked": -2,

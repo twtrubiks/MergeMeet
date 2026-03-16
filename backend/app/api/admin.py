@@ -200,25 +200,29 @@ async def review_report(
     report.reviewed_at = func.now()
     report.reviewed_by = current_admin.id
 
-    # 根據處理結果採取行動
-    if request.action:
-        # 取得被舉報用戶
+    # 取得被舉報用戶（action 或 APPROVED 都需要）
+    reported_user = None
+    if request.action or request.status == "APPROVED":
         user_result = await db.execute(select(User).where(User.id == report.reported_user_id))
-        user = user_result.scalar_one_or_none()
+        reported_user = user_result.scalar_one_or_none()
 
-        if user:
-            if request.action == "BAN_USER":
-                user.is_active = False
-                user.ban_reason = f"舉報: {report.reason}"
-            elif request.action == "WARNING":
-                user.warning_count += 1
+    # 根據處理結果採取行動
+    if request.action and reported_user:
+        if request.action == "BAN_USER":
+            reported_user.is_active = False
+            reported_user.ban_reason = f"舉報: {report.reason}"
+        elif request.action == "WARNING":
+            reported_user.warning_count += 1
+
+    # 舉報被確認時（APPROVED），扣分 -10 並增加警告次數（避免與 action=WARNING 重複累加）
+    if request.status == "APPROVED" and reported_user and request.action != "WARNING":
+        reported_user.warning_count += 1
 
     await db.commit()
 
-    # 舉報被確認時（APPROVED），額外扣分 -10
     if request.status == "APPROVED":
         await TrustScoreService.adjust_score(db, report.reported_user_id, "report_confirmed")
-        logger.info(f"Trust score -10 for user {report.reported_user_id} (report_confirmed)")
+        logger.info("Trust score -10 for user %s (report_confirmed)", report.reported_user_id)
 
     return {
         "success": True,

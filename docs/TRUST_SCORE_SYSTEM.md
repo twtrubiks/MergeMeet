@@ -44,7 +44,6 @@
 
 | 行為 | 分數變化 | 觸發條件 | 實作位置 |
 |------|----------|----------|----------|
-| 被舉報 | **-5** | 其他用戶舉報你 | `safety.py` report_user |
 | 舉報被確認 | **-10** | 管理員確認舉報成立 | `admin.py` review_report |
 | 發送違規內容 | **-3** | 訊息包含敏感詞/可疑模式 | `websocket.py` handle_chat_message |
 | 被封鎖 | **-2** | 其他用戶封鎖你 | `safety.py` block_user |
@@ -82,8 +81,8 @@ class TrustScoreService:
 # Email 驗證加分
 await TrustScoreService.adjust_score(db, user.id, "email_verified")
 
-# 被舉報扣分
-await TrustScoreService.adjust_score(db, reported_user_id, "reported")
+# 舉報確認扣分（管理員審核通過後才執行）
+await TrustScoreService.adjust_score(db, reported_user_id, "report_confirmed")
 
 # 檢查訊息限制
 can_send, remaining = await TrustScoreService.check_message_rate_limit(
@@ -226,8 +225,7 @@ pytest tests/test_safety.py::test_report_user_success -v
 正常用戶
 ├─ 初始分數: 50
 ├─ 發送違規內容: -3 → 47
-├─ 被舉報 2 次: -10 → 37
-├─ 舉報被確認: -10 → 27
+├─ 舉報確認 2 次: -20 → 27
 └─ 最終分數: 27（需關注）
 ```
 
@@ -236,10 +234,9 @@ pytest tests/test_safety.py::test_report_user_success -v
 ```
 問題用戶
 ├─ 初始分數: 50
-├─ 被舉報 3 次: -15 → 35
-├─ 舉報確認 2 次: -20 → 15
-├─ 被封鎖 3 次: -6 → 9
-└─ 最終分數: 9（受限模式）
+├─ 舉報確認 3 次: -30 → 20
+├─ 被封鎖 3 次: -6 → 14
+└─ 最終分數: 14（受限模式）
     ├─ 配對排序極低
     ├─ 每日訊息上限 20 則
     └─ 建議管理員審查

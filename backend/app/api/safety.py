@@ -200,6 +200,20 @@ async def report_user(
             detail=f"無效的舉報類型。有效類型：{', '.join(valid_types)}",
         )
 
+    # 重複舉報檢查：同一舉報者對同一用戶不可有 PENDING 或 UNDER_REVIEW 的舉報
+    existing_report = await db.execute(
+        select(Report).where(
+            Report.reporter_id == current_user.id,
+            Report.reported_user_id == reported_user_uuid,
+            Report.status.in_(["PENDING", "UNDER_REVIEW"]),
+        )
+    )
+    if existing_report.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="您已對該用戶提交過舉報，目前正在處理中",
+        )
+
     # 創建舉報記錄（使用統一的 UUID 對象）
     new_report = Report(
         reporter_id=current_user.id,
@@ -211,15 +225,8 @@ async def report_user(
     )
     db.add(new_report)
 
-    # 更新被舉報用戶的警告次數
-    reported_user.warning_count += 1
-
     await db.commit()
     await db.refresh(new_report)
-
-    # 信任分數減分：被舉報者 -5 分
-    await TrustScoreService.adjust_score(db, reported_user_uuid, "reported")
-    logger.info(f"Trust score -5 for user {reported_user_uuid} (reported)")
 
     return ReportResponse(
         id=str(new_report.id),

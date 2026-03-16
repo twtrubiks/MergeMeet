@@ -372,20 +372,21 @@ async def test_get_my_reports(
 
 
 @pytest.mark.asyncio
-async def test_report_increases_warning_count(
+async def test_report_does_not_change_score_or_warning(
     client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession
 ):
-    """測試：舉報會增加被舉報用戶的警告次數"""
+    """測試：提交舉報不會立即扣分或增加警告次數（需管理員確認後才執行）"""
 
-    # 取得 Bob 的初始警告次數
+    # 取得 Bob 的初始狀態
     result = await test_db.execute(
         select(User).where(User.email == test_users_for_safety["bob"]["email"])
     )
     bob = result.scalar_one()
     initial_warning_count = bob.warning_count
+    initial_trust_score = bob.trust_score
 
     # Alice 舉報 Bob
-    await client.post(
+    response = await client.post(
         "/api/safety/report",
         headers={"Authorization": f"Bearer {test_users_for_safety['alice']['token']}"},
         json={
@@ -394,7 +395,45 @@ async def test_report_increases_warning_count(
             "reason": "不當行為讓我感到不舒服",
         },
     )
+    assert response.status_code == 201
 
-    # 刷新並檢查警告次數
+    # 刷新並檢查：分數和警告次數都不應改變
     await test_db.refresh(bob)
-    assert bob.warning_count == initial_warning_count + 1
+    assert bob.warning_count == initial_warning_count
+    assert bob.trust_score == initial_trust_score
+
+
+@pytest.mark.asyncio
+async def test_duplicate_report_rejected(
+    client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession
+):
+    """測試：對同一用戶重複提交舉報（PENDING 狀態）應被拒絕"""
+
+    # 取得 Bob
+    result = await test_db.execute(
+        select(User).where(User.email == test_users_for_safety["bob"]["email"])
+    )
+    bob = result.scalar_one()
+
+    report_data = {
+        "reported_user_id": str(bob.id),
+        "report_type": "HARASSMENT",
+        "reason": "騷擾行為讓我感到不舒服的體驗",
+    }
+
+    # 第一次舉報應成功
+    response1 = await client.post(
+        "/api/safety/report",
+        headers={"Authorization": f"Bearer {test_users_for_safety['alice']['token']}"},
+        json=report_data,
+    )
+    assert response1.status_code == 201
+
+    # 第二次舉報同一人應被拒絕
+    response2 = await client.post(
+        "/api/safety/report",
+        headers={"Authorization": f"Bearer {test_users_for_safety['alice']['token']}"},
+        json=report_data,
+    )
+    assert response2.status_code == 400
+    assert "已對該用戶提交過舉報" in response2.json()["detail"]
