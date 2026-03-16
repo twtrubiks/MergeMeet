@@ -26,7 +26,7 @@ from app.middleware.last_active import (  # noqa: E402
 )
 from app.services.content_moderation import ContentModerationService  # noqa: E402
 from app.services.photo_moderation import PhotoModerationService  # noqa: E402
-from app.services.redis_client import get_redis  # noqa: E402
+from app.services.redis_client import INTEREST_TAGS_CACHE_KEY, get_redis  # noqa: E402
 from app.services.token_blacklist import token_blacklist  # noqa: E402
 from app.services.token_invalidator import TokenInvalidator  # noqa: E402
 
@@ -111,6 +111,10 @@ async def client(test_db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
         redis_conn = await get_redis()
         await token_blacklist.set_redis(redis_conn)
         TokenInvalidator.set_redis(redis_conn)
+        # 清除興趣標籤快取，避免真實 Redis 快取干擾測試
+        keys = [key async for key in redis_conn.scan_iter(match=f"{INTEREST_TAGS_CACHE_KEY}*")]
+        if keys:
+            await redis_conn.delete(*keys)
     except Exception:
         pass  # Redis 不可用時回退到內存模式
 

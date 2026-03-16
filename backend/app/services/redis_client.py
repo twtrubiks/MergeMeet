@@ -52,6 +52,9 @@ class RedisClient:
 # 全局單例
 redis_client = RedisClient()
 
+# 快取 Key 常數
+INTEREST_TAGS_CACHE_KEY = "cache:interest_tags"
+
 
 async def get_redis() -> redis.Redis:
     """依賴注入用的 Redis 連線獲取函數"""

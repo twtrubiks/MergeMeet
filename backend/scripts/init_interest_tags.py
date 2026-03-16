@@ -7,6 +7,7 @@ from pathlib import Path
 # 添加項目根目錄到 Python 路徑
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import redis.asyncio as aioredis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
@@ -104,6 +105,20 @@ async def init_tags():
 
         await session.commit()
         print(f"✅ 成功添加 {len(DEFAULT_INTEREST_TAGS)} 個興趣標籤")
+
+    # 清除 Redis 興趣標籤快取
+    r = None
+    try:
+        r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        keys = [key async for key in r.scan_iter(match="cache:interest_tags*")]
+        if keys:
+            await r.delete(*keys)
+        print("🗑️  已清除興趣標籤 Redis 快取")
+    except (aioredis.RedisError, ConnectionError):
+        print("⚠️  Redis 快取清除失敗（Redis 可能未啟動）")
+    finally:
+        if r:
+            await r.aclose()
 
     await engine.dispose()
 

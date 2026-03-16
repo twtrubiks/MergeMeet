@@ -32,7 +32,7 @@ from app.schemas.profile import (
 )
 from app.services.content_moderation import ContentModerationService
 from app.services.file_storage import file_storage
-from app.services.redis_client import get_redis
+from app.services.redis_client import INTEREST_TAGS_CACHE_KEY, get_redis
 
 router = APIRouter(prefix="/api/profile")
 logger = logging.getLogger(__name__)
@@ -829,8 +829,8 @@ async def set_profile_picture(
     )
 
 
-INTEREST_TAGS_CACHE_KEY = "cache:interest_tags"
-INTEREST_TAGS_CACHE_TTL = 86400  # 24 小時
+INTEREST_TAGS_CACHE_TTL = 86400  # 24 小時（Redis）
+INTEREST_TAGS_BROWSER_MAX_AGE = 600  # 10 分鐘（瀏覽器）
 
 
 @router.get("/interest-tags", response_model=list[InterestTagResponse])
@@ -841,7 +841,7 @@ async def get_interest_tags(
     redis_conn: aioredis.Redis = Depends(get_redis),
 ):
     """取得所有興趣標籤"""
-    response.headers["Cache-Control"] = f"public, max-age={INTEREST_TAGS_CACHE_TTL}"
+    response.headers["Cache-Control"] = f"public, max-age={INTEREST_TAGS_BROWSER_MAX_AGE}"
 
     # 嘗試從 Redis 讀取快取
     cache_key = f"{INTEREST_TAGS_CACHE_KEY}:{category}" if category else INTEREST_TAGS_CACHE_KEY
