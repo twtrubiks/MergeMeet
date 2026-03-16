@@ -1,12 +1,14 @@
 """個人檔案相關 API"""
 
 import io
+import json
 import logging
 import uuid
 from datetime import date
 
+import redis.asyncio as aioredis
 from dateutil.relativedelta import relativedelta
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 from geoalchemy2.functions import ST_MakePoint, ST_SetSRID
 from PIL import Image
 from sqlalchemy import select
@@ -30,6 +32,7 @@ from app.schemas.profile import (
 )
 from app.services.content_moderation import ContentModerationService
 from app.services.file_storage import file_storage
+from app.services.redis_client import get_redis
 
 router = APIRouter(prefix="/api/profile")
 logger = logging.getLogger(__name__)
@@ -826,9 +829,30 @@ async def set_profile_picture(
     )
 
 
+INTEREST_TAGS_CACHE_KEY = "cache:interest_tags"
+INTEREST_TAGS_CACHE_TTL = 86400  # 24 小時
+
+
 @router.get("/interest-tags", response_model=list[InterestTagResponse])
-async def get_interest_tags(category: str = None, db: AsyncSession = Depends(get_db)):
+async def get_interest_tags(
+    response: Response,
+    category: str = None,
+    db: AsyncSession = Depends(get_db),
+    redis_conn: aioredis.Redis = Depends(get_redis),
+):
     """取得所有興趣標籤"""
+    response.headers["Cache-Control"] = f"public, max-age={INTEREST_TAGS_CACHE_TTL}"
+
+    # 嘗試從 Redis 讀取快取
+    cache_key = f"{INTEREST_TAGS_CACHE_KEY}:{category}" if category else INTEREST_TAGS_CACHE_KEY
+    try:
+        cached = await redis_conn.get(cache_key)
+        if cached:
+            return json.loads(cached)
+    except aioredis.RedisError:
+        logger.warning("Redis 快取讀取失敗，回退到資料庫查詢")
+
+    # 快取未命中，查詢資料庫
     query = select(InterestTag).where(InterestTag.is_active.is_(True))
 
     if category:
@@ -837,10 +861,18 @@ async def get_interest_tags(category: str = None, db: AsyncSession = Depends(get
     result = await db.execute(query.order_by(InterestTag.category, InterestTag.name))
     tags = result.scalars().all()
 
-    return [
-        InterestTagResponse(id=str(tag.id), name=tag.name, category=tag.category, icon=tag.icon)
+    tag_dicts = [
+        {"id": str(tag.id), "name": tag.name, "category": tag.category, "icon": tag.icon}
         for tag in tags
     ]
+
+    # 寫入 Redis 快取
+    try:
+        await redis_conn.set(cache_key, json.dumps(tag_dicts), ex=INTEREST_TAGS_CACHE_TTL)
+    except aioredis.RedisError:
+        logger.warning("Redis 快取寫入失敗")
+
+    return tag_dicts
 
 
 @router.post(
@@ -850,6 +882,7 @@ async def create_interest_tag(
     request: InterestTagCreateRequest,
     current_user: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db),
+    redis_conn: aioredis.Redis = Depends(get_redis),
 ):
     """建立興趣標籤（僅管理員）"""
     # 檢查標籤是否已存在
@@ -869,6 +902,15 @@ async def create_interest_tag(
     db.add(new_tag)
     await db.commit()
     await db.refresh(new_tag)
+
+    # 清除興趣標籤快取（全量 + 該 category）
+    try:
+        await redis_conn.delete(
+            INTEREST_TAGS_CACHE_KEY,
+            f"{INTEREST_TAGS_CACHE_KEY}:{request.category}",
+        )
+    except aioredis.RedisError:
+        logger.warning("清除興趣標籤快取失敗")
 
     return InterestTagResponse(
         id=str(new_tag.id), name=new_tag.name, category=new_tag.category, icon=new_tag.icon
