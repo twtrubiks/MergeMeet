@@ -18,7 +18,12 @@ load_dotenv()
 
 from app.core.database import Base, get_db  # noqa: E402
 from app.main import app  # noqa: E402
-from app.middleware.last_active import reset_session_factory, set_session_factory  # noqa: E402
+from app.middleware.last_active import (  # noqa: E402
+    reset_session_factory,
+    reset_throttle_seconds,
+    set_session_factory,
+    set_throttle_seconds,
+)
 from app.services.content_moderation import ContentModerationService  # noqa: E402
 from app.services.photo_moderation import PhotoModerationService  # noqa: E402
 from app.services.redis_client import get_redis  # noqa: E402
@@ -64,6 +69,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     ContentModerationService.set_session_factory(TestSessionLocal)
     PhotoModerationService.set_session_factory(TestSessionLocal)
     set_session_factory(TestSessionLocal)
+    set_throttle_seconds(0)  # 測試時禁用節流，確保每次請求都更新 DB
 
     async with TestSessionLocal() as session:
         yield session
@@ -72,6 +78,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     ContentModerationService.reset_session_factory()
     PhotoModerationService.reset_session_factory()
     reset_session_factory()
+    reset_throttle_seconds()
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
