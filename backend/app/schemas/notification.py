@@ -2,8 +2,9 @@
 
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
-from pydantic import UUID4, BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class NotificationResponse(BaseModel):
@@ -11,7 +12,7 @@ class NotificationResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: UUID4
+    id: UUID
     type: str = Field(..., description="通知類型: notification_message/match/liked")
     title: str
     content: str | None = None

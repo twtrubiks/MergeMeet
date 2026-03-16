@@ -1,8 +1,9 @@
 """訊息相關 Schema"""
 
 from datetime import datetime
+from uuid import UUID
 
-from pydantic import UUID4, BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MessageResponse(BaseModel):
@@ -10,9 +11,9 @@ class MessageResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: UUID4
-    match_id: UUID4
-    sender_id: UUID4
+    id: UUID
+    match_id: UUID
+    sender_id: UUID
     content: str
     message_type: str
     is_read: datetime | None = None
@@ -29,7 +30,7 @@ class ChatHistoryResponse(BaseModel):
 
     messages: list[MessageResponse]
     has_more: bool
-    next_cursor: UUID4 | None = None  # 最舊訊息 ID，供下次查詢
+    next_cursor: UUID | None = None  # 最舊訊息 ID，供下次查詢
     total: int  # 總訊息數（供 UI 顯示）
 
 
@@ -38,8 +39,8 @@ class MatchWithLastMessageResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    match_id: UUID4
-    other_user_id: UUID4
+    match_id: UUID
+    other_user_id: UUID
     other_user_name: str
     other_user_avatar: str | None = None
     last_message: MessageResponse | None = None
@@ -54,7 +55,7 @@ class SendMessageRequest(BaseModel):
     即時聊天訊息不宜過長，防止濫用和 DoS 攻擊
     """
 
-    match_id: UUID4
+    match_id: UUID
     content: str = Field(..., min_length=1, max_length=2000)
     message_type: str = Field(default="TEXT", pattern="^(TEXT|IMAGE|GIF)$")
 
@@ -62,13 +63,13 @@ class SendMessageRequest(BaseModel):
 class MarkAsReadRequest(BaseModel):
     """標記為已讀請求"""
 
-    message_ids: list[UUID4] = Field(..., min_length=1)
+    message_ids: list[UUID] = Field(..., min_length=1)
 
 
 class ChatImageUploadResponse(BaseModel):
     """聊天圖片上傳回應"""
 
-    image_id: UUID4
+    image_id: UUID
     image_url: str
     thumbnail_url: str
     width: int
