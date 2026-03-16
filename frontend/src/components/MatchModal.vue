@@ -124,13 +124,13 @@ const goToMatches = () => {
 
 /* Modal 內容 */
 .modal-content {
-  padding: 40px 30px 30px;
+  padding: var(--space-10) var(--space-8) var(--space-8);
   text-align: center;
 }
 
 /* 配對成功圖示 */
 .match-icon {
-  margin-bottom: 20px;
+  margin-bottom: var(--space-5);
   position: relative;
 }
 
@@ -196,14 +196,14 @@ const goToMatches = () => {
 }
 
 .modal-subtitle {
-  font-size: 16px;
-  color: #666;
-  margin: 0 0 30px;
+  font-size: var(--font-size-base);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-8);
 }
 
 /* 用戶資訊 */
 .user-info {
-  margin-bottom: 30px;
+  margin-bottom: var(--space-8);
 }
 
 .user-avatar {
@@ -235,34 +235,34 @@ const goToMatches = () => {
 }
 
 .user-name {
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
   font-weight: 600;
-  color: #333;
-  margin: 0 0 5px;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--space-1);
 }
 
 .user-age {
-  font-size: 16px;
-  color: #666;
-  margin: 0 0 20px;
+  font-size: var(--font-size-base);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-5);
 }
 
 /* 共同興趣 */
 .common-interests {
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid #eee;
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border-light);
 }
 
 .interests-title {
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   color: var(--color-text-muted);
-  margin: 0 0 10px;
+  margin: 0 0 var(--space-3);
 }
 
 .interests-tags {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   justify-content: center;
   flex-wrap: wrap;
 }
@@ -280,7 +280,7 @@ const goToMatches = () => {
 /* 操作按鈕 */
 .modal-actions {
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .modal-actions button {

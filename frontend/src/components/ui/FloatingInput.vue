@@ -113,13 +113,13 @@ const togglePasswordVisibility = () => {
 <style scoped>
 .floating-input {
   position: relative;
-  margin-bottom: 24px;
+  margin-bottom: var(--space-6);
 }
 
 .input-field {
   width: 100%;
   padding: 16px 16px 8px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--color-border);
   border-radius: 12px;
   font-size: 1rem;
   background: white;
@@ -128,12 +128,12 @@ const togglePasswordVisibility = () => {
 }
 
 .input-field:focus {
-  border-color: #667eea;
-  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 4px var(--color-primary-alpha-10);
 }
 
 .input-field:disabled {
-  background-color: #f5f5f5;
+  background-color: var(--color-background-light);
   cursor: not-allowed;
   opacity: 0.7;
 }
@@ -143,7 +143,7 @@ const togglePasswordVisibility = () => {
   left: 16px;
   top: 50%;
   transform: translateY(-50%);
-  color: #999;
+  color: var(--color-text-light);
   font-size: 1rem;
   pointer-events: none;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -155,20 +155,20 @@ const togglePasswordVisibility = () => {
 .floating-input.is-focused .input-label {
   top: 0;
   font-size: 0.75rem;
-  color: #667eea;
+  color: var(--color-primary-500);
   font-weight: 600;
 }
 
 .floating-input.has-error .input-field {
-  border-color: #f44336;
+  border-color: var(--color-error-500);
 }
 
 .floating-input.has-error .input-field:focus {
-  box-shadow: 0 0 0 4px rgba(244, 67, 54, 0.1);
+  box-shadow: 0 0 0 4px var(--color-error-alpha-10);
 }
 
 .floating-input.has-error .input-label {
-  color: #f44336;
+  color: var(--color-error-500);
 }
 
 .input-border {
@@ -177,7 +177,7 @@ const togglePasswordVisibility = () => {
   left: 50%;
   width: 0;
   height: 2px;
-  background: linear-gradient(90deg, #667eea, #764ba2);
+  background: var(--color-primary-gradient);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   transform: translateX(-50%);
 }
@@ -191,7 +191,7 @@ const togglePasswordVisibility = () => {
   top: 100%;
   left: 0;
   font-size: 0.75rem;
-  color: #f44336;
+  color: var(--color-error-500);
   margin-top: 4px;
   animation: slideDown 0.3s ease;
 }
@@ -210,8 +210,8 @@ const togglePasswordVisibility = () => {
 /* Glow effect on focus */
 .floating-input.is-focused .input-field {
   box-shadow:
-    0 0 0 4px rgba(102, 126, 234, 0.15),
-    0 8px 16px rgba(102, 126, 234, 0.1);
+    0 0 0 4px var(--color-primary-alpha-20),
+    0 8px 16px var(--color-primary-alpha-10);
 }
 
 /* Password toggle button */
@@ -228,7 +228,7 @@ const togglePasswordVisibility = () => {
   border: none;
   padding: 8px;
   cursor: pointer;
-  color: #666;
+  color: var(--color-text-muted);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -237,16 +237,27 @@ const togglePasswordVisibility = () => {
 }
 
 .password-toggle:hover {
-  background: rgba(102, 126, 234, 0.1);
-  color: #667eea;
+  background: var(--color-primary-alpha-10);
+  color: var(--color-primary-500);
 }
 
 .password-toggle:focus {
-  outline: 2px solid #667eea;
+  outline: 2px solid var(--color-primary-500);
   outline-offset: 2px;
 }
 
 .floating-input.has-error .password-toggle {
   top: calc(50% - 10px);
+}
+
+@media (max-width: 480px) {
+  .floating-input {
+    margin-bottom: var(--space-5);
+  }
+
+  .input-field {
+    padding: var(--space-3) var(--space-3) var(--space-2);
+    font-size: var(--font-size-base);
+  }
 }
 </style>

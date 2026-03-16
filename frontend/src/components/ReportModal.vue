@@ -1,6 +1,14 @@
 <template>
   <Transition name="modal">
-    <div v-if="show" class="modal-overlay" @click="handleClose">
+    <div
+      v-if="show"
+      class="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="舉報用戶"
+      @click="handleClose"
+      @keydown.escape="handleClose"
+    >
       <div class="modal-content" @click.stop>
         <div class="modal-header">
           <h2>舉報用戶</h2>
@@ -104,6 +112,7 @@ const evidence = ref('')
 const loading = ref(false)
 const error = ref(null)
 const success = ref(false)
+let closeTimer = null
 
 // 表單驗證
 const canSubmit = computed(() => {
@@ -129,7 +138,7 @@ const handleSubmit = async () => {
     emit('reported')
 
     // 2 秒後自動關閉
-    setTimeout(() => {
+    closeTimer = setTimeout(() => {
       handleClose()
     }, 2000)
   } catch (err) {
@@ -152,6 +161,10 @@ const resetForm = () => {
   evidence.value = ''
   error.value = null
   success.value = false
+  if (closeTimer) {
+    clearTimeout(closeTimer)
+    closeTimer = null
+  }
 }
 
 // 監聽 show 變化，重置表單
@@ -184,7 +197,7 @@ watch(
 /* Modal 內容 */
 .modal-content {
   background: white;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   max-width: min(500px, calc(100vw - 40px));
   width: 100%;
   max-height: 90vh;
@@ -197,26 +210,26 @@ watch(
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px 24px 16px;
-  border-bottom: 1px solid #f0f0f0;
+  padding: var(--space-6) var(--space-6) var(--space-4);
+  border-bottom: 1px solid var(--color-border-light);
 }
 
 .modal-header h2 {
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
   font-weight: 700;
-  color: #333;
+  color: var(--color-text-primary);
   margin: 0;
 }
 
 .close-btn {
   background: none;
   border: none;
-  font-size: 28px;
+  font-size: var(--font-size-3xl);
   color: var(--color-text-muted);
   cursor: pointer;
   padding: 0;
-  min-width: 44px;
-  min-height: 44px;
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -225,20 +238,20 @@ watch(
 }
 
 .close-btn:hover {
-  background: #f5f5f5;
-  color: #666;
+  background: var(--color-background-light);
+  color: var(--color-text-muted);
 }
 
 /* Modal 內容區 */
 .modal-body {
-  padding: 24px;
+  padding: var(--space-6);
 }
 
 .warning-text {
-  font-size: 14px;
-  color: #666;
-  margin-bottom: 20px;
-  padding: 12px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-5);
+  padding: var(--space-3);
   background: #fff3e0;
   border-left: 3px solid #ff9800;
   border-radius: 4px;
@@ -246,34 +259,35 @@ watch(
 
 /* 表單群組 */
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: var(--space-5);
 }
 
 .form-group label {
   display: block;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
-  color: #333;
-  margin-bottom: 8px;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-2);
 }
 
 .form-control {
   width: 100%;
-  padding: 12px;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  font-size: 14px;
+  padding: var(--space-3);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
   font-family: inherit;
   transition: border-color 0.2s ease;
 }
 
 .form-control:focus {
   outline: none;
-  border-color: #ff6b6b;
+  border-color: var(--color-like);
+  box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.2);
 }
 
 .form-control:disabled {
-  background: #f5f5f5;
+  background: var(--color-background-light);
   cursor: not-allowed;
 }
 
@@ -288,7 +302,7 @@ textarea.form-control {
 
 .char-count {
   text-align: right;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   color: var(--color-text-muted);
   margin-top: 4px;
 }
@@ -296,10 +310,10 @@ textarea.form-control {
 /* 訊息 */
 .error-message,
 .success-message {
-  padding: 12px;
-  border-radius: 8px;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
   margin-top: 16px;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
 }
 
 .error-message {
@@ -318,20 +332,20 @@ textarea.form-control {
 .modal-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  padding: 16px 24px 24px;
-  border-top: 1px solid #f0f0f0;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6) var(--space-6);
+  border-top: 1px solid var(--color-border-light);
 }
 
 .btn {
-  padding: 12px 24px;
+  padding: var(--space-3) var(--space-6);
   border: none;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  min-height: 44px;
+  min-height: var(--touch-target-min);
 }
 
 .btn:disabled {
@@ -340,21 +354,21 @@ textarea.form-control {
 }
 
 .btn-cancel {
-  background: #f5f5f5;
-  color: #666;
+  background: var(--color-background-light);
+  color: var(--color-text-muted);
 }
 
 .btn-cancel:hover:not(:disabled) {
-  background: #e0e0e0;
+  background: var(--color-border);
 }
 
 .btn-report {
-  background: #ff6b6b;
+  background: var(--color-like);
   color: white;
 }
 
 .btn-report:hover:not(:disabled) {
-  background: #ff5252;
+  background: var(--color-like-hover);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
 }
@@ -387,7 +401,7 @@ textarea.form-control {
   }
 
   .modal-header h2 {
-    font-size: 20px;
+    font-size: var(--font-size-xl);
   }
 
   .modal-body {

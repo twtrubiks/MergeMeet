@@ -81,7 +81,7 @@ defineProps({
   font-size: var(--font-size-5xl);
   margin-bottom: var(--space-4);
   text-align: center;
-  animation: float 3s ease-in-out infinite;
+  animation: float 6s ease-in-out infinite;
 }
 
 @keyframes float {

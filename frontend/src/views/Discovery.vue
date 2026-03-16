@@ -10,7 +10,11 @@
       <h1 class="page-title">探索配對</h1>
 
       <!-- 載入中 -->
-      <div v-if="discoveryStore.loading && !discoveryStore.currentCandidate" class="loading">
+      <div
+        v-if="discoveryStore.loading && !discoveryStore.currentCandidate"
+        class="loading"
+        aria-busy="true"
+      >
         <HeartLoader text="尋找你的真命天子..." />
       </div>
 
@@ -51,6 +55,7 @@
               v-if="candidate.photos?.length"
               :src="candidate.photos[0]"
               :alt="candidate.display_name"
+              loading="lazy"
               @error="(e) => (e.target.src = defaultAvatar)"
             />
             <div v-else class="image-placeholder">
@@ -76,7 +81,14 @@
           </div>
 
           <!-- 卡片資訊 -->
-          <div class="card-info" @click.stop="index === 0 ? openUserDetail(candidate) : null">
+          <div
+            class="card-info"
+            :role="index === 0 ? 'button' : undefined"
+            :tabindex="index === 0 ? 0 : undefined"
+            :aria-label="index === 0 ? `查看 ${candidate.display_name} 的完整資料` : undefined"
+            @click.stop="index === 0 ? openUserDetail(candidate) : null"
+            @keydown.enter.stop="index === 0 ? openUserDetail(candidate) : null"
+          >
             <div class="card-header">
               <h2 class="card-name">{{ candidate.display_name }}</h2>
               <span class="card-age">{{ candidate.age }}</span>
@@ -451,21 +463,21 @@ onUnmounted(() => {
 }
 
 .back-home-btn .btn-text {
-  font-size: 0.95rem;
+  font-size: var(--font-size-base);
 }
 
 .page-title {
   text-align: center;
-  font-size: 32px;
+  font-size: var(--font-size-4xl);
   font-weight: 700;
-  color: #333;
-  margin-bottom: 30px;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-8);
 }
 
 /* 載入中 */
 .loading {
   text-align: center;
-  padding: 60px 20px;
+  padding: var(--space-16) var(--space-5);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -474,13 +486,13 @@ onUnmounted(() => {
 /* 錯誤訊息 */
 .error-message {
   text-align: center;
-  padding: 40px 20px;
+  padding: var(--space-10) var(--space-5);
 }
 
 .error-message p {
-  color: #e74c3c;
-  font-size: 16px;
-  margin-bottom: 20px;
+  color: var(--color-error-500);
+  font-size: var(--font-size-base);
+  margin-bottom: var(--space-5);
 }
 
 .btn-retry {
@@ -503,7 +515,7 @@ onUnmounted(() => {
 /* 空狀態 */
 .empty-state {
   text-align: center;
-  padding: 60px 20px;
+  padding: var(--space-16) var(--space-5);
 }
 
 .empty-icon {
@@ -517,15 +529,15 @@ onUnmounted(() => {
 }
 
 .empty-state h2 {
-  font-size: 24px;
-  color: #333;
-  margin-bottom: 10px;
+  font-size: var(--font-size-2xl);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-3);
 }
 
 .empty-state p {
-  font-size: 16px;
-  color: #666;
-  margin-bottom: 30px;
+  font-size: var(--font-size-base);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-8);
 }
 
 .btn-refresh {
@@ -557,7 +569,7 @@ onUnmounted(() => {
   display: inline-block;
   padding: 2px 8px;
   background: rgba(255, 255, 255, 0.8);
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   font-family: monospace;
   font-size: var(--font-size-xs);
@@ -567,15 +579,15 @@ onUnmounted(() => {
 
 .hint-separator {
   margin: 0 var(--space-2);
-  color: #ccc;
+  color: var(--color-border);
 }
 
 /* 卡片容器 */
 .cards-container {
   position: relative;
   width: 100%;
-  height: 600px;
-  margin-bottom: 30px;
+  height: min(600px, 70vh);
+  margin-bottom: var(--space-8);
 }
 
 /* 候選人卡片 */
@@ -583,8 +595,8 @@ onUnmounted(() => {
   position: absolute;
   width: 100%;
   height: 100%;
-  background: white;
-  border-radius: 20px;
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
   overflow: hidden;
   transition:
@@ -678,10 +690,10 @@ onUnmounted(() => {
   right: 20px;
   background: rgba(255, 255, 255, 0.95);
   padding: 8px 16px;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
@@ -709,7 +721,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: var(--font-size-xl);
   cursor: pointer;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   transition: all 0.2s ease;
@@ -717,7 +729,7 @@ onUnmounted(() => {
 }
 
 .report-btn:hover {
-  background: #fff;
+  background: var(--color-surface);
   transform: scale(1.1);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
 }
@@ -728,32 +740,32 @@ onUnmounted(() => {
 
 /* 卡片資訊 */
 .card-info {
-  padding: 20px;
+  padding: var(--space-5);
   cursor: pointer;
   transition: background-color 0.2s ease;
 }
 
 .top-card .card-info:hover {
-  background-color: #fffaf0;
+  background-color: var(--color-surface-hover);
 }
 
 .card-header {
   display: flex;
   align-items: baseline;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
 }
 
 .card-name {
-  font-size: 28px;
+  font-size: var(--font-size-3xl);
   font-weight: 700;
-  color: #333;
+  color: var(--color-text-primary);
   margin: 0;
 }
 
 .card-age {
-  font-size: 24px;
-  color: #666;
+  font-size: var(--font-size-2xl);
+  color: var(--color-text-muted);
 }
 
 .card-distance {
@@ -771,9 +783,9 @@ onUnmounted(() => {
 
 .card-interests {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   flex-wrap: wrap;
-  margin-bottom: 15px;
+  margin-bottom: var(--space-4);
 }
 
 .interest-tag {
@@ -787,8 +799,8 @@ onUnmounted(() => {
 }
 
 .card-bio {
-  font-size: 14px;
-  color: #666;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
   line-height: 1.5;
   margin: 0;
 }
@@ -812,8 +824,8 @@ onUnmounted(() => {
 .action-buttons {
   display: flex;
   justify-content: center;
-  gap: 40px;
-  padding: 20px 0;
+  gap: var(--space-10);
+  padding: var(--space-5) 0;
 }
 
 .action-btn {
@@ -869,15 +881,15 @@ onUnmounted(() => {
 }
 
 .pass-btn {
-  background: #f5f5f5;
-  color: #666;
-  border: 3px solid #ddd;
+  background: var(--color-background-light);
+  color: var(--color-text-muted);
+  border: 3px solid var(--color-border);
 }
 
 .pass-btn:hover:not(:disabled) {
-  background: #e0e0e0;
-  color: #333;
-  border-color: #bbb;
+  background: var(--color-border);
+  color: var(--color-text-primary);
+  border-color: var(--color-border);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
 }
 
@@ -904,9 +916,9 @@ onUnmounted(() => {
 }
 
 .btn-text {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: 700;
-  margin-top: 5px;
+  margin-top: var(--space-1);
   position: relative;
   z-index: 1;
   letter-spacing: 0.5px;
@@ -924,7 +936,7 @@ onUnmounted(() => {
 /* 響應式設計 */
 @media (max-width: 768px) {
   .cards-container {
-    height: 500px;
+    height: min(500px, 65vh);
   }
 
   .card-image {
@@ -942,6 +954,25 @@ onUnmounted(() => {
 
   .btn-icon {
     font-size: 32px;
+  }
+}
+
+@media (max-width: 480px) {
+  .cards-container {
+    height: min(450px, 60vh);
+  }
+
+  .card-image {
+    height: 280px;
+  }
+
+  .action-buttons {
+    gap: var(--space-6);
+  }
+
+  .action-btn {
+    width: 70px;
+    height: 70px;
   }
 }
 

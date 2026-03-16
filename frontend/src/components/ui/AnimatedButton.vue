@@ -14,7 +14,6 @@
     <span v-else class="btn-content">
       <slot></slot>
     </span>
-    <span class="shine" aria-hidden="true"></span>
   </button>
 </template>
 
@@ -77,6 +76,11 @@ defineEmits(['click'])
   transform: translateX(100%);
 }
 
+.animated-btn:focus-visible {
+  outline: 3px solid var(--color-primary-600);
+  outline-offset: 2px;
+}
+
 .animated-btn:active {
   transform: scale(0.98);
 }
@@ -87,20 +91,6 @@ defineEmits(['click'])
   display: flex;
   align-items: center;
   gap: var(--space-2);
-}
-
-.shine {
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-  transition: left var(--duration-slower);
-}
-
-.animated-btn:hover .shine {
-  left: 100%;
 }
 
 /* Variants */

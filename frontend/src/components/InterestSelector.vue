@@ -121,23 +121,23 @@ const toggleTag = (tagId) => {
 
 .interest-selector h3 {
   margin-bottom: 0.5rem;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .hint {
-  color: #666;
+  color: var(--color-text-muted);
   font-size: 0.9rem;
   margin-bottom: 1.5rem;
 }
 
 .hint .warning {
-  color: #f39c12;
+  color: var(--color-warning-500);
   font-weight: 600;
   margin-left: 0.5rem;
 }
 
 .hint .success {
-  color: #27ae60;
+  color: var(--color-success-500);
   font-weight: 600;
   margin-left: 0.5rem;
 }
@@ -154,11 +154,11 @@ const toggleTag = (tagId) => {
 
 .category-title {
   margin-bottom: 1rem;
-  color: #555;
+  color: var(--color-text-secondary);
   font-size: 1.1rem;
   font-weight: 600;
   padding-bottom: 0.5rem;
-  border-bottom: 2px solid #f0f0f0;
+  border-bottom: 2px solid var(--color-border-light);
 }
 
 .tags-grid {
@@ -175,22 +175,22 @@ const toggleTag = (tagId) => {
   gap: 0.5rem;
   padding: 1rem;
   background: white;
-  border: 2px solid #e0e0e0;
-  border-radius: 12px;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: all 0.3s;
   min-height: 80px;
 }
 
 .tag-button:hover:not(:disabled) {
-  border-color: #667eea;
+  border-color: var(--color-primary-500);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+  box-shadow: 0 4px 12px var(--color-primary-alpha-20);
 }
 
 .tag-button.selected {
-  border-color: #667eea;
-  background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+  border-color: var(--color-primary-500);
+  background: linear-gradient(135deg, var(--color-primary-alpha-10), rgba(225, 29, 72, 0.05));
 }
 
 .tag-button:disabled {
@@ -204,7 +204,7 @@ const toggleTag = (tagId) => {
 
 .tag-name {
   font-size: 0.9rem;
-  color: #333;
+  color: var(--color-text-primary);
   text-align: center;
 }
 
@@ -214,7 +214,7 @@ const toggleTag = (tagId) => {
   right: 6px;
   width: 20px;
   height: 20px;
-  background: #667eea;
+  background: var(--color-primary-500);
   color: white;
   border-radius: 50%;
   display: flex;
@@ -230,14 +230,14 @@ const toggleTag = (tagId) => {
   align-items: center;
   gap: 1rem;
   padding: 2rem;
-  color: #666;
+  color: var(--color-text-muted);
 }
 
 .spinner-small {
   width: 30px;
   height: 30px;
-  border: 3px solid #e0e0e0;
-  border-top-color: #667eea;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary-500);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }

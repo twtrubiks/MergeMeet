@@ -50,14 +50,14 @@ defineProps({
 
 /* Variants */
 .badge.default {
-  background: #f5f5f5;
-  color: #666;
+  background: var(--color-background-light);
+  color: var(--color-text-muted);
 }
 
 .badge.primary {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.15));
-  color: #667eea;
-  border: 1px solid rgba(102, 126, 234, 0.3);
+  background: linear-gradient(135deg, var(--color-primary-alpha-10), rgba(118, 75, 162, 0.15));
+  color: var(--color-primary-500);
+  border: 1px solid var(--color-primary-alpha-30);
 }
 
 .badge.success {

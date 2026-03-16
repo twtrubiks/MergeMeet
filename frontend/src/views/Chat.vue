@@ -12,8 +12,11 @@
         <div
           v-if="currentConversation"
           class="chat-user-info clickable"
-          title="點擊查看詳情"
+          role="button"
+          tabindex="0"
+          :aria-label="`查看 ${currentConversation.other_user_name} 的詳情`"
           @click="openUserDetail"
+          @keydown.enter="openUserDetail"
         >
           <n-avatar
             :src="currentConversation.other_user_avatar"
@@ -561,7 +564,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background-color: #f5f5f5;
+  background-color: var(--color-background-light);
 }
 
 /* 修復 n-spin 組件破壞 flex 佈局的問題 */
@@ -577,21 +580,21 @@ onUnmounted(() => {
 .chat-header {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
-  background-color: white;
-  border-bottom: 1px solid #e5e5e5;
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-border-light);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .back-button {
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
 }
 
 .chat-user-info {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   flex: 1;
 }
 
@@ -599,7 +602,7 @@ onUnmounted(() => {
   cursor: pointer;
   padding: 8px;
   margin: -8px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   transition: background-color 0.2s;
 }
 
@@ -608,13 +611,13 @@ onUnmounted(() => {
 }
 
 .user-hint {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   color: var(--color-text-muted);
   margin-top: 2px;
 }
 
 .more-button {
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
   flex-shrink: 0;
 }
 
@@ -625,34 +628,34 @@ onUnmounted(() => {
 }
 
 .user-name {
-  font-size: 16px;
+  font-size: var(--font-size-base);
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 /* 打字指示器（固定在輸入框上方） */
 .typing-indicator-fixed {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: rgba(24, 144, 255, 0.1);
-  border-left: 3px solid #1890ff;
-  font-size: 13px;
-  color: #1890ff;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-primary-alpha-10);
+  border-left: 3px solid var(--color-primary-500);
+  font-size: var(--font-size-sm);
+  color: var(--color-primary-500);
   animation: slideDown 0.3s ease;
 }
 
 .typing-dots {
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .typing-dots span {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background-color: #1890ff;
+  background-color: var(--color-primary-500);
   animation: typing 1.4s infinite;
 }
 
@@ -695,8 +698,8 @@ onUnmounted(() => {
 .message-list {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
-  background-color: #f5f5f5;
+  padding: var(--space-4);
+  background-color: var(--color-background-light);
 }
 
 .empty-state {
@@ -715,26 +718,26 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 12px;
-  color: #666;
-  font-size: 14px;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
 }
 
 .no-more {
   display: flex;
   justify-content: center;
-  padding: 12px;
+  padding: var(--space-3);
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .chat-input-area {
   display: flex;
-  gap: 12px;
-  padding: 12px 16px;
-  background-color: white;
-  border-top: 1px solid #e5e5e5;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-surface);
+  border-top: 1px solid var(--color-border-light);
   align-items: flex-end;
 }
 
@@ -766,11 +769,11 @@ onUnmounted(() => {
 }
 
 .message-list::-webkit-scrollbar-thumb {
-  background: #ccc;
+  background: var(--color-border);
   border-radius: 3px;
 }
 
 .message-list::-webkit-scrollbar-thumb:hover {
-  background: #999;
+  background: var(--color-text-light);
 }
 </style>

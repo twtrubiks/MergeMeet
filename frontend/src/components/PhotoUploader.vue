@@ -80,6 +80,7 @@
           ref="fileInput"
           type="file"
           accept="image/*"
+          aria-label="選擇要上傳的照片"
           style="display: none"
           @change="handleFileSelect"
         />
@@ -94,7 +95,15 @@
     <!-- 申訴 Modal -->
     <Teleport to="body">
       <Transition name="modal">
-        <div v-if="showAppealModal" class="appeal-modal-overlay" @click="closeAppealModal">
+        <div
+          v-if="showAppealModal"
+          class="appeal-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="照片申訴"
+          @click="closeAppealModal"
+          @keydown.escape="closeAppealModal"
+        >
           <div class="appeal-modal" @click.stop>
             <h3>照片申訴</h3>
 
@@ -159,13 +168,13 @@ const reordering = ref(false)
 // 本地照片順序狀態（用於拖拽）
 const localPhotos = ref([])
 
-// 同步 store 照片到本地
+// 同步 store 照片到本地（以陣列長度和 ID 順序作為淺層比較依據）
 watch(
-  () => profileStore.profilePhotos,
-  (newPhotos) => {
-    localPhotos.value = [...newPhotos]
+  () => profileStore.profilePhotos.map((p) => p.id).join(','),
+  () => {
+    localPhotos.value = [...profileStore.profilePhotos]
   },
-  { immediate: true, deep: true }
+  { immediate: true }
 )
 
 // 申訴相關狀態
@@ -364,7 +373,7 @@ const submitAppeal = async () => {
 
 .photo-uploader h3 {
   margin-bottom: 0.5rem;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .hint {
@@ -382,9 +391,9 @@ const submitAppeal = async () => {
 .photo-card {
   position: relative;
   aspect-ratio: 1;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   overflow: hidden;
-  background: #f5f5f5;
+  background: var(--color-background-light);
   cursor: grab;
   user-select: none;
 }
@@ -396,8 +405,8 @@ const submitAppeal = async () => {
 /* 拖拽時的幽靈效果 */
 .photo-ghost {
   opacity: 0.5;
-  background: #c8ebfb !important;
-  border: 2px dashed #667eea;
+  background: var(--color-primary-100) !important;
+  border: 2px dashed var(--color-primary-500);
 }
 
 /* 正在拖拽的元素 */
@@ -495,7 +504,7 @@ const submitAppeal = async () => {
   position: absolute;
   top: 8px;
   right: 8px;
-  background: rgba(102, 126, 234, 0.9);
+  background: var(--color-primary-600);
   color: white;
   padding: 4px 8px;
   border-radius: 4px;
@@ -516,8 +525,8 @@ const submitAppeal = async () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border: 2px dashed #ccc;
-  background: #fafafa;
+  border: 2px dashed var(--color-border);
+  background: var(--color-background-light);
   transition:
     border-color 0.3s,
     background 0.3s;
@@ -525,8 +534,8 @@ const submitAppeal = async () => {
 }
 
 .upload-card:hover {
-  border-color: #667eea;
-  background: #f0f0ff;
+  border-color: var(--color-primary-500);
+  background: var(--color-primary-50);
 }
 
 .upload-icon {
@@ -536,15 +545,15 @@ const submitAppeal = async () => {
 
 .upload-card p {
   margin: 0;
-  color: #666;
+  color: var(--color-text-muted);
   font-size: 0.9rem;
 }
 
 .spinner-small {
   width: 30px;
   height: 30px;
-  border: 3px solid #e0e0e0;
-  border-top-color: #667eea;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary-500);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -560,8 +569,8 @@ const submitAppeal = async () => {
   padding: 12px;
   background: #fee;
   border: 1px solid #fcc;
-  border-radius: 8px;
-  color: #c33;
+  border-radius: var(--radius-sm);
+  color: var(--color-error-500);
   font-size: 0.9rem;
 }
 
@@ -571,7 +580,7 @@ const submitAppeal = async () => {
 }
 
 .photo-rejected {
-  border: 2px solid #ff4d4f;
+  border: 2px solid var(--color-error-500);
 }
 
 .moderation-badge {
@@ -656,13 +665,24 @@ const submitAppeal = async () => {
   }
 }
 
+@media (max-width: 360px) {
+  .photo-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+
+  .upload-section {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* 申訴按鈕 */
 .appeal-btn {
   margin-top: 8px;
   padding: 6px 12px;
   background: rgba(255, 255, 255, 0.9);
-  color: #ff6b6b;
-  border: 1px solid #ff6b6b;
+  color: var(--color-like);
+  border: 1px solid var(--color-like);
   border-radius: 4px;
   font-size: 0.75rem;
   font-weight: 600;
@@ -672,7 +692,7 @@ const submitAppeal = async () => {
 }
 
 .appeal-btn:hover {
-  background: #ff6b6b;
+  background: var(--color-like);
   color: white;
 }
 
@@ -690,7 +710,7 @@ const submitAppeal = async () => {
 
 .appeal-modal {
   background: white;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   max-width: 450px;
   width: 100%;
   padding: 24px;
@@ -700,14 +720,14 @@ const submitAppeal = async () => {
 .appeal-modal h3 {
   margin: 0 0 20px;
   font-size: 1.25rem;
-  color: #333;
+  color: var(--color-text-primary);
   text-align: center;
 }
 
 .appeal-photo-preview {
   width: 100%;
   height: 200px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   margin-bottom: 16px;
 }
@@ -726,7 +746,7 @@ const submitAppeal = async () => {
   display: block;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #666;
+  color: var(--color-text-muted);
   margin-bottom: 4px;
 }
 
@@ -735,7 +755,7 @@ const submitAppeal = async () => {
   padding: 10px;
   background: #fff5f5;
   border-radius: 6px;
-  color: #c33;
+  color: var(--color-error-500);
   font-size: 0.9rem;
 }
 
@@ -747,15 +767,15 @@ const submitAppeal = async () => {
   display: block;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #666;
+  color: var(--color-text-muted);
   margin-bottom: 8px;
 }
 
 .appeal-form textarea {
   width: 100%;
   padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
   font-size: 0.9rem;
   resize: vertical;
   font-family: inherit;
@@ -763,7 +783,7 @@ const submitAppeal = async () => {
 
 .appeal-form textarea:focus {
   outline: none;
-  border-color: #ff6b6b;
+  border-color: var(--color-like);
 }
 
 .char-count {
@@ -781,10 +801,10 @@ const submitAppeal = async () => {
 
 .btn-cancel {
   padding: 10px 20px;
-  background: #f5f5f5;
-  color: #666;
+  background: var(--color-background-light);
+  color: var(--color-text-muted);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
@@ -792,15 +812,15 @@ const submitAppeal = async () => {
 }
 
 .btn-cancel:hover {
-  background: #e0e0e0;
+  background: var(--color-border);
 }
 
 .btn-submit {
   padding: 10px 20px;
-  background: #ff6b6b;
+  background: var(--color-like);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
@@ -808,7 +828,7 @@ const submitAppeal = async () => {
 }
 
 .btn-submit:hover:not(:disabled) {
-  background: #ff5252;
+  background: var(--color-like-hover);
 }
 
 .btn-submit:disabled {

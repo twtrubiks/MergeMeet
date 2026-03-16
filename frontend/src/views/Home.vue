@@ -110,7 +110,7 @@ const handleLogout = () => {
   position: absolute;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.08);
-  animation: float 25s infinite ease-in-out;
+  animation: float 60s infinite ease-in-out;
 }
 
 .circle-1 {
@@ -148,16 +148,10 @@ const handleLogout = () => {
 @keyframes float {
   0%,
   100% {
-    transform: translate(0, 0) scale(1);
-  }
-  25% {
-    transform: translate(30px, -30px) scale(1.05);
+    transform: translate(0, 0);
   }
   50% {
-    transform: translate(-20px, 20px) scale(0.95);
-  }
-  75% {
-    transform: translate(25px, 15px) scale(1.02);
+    transform: translate(10px, -10px);
   }
 }
 
@@ -200,9 +194,7 @@ const handleLogout = () => {
 .heart-icon {
   color: white;
   filter: drop-shadow(0 8px 16px var(--color-like-alpha-40));
-  animation:
-    heartBeat 1.5s infinite,
-    pulse 2s infinite;
+  animation: heartBeat 2s ease-in-out infinite;
 }
 
 .heart-left {
@@ -225,16 +217,6 @@ const handleLogout = () => {
   20%,
   40% {
     transform: scale(0.95);
-  }
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    filter: drop-shadow(0 8px 16px rgba(255, 107, 107, 0.4));
-  }
-  50% {
-    filter: drop-shadow(0 12px 24px rgba(255, 107, 107, 0.6));
   }
 }
 
