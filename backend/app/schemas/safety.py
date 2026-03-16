@@ -28,6 +28,21 @@ class BlockedUserResponse(BaseModel):
     created_at: datetime
 
 
+class BlockResponse(BaseModel):
+    """封鎖用戶回應"""
+
+    blocked: bool
+    message: str
+    match_cancelled: bool
+
+
+class UnblockResponse(BaseModel):
+    """解除封鎖回應"""
+
+    unblocked: bool
+    message: str
+
+
 class ReportUserRequest(BaseModel):
     """舉報用戶請求"""
 

@@ -16,10 +16,13 @@ from app.models.report import Report
 from app.models.user import User
 from app.schemas.admin import (
     BanUserRequest,
+    BanUserResponse,
     DashboardStatsResponse,
     ReportDetailResponse,
     ReviewReportRequest,
+    ReviewReportResponse,
     UnbanUserRequest,
+    UnbanUserResponse,
     UserManagementResponse,
 )
 from app.services.trust_score import TrustScoreService
@@ -168,7 +171,7 @@ async def get_all_reports(
     return response
 
 
-@router.post("/reports/{report_id}/review")
+@router.post("/reports/{report_id}/review", response_model=ReviewReportResponse)
 async def review_report(
     report_id: str,
     request: ReviewReportRequest,
@@ -307,7 +310,7 @@ async def get_all_users(
     ]
 
 
-@router.post("/users/ban")
+@router.post("/users/ban", response_model=BanUserResponse)
 async def ban_user(
     request: BanUserRequest,
     current_admin: User = Depends(get_current_admin_user),
@@ -348,7 +351,7 @@ async def ban_user(
     }
 
 
-@router.post("/users/unban")
+@router.post("/users/unban", response_model=UnbanUserResponse)
 async def unban_user(
     request: UnbanUserRequest,
     current_admin: User = Depends(get_current_admin_user),

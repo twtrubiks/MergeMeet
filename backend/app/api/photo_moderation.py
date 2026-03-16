@@ -64,6 +64,16 @@ class PendingPhotosListResponse(BaseModel):
     page_size: int
 
 
+class PhotoDetailResponse(PendingPhotoResponse):
+    """照片詳情回應（擴展 PendingPhotoResponse）"""
+
+    rejection_reason: str | None = None
+    reviewed_at: str | None = None
+    mime_type: str | None = None
+    auto_moderation_score: float | None = None
+    auto_moderation_labels: str | None = None
+
+
 class PhotoStatsResponse(BaseModel):
     """照片審核統計回應"""
 
@@ -126,7 +136,7 @@ async def get_photo_stats(
     return PhotoStatsResponse(**stats)
 
 
-@router.get("/{photo_id}")
+@router.get("/{photo_id}", response_model=PhotoDetailResponse)
 async def get_photo_detail(
     photo_id: UUID,
     current_admin: User = Depends(get_current_admin_user),

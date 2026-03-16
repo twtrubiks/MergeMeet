@@ -50,6 +50,19 @@ class MatchSummary(BaseModel):
     unread_count: int = 0
 
 
+class PassResponse(BaseModel):
+    """跳過用戶回應"""
+
+    passed: bool
+    message: str
+
+
+class UnmatchResponse(BaseModel):
+    """取消配對回應"""
+
+    message: str
+
+
 class MatchDetail(BaseModel):
     """配對詳細資訊"""
 

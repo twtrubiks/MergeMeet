@@ -14,9 +14,11 @@ from app.models.report import Report
 from app.models.user import User
 from app.schemas.safety import (
     BlockedUserResponse,
+    BlockResponse,
     BlockUserRequest,
     ReportResponse,
     ReportUserRequest,
+    UnblockResponse,
 )
 from app.services.trust_score import TrustScoreService
 
@@ -25,7 +27,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/block/{user_id}", status_code=status.HTTP_201_CREATED)
+@router.post("/block/{user_id}", status_code=status.HTTP_201_CREATED, response_model=BlockResponse)
 async def block_user(
     user_id: uuid.UUID,
     request: BlockUserRequest,
@@ -93,7 +95,7 @@ async def block_user(
     return {"blocked": True, "message": "已封鎖用戶", "match_cancelled": match is not None}
 
 
-@router.delete("/block/{user_id}")
+@router.delete("/block/{user_id}", response_model=UnblockResponse)
 async def unblock_user(
     user_id: uuid.UUID,
     current_user: User = Depends(get_current_user),

@@ -78,6 +78,32 @@ class UserManagementResponse(BaseModel):
         return v if v is not None else 0
 
 
+class ReviewReportResponse(BaseModel):
+    """處理舉報回應"""
+
+    success: bool
+    message: str
+    report_id: str
+    status: str
+
+
+class BanUserResponse(BaseModel):
+    """封禁用戶回應"""
+
+    success: bool
+    message: str
+    user_id: str
+    banned_until: str
+
+
+class UnbanUserResponse(BaseModel):
+    """解封用戶回應"""
+
+    success: bool
+    message: str
+    user_id: str
+
+
 class BanUserRequest(BaseModel):
     """封禁用戶請求"""
 

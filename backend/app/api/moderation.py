@@ -290,7 +290,7 @@ async def get_all_appeals(
     )
 
 
-@router.post("/appeals/{appeal_id}/review")
+@router.post("/appeals/{appeal_id}/review", response_model=ContentAppealResponse)
 async def review_appeal(
     appeal_id: uuid.UUID,
     review_data: ContentAppealReview,

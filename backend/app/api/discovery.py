@@ -44,7 +44,13 @@ from app.models.match import BlockedUser, Like, Match, Message, Pass
 from app.models.notification import Notification
 from app.models.profile import Profile
 from app.models.user import User
-from app.schemas.discovery import LikeResponse, MatchSummary, ProfileCard
+from app.schemas.discovery import (
+    LikeResponse,
+    MatchSummary,
+    PassResponse,
+    ProfileCard,
+    UnmatchResponse,
+)
 from app.services.matching_service import matching_service
 from app.services.trust_score import TrustScoreService
 
@@ -592,7 +598,7 @@ async def like_user(
     return LikeResponse(liked=True, is_match=is_match, match_id=match_id)
 
 
-@router.post("/pass/{user_id}")
+@router.post("/pass/{user_id}", response_model=PassResponse)
 async def pass_user(
     user_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -741,7 +747,7 @@ async def get_matches(
     return match_summaries
 
 
-@router.delete("/unmatch/{match_id}")
+@router.delete("/unmatch/{match_id}", response_model=UnmatchResponse)
 async def unmatch(
     match_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
