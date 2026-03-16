@@ -466,7 +466,7 @@ onMounted(() => {
 .status-resolved,
 .status-approved {
   background: #e8f5e9;
-  color: #4caf50;
+  color: var(--color-success-500);
 }
 
 .status-dismissed,

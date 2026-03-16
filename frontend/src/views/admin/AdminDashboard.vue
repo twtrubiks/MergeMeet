@@ -1703,7 +1703,7 @@ onMounted(() => {
 /* 危險狀態 */
 .stat-card.danger .stat-icon {
   background: linear-gradient(135deg, #fdedec 0%, #f9d5d3 100%);
-  color: #e74c3c;
+  color: var(--color-error-500);
 }
 
 .stat-info {
@@ -1976,7 +1976,7 @@ onMounted(() => {
 
 .photo-time {
   font-size: 11px;
-  color: #bdc3c7;
+  color: var(--color-text-light);
 }
 
 .photo-actions {

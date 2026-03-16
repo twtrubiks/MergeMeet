@@ -267,7 +267,7 @@ const formattedTime = computed(() => {
 .message-image img {
   width: 100%;
   display: block;
-  background-color: #f5f5f5;
+  background-color: var(--color-background-light);
 }
 
 .gif-badge {

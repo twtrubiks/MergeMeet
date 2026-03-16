@@ -356,7 +356,7 @@ onMounted(() => {
 
 .btn-unblock {
   padding: 10px 24px;
-  background: #4caf50;
+  background: var(--color-success-500);
   color: white;
   border: none;
   border-radius: var(--radius-sm);
@@ -368,7 +368,7 @@ onMounted(() => {
 }
 
 .btn-unblock:hover:not(:disabled) {
-  background: #45a049;
+  background: var(--color-success-600);
   transform: translateY(-2px);
 }
 
@@ -464,12 +464,12 @@ onMounted(() => {
 }
 
 .btn-confirm {
-  background: #4caf50;
+  background: var(--color-success-500);
   color: white;
 }
 
 .btn-confirm:hover:not(:disabled) {
-  background: #45a049;
+  background: var(--color-success-600);
 }
 
 .btn-confirm:disabled {

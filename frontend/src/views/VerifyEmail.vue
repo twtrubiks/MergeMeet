@@ -395,7 +395,7 @@ onUnmounted(() => {
 }
 
 .auth-header p {
-  color: #666;
+  color: var(--color-text-muted);
   font-size: 0.95rem;
   margin: 4px 0;
 }
@@ -553,7 +553,7 @@ onUnmounted(() => {
 .hint-section {
   text-align: center;
   padding-top: 16px;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--color-border);
 }
 
 .hint-text {

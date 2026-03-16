@@ -161,7 +161,7 @@ const confirmUpload = async () => {
   max-height: 400px;
   overflow: hidden;
   border-radius: 8px;
-  background-color: #f5f5f5;
+  background-color: var(--color-background-light);
 }
 
 .image-preview img {

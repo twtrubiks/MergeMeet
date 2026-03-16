@@ -382,7 +382,7 @@ onMounted(() => {
 .spinner {
   width: 48px;
   height: 48px;
-  border: 4px solid #f0f0f0;
+  border: 4px solid var(--color-border-light);
   border-top-color: var(--color-primary-500);
   border-radius: 50%;
   animation: spin 1s linear infinite;
@@ -426,7 +426,7 @@ onMounted(() => {
 }
 
 .error-state h2 {
-  color: #e53935;
+  color: var(--color-error-500);
   font-size: 1.6rem;
   margin-bottom: 16px;
   font-weight: 600;
@@ -461,7 +461,7 @@ onMounted(() => {
 }
 
 .success-state h2 {
-  color: #4caf50;
+  color: var(--color-success-500);
   font-size: 1.8rem;
   margin-bottom: 16px;
   font-weight: 600;
@@ -504,7 +504,7 @@ onMounted(() => {
   gap: 6px;
   font-size: 0.85rem;
   padding: 12px;
-  background: #f8f9fa;
+  background: var(--color-background-light);
   border-radius: 8px;
 }
 
@@ -512,12 +512,12 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #e53935;
+  color: var(--color-error-500);
   transition: color 0.3s ease;
 }
 
 .password-strength span.valid {
-  color: #4caf50;
+  color: var(--color-success-500);
 }
 
 .password-strength span::before {
@@ -530,7 +530,7 @@ onMounted(() => {
 }
 
 .error-message {
-  color: #e53935;
+  color: var(--color-error-500);
   font-size: 0.9rem;
   text-align: center;
   padding: 12px;
@@ -543,7 +543,7 @@ onMounted(() => {
   margin-top: 32px;
   text-align: center;
   padding-top: 24px;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--color-border);
 }
 
 .auth-footer p {

@@ -300,7 +300,7 @@ const handleLogin = async () => {
 }
 
 .heart-icon {
-  color: #ff6b6b;
+  color: var(--color-like);
   filter: drop-shadow(0 4px 8px rgba(255, 107, 107, 0.3));
 }
 
@@ -416,7 +416,7 @@ const handleLogin = async () => {
   margin-top: 32px;
   text-align: center;
   padding-top: 24px;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--color-border);
 }
 
 .auth-footer p {

@@ -1023,7 +1023,7 @@ onMounted(async () => {
 }
 
 .form-group .success-hint {
-  color: #4caf50;
+  color: var(--color-success-500);
   font-weight: 500;
   margin-top: 8px;
   display: block;
@@ -1104,7 +1104,7 @@ onMounted(async () => {
   background: linear-gradient(135deg, rgba(244, 67, 54, 0.1), rgba(233, 30, 99, 0.1));
   border: 2px solid rgba(244, 67, 54, 0.3);
   border-radius: var(--radius-md);
-  color: #c33;
+  color: var(--color-error-500);
   font-weight: 600;
   animation: shake 0.5s ease;
 }

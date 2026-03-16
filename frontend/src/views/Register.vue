@@ -471,7 +471,7 @@ const handleRegister = async () => {
   align-items: center;
   gap: 8px;
   background: linear-gradient(135deg, #fff5f5, #ffe5e5);
-  color: #c33;
+  color: var(--color-error-500);
   padding: 12px 16px;
   border-radius: 12px;
   font-size: 0.9rem;

@@ -62,7 +62,7 @@ defineProps({
 
 .badge.success {
   background: linear-gradient(135deg, rgba(76, 175, 80, 0.15), rgba(102, 187, 106, 0.15));
-  color: #4caf50;
+  color: var(--color-success-500);
   border: 1px solid rgba(76, 175, 80, 0.3);
 }
 

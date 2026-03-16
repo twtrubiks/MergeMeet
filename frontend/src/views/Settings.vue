@@ -772,7 +772,7 @@ onUnmounted(() => {
   gap: 6px;
   font-size: 0.85rem;
   padding: 12px;
-  background: #f8f9fa;
+  background: var(--color-background-light);
   border-radius: var(--radius-sm);
 }
 
@@ -1054,7 +1054,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   padding: 16px 20px;
-  background: #f8f9fa;
+  background: var(--color-background-light);
   border-radius: var(--radius-md);
   text-decoration: none;
   color: var(--color-text-primary);

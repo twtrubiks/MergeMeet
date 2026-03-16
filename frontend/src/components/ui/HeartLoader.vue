@@ -109,7 +109,7 @@ defineProps({
 
 .loader-text {
   font-size: 1rem;
-  color: #666;
+  color: var(--color-text-muted);
   font-weight: 500;
   animation: fadeInOut 1.5s infinite;
 }
