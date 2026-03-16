@@ -201,8 +201,7 @@ const goToLogin = () => {
 .auth-card {
   position: relative;
   z-index: 1;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.97);
   border-radius: 24px;
   padding: 48px;
   max-width: 450px;

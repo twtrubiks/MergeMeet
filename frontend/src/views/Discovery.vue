@@ -619,6 +619,11 @@ onUnmounted(() => {
 
 .top-card {
   z-index: 10;
+}
+
+/* will-change 僅在動畫期間啟用，避免永久佔用 GPU 記憶體 */
+.candidate-card.exit-right,
+.candidate-card.exit-left {
   will-change: transform, opacity;
 }
 

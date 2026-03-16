@@ -584,8 +584,7 @@ onUnmounted(() => {
 .settings-card {
   position: relative;
   z-index: 1;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.97);
   border-radius: var(--radius-xl);
   padding: var(--space-12);
   max-width: min(480px, calc(100vw - 40px));
