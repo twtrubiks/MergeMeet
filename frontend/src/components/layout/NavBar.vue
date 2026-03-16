@@ -20,15 +20,15 @@
       <!-- 中間：導航連結 -->
       <nav class="navbar-center">
         <router-link to="/discovery" class="nav-link" active-class="active">
-          <n-icon size="20"><SearchOutline /></n-icon>
+          <Icon name="search" size="sm" decorative />
           <span class="nav-text">探索</span>
         </router-link>
         <router-link to="/matches" class="nav-link" active-class="active">
-          <n-icon size="20"><Heart /></n-icon>
+          <Icon name="heart" size="sm" decorative />
           <span class="nav-text">配對</span>
         </router-link>
         <router-link to="/messages" class="nav-link" active-class="active">
-          <n-icon size="20"><ChatbubbleEllipses /></n-icon>
+          <Icon name="chat" size="sm" decorative />
           <span class="nav-text">訊息</span>
         </router-link>
       </nav>
@@ -56,18 +56,11 @@
 import { computed, h } from 'vue'
 import { useRouter } from 'vue-router'
 import { NIcon, NDropdown, NButton, NAvatar } from 'naive-ui'
-import {
-  SearchOutline,
-  Heart,
-  ChatbubbleEllipses,
-  PersonOutline,
-  SettingsOutline,
-  LogOutOutline,
-  ShieldOutline
-} from '@vicons/ionicons5'
+import { PersonOutline, SettingsOutline, LogOutOutline, ShieldOutline } from '@vicons/ionicons5'
 import { useUserStore } from '@/stores/user'
 import { useProfileStore } from '@/stores/profile'
 import NotificationBell from '@/components/NotificationBell.vue'
+import Icon from '@/components/ui/Icon.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
