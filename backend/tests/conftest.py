@@ -21,6 +21,9 @@ from app.main import app  # noqa: E402
 from app.middleware.last_active import reset_session_factory, set_session_factory  # noqa: E402
 from app.services.content_moderation import ContentModerationService  # noqa: E402
 from app.services.photo_moderation import PhotoModerationService  # noqa: E402
+from app.services.redis_client import get_redis  # noqa: E402
+from app.services.token_blacklist import token_blacklist  # noqa: E402
+from app.services.token_invalidator import TokenInvalidator  # noqa: E402
 
 # 測試資料庫 URL（使用獨立的 PostgreSQL 測試資料庫）
 # 優先從環境變數讀取，預設值僅作為提醒
@@ -84,12 +87,25 @@ async def test_db(db_session: AsyncSession) -> AsyncGenerator[AsyncSession, None
 
 @pytest.fixture(scope="function")
 async def client(test_db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
-    """測試 HTTP Client"""
+    """測試 HTTP Client
+
+    Note:
+        httpx AsyncClient 不會觸發 ASGI lifespan 事件，
+        因此需要手動初始化 Redis 相關服務（模擬 main.py lifespan 的行為）。
+    """
 
     async def override_get_db():
         yield test_db
 
     app.dependency_overrides[get_db] = override_get_db
+
+    # 手動初始化 Redis（httpx 不觸發 lifespan，需模擬 main.py 的啟動邏輯）
+    try:
+        redis_conn = await get_redis()
+        await token_blacklist.set_redis(redis_conn)
+        TokenInvalidator.set_redis(redis_conn)
+    except Exception:
+        pass  # Redis 不可用時回退到內存模式
 
     async with AsyncClient(app=app, base_url="http://test", follow_redirects=True) as ac:
         yield ac
