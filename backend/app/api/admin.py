@@ -46,55 +46,51 @@ async def get_dashboard_stats(
     - 舉報統計（總數、待處理）
     - 封鎖統計
     """
-    # 用戶統計
-    total_users_result = await db.execute(select(func.count(User.id)))
-    total_users = total_users_result.scalar()
-
-    active_users_result = await db.execute(
-        select(func.count(User.id)).where(User.is_active.is_(True))
+    # 用戶統計（1 次查詢取代 3 次）
+    users_result = await db.execute(
+        select(
+            func.count(User.id).label("total"),
+            func.count(User.id).filter(User.is_active.is_(True)).label("active"),
+            func.count(User.id).filter(User.is_active.is_(False)).label("banned"),
+        )
     )
-    active_users = active_users_result.scalar()
+    users_row = users_result.one()
 
-    banned_users_result = await db.execute(
-        select(func.count(User.id)).where(User.is_active.is_(False))
+    # 配對統計（1 次查詢取代 2 次）
+    matches_result = await db.execute(
+        select(
+            func.count(Match.id).label("total"),
+            func.count(Match.id).filter(Match.status == "ACTIVE").label("active"),
+        )
     )
-    banned_users = banned_users_result.scalar()
-
-    # 配對統計
-    total_matches_result = await db.execute(select(func.count(Match.id)))
-    total_matches = total_matches_result.scalar()
-
-    active_matches_result = await db.execute(
-        select(func.count(Match.id)).where(Match.status == "ACTIVE")
-    )
-    active_matches = active_matches_result.scalar()
+    matches_row = matches_result.one()
 
     # 訊息統計
     total_messages_result = await db.execute(select(func.count(Message.id)))
     total_messages = total_messages_result.scalar()
 
-    # 舉報統計
-    total_reports_result = await db.execute(select(func.count(Report.id)))
-    total_reports = total_reports_result.scalar()
-
-    pending_reports_result = await db.execute(
-        select(func.count(Report.id)).where(Report.status == "PENDING")
+    # 舉報統計（1 次查詢取代 2 次）
+    reports_result = await db.execute(
+        select(
+            func.count(Report.id).label("total"),
+            func.count(Report.id).filter(Report.status == "PENDING").label("pending"),
+        )
     )
-    pending_reports = pending_reports_result.scalar()
+    reports_row = reports_result.one()
 
     # 封鎖統計
     total_blocked_result = await db.execute(select(func.count(BlockedUser.id)))
     total_blocked_users = total_blocked_result.scalar()
 
     return DashboardStatsResponse(
-        total_users=total_users,
-        active_users=active_users,
-        banned_users=banned_users,
-        total_matches=total_matches,
-        active_matches=active_matches,
+        total_users=users_row.total,
+        active_users=users_row.active,
+        banned_users=users_row.banned,
+        total_matches=matches_row.total,
+        active_matches=matches_row.active,
         total_messages=total_messages,
-        total_reports=total_reports,
-        pending_reports=pending_reports,
+        total_reports=reports_row.total,
+        pending_reports=reports_row.pending,
         total_blocked_users=total_blocked_users,
     )
 

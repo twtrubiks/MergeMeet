@@ -158,19 +158,24 @@ async def get_conversations(
     )
     profiles_by_user_id = {p.user_id: p for p in profiles_result.scalars().all()}
 
-    # 批次查詢 2：所有訊息（用於找最後一條訊息）
-    messages_result = await db.execute(
-        select(Message)
-        .where(and_(Message.match_id.in_(match_ids), Message.deleted_at.is_(None)))
-        .order_by(Message.match_id, desc(Message.sent_at))
+    # 批次查詢 2：用窗口函數取每個 match 的最後一條訊息
+    row_num = (
+        func.row_number()
+        .over(
+            partition_by=Message.match_id,
+            order_by=[desc(Message.sent_at), desc(Message.id)],
+        )
+        .label("rn")
     )
-    all_messages = messages_result.scalars().all()
-
-    # 整理每個 match 的最後一條訊息
-    last_messages_by_match = {}
-    for msg in all_messages:
-        if msg.match_id not in last_messages_by_match:
-            last_messages_by_match[msg.match_id] = msg
+    subq = (
+        select(Message.id, row_num)
+        .where(and_(Message.match_id.in_(match_ids), Message.deleted_at.is_(None)))
+        .subquery()
+    )
+    last_msgs_result = await db.execute(
+        select(Message).join(subq, Message.id == subq.c.id).where(subq.c.rn == 1)
+    )
+    last_messages_by_match = {msg.match_id: msg for msg in last_msgs_result.scalars().all()}
 
     # 批次查詢 3：所有未讀訊息數（1 次查詢取代 N 次）
     unread_counts_result = await db.execute(

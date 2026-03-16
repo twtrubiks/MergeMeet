@@ -381,74 +381,70 @@ async def get_moderation_stats(
     """
     取得審核統計數據（管理員）
     """
-    # 敏感詞統計
-    total_words_result = await db.execute(select(func.count(SensitiveWord.id)))
-    total_sensitive_words = total_words_result.scalar()
-
-    active_words_result = await db.execute(
-        select(func.count(SensitiveWord.id)).where(SensitiveWord.is_active.is_(True))
+    # 敏感詞統計（1 次查詢取代 2 次）
+    words_result = await db.execute(
+        select(
+            func.count(SensitiveWord.id).label("total"),
+            func.count(SensitiveWord.id).filter(SensitiveWord.is_active.is_(True)).label("active"),
+        )
     )
-    active_sensitive_words = active_words_result.scalar()
+    words_row = words_result.one()
 
-    # 申訴統計
-    total_appeals_result = await db.execute(select(func.count(ContentAppeal.id)))
-    total_appeals = total_appeals_result.scalar()
-
-    pending_appeals_result = await db.execute(
-        select(func.count(ContentAppeal.id)).where(ContentAppeal.status == "PENDING")
+    # 申訴統計（1 次查詢取代 4 次）
+    appeals_result = await db.execute(
+        select(
+            func.count(ContentAppeal.id).label("total"),
+            func.count(ContentAppeal.id).filter(ContentAppeal.status == "PENDING").label("pending"),
+            func.count(ContentAppeal.id)
+            .filter(ContentAppeal.status == "APPROVED")
+            .label("approved"),
+            func.count(ContentAppeal.id)
+            .filter(ContentAppeal.status == "REJECTED")
+            .label("rejected"),
+        )
     )
-    pending_appeals = pending_appeals_result.scalar()
+    appeals_row = appeals_result.one()
 
-    approved_appeals_result = await db.execute(
-        select(func.count(ContentAppeal.id)).where(ContentAppeal.status == "APPROVED")
-    )
-    approved_appeals = approved_appeals_result.scalar()
-
-    rejected_appeals_result = await db.execute(
-        select(func.count(ContentAppeal.id)).where(ContentAppeal.status == "REJECTED")
-    )
-    rejected_appeals = rejected_appeals_result.scalar()
-
-    # 違規統計
+    # 違規統計（1 次查詢取代 3 次）
     now = datetime.now(UTC)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week_start = now - timedelta(days=7)
     month_start = now - timedelta(days=30)
 
-    today_violations_result = await db.execute(
-        select(func.count(ModerationLog.id)).where(
-            and_(ModerationLog.is_approved.is_(False), ModerationLog.created_at >= today_start)
+    violations_result = await db.execute(
+        select(
+            func.count(ModerationLog.id)
+            .filter(
+                and_(ModerationLog.is_approved.is_(False), ModerationLog.created_at >= today_start)
+            )
+            .label("today"),
+            func.count(ModerationLog.id)
+            .filter(
+                and_(ModerationLog.is_approved.is_(False), ModerationLog.created_at >= week_start)
+            )
+            .label("week"),
+            func.count(ModerationLog.id)
+            .filter(
+                and_(ModerationLog.is_approved.is_(False), ModerationLog.created_at >= month_start)
+            )
+            .label("month"),
         )
     )
-    total_violations_today = today_violations_result.scalar()
-
-    week_violations_result = await db.execute(
-        select(func.count(ModerationLog.id)).where(
-            and_(ModerationLog.is_approved.is_(False), ModerationLog.created_at >= week_start)
-        )
-    )
-    total_violations_this_week = week_violations_result.scalar()
-
-    month_violations_result = await db.execute(
-        select(func.count(ModerationLog.id)).where(
-            and_(ModerationLog.is_approved.is_(False), ModerationLog.created_at >= month_start)
-        )
-    )
-    total_violations_this_month = month_violations_result.scalar()
+    violations_row = violations_result.one()
 
     # 最常觸發的敏感詞（簡化版，返回空列表）
     # 實際應該分析 triggered_word_ids 欄位
     most_triggered_words = []
 
     return ModerationStatsResponse(
-        total_sensitive_words=total_sensitive_words,
-        active_sensitive_words=active_sensitive_words,
-        total_appeals=total_appeals,
-        pending_appeals=pending_appeals,
-        approved_appeals=approved_appeals,
-        rejected_appeals=rejected_appeals,
-        total_violations_today=total_violations_today,
-        total_violations_this_week=total_violations_this_week,
-        total_violations_this_month=total_violations_this_month,
+        total_sensitive_words=words_row.total,
+        active_sensitive_words=words_row.active,
+        total_appeals=appeals_row.total,
+        pending_appeals=appeals_row.pending,
+        approved_appeals=appeals_row.approved,
+        rejected_appeals=appeals_row.rejected,
+        total_violations_today=violations_row.today,
+        total_violations_this_week=violations_row.week,
+        total_violations_this_month=violations_row.month,
         most_triggered_words=most_triggered_words,
     )

@@ -34,7 +34,7 @@ import redis.asyncio as redis
 from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from geoalchemy2.functions import ST_DWithin
-from sqlalchemy import and_, case, delete, func, or_, select
+from sqlalchemy import and_, case, delete, func, or_, select, union_all
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -152,38 +152,36 @@ async def browse_users(
         else:
             query = query.where(Profile.gender == gender_preference)
 
-    # 排除已喜歡的用戶（包括互相喜歡的）
-    liked_users_subquery = select(Like.to_user_id).where(Like.from_user_id == current_user.id)
-    query = query.where(Profile.user_id.notin_(liked_users_subquery))
-
-    # 排除已配對的用戶
-    matched_users_subquery = select(
-        case((Match.user1_id == current_user.id, Match.user2_id), else_=Match.user1_id)
-    ).where(
-        or_(Match.user1_id == current_user.id, Match.user2_id == current_user.id),
-        Match.status == "ACTIVE",
-    )
-    query = query.where(Profile.user_id.notin_(matched_users_subquery))
-
-    # 排除已封鎖的用戶
-    blocked_subquery = select(BlockedUser.blocked_id).where(
-        BlockedUser.blocker_id == current_user.id
-    )
-    query = query.where(Profile.user_id.notin_(blocked_subquery))
-
-    # 排除封鎖我的用戶
-    blocked_me_subquery = select(BlockedUser.blocker_id).where(
-        BlockedUser.blocked_id == current_user.id
-    )
-    query = query.where(Profile.user_id.notin_(blocked_me_subquery))
-
-    # 排除 24 小時內跳過的用戶（類似 Tinder 做法）
+    # 排除用戶：已喜歡、已配對、已封鎖（雙向）、24h 內跳過
+    # 合併成一個 UNION 子查詢，只做一次 anti-join
     pass_cutoff = datetime.now(UTC) - timedelta(hours=24)
-    passed_users_subquery = select(Pass.to_user_id).where(
-        Pass.from_user_id == current_user.id,
-        Pass.passed_at > pass_cutoff,  # 只排除 24 小時內跳過的
-    )
-    query = query.where(Profile.user_id.notin_(passed_users_subquery))
+    excluded_users = union_all(
+        # 已喜歡的用戶
+        select(Like.to_user_id.label("user_id")).where(Like.from_user_id == current_user.id),
+        # 已配對的用戶
+        select(
+            case((Match.user1_id == current_user.id, Match.user2_id), else_=Match.user1_id).label(
+                "user_id"
+            )
+        ).where(
+            or_(Match.user1_id == current_user.id, Match.user2_id == current_user.id),
+            Match.status == "ACTIVE",
+        ),
+        # 我封鎖的用戶
+        select(BlockedUser.blocked_id.label("user_id")).where(
+            BlockedUser.blocker_id == current_user.id
+        ),
+        # 封鎖我的用戶
+        select(BlockedUser.blocker_id.label("user_id")).where(
+            BlockedUser.blocked_id == current_user.id
+        ),
+        # 24h 內跳過的用戶
+        select(Pass.to_user_id.label("user_id")).where(
+            Pass.from_user_id == current_user.id,
+            Pass.passed_at > pass_cutoff,
+        ),
+    ).subquery("excluded")
+    query = query.where(Profile.user_id.notin_(select(excluded_users.c.user_id)))
 
     # 限制數量（先取較多候選人，稍後排序後再限制）
     query = query.limit(limit * 3)
