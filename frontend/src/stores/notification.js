@@ -13,6 +13,7 @@
  * GET  /api/notifications/unread-count - 取得未讀數量
  * PUT  /api/notifications/{id}/read    - 標記單個為已讀
  * PUT  /api/notifications/read-all     - 標記全部已讀
+ * PUT  /api/notifications/read-by-match/{match_id} - 標記指定配對的訊息通知為已讀
  * DELETE /api/notifications/{id}       - 刪除單個通知
  * ==============================
  */
@@ -400,35 +401,13 @@ export const useNotificationStore = defineStore('notification', () => {
    * @param {string} matchId - 配對 ID
    */
   const markMessageNotificationsAsReadByMatchIdAPI = async (matchId) => {
-    // 1. 收集符合條件的通知 ID
-    const notificationIds = notifications.value
-      .filter((n) => {
-        const notificationMatchId = n.data?.matchId || n.data?.match_id
-        return (
-          n.type === NotificationType.NEW_MESSAGE &&
-          !n.read &&
-          notificationMatchId === matchId &&
-          n.fromAPI // 只處理有資料庫 ID 的通知
-        )
-      })
-      .map((n) => n.id)
-
-    if (notificationIds.length === 0) {
-      // 沒有需要標記的通知，仍然更新本地狀態
-      markMessageNotificationsAsReadByMatchId(matchId)
-      return
-    }
-
-    // 2. 批量呼叫 API
     try {
-      await Promise.all(notificationIds.map((id) => apiClient.put(`/notifications/${id}/read`)))
-      // 3. 成功後更新本地狀態
+      await apiClient.put(`/notifications/read-by-match/${matchId}`)
+      // 成功後更新本地狀態
       markMessageNotificationsAsReadByMatchId(matchId)
       logger.debug(
         '[Notification] Marked message notifications as read via API for match:',
-        matchId,
-        'count:',
-        notificationIds.length
+        matchId
       )
     } catch (error) {
       logger.error('[Notification] Failed to mark message notifications as read:', error)

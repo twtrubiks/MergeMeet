@@ -501,6 +501,205 @@ class TestNotificationAPI:
         assert result.scalar_one_or_none() is None
 
     @pytest.mark.asyncio
+    async def test_mark_as_read_by_match_id(
+        self, client: AsyncClient, test_db: AsyncSession, test_user_with_token
+    ):
+        """測試：標記指定配對的訊息通知為已讀"""
+        user = test_user_with_token["user"]
+        match_id = uuid.uuid4()
+
+        # 建立 3 個同 match_id 的未讀訊息通知
+        for i in range(3):
+            test_db.add(
+                Notification(
+                    user_id=user.id,
+                    type="notification_message",
+                    title=f"訊息 {i}",
+                    data={"match_id": str(match_id), "sender_id": str(uuid.uuid4())},
+                    is_read=False,
+                )
+            )
+        await test_db.commit()
+
+        response = await client.put(
+            f"/api/notifications/read-by-match/{match_id}",
+            headers={"Authorization": f"Bearer {test_user_with_token['token']}"},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+
+        # 驗證全部已標記為已讀
+        result = await test_db.execute(
+            select(Notification).where(
+                Notification.user_id == user.id,
+                Notification.type == "notification_message",
+                Notification.data["match_id"].astext == str(match_id),
+            )
+        )
+        for n in result.scalars().all():
+            assert n.is_read is True
+
+    @pytest.mark.asyncio
+    async def test_mark_as_read_by_match_id_does_not_affect_other_matches(
+        self, client: AsyncClient, test_db: AsyncSession, test_user_with_token
+    ):
+        """測試：不影響其他配對的通知"""
+        user = test_user_with_token["user"]
+        target_match_id = uuid.uuid4()
+        other_match_id = uuid.uuid4()
+
+        # 目標配對的通知
+        test_db.add(
+            Notification(
+                user_id=user.id,
+                type="notification_message",
+                title="目標配對",
+                data={"match_id": str(target_match_id)},
+                is_read=False,
+            )
+        )
+        # 其他配對的通知
+        test_db.add(
+            Notification(
+                user_id=user.id,
+                type="notification_message",
+                title="其他配對",
+                data={"match_id": str(other_match_id)},
+                is_read=False,
+            )
+        )
+        await test_db.commit()
+
+        await client.put(
+            f"/api/notifications/read-by-match/{target_match_id}",
+            headers={"Authorization": f"Bearer {test_user_with_token['token']}"},
+        )
+
+        # 其他配對的通知應該仍未讀
+        result = await test_db.execute(
+            select(Notification).where(
+                Notification.user_id == user.id,
+                Notification.data["match_id"].astext == str(other_match_id),
+            )
+        )
+        other_notification = result.scalar_one()
+        assert other_notification.is_read is False
+
+    @pytest.mark.asyncio
+    async def test_mark_as_read_by_match_id_does_not_affect_other_types(
+        self, client: AsyncClient, test_db: AsyncSession, test_user_with_token
+    ):
+        """測試：不影響其他類型的通知（如 notification_match）"""
+        user = test_user_with_token["user"]
+        match_id = uuid.uuid4()
+
+        # 訊息通知
+        test_db.add(
+            Notification(
+                user_id=user.id,
+                type="notification_message",
+                title="訊息",
+                data={"match_id": str(match_id)},
+                is_read=False,
+            )
+        )
+        # 配對通知（同 match_id 但不同類型）
+        test_db.add(
+            Notification(
+                user_id=user.id,
+                type="notification_match",
+                title="配對",
+                data={"match_id": str(match_id)},
+                is_read=False,
+            )
+        )
+        await test_db.commit()
+
+        await client.put(
+            f"/api/notifications/read-by-match/{match_id}",
+            headers={"Authorization": f"Bearer {test_user_with_token['token']}"},
+        )
+
+        # notification_match 應該仍未讀
+        result = await test_db.execute(
+            select(Notification).where(
+                Notification.user_id == user.id,
+                Notification.type == "notification_match",
+            )
+        )
+        match_notification = result.scalar_one()
+        assert match_notification.is_read is False
+
+    @pytest.mark.asyncio
+    async def test_mark_as_read_by_match_id_no_matching_notifications(
+        self, client: AsyncClient, test_user_with_token
+    ):
+        """測試：無符合通知時回傳成功（空操作）"""
+        fake_match_id = uuid.uuid4()
+
+        response = await client.put(
+            f"/api/notifications/read-by-match/{fake_match_id}",
+            headers={"Authorization": f"Bearer {test_user_with_token['token']}"},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_mark_as_read_by_match_id_skips_already_read(
+        self, client: AsyncClient, test_db: AsyncSession, test_user_with_token
+    ):
+        """測試：已讀通知不會出錯"""
+        user = test_user_with_token["user"]
+        match_id = uuid.uuid4()
+
+        # 建立 1 個已讀 + 1 個未讀
+        test_db.add(
+            Notification(
+                user_id=user.id,
+                type="notification_message",
+                title="已讀",
+                data={"match_id": str(match_id)},
+                is_read=True,
+            )
+        )
+        test_db.add(
+            Notification(
+                user_id=user.id,
+                type="notification_message",
+                title="未讀",
+                data={"match_id": str(match_id)},
+                is_read=False,
+            )
+        )
+        await test_db.commit()
+
+        response = await client.put(
+            f"/api/notifications/read-by-match/{match_id}",
+            headers={"Authorization": f"Bearer {test_user_with_token['token']}"},
+        )
+
+        assert response.status_code == 200
+
+        # 兩個都應該是已讀
+        result = await test_db.execute(
+            select(Notification).where(
+                Notification.user_id == user.id,
+                Notification.data["match_id"].astext == str(match_id),
+            )
+        )
+        for n in result.scalars().all():
+            assert n.is_read is True
+
+    @pytest.mark.asyncio
+    async def test_mark_as_read_by_match_id_unauthorized(self, client: AsyncClient):
+        """測試：未授權存取"""
+        fake_match_id = uuid.uuid4()
+        response = await client.put(f"/api/notifications/read-by-match/{fake_match_id}")
+        assert response.status_code in [401, 403]
+
+    @pytest.mark.asyncio
     async def test_unauthorized_access(self, client: AsyncClient):
         """測試：未授權存取"""
         response = await client.get("/api/notifications")

@@ -122,6 +122,28 @@ async def mark_all_as_read(
     return SuccessResponse(success=True)
 
 
+@router.put("/read-by-match/{match_id}", response_model=SuccessResponse)
+async def mark_as_read_by_match(
+    match_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """標記指定配對的所有訊息通知為已讀"""
+    await db.execute(
+        update(Notification)
+        .where(
+            Notification.user_id == current_user.id,
+            Notification.type == "notification_message",
+            Notification.is_read == False,  # noqa: E712
+            Notification.data["match_id"].astext == str(match_id),
+        )
+        .values(is_read=True)
+    )
+    await db.commit()
+
+    return SuccessResponse(success=True)
+
+
 @router.delete("/{notification_id}", response_model=SuccessResponse)
 async def delete_notification(
     notification_id: uuid.UUID,
