@@ -30,8 +30,24 @@ export const useUserStore = defineStore('user', () => {
     isLocked: false
   })
 
+  /**
+   * 檢查 JWT Token 是否已過期
+   * @returns {boolean} true 表示已過期或無法解析
+   */
+  const isTokenExpired = () => {
+    if (!accessToken.value) return true
+    try {
+      const payload = accessToken.value.split('.')[1]
+      const { exp } = JSON.parse(base64UrlDecode(payload))
+      if (!exp) return false // 沒有 exp 欄位則不判定過期
+      return Date.now() >= exp * 1000
+    } catch {
+      return true
+    }
+  }
+
   // 計算屬性
-  const isAuthenticated = computed(() => !!accessToken.value)
+  const isAuthenticated = computed(() => !!accessToken.value && !isTokenExpired())
   const userEmail = computed(() => user.value?.email || null)
   const isAdmin = computed(() => user.value?.is_admin === true)
 

@@ -247,11 +247,11 @@ export const useChatStore = defineStore('chat', () => {
     try {
       await apiClient.delete(`/messages/messages/${messageId}`)
 
-      // 從本地狀態移除
+      // 從本地狀態移除（使用 filter 創建新陣列觸發 Vue 響應式）
       for (const matchId in messages.value) {
         const index = messages.value[matchId].findIndex((m) => m.id === messageId)
         if (index > -1) {
-          messages.value[matchId].splice(index, 1)
+          messages.value[matchId] = messages.value[matchId].filter((m) => m.id !== messageId)
           break
         }
       }
@@ -476,11 +476,11 @@ export const useChatStore = defineStore('chat', () => {
 
     logger.debug('[Chat] Received message_deleted event:', data)
 
-    // 從本地狀態移除訊息
+    // 從本地狀態移除訊息（使用 filter 創建新陣列觸發 Vue 響應式）
     if (messages.value[match_id]) {
-      const index = messages.value[match_id].findIndex((m) => m.id === message_id)
-      if (index > -1) {
-        messages.value[match_id].splice(index, 1)
+      const before = messages.value[match_id].length
+      messages.value[match_id] = messages.value[match_id].filter((m) => m.id !== message_id)
+      if (messages.value[match_id].length < before) {
         logger.debug('[Chat] Message removed from local state:', message_id)
       }
     }
