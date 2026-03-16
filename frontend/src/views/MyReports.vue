@@ -287,7 +287,7 @@ onMounted(() => {
   text-align: center;
   font-size: 32px;
   font-weight: 700;
-  color: #333;
+  color: var(--color-text-primary);
   margin-bottom: 20px;
 }
 
@@ -308,7 +308,7 @@ onMounted(() => {
   cursor: pointer;
   transition: all 0.3s ease;
   background: rgba(255, 255, 255, 0.8);
-  color: #666;
+  color: var(--color-text-muted);
 }
 
 .tab-btn:hover {
@@ -331,8 +331,8 @@ onMounted(() => {
 .spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #ff6b6b;
+  border: 4px solid var(--color-border-light);
+  border-top: 4px solid var(--color-like);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 16px;
@@ -363,7 +363,7 @@ onMounted(() => {
 
 .empty-state h2 {
   font-size: 20px;
-  color: #333;
+  color: var(--color-text-primary);
   margin: 0 0 8px;
 }
 
@@ -404,7 +404,7 @@ onMounted(() => {
 
 .type-inappropriate {
   background: #ffe0e0;
-  color: #c33;
+  color: var(--color-error-500);
 }
 
 .type-harassment {
@@ -423,8 +423,8 @@ onMounted(() => {
 }
 
 .type-other {
-  background: #f5f5f5;
-  color: #666;
+  background: var(--color-background-light);
+  color: var(--color-text-muted);
 }
 
 .type-photo {
@@ -453,8 +453,8 @@ onMounted(() => {
 
 .status-dismissed,
 .status-rejected {
-  background: #f5f5f5;
-  color: #999;
+  background: var(--color-background-light);
+  color: var(--color-text-light);
 }
 
 /* 舉報內容 */
@@ -465,7 +465,7 @@ onMounted(() => {
 .report-reason {
   margin: 0;
   font-size: 15px;
-  color: #333;
+  color: var(--color-text-primary);
   line-height: 1.5;
 }
 
@@ -473,30 +473,30 @@ onMounted(() => {
 .appeal-label,
 .response-label {
   font-size: 13px;
-  color: #666;
+  color: var(--color-text-muted);
   margin: 0 0 4px;
   font-weight: 600;
 }
 
 /* 管理員回覆 */
 .admin-response {
-  background: #f8f9fa;
+  background: var(--color-background-light);
   border-radius: 12px;
   padding: 12px;
   margin-bottom: 12px;
-  border-left: 3px solid #ff6b6b;
+  border-left: 3px solid var(--color-like);
 }
 
 .response-content {
   margin: 0;
   font-size: 14px;
-  color: #333;
+  color: var(--color-text-primary);
   line-height: 1.5;
 }
 
 /* 舉報時間 */
 .report-footer {
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--color-border-light);
   padding-top: 12px;
   display: flex;
   justify-content: space-between;

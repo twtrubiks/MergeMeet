@@ -296,7 +296,7 @@ onUnmounted(() => {
   border: none;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.9);
-  color: #333;
+  color: var(--color-text-primary);
   font-size: 28px;
   cursor: pointer;
   display: flex;
@@ -365,14 +365,14 @@ onUnmounted(() => {
 .user-name {
   font-size: 28px;
   font-weight: 700;
-  color: #333;
+  color: var(--color-text-primary);
   margin: 0;
 }
 
 .user-age {
   font-size: 24px;
   font-weight: 400;
-  color: #666;
+  color: var(--color-text-muted);
 }
 
 /* 距離 */
@@ -381,7 +381,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 4px;
   font-size: 16px;
-  color: #888;
+  color: var(--color-text-light);
   margin: 0 0 16px;
 }
 
@@ -410,20 +410,20 @@ onUnmounted(() => {
 /* 自我介紹 */
 .user-bio {
   padding-top: 16px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--color-border-light);
 }
 
 .bio-title {
   font-size: 16px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
   margin: 0 0 8px;
 }
 
 .bio-content {
   font-size: 15px;
   line-height: 1.6;
-  color: #555;
+  color: var(--color-text-secondary);
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;

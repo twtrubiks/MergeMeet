@@ -170,7 +170,7 @@ onMounted(() => {
   text-align: center;
   font-size: 32px;
   font-weight: 700;
-  color: #333;
+  color: var(--color-text-primary);
   margin-bottom: 30px;
 }
 
@@ -184,8 +184,8 @@ onMounted(() => {
   width: 50px;
   height: 50px;
   margin: 0 auto 20px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #ff6b6b;
+  border: 4px solid var(--color-border-light);
+  border-top: 4px solid var(--color-like);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -206,14 +206,14 @@ onMounted(() => {
 }
 
 .error-message p {
-  color: #e74c3c;
+  color: var(--color-error-500);
   font-size: 16px;
   margin-bottom: 20px;
 }
 
 .btn-retry {
   padding: 12px 30px;
-  background: #ff6b6b;
+  background: var(--color-like);
   color: white;
   border: none;
   border-radius: 25px;
@@ -224,7 +224,7 @@ onMounted(() => {
 }
 
 .btn-retry:hover {
-  background: #ff5252;
+  background: var(--color-like-hover);
   transform: translateY(-2px);
 }
 
@@ -241,13 +241,13 @@ onMounted(() => {
 
 .empty-state h2 {
   font-size: 24px;
-  color: #333;
+  color: var(--color-text-primary);
   margin-bottom: 10px;
 }
 
 .empty-state p {
   font-size: 16px;
-  color: #666;
+  color: var(--color-text-muted);
   margin-bottom: 30px;
 }
 
@@ -311,7 +311,7 @@ onMounted(() => {
 .blocked-email {
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
   margin: 0 0 6px;
 }
 
@@ -323,21 +323,21 @@ onMounted(() => {
 
 .blocked-reason {
   padding: 12px;
-  background: #f5f5f5;
+  background: var(--color-background-light);
   border-radius: 8px;
-  border-left: 4px solid #ff6b6b;
+  border-left: 4px solid var(--color-like);
 }
 
 .reason-label {
   font-size: 12px;
-  color: #666;
+  color: var(--color-text-muted);
   font-weight: 600;
   margin: 0 0 6px;
 }
 
 .reason-text {
   font-size: 14px;
-  color: #333;
+  color: var(--color-text-primary);
   margin: 0;
   line-height: 1.5;
 }
@@ -419,13 +419,13 @@ onMounted(() => {
 .modal-title {
   font-size: 24px;
   font-weight: 700;
-  color: #333;
+  color: var(--color-text-primary);
   margin: 0 0 12px;
 }
 
 .modal-subtitle {
   font-size: 15px;
-  color: #666;
+  color: var(--color-text-muted);
   line-height: 1.5;
   margin: 0 0 30px;
 }
@@ -447,12 +447,12 @@ onMounted(() => {
 }
 
 .btn-cancel {
-  background: #f5f5f5;
-  color: #666;
+  background: var(--color-background-light);
+  color: var(--color-text-muted);
 }
 
 .btn-cancel:hover {
-  background: #e0e0e0;
+  background: var(--color-border);
 }
 
 .btn-confirm {

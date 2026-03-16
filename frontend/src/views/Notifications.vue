@@ -315,7 +315,7 @@ onMounted(() => {
   text-align: center;
   font-size: 32px;
   font-weight: 700;
-  color: #333;
+  color: var(--color-text-primary);
   margin-bottom: 20px;
 }
 
@@ -328,7 +328,7 @@ onMounted(() => {
 
 .mark-all-btn {
   padding: 10px 20px;
-  background: #ff6b6b;
+  background: var(--color-like);
   color: white;
   border: none;
   border-radius: 20px;
@@ -339,7 +339,7 @@ onMounted(() => {
 }
 
 .mark-all-btn:hover:not(:disabled) {
-  background: #ff5252;
+  background: var(--color-like-hover);
   transform: translateY(-2px);
 }
 
@@ -357,8 +357,8 @@ onMounted(() => {
 .spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #ff6b6b;
+  border: 4px solid var(--color-border-light);
+  border-top: 4px solid var(--color-like);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 16px;
@@ -389,7 +389,7 @@ onMounted(() => {
 
 .empty-state h2 {
   font-size: 20px;
-  color: #333;
+  color: var(--color-text-primary);
   margin: 0 0 8px;
 }
 
@@ -414,7 +414,7 @@ onMounted(() => {
   cursor: pointer;
   transition: background-color 0.2s;
   position: relative;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid var(--color-background-light);
 }
 
 .notification-item:last-child {
@@ -422,7 +422,7 @@ onMounted(() => {
 }
 
 .notification-item:hover {
-  background-color: #f8f9fa;
+  background-color: var(--color-background-light);
 }
 
 .notification-item.unread {
@@ -459,7 +459,7 @@ onMounted(() => {
 }
 
 .icon-default {
-  background-color: #f5f5f5;
+  background-color: var(--color-background-light);
 }
 
 /* 通知內容 */
@@ -471,13 +471,13 @@ onMounted(() => {
 .notification-title {
   font-weight: 600;
   font-size: 15px;
-  color: #333;
+  color: var(--color-text-primary);
   margin-bottom: 4px;
 }
 
 .notification-body {
   font-size: 14px;
-  color: #666;
+  color: var(--color-text-muted);
   margin-bottom: 6px;
   line-height: 1.4;
 }
@@ -521,14 +521,14 @@ onMounted(() => {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background-color: #ff6b6b;
+  background-color: var(--color-like);
 }
 
 /* 載入更多 */
 .load-more {
   padding: 16px;
   text-align: center;
-  border-top: 1px solid #f5f5f5;
+  border-top: 1px solid var(--color-background-light);
 }
 
 .load-more-btn {

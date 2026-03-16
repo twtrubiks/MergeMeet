@@ -378,7 +378,7 @@ const handleRegister = async () => {
 }
 
 .auth-header p {
-  color: #555;
+  color: var(--color-text-secondary);
   font-size: 1rem;
   font-weight: 500;
 }
@@ -396,7 +396,7 @@ const handleRegister = async () => {
 .password-strength {
   width: 100%;
   height: 4px;
-  background: #e0e0e0;
+  background: var(--color-border);
   border-radius: 2px;
   overflow: hidden;
   margin-top: -16px;
@@ -425,7 +425,7 @@ const handleRegister = async () => {
 }
 
 .hint {
-  color: #555;
+  color: var(--color-text-secondary);
   font-size: 0.8rem;
   font-weight: 500;
   margin-top: -8px;
@@ -439,7 +439,7 @@ const handleRegister = async () => {
 .date-label {
   display: block;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
   font-size: 0.85rem;
   margin-bottom: 8px;
 }
@@ -447,7 +447,7 @@ const handleRegister = async () => {
 .date-input {
   width: 100%;
   padding: 14px 16px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--color-border);
   border-radius: 12px;
   font-size: 1rem;
   background: white;
@@ -462,7 +462,7 @@ const handleRegister = async () => {
 }
 
 .date-input:disabled {
-  background-color: #f5f5f5;
+  background-color: var(--color-background-light);
   cursor: not-allowed;
   opacity: 0.7;
 }
@@ -501,11 +501,11 @@ const handleRegister = async () => {
   margin-top: 24px;
   text-align: center;
   padding-top: 20px;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--color-border);
 }
 
 .auth-footer p {
-  color: #555;
+  color: var(--color-text-secondary);
   font-size: 0.95rem;
 }
 

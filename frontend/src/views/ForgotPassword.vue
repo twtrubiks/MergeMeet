@@ -304,7 +304,7 @@ const goToLogin = () => {
 }
 
 .success-message h2 {
-  color: #4caf50;
+  color: var(--color-success-500);
   font-size: 1.8rem;
   margin-bottom: 16px;
   font-weight: 600;
@@ -340,7 +340,7 @@ const goToLogin = () => {
   margin-top: 32px;
   text-align: center;
   padding-top: 24px;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--color-border);
 }
 
 .auth-footer p {

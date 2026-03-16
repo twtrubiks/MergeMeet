@@ -244,7 +244,7 @@ const formatTime = (timestamp) => {
 
 <style scoped>
 .bell-button {
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .bell-button:hover {
@@ -264,13 +264,13 @@ const formatTime = (timestamp) => {
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--color-border-light);
 }
 
 .header-title {
   font-weight: 600;
   font-size: 16px;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .mark-all-btn {
@@ -300,11 +300,11 @@ const formatTime = (timestamp) => {
   cursor: pointer;
   transition: background-color 0.2s;
   position: relative;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid var(--color-background-light);
 }
 
 .notification-item:hover {
-  background-color: #f8f9fa;
+  background-color: var(--color-background-light);
 }
 
 .notification-item.unread {
@@ -345,8 +345,8 @@ const formatTime = (timestamp) => {
 }
 
 .icon-default {
-  background-color: #f5f5f5;
-  color: #666;
+  background-color: var(--color-background-light);
+  color: var(--color-text-muted);
 }
 
 .notification-content {
@@ -357,14 +357,14 @@ const formatTime = (timestamp) => {
 .notification-title {
   font-weight: 500;
   font-size: 14px;
-  color: #333;
+  color: var(--color-text-primary);
   margin-bottom: 4px;
   line-height: 1.3;
 }
 
 .notification-preview {
   font-size: 13px;
-  color: #666;
+  color: var(--color-text-muted);
   margin-bottom: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -380,7 +380,7 @@ const formatTime = (timestamp) => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: #ff6b6b;
+  background-color: var(--color-like);
   flex-shrink: 0;
   margin-left: 8px;
   margin-top: 4px;
@@ -389,7 +389,7 @@ const formatTime = (timestamp) => {
 /* 查看全部連結 */
 .view-all {
   padding: 12px 16px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--color-border-light);
   text-align: center;
 }
 
@@ -402,7 +402,7 @@ const formatTime = (timestamp) => {
 }
 
 .view-all-link:hover {
-  color: #ff5252;
+  color: var(--color-like-hover);
   text-decoration: underline;
 }
 </style>

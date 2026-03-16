@@ -1607,7 +1607,7 @@ onMounted(() => {
 <style scoped>
 .admin-dashboard {
   min-height: 100vh;
-  background-color: #f5f7fa;
+  background-color: var(--color-background-light);
 }
 
 .admin-header {
@@ -1632,7 +1632,7 @@ onMounted(() => {
 }
 
 .admin-email {
-  color: #666;
+  color: var(--color-text-muted);
   font-size: 14px;
 }
 
@@ -1713,12 +1713,12 @@ onMounted(() => {
 .stat-value {
   font-size: 32px;
   font-weight: 700;
-  color: #2c3e50;
+  color: var(--color-text-dark);
 }
 
 .stat-label {
   font-size: 14px;
-  color: #7f8c8d;
+  color: var(--color-text-light);
   margin-top: 4px;
 }
 
@@ -1738,7 +1738,7 @@ onMounted(() => {
 .empty-state {
   text-align: center;
   padding: 60px 20px;
-  color: #999;
+  color: var(--color-text-light);
 }
 
 .reports-list {
@@ -1766,12 +1766,12 @@ onMounted(() => {
 
 .report-body p {
   margin: 8px 0;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .report-time {
   font-size: 12px;
-  color: #999;
+  color: var(--color-text-light);
   margin-top: 8px;
 }
 
@@ -1853,12 +1853,12 @@ onMounted(() => {
 
 .appeal-body p {
   margin: 8px 0;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .appeal-time {
   font-size: 12px;
-  color: #999;
+  color: var(--color-text-light);
   margin-top: 8px;
 }
 
@@ -1873,7 +1873,7 @@ onMounted(() => {
 }
 
 .admin-response {
-  background: #f5f7fa;
+  background: var(--color-background-light);
   padding: 12px;
   border-radius: 8px;
   margin-top: 12px;
@@ -1881,12 +1881,12 @@ onMounted(() => {
 
 .admin-response p {
   margin: 4px 0;
-  color: #666;
+  color: var(--color-text-muted);
 }
 
 .response-time {
   font-size: 12px;
-  color: #999;
+  color: var(--color-text-light);
 }
 
 /* User management styles */
@@ -1941,7 +1941,7 @@ onMounted(() => {
   height: 200px;
   overflow: hidden;
   cursor: pointer;
-  background-color: #f5f7fa;
+  background-color: var(--color-background-light);
 }
 
 .photo-image img {
@@ -1957,7 +1957,7 @@ onMounted(() => {
 
 .photo-info {
   padding: 12px 16px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--color-border-light);
 }
 
 .photo-info p {
@@ -1966,12 +1966,12 @@ onMounted(() => {
 
 .photo-name {
   font-size: 14px;
-  color: #2c3e50;
+  color: var(--color-text-dark);
 }
 
 .photo-email {
   font-size: 12px;
-  color: #7f8c8d;
+  color: var(--color-text-light);
 }
 
 .photo-time {
@@ -1994,12 +1994,12 @@ onMounted(() => {
   text-align: left;
   margin-top: 16px;
   padding: 16px;
-  background: #f5f7fa;
+  background: var(--color-background-light);
   border-radius: 8px;
 }
 
 .detail-info p {
   margin: 8px 0;
-  color: #666;
+  color: var(--color-text-muted);
 }
 </style>

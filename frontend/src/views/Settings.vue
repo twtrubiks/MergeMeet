@@ -642,7 +642,7 @@ onUnmounted(() => {
 }
 
 .settings-header p {
-  color: #666;
+  color: var(--color-text-muted);
   font-size: 1rem;
 }
 
@@ -685,10 +685,10 @@ onUnmounted(() => {
   gap: 8px;
   font-size: 1.1rem;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
   margin-bottom: 20px;
   padding-bottom: 12px;
-  border-bottom: 2px solid #f0f0f0;
+  border-bottom: 2px solid var(--color-border-light);
 }
 
 /* 區塊標題 */
@@ -702,10 +702,10 @@ onUnmounted(() => {
   gap: 8px;
   font-size: 1.2rem;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
   margin-bottom: 24px;
   padding-bottom: 12px;
-  border-bottom: 2px solid #f0f0f0;
+  border-bottom: 2px solid var(--color-border-light);
 }
 
 .section-icon {
@@ -735,14 +735,14 @@ onUnmounted(() => {
 }
 
 .success-state h3 {
-  color: #4caf50;
+  color: var(--color-success-500);
   font-size: 1.8rem;
   margin-bottom: 16px;
   font-weight: 600;
 }
 
 .success-text {
-  color: #666;
+  color: var(--color-text-muted);
   margin-bottom: 8px;
   font-size: 1.1rem;
 }
@@ -781,12 +781,12 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #e53935;
+  color: var(--color-error-500);
   transition: color 0.3s ease;
 }
 
 .password-strength span.valid {
-  color: #4caf50;
+  color: var(--color-success-500);
 }
 
 .password-strength span::before {
@@ -799,7 +799,7 @@ onUnmounted(() => {
 }
 
 .error-message {
-  color: #e53935;
+  color: var(--color-error-500);
   font-size: 0.9rem;
   text-align: center;
   padding: 12px;
@@ -813,7 +813,7 @@ onUnmounted(() => {
   margin-top: 32px;
   text-align: center;
   padding-top: 24px;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--color-border);
 }
 
 .back-link {
@@ -842,7 +842,7 @@ onUnmounted(() => {
 
 .form-label {
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
   font-size: 0.95rem;
 }
 
@@ -862,12 +862,12 @@ onUnmounted(() => {
 
 .age-input label {
   font-size: 0.8rem;
-  color: #666;
+  color: var(--color-text-muted);
 }
 
 .age-input input {
   padding: 12px 16px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--color-border);
   border-radius: 12px;
   font-size: 1rem;
   text-align: center;
@@ -880,7 +880,7 @@ onUnmounted(() => {
 }
 
 .age-input input:disabled {
-  background: #f5f5f5;
+  background: var(--color-background-light);
   cursor: not-allowed;
 }
 
@@ -891,7 +891,7 @@ onUnmounted(() => {
 }
 
 .field-error {
-  color: #e53935;
+  color: var(--color-error-500);
   font-size: 0.85rem;
   margin: 0;
 }
@@ -968,7 +968,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   padding: 16px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--color-border);
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -996,12 +996,12 @@ onUnmounted(() => {
 .option-label {
   font-size: 0.9rem;
   font-weight: 500;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 /* 成功訊息 */
 .success-message {
-  color: #4caf50;
+  color: var(--color-success-500);
   font-size: 0.9rem;
   text-align: center;
   padding: 12px;
@@ -1036,7 +1036,7 @@ onUnmounted(() => {
 }
 
 .loading-state p {
-  color: #666;
+  color: var(--color-text-muted);
   font-size: 0.95rem;
 }
 
@@ -1058,7 +1058,7 @@ onUnmounted(() => {
   background: #f8f9fa;
   border-radius: 12px;
   text-decoration: none;
-  color: #333;
+  color: var(--color-text-primary);
   transition: all 0.3s ease;
 }
 
