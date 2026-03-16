@@ -456,15 +456,5 @@ const handleLogin = async () => {
   }
 }
 
-/* 無障礙：減少動畫 */
-@media (prefers-reduced-motion: reduce) {
-  .logo-hearts .heart-icon,
-  .circle {
-    animation: none;
-  }
-
-  .auth-card {
-    animation: none;
-  }
-}
+/* prefers-reduced-motion 由 tokens.css 全域處理 */
 </style>

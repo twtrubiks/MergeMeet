@@ -209,13 +209,27 @@
   border-width: 0;
 }
 
-/* 減少動態效果偏好 */
+/* 減少動態效果偏好
+ * 策略：
+ * - 裝飾性動畫：完全停止（0.01ms + iteration-count: 1）
+ * - 狀態轉換 transition：保留極短時間（0.15s），讓用戶仍能感知 hover/focus 變化
+ * - 載入指示器 (.spinner/.loader)：保留旋轉動畫，確保功能性回饋
+ * - scroll-behavior：強制非平滑
+ */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    transition-duration: 0.15s !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* 功能性例外：載入指示器必須持續旋轉 */
+  .spinner,
+  .spinner-small,
+  .loader {
+    animation: spin 1s linear infinite !important;
   }
 }

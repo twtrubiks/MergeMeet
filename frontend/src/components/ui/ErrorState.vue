@@ -218,10 +218,5 @@ const buttonVariant = computed(() => {
   }
 }
 
-/* 減少動態效果偏好 */
-@media (prefers-reduced-motion: reduce) {
-  .error-icon {
-    animation: none;
-  }
-}
+/* prefers-reduced-motion 由 tokens.css 全域處理 */
 </style>

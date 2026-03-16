@@ -95,15 +95,5 @@ main.with-navbar {
   padding-top: 56px; /* NavBar 高度 */
 }
 
-/* 尊重用戶的減少動畫偏好設置 (可訪問性) */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
+/* prefers-reduced-motion 由 tokens.css 全域處理，此處不重複 */
 </style>

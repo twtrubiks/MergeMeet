@@ -331,18 +331,5 @@ h1 {
   }
 }
 
-/* 無障礙：減少動態效果 */
-@media (prefers-reduced-motion: reduce) {
-  .circle {
-    animation: none;
-  }
-
-  .heart-icon {
-    animation: none;
-  }
-
-  .hero-section {
-    animation: none;
-  }
-}
+/* prefers-reduced-motion 由 tokens.css 全域處理 */
 </style>
