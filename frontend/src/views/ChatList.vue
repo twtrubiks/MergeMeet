@@ -189,7 +189,7 @@ onMounted(async () => {
   background: rgba(255, 255, 255, 0.95);
   color: var(--color-primary-500);
   text-decoration: none;
-  border-radius: 25px;
+  border-radius: var(--radius-2xl);
   font-weight: 600;
   font-size: 0.95rem;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
@@ -249,7 +249,7 @@ onMounted(async () => {
   min-height: 500px;
   text-align: center;
   background: white;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   padding: 60px 40px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   animation: fadeIn 0.6s ease;
@@ -303,7 +303,7 @@ onMounted(async () => {
 
 .conversation-list {
   background: white;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   overflow: hidden;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }

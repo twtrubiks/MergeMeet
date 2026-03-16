@@ -783,7 +783,7 @@ onMounted(async () => {
   background: rgba(255, 255, 255, 0.95);
   color: var(--color-primary-500);
   text-decoration: none;
-  border-radius: 25px;
+  border-radius: var(--radius-2xl);
   font-weight: 600;
   font-size: 0.95rem;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
@@ -807,7 +807,7 @@ onMounted(async () => {
 
 .card {
   background: white;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 2rem;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
 }
@@ -968,7 +968,7 @@ onMounted(async () => {
   width: 100%;
   padding: 14px 16px;
   border: 2px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   font-size: 1rem;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   background: white;
@@ -1027,7 +1027,7 @@ onMounted(async () => {
   background: var(--color-primary-gradient);
   color: white;
   border: none;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
@@ -1053,7 +1053,7 @@ onMounted(async () => {
   width: 100%;
   padding: 12px 16px;
   border: 2px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   font-size: 15px;
   transition: all 0.3s ease;
   background: white;
@@ -1088,7 +1088,7 @@ onMounted(async () => {
   padding: 16px 20px;
   background: linear-gradient(135deg, rgba(244, 67, 54, 0.1), rgba(233, 30, 99, 0.1));
   border: 2px solid rgba(244, 67, 54, 0.3);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   color: #c33;
   font-weight: 600;
   animation: shake 0.5s ease;
@@ -1205,7 +1205,7 @@ onMounted(async () => {
 .photo-item {
   position: relative;
   aspect-ratio: 1;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1234,7 +1234,7 @@ onMounted(async () => {
   background: var(--color-primary-gradient);
   color: white;
   padding: 6px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: 0.75rem;
   font-weight: 700;
   box-shadow: 0 2px 8px rgba(225, 29, 72, 0.4);
@@ -1251,7 +1251,7 @@ onMounted(async () => {
   padding: 10px 18px;
   background: linear-gradient(135deg, var(--color-primary-alpha-10), var(--color-primary-alpha-10));
   border: 1px solid var(--color-primary-alpha-30);
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   font-size: 0.95rem;
   color: var(--color-primary-500);
   font-weight: 600;
@@ -1275,7 +1275,7 @@ onMounted(async () => {
   justify-content: space-between;
   padding: 12px 16px;
   background: linear-gradient(135deg, rgba(225, 29, 72, 0.05), rgba(225, 29, 72, 0.05));
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(225, 29, 72, 0.15);
   transition: all 0.2s ease;
 }
@@ -1306,7 +1306,7 @@ onMounted(async () => {
 
 .badge {
   padding: 10px 18px;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   font-size: 0.9rem;
   font-weight: 700;
   transition: all 0.2s ease;

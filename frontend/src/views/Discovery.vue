@@ -875,6 +875,11 @@ onUnmounted(() => {
   transform: scale(1.05);
 }
 
+.action-btn:focus-visible {
+  outline: 3px solid var(--color-primary-600);
+  outline-offset: 4px;
+}
+
 .action-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;

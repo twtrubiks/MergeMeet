@@ -265,7 +265,7 @@ onMounted(() => {
   background: rgba(255, 255, 255, 0.95);
   color: var(--color-like-accessible);
   text-decoration: none;
-  border-radius: 25px;
+  border-radius: var(--radius-2xl);
   font-weight: 600;
   font-size: 0.95rem;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
@@ -285,7 +285,7 @@ onMounted(() => {
 
 .page-title {
   text-align: center;
-  font-size: 32px;
+  font-size: var(--font-size-4xl);
   font-weight: 700;
   color: var(--color-text-primary);
   margin-bottom: 20px;
@@ -302,8 +302,8 @@ onMounted(() => {
 .tab-btn {
   padding: 12px 24px;
   border: none;
-  border-radius: 25px;
-  font-size: 15px;
+  border-radius: var(--radius-2xl);
+  font-size: var(--font-size-base);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -352,7 +352,7 @@ onMounted(() => {
   text-align: center;
   padding: 60px 20px;
   background: white;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
@@ -362,13 +362,13 @@ onMounted(() => {
 }
 
 .empty-state h2 {
-  font-size: 20px;
+  font-size: var(--font-size-xl);
   color: var(--color-text-primary);
   margin: 0 0 8px;
 }
 
 .empty-state p {
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   color: var(--color-text-muted);
   margin: 0;
 }
@@ -382,7 +382,7 @@ onMounted(() => {
 
 .report-item {
   background: white;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 20px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
@@ -397,8 +397,8 @@ onMounted(() => {
 
 .report-type {
   padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 13px;
+  border-radius: var(--radius-xl);
+  font-size: var(--font-size-sm);
   font-weight: 600;
 }
 
@@ -434,8 +434,8 @@ onMounted(() => {
 
 .report-status {
   padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 13px;
+  border-radius: var(--radius-xl);
+  font-size: var(--font-size-sm);
   font-weight: 600;
 }
 
@@ -464,7 +464,7 @@ onMounted(() => {
 
 .report-reason {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--font-size-base);
   color: var(--color-text-primary);
   line-height: 1.5;
 }
@@ -472,7 +472,7 @@ onMounted(() => {
 /* 申訴標籤 */
 .appeal-label,
 .response-label {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   color: var(--color-text-muted);
   margin: 0 0 4px;
   font-weight: 600;
@@ -481,7 +481,7 @@ onMounted(() => {
 /* 管理員回覆 */
 .admin-response {
   background: var(--color-background-light);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 12px;
   margin-bottom: 12px;
   border-left: 3px solid var(--color-like);
@@ -489,7 +489,7 @@ onMounted(() => {
 
 .response-content {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   color: var(--color-text-primary);
   line-height: 1.5;
 }
@@ -507,7 +507,7 @@ onMounted(() => {
 
 .report-time,
 .reviewed-time {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   color: var(--color-text-muted);
 }
 

@@ -195,7 +195,7 @@ onUnmounted(() => {
 /* Modal 容器 */
 .modal-container {
   background: white;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   max-width: min(500px, calc(100vw - 40px));
   width: 100%;
   max-height: 90vh;
@@ -229,7 +229,7 @@ onUnmounted(() => {
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.5);
   color: white;
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
   cursor: pointer;
   z-index: 10;
   display: flex;
@@ -240,6 +240,11 @@ onUnmounted(() => {
 
 .close-btn:hover {
   background: rgba(0, 0, 0, 0.7);
+}
+
+.close-btn:focus-visible {
+  outline: 3px solid white;
+  outline-offset: 2px;
 }
 
 /* 照片輪播區 */
@@ -297,7 +302,7 @@ onUnmounted(() => {
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.9);
   color: var(--color-text-primary);
-  font-size: 28px;
+  font-size: var(--font-size-3xl);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -309,6 +314,11 @@ onUnmounted(() => {
 .carousel-btn:hover {
   background: white;
   transform: translateY(-50%) scale(1.1);
+}
+
+.carousel-btn:focus-visible {
+  outline: 3px solid var(--color-primary-600);
+  outline-offset: 2px;
 }
 
 .carousel-btn.prev {
@@ -363,14 +373,14 @@ onUnmounted(() => {
 }
 
 .user-name {
-  font-size: 28px;
+  font-size: var(--font-size-3xl);
   font-weight: 700;
   color: var(--color-text-primary);
   margin: 0;
 }
 
 .user-age {
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
   font-weight: 400;
   color: var(--color-text-muted);
 }
@@ -380,13 +390,13 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 16px;
+  font-size: var(--font-size-base);
   color: var(--color-text-light);
   margin: 0 0 16px;
 }
 
 .distance-icon {
-  font-size: 14px;
+  font-size: var(--font-size-sm);
 }
 
 /* 興趣標籤 */
@@ -402,8 +412,8 @@ onUnmounted(() => {
   padding: 8px 16px;
   background: #fff0f0;
   color: var(--color-like-accessible);
-  border-radius: 20px;
-  font-size: 14px;
+  border-radius: var(--radius-xl);
+  font-size: var(--font-size-sm);
   font-weight: 500;
 }
 
@@ -414,14 +424,14 @@ onUnmounted(() => {
 }
 
 .bio-title {
-  font-size: 16px;
+  font-size: var(--font-size-base);
   font-weight: 600;
   color: var(--color-text-primary);
   margin: 0 0 8px;
 }
 
 .bio-content {
-  font-size: 15px;
+  font-size: var(--font-size-base);
   line-height: 1.6;
   color: var(--color-text-secondary);
   margin: 0;

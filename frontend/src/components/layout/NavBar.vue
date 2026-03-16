@@ -231,6 +231,11 @@ const handleUserMenuSelect = (key) => {
   color: var(--color-text-primary);
 }
 
+.nav-link:focus-visible {
+  outline: 3px solid var(--color-primary-600);
+  outline-offset: -3px;
+}
+
 .nav-link.active {
   background-color: var(--color-primary-alpha-10);
   color: var(--color-primary-600);

@@ -348,6 +348,11 @@ textarea.form-control {
   min-height: var(--touch-target-min);
 }
 
+.btn:focus-visible {
+  outline: 3px solid var(--color-primary-600);
+  outline-offset: 2px;
+}
+
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;

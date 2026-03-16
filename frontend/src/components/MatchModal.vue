@@ -442,6 +442,11 @@ const particleStyle = (i) => {
   background: var(--color-border);
 }
 
+.modal-actions button:focus-visible {
+  outline: 3px solid var(--color-primary-600);
+  outline-offset: 2px;
+}
+
 /* Modal 過渡效果 */
 .modal-enter-active,
 .modal-leave-active {

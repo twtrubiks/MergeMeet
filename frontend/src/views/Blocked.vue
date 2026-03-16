@@ -168,7 +168,7 @@ onMounted(() => {
 
 .page-title {
   text-align: center;
-  font-size: 32px;
+  font-size: var(--font-size-4xl);
   font-weight: 700;
   color: var(--color-text-primary);
   margin-bottom: 30px;
@@ -207,7 +207,7 @@ onMounted(() => {
 
 .error-message p {
   color: var(--color-error-500);
-  font-size: 16px;
+  font-size: var(--font-size-base);
   margin-bottom: 20px;
 }
 
@@ -216,8 +216,8 @@ onMounted(() => {
   background: var(--color-like);
   color: white;
   border: none;
-  border-radius: 25px;
-  font-size: 16px;
+  border-radius: var(--radius-2xl);
+  font-size: var(--font-size-base);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -240,13 +240,13 @@ onMounted(() => {
 }
 
 .empty-state h2 {
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
   color: var(--color-text-primary);
   margin-bottom: 10px;
 }
 
 .empty-state p {
-  font-size: 16px;
+  font-size: var(--font-size-base);
   color: var(--color-text-muted);
   margin-bottom: 30px;
 }
@@ -257,8 +257,8 @@ onMounted(() => {
   background: linear-gradient(135deg, #ff6b6b, #ff8e53);
   color: white;
   text-decoration: none;
-  border-radius: 25px;
-  font-size: 16px;
+  border-radius: var(--radius-2xl);
+  font-size: var(--font-size-base);
   font-weight: 600;
   transition: all 0.3s ease;
   box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
@@ -279,7 +279,7 @@ onMounted(() => {
 /* 封鎖卡片 */
 .blocked-card {
   background: white;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 24px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
   display: flex;
@@ -309,14 +309,14 @@ onMounted(() => {
 }
 
 .blocked-email {
-  font-size: 18px;
+  font-size: var(--font-size-lg);
   font-weight: 600;
   color: var(--color-text-primary);
   margin: 0 0 6px;
 }
 
 .blocked-date {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   color: var(--color-text-muted);
   margin: 0;
 }
@@ -324,19 +324,19 @@ onMounted(() => {
 .blocked-reason {
   padding: 12px;
   background: var(--color-background-light);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border-left: 4px solid var(--color-like);
 }
 
 .reason-label {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   color: var(--color-text-muted);
   font-weight: 600;
   margin: 0 0 6px;
 }
 
 .reason-text {
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   color: var(--color-text-primary);
   margin: 0;
   line-height: 1.5;
@@ -351,8 +351,8 @@ onMounted(() => {
   background: #4caf50;
   color: white;
   border: none;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -387,7 +387,7 @@ onMounted(() => {
 /* Modal 容器 */
 .modal-container {
   background: white;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   max-width: 450px;
   width: 100%;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
@@ -417,14 +417,14 @@ onMounted(() => {
 }
 
 .modal-title {
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
   font-weight: 700;
   color: var(--color-text-primary);
   margin: 0 0 12px;
 }
 
 .modal-subtitle {
-  font-size: 15px;
+  font-size: var(--font-size-base);
   color: var(--color-text-muted);
   line-height: 1.5;
   margin: 0 0 30px;
@@ -439,8 +439,8 @@ onMounted(() => {
   flex: 1;
   padding: 14px 20px;
   border: none;
-  border-radius: 12px;
-  font-size: 16px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;

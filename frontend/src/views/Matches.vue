@@ -541,7 +541,7 @@ onUnmounted(() => {
 .match-card {
   position: relative;
   background: white;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   padding: 24px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -593,7 +593,7 @@ onUnmounted(() => {
   background: linear-gradient(135deg, #ffd700, #ffa500);
   color: white;
   padding: 6px 12px;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.5px;
@@ -655,7 +655,7 @@ onUnmounted(() => {
   justify-content: center;
   background: linear-gradient(135deg, #ff6b6b, #ff8e53);
   color: white;
-  font-size: 36px;
+  font-size: var(--font-size-4xl);
   font-weight: 800;
 }
 
@@ -748,7 +748,7 @@ onUnmounted(() => {
   background: linear-gradient(135deg, var(--color-primary-alpha-10), var(--color-primary-alpha-10));
   color: var(--color-primary-500);
   border: 1px solid var(--color-primary-alpha-30);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   font-size: 0.8rem;
   font-weight: 600;
   transition: all 0.2s ease;
@@ -765,7 +765,7 @@ onUnmounted(() => {
   padding: 6px 14px;
   background: rgba(0, 0, 0, 0.05);
   color: var(--color-text-muted);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   font-size: 0.8rem;
   font-weight: 600;
 }
@@ -856,7 +856,7 @@ onUnmounted(() => {
 /* Modal 容器 */
 .modal-container {
   background: white;
-  border-radius: 24px;
+  border-radius: var(--radius-2xl);
   max-width: 480px;
   width: 100%;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);

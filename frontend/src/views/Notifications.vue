@@ -293,7 +293,7 @@ onMounted(() => {
   background: rgba(255, 255, 255, 0.95);
   color: var(--color-like-accessible);
   text-decoration: none;
-  border-radius: 25px;
+  border-radius: var(--radius-2xl);
   font-weight: 600;
   font-size: 0.95rem;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
@@ -313,7 +313,7 @@ onMounted(() => {
 
 .page-title {
   text-align: center;
-  font-size: 32px;
+  font-size: var(--font-size-4xl);
   font-weight: 700;
   color: var(--color-text-primary);
   margin-bottom: 20px;
@@ -331,8 +331,8 @@ onMounted(() => {
   background: var(--color-like);
   color: white;
   border: none;
-  border-radius: 20px;
-  font-size: 14px;
+  border-radius: var(--radius-xl);
+  font-size: var(--font-size-sm);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -378,7 +378,7 @@ onMounted(() => {
   text-align: center;
   padding: 60px 20px;
   background: white;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
@@ -388,13 +388,13 @@ onMounted(() => {
 }
 
 .empty-state h2 {
-  font-size: 20px;
+  font-size: var(--font-size-xl);
   color: var(--color-text-primary);
   margin: 0 0 8px;
 }
 
 .empty-state p {
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   color: var(--color-text-muted);
   margin: 0;
 }
@@ -402,7 +402,7 @@ onMounted(() => {
 /* 通知列表 */
 .notification-list {
   background: white;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
   overflow: hidden;
 }
@@ -443,7 +443,7 @@ onMounted(() => {
   justify-content: center;
   margin-right: 16px;
   flex-shrink: 0;
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
 }
 
 .icon-message {
@@ -470,20 +470,20 @@ onMounted(() => {
 
 .notification-title {
   font-weight: 600;
-  font-size: 15px;
+  font-size: var(--font-size-base);
   color: var(--color-text-primary);
   margin-bottom: 4px;
 }
 
 .notification-body {
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   color: var(--color-text-muted);
   margin-bottom: 6px;
   line-height: 1.4;
 }
 
 .notification-time {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   color: var(--color-text-muted);
 }
 
@@ -502,7 +502,7 @@ onMounted(() => {
   border-radius: 50%;
   background: transparent;
   cursor: pointer;
-  font-size: 16px;
+  font-size: var(--font-size-base);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -536,8 +536,8 @@ onMounted(() => {
   background: transparent;
   color: var(--color-like-accessible);
   border: 2px solid var(--color-like-accessible);
-  border-radius: 20px;
-  font-size: 14px;
+  border-radius: var(--radius-xl);
+  font-size: var(--font-size-sm);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;

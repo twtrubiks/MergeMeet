@@ -774,7 +774,7 @@ onUnmounted(() => {
   font-size: 0.85rem;
   padding: 12px;
   background: #f8f9fa;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 
 .password-strength span {
@@ -804,7 +804,7 @@ onUnmounted(() => {
   text-align: center;
   padding: 12px;
   background: #ffebee;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   margin-top: 8px;
 }
 
@@ -868,7 +868,7 @@ onUnmounted(() => {
 .age-input input {
   padding: 12px 16px;
   border: 2px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   font-size: 1rem;
   text-align: center;
   transition: border-color 0.3s ease;
@@ -969,7 +969,7 @@ onUnmounted(() => {
   gap: 8px;
   padding: 16px;
   border: 2px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: all 0.3s ease;
   background: white;
@@ -1006,7 +1006,7 @@ onUnmounted(() => {
   text-align: center;
   padding: 12px;
   background: #e8f5e9;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   margin: 0;
 }
 
@@ -1056,7 +1056,7 @@ onUnmounted(() => {
   align-items: center;
   padding: 16px 20px;
   background: #f8f9fa;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   text-decoration: none;
   color: var(--color-text-primary);
   transition: all 0.3s ease;
