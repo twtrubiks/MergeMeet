@@ -23,7 +23,7 @@ class BlockedUserResponse(BaseModel):
 
     id: str
     blocked_user_id: str
-    blocked_user_email: str
+    blocked_user_display_name: str
     reason: str | None
     created_at: datetime
 

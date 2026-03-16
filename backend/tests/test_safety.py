@@ -168,8 +168,10 @@ async def test_get_blocked_users_list(
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 2
-    assert any(u["blocked_user_email"] == test_users_for_safety["bob"]["email"] for u in data)
-    assert any(u["blocked_user_email"] == test_users_for_safety["charlie"]["email"] for u in data)
+    # 驗證不洩露 email，改為顯示 display_name（測試中未建立 Profile，應為 fallback 值）
+    for u in data:
+        assert "blocked_user_email" not in u
+        assert "blocked_user_display_name" in u
 
 
 @pytest.mark.asyncio

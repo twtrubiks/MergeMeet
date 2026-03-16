@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.match import BlockedUser, Match
+from app.models.profile import Profile
 from app.models.report import Report
 from app.models.user import User
 from app.schemas.safety import (
@@ -141,24 +142,25 @@ async def get_blocked_users(
     # 批次載入：收集所有被封鎖用戶 ID
     blocked_user_ids = [block.blocked_id for block in blocked_users]
 
-    # 批次查詢所有被封鎖的用戶（1 次查詢取代 N 次）
-    users_result = await db.execute(select(User).where(User.id.in_(blocked_user_ids)))
-    users_by_id = {u.id: u for u in users_result.scalars().all()}
+    # 批次查詢所有被封鎖用戶的 display_name（只選需要的欄位）
+    profiles_result = await db.execute(
+        select(Profile.user_id, Profile.display_name).where(Profile.user_id.in_(blocked_user_ids))
+    )
+    display_names = {row[0]: row[1] for row in profiles_result.all()}
 
     # 組裝回應
     response = []
     for block in blocked_users:
-        user = users_by_id.get(block.blocked_id)
-        if user:
-            response.append(
-                BlockedUserResponse(
-                    id=str(block.id),
-                    blocked_user_id=str(user.id),
-                    blocked_user_email=user.email,
-                    reason=block.reason,
-                    created_at=block.created_at,
-                )
+        display_name = display_names.get(block.blocked_id, "未知用戶")
+        response.append(
+            BlockedUserResponse(
+                id=str(block.id),
+                blocked_user_id=str(block.blocked_id),
+                blocked_user_display_name=display_name,
+                reason=block.reason,
+                created_at=block.created_at,
             )
+        )
 
     return response
 

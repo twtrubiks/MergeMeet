@@ -36,7 +36,7 @@
             <div class="blocked-header">
               <div class="blocked-icon"><Icon name="shield" size="md" decorative /></div>
               <div class="blocked-details">
-                <h3 class="blocked-email">{{ blockedUser.blocked_user_email }}</h3>
+                <h3 class="blocked-email">{{ blockedUser.blocked_user_display_name }}</h3>
                 <p class="blocked-date">封鎖於 {{ formatDate(blockedUser.created_at) }}</p>
               </div>
             </div>

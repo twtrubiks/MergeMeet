@@ -18,8 +18,9 @@ Redis Key 設計:
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.expression import func
 
 from app.models.user import User
 
@@ -76,23 +77,26 @@ class TrustScoreService:
 
         adjustment = cls.ADJUSTMENTS[action]
 
-        # 查詢用戶
-        result = await db.execute(select(User).where(User.id == user_id))
-        user = result.scalar_one_or_none()
+        # 原子更新：在資料庫端計算新分數，避免 read-then-write 競態條件
+        result = await db.execute(
+            update(User)
+            .where(User.id == user_id)
+            .values(
+                trust_score=func.least(
+                    cls.MAX_SCORE,
+                    func.greatest(cls.MIN_SCORE, User.trust_score + adjustment),
+                )
+            )
+            .returning(User.trust_score)
+        )
+        row = result.scalar_one_or_none()
 
-        if not user:
+        if row is None:
             raise ValueError(f"用戶不存在: {user_id}")
 
-        # 計算新分數（確保在邊界內）
-        new_score = user.trust_score + adjustment
-        new_score = max(cls.MIN_SCORE, min(cls.MAX_SCORE, new_score))
-
-        # 更新分數
-        user.trust_score = new_score
         await db.commit()
-        await db.refresh(user)
 
-        return new_score
+        return row
 
     @classmethod
     async def get_score(cls, db: AsyncSession, user_id: uuid.UUID) -> int:
