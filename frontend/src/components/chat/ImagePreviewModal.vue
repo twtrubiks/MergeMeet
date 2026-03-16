@@ -5,7 +5,13 @@
     class="image-preview-modal"
     @update:show="$emit('update:show', $event)"
   >
-    <div class="image-preview-container" @click="handleBackgroundClick">
+    <div
+      class="image-preview-container"
+      role="dialog"
+      aria-modal="true"
+      aria-label="圖片預覽"
+      @click="handleBackgroundClick"
+    >
       <!-- 關閉按鈕 -->
       <n-button text class="close-button" @click="$emit('update:show', false)">
         <template #icon>

@@ -32,17 +32,32 @@
           <h2>{{ isCreating ? '建立個人檔案' : '編輯個人檔案' }}</h2>
 
           <!-- 步驟指示器 -->
-          <div class="steps">
-            <div class="step" :class="{ active: currentStep === 1 }">
-              <div class="step-number">1</div>
+          <div class="steps" role="list" aria-label="建立檔案步驟">
+            <div
+              class="step"
+              role="listitem"
+              :class="{ active: currentStep === 1, completed: currentStep > 1 }"
+              :aria-current="currentStep === 1 ? 'step' : undefined"
+            >
+              <div class="step-number" aria-hidden="true">1</div>
               <div class="step-label">基本資料</div>
             </div>
-            <div class="step" :class="{ active: currentStep === 2 }">
-              <div class="step-number">2</div>
+            <div
+              class="step"
+              role="listitem"
+              :class="{ active: currentStep === 2, completed: currentStep > 2 }"
+              :aria-current="currentStep === 2 ? 'step' : undefined"
+            >
+              <div class="step-number" aria-hidden="true">2</div>
               <div class="step-label">上傳照片</div>
             </div>
-            <div class="step" :class="{ active: currentStep === 3 }">
-              <div class="step-number">3</div>
+            <div
+              class="step"
+              role="listitem"
+              :class="{ active: currentStep === 3 }"
+              :aria-current="currentStep === 3 ? 'step' : undefined"
+            >
+              <div class="step-number" aria-hidden="true">3</div>
               <div class="step-label">興趣標籤</div>
             </div>
           </div>

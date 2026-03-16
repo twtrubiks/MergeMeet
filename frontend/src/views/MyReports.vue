@@ -10,17 +10,25 @@
       <h1 class="page-title">我的記錄</h1>
 
       <!-- Tab 切換 -->
-      <div class="tabs">
+      <div class="tabs" role="tablist" aria-label="記錄類型">
         <button
+          id="tab-reports"
           class="tab-btn"
+          role="tab"
           :class="{ active: activeTab === 'reports' }"
+          :aria-selected="activeTab === 'reports'"
+          aria-controls="panel-reports"
           @click="activeTab = 'reports'"
         >
           舉報記錄
         </button>
         <button
+          id="tab-appeals"
           class="tab-btn"
+          role="tab"
           :class="{ active: activeTab === 'appeals' }"
+          :aria-selected="activeTab === 'appeals'"
+          aria-controls="panel-appeals"
           @click="activeTab = 'appeals'"
         >
           照片申訴
@@ -34,7 +42,12 @@
       </div>
 
       <!-- 舉報記錄 Tab -->
-      <template v-else-if="activeTab === 'reports'">
+      <div
+        v-else-if="activeTab === 'reports'"
+        id="panel-reports"
+        role="tabpanel"
+        aria-labelledby="tab-reports"
+      >
         <!-- 空狀態 -->
         <div v-if="safetyStore.myReports.length === 0" class="empty-state">
           <div class="empty-icon">📋</div>
@@ -66,10 +79,15 @@
             </div>
           </div>
         </div>
-      </template>
+      </div>
 
       <!-- 照片申訴 Tab -->
-      <template v-else-if="activeTab === 'appeals'">
+      <div
+        v-else-if="activeTab === 'appeals'"
+        id="panel-appeals"
+        role="tabpanel"
+        aria-labelledby="tab-appeals"
+      >
         <!-- 空狀態 -->
         <div v-if="safetyStore.myAppeals.length === 0" class="empty-state">
           <div class="empty-icon">📷</div>
@@ -111,7 +129,7 @@
             </div>
           </div>
         </div>
-      </template>
+      </div>
     </div>
   </div>
 </template>

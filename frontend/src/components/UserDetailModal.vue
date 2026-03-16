@@ -1,6 +1,13 @@
 <template>
   <Transition name="modal">
-    <div v-if="show" class="modal-overlay" @click="handleClose">
+    <div
+      v-if="show"
+      class="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="用戶詳情"
+      @click="handleClose"
+    >
       <div class="modal-container" @click.stop>
         <!-- 關閉按鈕 -->
         <button class="close-btn" aria-label="關閉" @click="handleClose">

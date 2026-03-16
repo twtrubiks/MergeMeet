@@ -560,8 +560,8 @@ onMounted(() => {
   }
 
   .notification-icon {
-    width: 40px;
-    height: 40px;
+    width: var(--touch-target-min);
+    height: var(--touch-target-min);
     font-size: 20px;
     margin-right: 12px;
   }

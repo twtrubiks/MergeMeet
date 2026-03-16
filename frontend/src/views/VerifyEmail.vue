@@ -36,6 +36,7 @@
             inputmode="numeric"
             maxlength="1"
             :disabled="isLoading"
+            :aria-label="`驗證碼第 ${i} 位，共 6 位`"
             class="code-input"
             :class="{ 'has-value': codeDigits[i - 1] }"
             @input="handleCodeInput(i - 1, $event)"
@@ -428,14 +429,14 @@ onUnmounted(() => {
 }
 
 .success-state h2 {
-  color: #4caf50;
+  color: var(--color-success-500);
   font-size: 1.8rem;
   margin-bottom: 16px;
   font-weight: 600;
 }
 
 .success-text {
-  color: #666;
+  color: var(--color-text-muted);
   font-size: 1.1rem;
 }
 
@@ -448,7 +449,7 @@ onUnmounted(() => {
 
 .instruction {
   text-align: center;
-  color: #666;
+  color: var(--color-text-muted);
   font-size: 0.95rem;
   margin-bottom: 8px;
 }
@@ -466,23 +467,23 @@ onUnmounted(() => {
   text-align: center;
   font-size: 1.8rem;
   font-weight: 600;
-  border: 2px solid #e0e0e0;
-  border-radius: 12px;
-  background: #fafafa;
-  color: #333;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-background-light);
+  color: var(--color-text-primary);
   transition: all 0.3s ease;
   outline: none;
 }
 
 .code-input:focus {
-  border-color: #11998e;
-  background: #fff;
-  box-shadow: 0 0 0 3px rgba(17, 153, 142, 0.15);
+  border-color: var(--color-success-500);
+  background: var(--color-surface);
+  box-shadow: 0 0 0 3px var(--color-success-alpha-10);
 }
 
 .code-input.has-value {
-  border-color: #38ef7d;
-  background: #fff;
+  border-color: var(--color-success-400);
+  background: var(--color-surface);
 }
 
 .code-input:disabled {
@@ -492,12 +493,12 @@ onUnmounted(() => {
 
 /* 錯誤訊息 */
 .error-message {
-  color: #e53935;
+  color: var(--color-error-500);
   font-size: 0.9rem;
   text-align: center;
   padding: 12px;
   background: #ffebee;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 
 /* 重新發送區塊 */
@@ -514,7 +515,7 @@ onUnmounted(() => {
 .resend-btn {
   background: none;
   border: none;
-  color: #11998e;
+  color: var(--color-success-600);
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
@@ -524,16 +525,16 @@ onUnmounted(() => {
 }
 
 .resend-btn:hover:not(:disabled) {
-  background: rgba(17, 153, 142, 0.1);
+  background: var(--color-success-alpha-10);
 }
 
 .resend-btn:disabled {
-  color: #999;
+  color: var(--color-text-light);
   cursor: not-allowed;
 }
 
 .resend-success {
-  color: #4caf50;
+  color: var(--color-success-500);
   font-size: 0.9rem;
   margin-top: 8px;
   animation: fadeIn 0.3s ease;

@@ -62,11 +62,19 @@
 
     <!-- 解除封鎖確認彈窗 -->
     <Transition name="modal">
-      <div v-if="unblockTarget" class="modal-overlay" @click="cancelUnblock">
+      <div
+        v-if="unblockTarget"
+        class="modal-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="unblock-dialog-title"
+        @click="cancelUnblock"
+        @keydown.escape="cancelUnblock"
+      >
         <div class="modal-container" @click.stop>
           <div class="modal-content">
             <div class="modal-icon">❓</div>
-            <h2 class="modal-title">確定要解除封鎖？</h2>
+            <h2 id="unblock-dialog-title" class="modal-title">確定要解除封鎖？</h2>
             <p class="modal-subtitle">解除封鎖後，此用戶可能會再次出現在您的探索頁面中。</p>
             <div class="modal-actions">
               <button class="btn-cancel" @click="cancelUnblock">取消</button>
