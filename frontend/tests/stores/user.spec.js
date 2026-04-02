@@ -331,7 +331,11 @@ describe('User Store', () => {
 
       expect(store.isAuthenticated).toBe(false)
 
-      store.accessToken = 'test_token'
+      // 建立帶有效 exp 的假 JWT（exp 設為未來時間）
+      const futureExp = Math.floor(Date.now() / 1000) + 3600
+      const header = btoa(JSON.stringify({ alg: 'HS256' }))
+      const payload = btoa(JSON.stringify({ exp: futureExp }))
+      store.accessToken = `${header}.${payload}.fake_signature`
       expect(store.isAuthenticated).toBe(true)
 
       store.accessToken = null
