@@ -19,11 +19,11 @@
 | 層級 | 技術 | 版本 |
 |------|------|------|
 | **後端** | Python / FastAPI / SQLAlchemy 2.0 Async | 3.13+ |
-| **前端** | Vue 3 / Composition API | 3.4.0 |
-| **路由** | Vue Router | 4.2.5 |
-| **狀態管理** | Pinia | 2.1.7 |
-| **建置工具** | Vite | 5.0.12 |
-| **UI 框架** | Naive UI | 2.38.1 |
+| **前端** | Vue 3 / Composition API | 3.5.x |
+| **路由** | Vue Router | 5.0.x |
+| **狀態管理** | Pinia | 3.0.x |
+| **建置工具** | Vite | 8.0.x |
+| **UI 框架** | Naive UI | 2.44.x |
 | **資料庫** | PostgreSQL + PostGIS | 17 |
 | **快取** | Redis | 8.x |
 | **即時通訊** | WebSocket | - |
@@ -62,7 +62,7 @@
 
 - Docker & Docker Compose
 - Python 3.13+
-- Node.js 20+
+- Node.js 24+
 
 ### 手動設置
 
