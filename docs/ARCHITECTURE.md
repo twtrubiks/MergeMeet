@@ -86,17 +86,17 @@
 | 技術 | 版本 | 用途 | 狀態 |
 |------|------|------|------|
 | **Python** | 3.13+ | 主要開發語言 | ✅ |
-| **FastAPI** | 0.109+ | Web 框架 | ✅ |
+| **FastAPI** | 0.135+ | Web 框架 | ✅ |
 | **SQLAlchemy** | 2.0 | ORM（Async） | ✅ |
 | **PostgreSQL** | 17 | 主資料庫 | ✅ |
 | **PostGIS** | 3.5+ | 地理位置查詢 | ✅ |
 | **Redis** | 8.x | 快取/Session/登入限制 | 🔄 部分使用 |
-| **Pydantic** | 2.5+ | 資料驗證 | ✅ |
+| **Pydantic** | 2.12+ | 資料驗證 | ✅ |
 | **JWT** | python-jose | 認證機制 | ✅ |
-| **aiosmtplib** | 3.0+ | Email 發送服務 | ✅ |
+| **aiosmtplib** | 5.1+ | Email 發送服務 | ✅ |
 | **Mailpit** | latest | Email 測試工具（開發） | ✅ |
-| **Alembic** | 1.13+ | 資料庫遷移 | ✅ |
-| **pytest** | 7.4+ | 測試框架 | ✅ |
+| **Alembic** | 1.18+ | 資料庫遷移 | ✅ |
+| **pytest** | 9.0+ | 測試框架 | ✅ |
 | **Ruff** | 0.15+ | Linter + Formatter | ✅ |
 | **pre-commit** | 4.0+ | Git Hook 管理 | ✅ |
 
