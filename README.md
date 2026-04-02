@@ -18,7 +18,7 @@
 
 | 層級 | 技術 | 版本 |
 |------|------|------|
-| **後端** | Python / FastAPI / SQLAlchemy 2.0 Async | 3.12+ |
+| **後端** | Python / FastAPI / SQLAlchemy 2.0 Async | 3.13+ |
 | **前端** | Vue 3 / Composition API | 3.4.0 |
 | **路由** | Vue Router | 4.2.5 |
 | **狀態管理** | Pinia | 2.1.7 |
@@ -61,7 +61,7 @@
 ### 前置需求
 
 - Docker & Docker Compose
-- Python 3.12+
+- Python 3.13+
 - Node.js 20+
 
 ### 手動設置
