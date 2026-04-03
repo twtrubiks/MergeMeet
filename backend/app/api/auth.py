@@ -393,9 +393,12 @@ async def register(
     else:
         logger.error(f"Failed to send verification email to {mask_email(request.email)}")
 
-    # 生成 JWT Token（包含 email 資訊供前端使用）
+    # 生成 JWT Token（包含 email 和 is_admin 資訊供前端使用）
     access_token, refresh_token = _generate_auth_tokens(
-        str(new_user.id), email=new_user.email, email_verified=new_user.email_verified
+        str(new_user.id),
+        email=new_user.email,
+        email_verified=new_user.email_verified,
+        is_admin=new_user.is_admin if new_user.is_admin else None,
     )
 
     # 生成 CSRF Token 並設置 Cookie（HttpOnly Cookie 模式）
@@ -493,9 +496,12 @@ async def login(
     # 登入成功，清除失敗記錄
     await limiter.clear_attempts(request.email)
 
-    # 生成 JWT Token（包含 email 資訊供前端使用）
+    # 生成 JWT Token（包含 email 和 is_admin 資訊供前端使用）
     access_token, refresh_token = _generate_auth_tokens(
-        str(user.id), email=user.email, email_verified=user.email_verified
+        str(user.id),
+        email=user.email,
+        email_verified=user.email_verified,
+        is_admin=user.is_admin if user.is_admin else None,
     )
 
     # 生成 CSRF Token 並設置 Cookie（HttpOnly Cookie 模式）

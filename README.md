@@ -1,5 +1,17 @@
 # 🎉 MergeMeet 交友平台
 
+[![Python](https://img.shields.io/badge/Python-3.13+-blue.svg)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.135-green.svg)](https://fastapi.tiangolo.com/)
+[![Vue.js](https://img.shields.io/badge/Vue.js-3.5-brightgreen.svg)](https://vuejs.org/)
+[![Vite](https://img.shields.io/badge/Vite-8.x-purple.svg)](https://vite.dev/)
+[![Pinia](https://img.shields.io/badge/Pinia-3.x-yellow.svg)](https://pinia.vuejs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-24+-green.svg)](https://nodejs.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue.svg)](https://www.postgresql.org/)
+[![PostGIS](https://img.shields.io/badge/PostGIS-3.5-blue.svg)](https://postgis.net/)
+[![Redis](https://img.shields.io/badge/Redis-8-red.svg)](https://redis.io/)
+[![WebSocket](https://img.shields.io/badge/WebSocket-Real--time-orange.svg)](https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
+
 交友平台 MVP - FastAPI + Vue 3 + PostgreSQL + PostGIS
 
 * [Youtube Tutorial - Claude Code 寫 4 萬行交友軟體 配對演算法怎麼做](https://youtu.be/ebrpVisRAPQ)
