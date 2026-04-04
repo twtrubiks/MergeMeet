@@ -3,13 +3,10 @@
 import hashlib
 from datetime import UTC, datetime, timedelta
 
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from app.core.config import settings
-
-# 密碼加密上下文
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def _pre_hash_password(password: str) -> str:
@@ -46,7 +43,10 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     # 先對密碼進行 SHA256 預處理，再用 bcrypt 驗證
     pre_hashed = _pre_hash_password(plain_password)
-    return pwd_context.verify(pre_hashed, hashed_password)
+    try:
+        return bcrypt.checkpw(pre_hashed.encode("utf-8"), hashed_password.encode("utf-8"))
+    except (ValueError, TypeError):
+        return False
 
 
 def get_password_hash(password: str) -> str:
@@ -61,7 +61,7 @@ def get_password_hash(password: str) -> str:
     """
     # 先對密碼進行 SHA256 預處理，避免 bcrypt 的 72 bytes 限制
     pre_hashed = _pre_hash_password(password)
-    return pwd_context.hash(pre_hashed)
+    return bcrypt.hashpw(pre_hashed.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
