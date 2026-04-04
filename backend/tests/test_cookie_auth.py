@@ -11,7 +11,7 @@ import json
 from datetime import date
 
 import pytest
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 
 from app.core.security import get_password_hash
 from app.main import app
@@ -164,7 +164,7 @@ async def test_bearer_token_still_works(client: AsyncClient):
 
     # 建立新的 AsyncClient（不帶之前的 Cookie）
     # 使用 Bearer Token 存取 API
-    async with AsyncClient(app=app, base_url="http://test") as new_client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as new_client:
         response = await new_client.get(
             "/api/profile", headers={"Authorization": f"Bearer {access_token}"}
         )
@@ -223,7 +223,7 @@ async def test_logout_blacklists_access_token(client: AsyncClient):
     await client.post("/api/auth/logout", headers={"X-CSRF-Token": csrf_token})
 
     # 建立新的 AsyncClient 測試舊 Token（不帶 Cookie）
-    async with AsyncClient(app=app, base_url="http://test") as new_client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as new_client:
         response = await new_client.get(
             "/api/profile", headers={"Authorization": f"Bearer {access_token}"}
         )
@@ -429,7 +429,7 @@ async def test_admin_refresh_preserves_is_admin(client: AsyncClient, test_db):
 async def test_no_auth_provided(client: AsyncClient):
     """測試未提供任何認證憑證"""
     # 建立新的 AsyncClient，不帶任何 Cookie
-    async with AsyncClient(app=app, base_url="http://test") as new_client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as new_client:
         response = await new_client.get("/api/profile")
 
         assert response.status_code == 401

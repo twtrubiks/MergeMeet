@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock
 import pytest
 import pytest_asyncio
 from dotenv import load_dotenv
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
@@ -47,7 +47,7 @@ def event_loop():
 
 
 @pytest.fixture(scope="function")
-async def db_session() -> AsyncGenerator[AsyncSession, None]:
+async def db_session() -> AsyncGenerator[AsyncSession]:
     """測試資料庫 Session（主要使用名稱）"""
     # 建立測試引擎
     engine = create_async_engine(
@@ -87,13 +87,13 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 @pytest.fixture(scope="function")
-async def test_db(db_session: AsyncSession) -> AsyncGenerator[AsyncSession, None]:
+async def test_db(db_session: AsyncSession) -> AsyncGenerator[AsyncSession]:
     """測試資料庫 Session（別名，向後兼容）"""
     yield db_session
 
 
 @pytest.fixture(scope="function")
-async def client(test_db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+async def client(test_db: AsyncSession) -> AsyncGenerator[AsyncClient]:
     """測試 HTTP Client
 
     Note:
@@ -118,7 +118,9 @@ async def client(test_db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     except Exception:
         pass  # Redis 不可用時回退到內存模式
 
-    async with AsyncClient(app=app, base_url="http://test", follow_redirects=True) as ac:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test", follow_redirects=True
+    ) as ac:
         yield ac
 
     app.dependency_overrides.clear()

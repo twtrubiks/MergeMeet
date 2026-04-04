@@ -6,7 +6,7 @@ import uuid
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -407,7 +407,7 @@ async def test_change_password_token_invalidated(
     assert response.status_code == 200
 
     # 使用舊 Token 存取 API 應失敗（建立新 client 避免 Cookie 影響）
-    async with AsyncClient(app=app, base_url="http://test") as new_client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as new_client:
         response = await new_client.get(
             "/api/profile", headers={"Authorization": f"Bearer {token}"}
         )
@@ -599,7 +599,7 @@ async def test_change_password_weak(client: AsyncClient, user_for_password_chang
 async def test_change_password_unauthorized(client: AsyncClient):
     """測試未帶 Token 修改密碼"""
     # 使用新的 client 避免之前測試留下的 Cookie 影響
-    async with AsyncClient(app=app, base_url="http://test") as new_client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as new_client:
         response = await new_client.post(
             "/api/auth/change-password",
             json={"current_password": "OldPassword123", "new_password": "NewPassword456"},
@@ -612,7 +612,7 @@ async def test_change_password_unauthorized(client: AsyncClient):
 async def test_change_password_invalid_token(client: AsyncClient):
     """測試無效 Token 修改密碼"""
     # 使用新的 client 避免之前測試留下的 Cookie 影響
-    async with AsyncClient(app=app, base_url="http://test") as new_client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as new_client:
         response = await new_client.post(
             "/api/auth/change-password",
             headers={"Authorization": "Bearer invalid_token_here"},
@@ -789,7 +789,7 @@ async def test_reset_password_invalidates_tokens(client: AsyncClient, db_session
     assert reset_response.status_code == 200
 
     # 使用舊 Token 嘗試登出應該失敗（Token 已失效）
-    async with AsyncClient(app=app, base_url="http://test") as new_client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as new_client:
         logout_response = await new_client.post(
             "/api/auth/logout", headers={"Authorization": f"Bearer {old_token}"}
         )
