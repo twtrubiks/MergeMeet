@@ -92,7 +92,7 @@
 | **PostGIS** | 3.5+ | 地理位置查詢 | ✅ |
 | **Redis** | 8.x | 快取/Session/登入限制 | 🔄 部分使用 |
 | **Pydantic** | 2.12+ | 資料驗證 | ✅ |
-| **JWT** | python-jose | 認證機制 | ✅ |
+| **JWT** | PyJWT | 認證機制 | ✅ |
 | **aiosmtplib** | 5.1+ | Email 發送服務 | ✅ |
 | **Mailpit** | latest | Email 測試工具（開發） | ✅ |
 | **Alembic** | 1.18+ | 資料庫遷移 | ✅ |
