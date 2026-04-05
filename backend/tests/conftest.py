@@ -37,6 +37,30 @@ TEST_DATABASE_URL = os.getenv(
     "postgresql+asyncpg://mergemeet:YOUR_DB_PASSWORD_HERE@localhost:5432/mergemeet_test",
 )
 
+# 同步版本 URL（用於清除殘留連線）
+TEST_DATABASE_URL_SYNC = TEST_DATABASE_URL.replace("+asyncpg", "")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_stale_connections():
+    """測試開始前清除殘留的 DB 連線
+
+    防止先前被中斷的測試留下殭屍連線，導致 DDL 死鎖。
+    """
+    from sqlalchemy import create_engine
+
+    engine = create_engine(TEST_DATABASE_URL_SYNC)
+    with engine.connect() as conn:
+        conn.execute(
+            text(
+                "SELECT pg_terminate_backend(pid) "
+                "FROM pg_stat_activity "
+                "WHERE datname = current_database() AND pid != pg_backend_pid()"
+            )
+        )
+        conn.commit()
+    engine.dispose()
+
 
 @pytest.fixture(scope="session")
 def event_loop():
