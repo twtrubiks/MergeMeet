@@ -17,7 +17,7 @@ from app.schemas.notification import (
     UnreadCountResponse,
 )
 
-router = APIRouter(prefix="/api/notifications", tags=["通知"])
+router = APIRouter()
 
 
 @router.get("", response_model=NotificationListResponse)

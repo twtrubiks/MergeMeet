@@ -60,7 +60,7 @@ logger = logging.getLogger(__name__)
 # 每日喜歡次數限制
 FREE_DAILY_LIKE_LIMIT = 50
 
-router = APIRouter(prefix="/api/discovery", tags=["discovery"])
+router = APIRouter()
 
 
 @router.get("/browse", response_model=list[ProfileCard])

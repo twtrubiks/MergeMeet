@@ -179,16 +179,20 @@ async def hello_world():
 # ==================== API 路由 ====================
 
 app.include_router(auth.router, prefix=f"{settings.API_V1_PREFIX}/auth", tags=["認證"])
-app.include_router(profile.router, tags=["個人檔案"])
-app.include_router(discovery.router, tags=["探索配對"])
-app.include_router(websocket.router, tags=["WebSocket"])
-app.include_router(messages.router, tags=["聊天訊息"])
+app.include_router(profile.router, prefix=f"{settings.API_V1_PREFIX}/profile", tags=["個人檔案"])
+app.include_router(
+    discovery.router, prefix=f"{settings.API_V1_PREFIX}/discovery", tags=["探索配對"]
+)
+app.include_router(websocket.router, tags=["WebSocket"])  # /ws 不在 API prefix 下
+app.include_router(messages.router, prefix=f"{settings.API_V1_PREFIX}/messages", tags=["聊天訊息"])
 app.include_router(safety.router, prefix=f"{settings.API_V1_PREFIX}/safety", tags=["安全功能"])
 app.include_router(admin.router, prefix=f"{settings.API_V1_PREFIX}/admin", tags=["管理後台"])
 app.include_router(
     moderation.router, prefix=f"{settings.API_V1_PREFIX}/moderation", tags=["內容審核"]
 )
-app.include_router(notifications.router, tags=["通知"])
+app.include_router(
+    notifications.router, prefix=f"{settings.API_V1_PREFIX}/notifications", tags=["通知"]
+)
 app.include_router(
     photo_moderation.router, prefix=f"{settings.API_V1_PREFIX}/admin/photos", tags=["照片審核"]
 )

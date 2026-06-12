@@ -34,7 +34,7 @@ from app.services.content_moderation import ContentModerationService
 from app.services.file_storage import file_storage
 from app.services.redis_client import INTEREST_TAGS_CACHE_KEY, get_redis
 
-router = APIRouter(prefix="/api/profile")
+router = APIRouter()
 logger = logging.getLogger(__name__)
 
 

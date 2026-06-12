@@ -24,7 +24,7 @@ from app.schemas.message import (
 from app.services.file_storage import file_storage
 from app.websocket.manager import manager
 
-router = APIRouter(prefix="/api/messages")
+router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
