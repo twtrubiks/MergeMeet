@@ -232,7 +232,7 @@ npm run dev
 **預期結果：**
 
 - 訊息消失
-- Network: `DELETE /api/messages/messages/{message_id}` 返回 `204`
+- Network: `DELETE /api/messages/{message_id}` 返回 `204`
 
 ---
 

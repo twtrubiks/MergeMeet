@@ -245,7 +245,7 @@ export const useChatStore = defineStore('chat', () => {
    */
   const deleteMessage = async (messageId) => {
     try {
-      await apiClient.delete(`/messages/messages/${messageId}`)
+      await apiClient.delete(`/messages/${messageId}`)
 
       // 從本地狀態移除（使用 filter 創建新陣列觸發 Vue 響應式）
       for (const matchId in messages.value) {

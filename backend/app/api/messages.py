@@ -364,7 +364,7 @@ async def mark_all_messages_as_read(
     return None
 
 
-@router.delete("/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_message(
     message_id: str,
     current_user: User = Depends(get_current_user),

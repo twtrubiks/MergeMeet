@@ -485,7 +485,7 @@ async def test_delete_message_success(
 
     # Alice 刪除訊息
     response = await client.delete(
-        f"/api/messages/messages/{message.id}", headers={"Authorization": f"Bearer {alice_token}"}
+        f"/api/messages/{message.id}", headers={"Authorization": f"Bearer {alice_token}"}
     )
 
     assert response.status_code == 204
@@ -514,7 +514,7 @@ async def test_delete_message_not_owner(
 
     # Alice 嘗試刪除 Bob 的訊息
     response = await client.delete(
-        f"/api/messages/messages/{message.id}", headers={"Authorization": f"Bearer {alice_token}"}
+        f"/api/messages/{message.id}", headers={"Authorization": f"Bearer {alice_token}"}
     )
 
     assert response.status_code == 403
@@ -528,7 +528,7 @@ async def test_delete_nonexistent_message(client: AsyncClient, matched_users: di
     fake_message_id = "00000000-0000-0000-0000-000000000000"
 
     response = await client.delete(
-        f"/api/messages/messages/{fake_message_id}",
+        f"/api/messages/{fake_message_id}",
         headers={"Authorization": f"Bearer {alice_token}"},
     )
 
@@ -559,7 +559,7 @@ async def test_deleted_messages_not_in_history(
 
     # 刪除第一條訊息
     await client.delete(
-        f"/api/messages/messages/{message1.id}", headers={"Authorization": f"Bearer {alice_token}"}
+        f"/api/messages/{message1.id}", headers={"Authorization": f"Bearer {alice_token}"}
     )
 
     # 查看聊天記錄
@@ -600,7 +600,7 @@ async def test_delete_message_websocket_broadcast(
     with patch("app.websocket.manager.manager.send_to_match", new_callable=AsyncMock) as mock_send:
         # Alice 刪除訊息
         response = await client.delete(
-            f"/api/messages/messages/{message_id}",
+            f"/api/messages/{message_id}",
             headers={"Authorization": f"Bearer {alice_token}"},
         )
 
@@ -645,7 +645,7 @@ async def test_delete_message_websocket_event_format(
     with patch("app.websocket.manager.manager.send_to_match", new_callable=AsyncMock) as mock_send:
         # Bob 刪除訊息
         await client.delete(
-            f"/api/messages/messages/{message.id}", headers={"Authorization": f"Bearer {bob_token}"}
+            f"/api/messages/{message.id}", headers={"Authorization": f"Bearer {bob_token}"}
         )
 
         # 獲取廣播的事件數據
