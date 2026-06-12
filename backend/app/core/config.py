@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     # Redis（用於 Token 黑名單、登入限制、信任分數、內容審核快取）
     # ⚠️ 正式環境請更換為安全密碼
     REDIS_URL: str = "redis://:mergemeet_redis123@localhost:6379/0"
+    REDIS_MAX_CONNECTIONS: int = 50
 
     # 環境設定
     ENVIRONMENT: str = "development"

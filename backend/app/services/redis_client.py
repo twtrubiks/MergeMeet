@@ -36,7 +36,10 @@ class RedisClient:
         """
         if self._pool is None:
             self._pool = redis.ConnectionPool.from_url(
-                settings.REDIS_URL, encoding="utf-8", decode_responses=True
+                settings.REDIS_URL,
+                encoding="utf-8",
+                decode_responses=True,
+                max_connections=settings.REDIS_MAX_CONNECTIONS,
             )
             logger.info(f"Redis connection pool created: {settings.REDIS_URL}")
         return redis.Redis(connection_pool=self._pool)
