@@ -10,12 +10,13 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import generate_verification_code, verification_codes
+from app.api.auth import generate_verification_code
 from app.core.security import get_password_hash
 from app.main import app
 from app.models.user import User
 from app.services.redis_client import get_redis
 from app.services.token_invalidator import TokenInvalidator
+from app.services.verification_code import verification_codes
 
 
 @pytest.mark.asyncio

@@ -14,10 +14,10 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from httpx import AsyncClient
 
-from app.api.auth import VerificationCodeStore
 from app.services.content_moderation import ContentModerationService
 from app.services.redis_client import get_redis
 from app.services.token_blacklist import TokenBlacklist
+from app.services.verification_code import VerificationCodeStore
 
 # 標記所有測試為整合測試
 pytestmark = pytest.mark.integration

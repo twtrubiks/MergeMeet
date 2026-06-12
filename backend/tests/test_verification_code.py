@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.api.auth import VerificationCodeStore
+from app.services.verification_code import VerificationCodeStore
 
 
 class TestVerificationCodeStore:

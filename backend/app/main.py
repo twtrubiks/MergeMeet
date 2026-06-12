@@ -29,7 +29,6 @@ from app.api import (
     safety,
     websocket,
 )
-from app.api.auth import verification_codes
 from app.core.config import settings
 from app.core.database import close_db
 from app.middleware.last_active import LastActiveMiddleware
@@ -37,6 +36,7 @@ from app.services.content_moderation import ContentModerationService
 from app.services.redis_client import get_redis, redis_client
 from app.services.token_blacklist import token_blacklist
 from app.services.token_invalidator import TokenInvalidator
+from app.services.verification_code import verification_codes
 from app.websocket.manager import manager
 
 logger = logging.getLogger(__name__)
