@@ -1,6 +1,24 @@
 """配對推薦服務"""
 
-from datetime import UTC, datetime
+import uuid
+from datetime import UTC, datetime, timedelta
+
+from dateutil.relativedelta import relativedelta
+from geoalchemy2.functions import ST_DWithin
+from sqlalchemy import and_, case, func, or_, select, union_all
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.models.match import BlockedUser, Like, Match, Pass
+from app.models.profile import Profile
+from app.models.user import User
+from app.schemas.discovery import ProfileCard
+
+# 配對分數最低門檻（低於此分數的用戶不會出現在探索列表）
+MIN_MATCH_SCORE = 15.0
+
+# browse_candidates 分批撈取的批次上限（避免極端情況下掃描整個候選池）
+MAX_BROWSE_BATCHES = 10
 
 
 def _calculate_distance_score(distance_km: float) -> float:
@@ -204,6 +222,186 @@ class MatchingService:
                 return False
 
         return True
+
+    async def browse_candidates(
+        self,
+        db: AsyncSession,
+        viewer_id: uuid.UUID,
+        my_profile: Profile,
+        limit: int,
+    ) -> list[ProfileCard]:
+        """瀏覽可配對候選人
+
+        依偏好設定（年齡、距離、性別）過濾，排除已喜歡、已配對、已封鎖（雙向）、
+        24h 內跳過的用戶，計算配對分數後過濾低分者並依分數排序。
+
+        分批撈取：每批 limit*3 筆，過濾低分者後不足 limit 筆就再撈下一批，
+        直到湊滿、掃完候選池或達 MAX_BROWSE_BATCHES 上限。
+
+        Args:
+            db: 資料庫 session
+            viewer_id: 瀏覽者的 user_id
+            my_profile: 瀏覽者的 Profile（需預先加載 interests）
+            limit: 返回數量上限
+
+        Returns:
+            依配對分數排序（高到低）的 ProfileCard 列表
+        """
+        min_age = my_profile.min_age_preference or 18
+        max_age = my_profile.max_age_preference or 99
+        max_distance_km = my_profile.max_distance_km or 50
+        gender_preference = my_profile.gender_preference
+
+        # 計算年齡範圍的出生日期
+        today = datetime.today().date()
+        max_birth_date = today - relativedelta(years=min_age)
+        min_birth_date = today - relativedelta(years=max_age + 1)
+
+        # 計算距離作為標籤，避免 N+1 查詢
+        distance_label = (
+            func.ST_Distance(
+                Profile.location,
+                my_profile.location,
+                True,  # use_spheroid=True
+            )
+            / 1000  # 轉換為公里
+        ).label("distance_km")
+
+        query = (
+            select(Profile, distance_label)
+            .join(User, Profile.user_id == User.id)
+            .options(
+                selectinload(Profile.user),
+                selectinload(Profile.photos),
+                selectinload(Profile.interests),
+            )
+            .where(
+                and_(
+                    Profile.user_id != viewer_id,
+                    Profile.is_visible.is_(True),
+                    Profile.is_complete.is_(True),
+                    User.is_active.is_(True),
+                    # 年齡篩選
+                    User.date_of_birth >= min_birth_date,
+                    User.date_of_birth <= max_birth_date,
+                    # 距離篩選 (PostGIS)
+                    ST_DWithin(
+                        Profile.location,
+                        my_profile.location,
+                        max_distance_km * 1000,  # 轉換為公尺
+                        True,  # use_spheroid=True，使用球面計算
+                    ),
+                )
+            )
+        )
+
+        # 性別篩選
+        if gender_preference and gender_preference != "all":
+            if gender_preference == "both":
+                query = query.where(Profile.gender.in_(["male", "female"]))
+            else:
+                query = query.where(Profile.gender == gender_preference)
+
+        # 排除用戶：已喜歡、已配對、已封鎖（雙向）、24h 內跳過
+        # 合併成一個 UNION 子查詢，只做一次 anti-join
+        pass_cutoff = datetime.now(UTC) - timedelta(hours=24)
+        excluded_users = union_all(
+            # 已喜歡的用戶
+            select(Like.to_user_id.label("user_id")).where(Like.from_user_id == viewer_id),
+            # 已配對的用戶
+            select(
+                case((Match.user1_id == viewer_id, Match.user2_id), else_=Match.user1_id).label(
+                    "user_id"
+                )
+            ).where(
+                or_(Match.user1_id == viewer_id, Match.user2_id == viewer_id),
+                Match.status == "ACTIVE",
+            ),
+            # 我封鎖的用戶
+            select(BlockedUser.blocked_id.label("user_id")).where(
+                BlockedUser.blocker_id == viewer_id
+            ),
+            # 封鎖我的用戶
+            select(BlockedUser.blocker_id.label("user_id")).where(
+                BlockedUser.blocked_id == viewer_id
+            ),
+            # 24h 內跳過的用戶
+            select(Pass.to_user_id.label("user_id")).where(
+                Pass.from_user_id == viewer_id,
+                Pass.passed_at > pass_cutoff,
+            ),
+        ).subquery("excluded")
+        query = query.where(Profile.user_id.notin_(select(excluded_users.c.user_id)))
+
+        # 固定排序，確保 offset 分頁不重複、不遺漏
+        query = query.order_by(Profile.user_id)
+
+        # 瀏覽者偏好資料（每批共用）
+        user_data = {
+            "interests": [interest.name for interest in my_profile.interests],
+            "min_age_preference": min_age,
+            "max_age_preference": max_age,
+            "max_distance_km": max_distance_km,
+            "gender_preference": gender_preference,
+        }
+
+        batch_size = limit * 3
+        profile_cards: list[ProfileCard] = []
+
+        for batch_index in range(MAX_BROWSE_BATCHES):
+            result = await db.execute(query.offset(batch_index * batch_size).limit(batch_size))
+            rows = result.all()
+
+            for profile, distance_km in rows:
+                # 計算年齡
+                age = relativedelta(today, profile.user.date_of_birth).years
+
+                # 取得興趣標籤與照片
+                interests = [interest.name for interest in profile.interests]
+                photos = [
+                    photo.url for photo in sorted(profile.photos, key=lambda p: p.display_order)
+                ]
+
+                # 計算配對分數
+                match_score = self.calculate_match_score(
+                    user_data,
+                    {
+                        "interests": interests,
+                        "distance_km": distance_km,
+                        "last_active": profile.last_active,
+                        "photo_count": len(photos),
+                        "bio": profile.bio,
+                        "age": age,
+                        "trust_score": profile.user.trust_score,
+                    },
+                )
+
+                # 過濾低於門檻的用戶
+                if match_score < MIN_MATCH_SCORE:
+                    continue
+
+                profile_cards.append(
+                    ProfileCard(
+                        user_id=profile.user_id,
+                        display_name=profile.display_name,
+                        age=age,
+                        gender=profile.gender,
+                        bio=profile.bio,
+                        location_name=profile.location_name,
+                        distance_km=round(distance_km, 1) if distance_km else None,
+                        interests=interests,
+                        photos=photos,
+                        match_score=round(match_score, 1),
+                    )
+                )
+
+            # 已湊滿或候選池已掃完
+            if len(profile_cards) >= limit or len(rows) < batch_size:
+                break
+
+        # 依配對分數排序（高到低）並限制返回數量
+        profile_cards.sort(key=lambda x: x.match_score or 0, reverse=True)
+        return profile_cards[:limit]
 
 
 # 單例模式

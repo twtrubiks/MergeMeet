@@ -1,11 +1,12 @@
 """探索與配對功能測試"""
 
 import asyncio
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from io import BytesIO
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from geoalchemy2.functions import ST_MakePoint, ST_SetSRID
 from httpx import AsyncClient
 from PIL import Image
 from sqlalchemy import select
@@ -13,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.discovery import FREE_DAILY_LIKE_LIMIT
 from app.models.match import Pass
-from app.models.profile import InterestTag
+from app.models.profile import InterestTag, Profile
 from app.models.user import User
 
 
@@ -210,6 +211,115 @@ async def test_browse_users_success(client: AsyncClient, completed_profiles: dic
         assert "distance_km" in candidate
         assert "interests" in candidate
         assert "match_score" in candidate
+
+
+async def _create_candidate_pool(
+    test_db: AsyncSession,
+    count: int,
+    *,
+    prefix: str,
+    latitude: float,
+    last_active: datetime | None = None,
+):
+    """直接在 DB 建立候選人（繞過 API 以加速大量建立）
+
+    分數構成（viewer 位於台北 25.0330, 121.5654）：
+    - latitude=25.33（約 33km）+ last_active=None：距離 5 + 信任 4 = 9 分（低於門檻 15）
+    - latitude=25.034（約 0.1km）+ last_active=now：距離 20 + 活躍 20 + 信任 4 = 44 分
+    """
+    users = []
+    for i in range(count):
+        user = User(
+            email=f"{prefix}{i}@example.com",
+            password_hash="test-hash",
+            date_of_birth=date(1995, 1, 1),
+            is_active=True,
+        )
+        test_db.add(user)
+        users.append(user)
+    await test_db.flush()
+
+    for i, user in enumerate(users):
+        test_db.add(
+            Profile(
+                user_id=user.id,
+                display_name=f"{prefix}{i}",
+                gender="male",
+                location=ST_SetSRID(ST_MakePoint(121.5654, latitude), 4326),
+                is_complete=True,
+                is_visible=True,
+                last_active=last_active,
+            )
+        )
+    await test_db.commit()
+
+
+@pytest.fixture
+async def viewer_with_profile(client: AsyncClient, auth_user: dict) -> dict:
+    """建立一個只有基本檔案（含位置）的瀏覽者"""
+    response = await client.post(
+        "/api/profile",
+        headers=auth_user["headers"],
+        json={
+            "display_name": "Viewer",
+            "gender": "female",
+            "location": {
+                "latitude": 25.0330,
+                "longitude": 121.5654,
+                "location_name": "台北市信義區",
+            },
+        },
+    )
+    assert response.status_code == 201, f"Failed to create viewer profile: {response.text}"
+    return auth_user
+
+
+@pytest.mark.asyncio
+async def test_browse_fills_limit_when_first_batch_is_low_score(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """測試：候選池前段大多低分時，仍應湊滿 limit 筆高分候選人
+
+    回歸測試：舊實作只撈 limit*3 筆（且無排序）再過濾低分者，
+    當低分者集中在前段時會回傳不足 limit 筆，即使資料庫還有高分候選人。
+    """
+    # 15 個低分候選人先插入（佔滿舊實作 limit*3 的緩衝）
+    await _create_candidate_pool(test_db, 15, prefix="lowscore", latitude=25.33)
+    # 5 個高分候選人後插入
+    await _create_candidate_pool(
+        test_db, 5, prefix="highscore", latitude=25.034, last_active=datetime.now(UTC)
+    )
+
+    response = await client.get(
+        "/api/discovery/browse?limit=5",
+        headers=viewer_with_profile["headers"],
+    )
+
+    assert response.status_code == 200
+    candidates = response.json()
+    assert len(candidates) == 5, f"應回傳 5 筆高分候選人，實際只有 {len(candidates)} 筆"
+    assert all(c["display_name"].startswith("highscore") for c in candidates)
+
+
+@pytest.mark.asyncio
+async def test_browse_returns_all_qualified_when_fewer_than_limit(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """測試：合格候選人少於 limit 時，回傳全部且正常終止"""
+    await _create_candidate_pool(test_db, 3, prefix="lowscore", latitude=25.33)
+    await _create_candidate_pool(
+        test_db, 2, prefix="highscore", latitude=25.034, last_active=datetime.now(UTC)
+    )
+
+    response = await client.get(
+        "/api/discovery/browse?limit=5",
+        headers=viewer_with_profile["headers"],
+    )
+
+    assert response.status_code == 200
+    candidates = response.json()
+    assert len(candidates) == 2
+    assert all(c["display_name"].startswith("highscore") for c in candidates)
 
 
 @pytest.mark.asyncio
