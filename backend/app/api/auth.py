@@ -8,7 +8,6 @@
 - ✅ 密碼修改功能：POST /change-password（需舊密碼驗證，修改後 Token 失效）
 """
 
-import asyncio
 import logging
 import secrets
 import string
@@ -54,6 +53,7 @@ from app.schemas.auth import (
     VerifyResetTokenResponse,
 )
 from app.services.email import EmailService
+from app.services.email_rate_limiter import EmailRateLimiter
 from app.services.login_limiter import LoginLimiter
 from app.services.redis_client import get_redis
 from app.services.token_blacklist import token_blacklist
@@ -96,30 +96,7 @@ def _generate_auth_tokens(
     return access_token, refresh_token
 
 
-# Email 發送速率限制（防止濫用）
-# 格式: {email: (last_sent_time, send_count_today)}
-#
-# TODO [Redis 擴展] 多實例部署時需改用 Redis
-# 目前使用內存存儲，僅支援單實例部署。
-# 如需水平擴展，建議改用 Redis 實現：
-#
-# Redis Key 設計：
-# - email_rate:{email}:last_sent - 上次發送時間戳 (Unix timestamp)
-# - email_rate:{email}:count - 今日發送次數 (integer, TTL: 到午夜)
-#
-# 實現參考：
-# class EmailRateLimiter:
-#     async def check_and_record(self, email: str) -> bool:
-#         key_last = f"email_rate:{email}:last_sent"
-#         key_count = f"email_rate:{email}:count"
-#         # 使用 Redis MULTI/EXEC 確保原子性
-#         # ...
-#
-email_rate_limit: dict[str, tuple[datetime, int]] = {}
-email_rate_limit_lock = asyncio.Lock()
-
-
-async def check_email_rate_limit(email: str) -> bool:
+async def check_email_rate_limit(redis_conn: aioredis.Redis, email: str) -> None:
     """
     檢查 Email 發送速率限制
 
@@ -127,43 +104,25 @@ async def check_email_rate_limit(email: str) -> bool:
     - 60 秒內只能發送 1 次
     - 每天最多發送 5 次
 
-    Returns:
-        True 如果允許發送，False 如果超過限制
-
     Raises:
         HTTPException 如果超過限制
     """
-    async with email_rate_limit_lock:
-        now = datetime.now(UTC)
+    limiter = EmailRateLimiter(redis_conn)
+    result = await limiter.check_and_record(email)
 
-        if email in email_rate_limit:
-            last_sent, count_today = email_rate_limit[email]
+    if result.allowed:
+        return
 
-            # 檢查是否在 60 秒冷卻期內
-            time_since_last = (now - last_sent).total_seconds()
-            if time_since_last < 60:
-                remaining = 60 - int(time_since_last)
-                raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail=f"發送過於頻繁，請等待 {remaining} 秒後再試",
-                )
+    if result.daily_limit_reached:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="今日發送次數已達上限（5 次），請明天再試",
+        )
 
-            # 檢查是否是新的一天（重置計數）
-            if last_sent.date() < now.date():
-                email_rate_limit[email] = (now, 1)
-            else:
-                # 同一天，檢查次數限制
-                if count_today >= 5:
-                    raise HTTPException(
-                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                        detail="今日發送次數已達上限（5 次），請明天再試",
-                    )
-                email_rate_limit[email] = (now, count_today + 1)
-        else:
-            # 第一次發送
-            email_rate_limit[email] = (now, 1)
-
-        return True
+    raise HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail=f"發送過於頻繁，請等待 {result.cooldown_seconds} 秒後再試",
+    )
 
 
 def generate_verification_code() -> str:
@@ -687,7 +646,9 @@ async def verify_email(
 
 @router.post("/resend-verification", response_model=ResendVerificationResponse)
 async def resend_verification(
-    request: ResendVerificationRequest, db: AsyncSession = Depends(get_db)
+    request: ResendVerificationRequest,
+    db: AsyncSession = Depends(get_db),
+    redis_conn: aioredis.Redis = Depends(get_redis),
 ):
     """
     重新發送驗證碼
@@ -701,7 +662,7 @@ async def resend_verification(
     """
     email = request.email
     # 檢查速率限制（會自動拋出 HTTPException 如果超過限制）
-    await check_email_rate_limit(email)
+    await check_email_rate_limit(redis_conn, email)
 
     # 統一回應訊息（防止用戶枚舉）
     success_message = {"message": "如果該信箱已註冊且未驗證，驗證碼已發送", "email": email}
@@ -740,7 +701,11 @@ async def resend_verification(
 
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
-async def forgot_password(request: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
+async def forgot_password(
+    request: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    redis_conn: aioredis.Redis = Depends(get_redis),
+):
     """
     忘記密碼 - 發送密碼重置郵件
 
@@ -754,7 +719,7 @@ async def forgot_password(request: ForgotPasswordRequest, db: AsyncSession = Dep
     - Token 存儲在資料庫，支援多實例部署
     """
     # 檢查速率限制
-    await check_email_rate_limit(request.email)
+    await check_email_rate_limit(redis_conn, request.email)
 
     # 查找用戶
     result = await db.execute(select(User).where(User.email == request.email))

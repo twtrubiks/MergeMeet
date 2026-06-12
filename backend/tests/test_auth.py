@@ -260,24 +260,40 @@ async def test_verify_email_wrong_code(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_resend_verification(client: AsyncClient):
     """測試重新發送驗證碼"""
+    # 使用唯一 email 避免 Redis 速率限制狀態跨測試執行殘留
+    unique_email = f"resend_{uuid.uuid4().hex[:8]}@example.com"
+
     # 先註冊
     await client.post(
         "/api/auth/register",
         json={
-            "email": "resend@example.com",
+            "email": unique_email,
             "password": "Password123",
             "date_of_birth": "1995-01-01",
         },
     )
 
     # 重新發送驗證碼（使用 JSON body）
-    response = await client.post(
-        "/api/auth/resend-verification", json={"email": "resend@example.com"}
-    )
+    response = await client.post("/api/auth/resend-verification", json={"email": unique_email})
 
     assert response.status_code == 200
     # 訊息格式已更新為防止用戶枚舉的模糊訊息
     assert "已註冊" in response.json()["message"] or "已發送" in response.json()["message"]
+
+
+@pytest.mark.asyncio
+async def test_resend_verification_cooldown(client: AsyncClient):
+    """測試重新發送驗證碼 - 60 秒冷卻期內重複請求被拒絕"""
+    unique_email = f"cooldown_{uuid.uuid4().hex[:8]}@example.com"
+
+    # 第一次請求成功
+    response = await client.post("/api/auth/resend-verification", json={"email": unique_email})
+    assert response.status_code == 200
+
+    # 冷卻期內立即重發應被拒絕
+    response = await client.post("/api/auth/resend-verification", json={"email": unique_email})
+    assert response.status_code == 429
+    assert "發送過於頻繁" in response.json()["detail"]
 
 
 @pytest.mark.asyncio
@@ -294,9 +310,8 @@ async def test_resend_verification_invalid_email_format(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_resend_verification_nonexistent_email_no_leak(client: AsyncClient):
     """測試重新發送驗證碼 - 不存在的 email 不洩露資訊（防止用戶枚舉）"""
-    response = await client.post(
-        "/api/auth/resend-verification", json={"email": "nonexistent_user_12345@example.com"}
-    )
+    unique_email = f"nonexistent_{uuid.uuid4().hex[:8]}@example.com"
+    response = await client.post("/api/auth/resend-verification", json={"email": unique_email})
 
     # 應返回 200 而非 404（防止攻擊者探測 email 是否存在）
     assert response.status_code == 200
@@ -308,26 +323,26 @@ async def test_resend_verification_already_verified_no_leak(
     client: AsyncClient, db_session: AsyncSession
 ):
     """測試重新發送驗證碼 - 已驗證的 email 不洩露資訊"""
+    unique_email = f"verified_{uuid.uuid4().hex[:8]}@example.com"
+
     # 註冊用戶
     await client.post(
         "/api/auth/register",
         json={
-            "email": "verified_user@example.com",
+            "email": unique_email,
             "password": "Password123",
             "date_of_birth": "1995-01-01",
         },
     )
 
     # 手動設置為已驗證
-    result = await db_session.execute(select(User).where(User.email == "verified_user@example.com"))
+    result = await db_session.execute(select(User).where(User.email == unique_email))
     user = result.scalar_one()
     user.email_verified = True
     await db_session.commit()
 
     # 重新發送驗證碼
-    response = await client.post(
-        "/api/auth/resend-verification", json={"email": "verified_user@example.com"}
-    )
+    response = await client.post("/api/auth/resend-verification", json={"email": unique_email})
 
     # 應返回 200 而非 400（防止攻擊者探測 email 驗證狀態）
     assert response.status_code == 200
@@ -629,18 +644,20 @@ async def test_change_password_invalid_token(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_forgot_password(client: AsyncClient):
     """測試忘記密碼 - 發送重置郵件"""
+    unique_email = f"forgot_{uuid.uuid4().hex[:8]}@example.com"
+
     # 先註冊
     await client.post(
         "/api/auth/register",
         json={
-            "email": "forgot@example.com",
+            "email": unique_email,
             "password": "Password123",
             "date_of_birth": "1995-01-01",
         },
     )
 
     # 請求密碼重置
-    response = await client.post("/api/auth/forgot-password", json={"email": "forgot@example.com"})
+    response = await client.post("/api/auth/forgot-password", json={"email": unique_email})
 
     assert response.status_code == 200
     # 不透露 email 是否存在
@@ -650,9 +667,8 @@ async def test_forgot_password(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_forgot_password_nonexistent_email(client: AsyncClient):
     """測試忘記密碼 - 不存在的 email 也返回相同訊息（防止枚舉）"""
-    response = await client.post(
-        "/api/auth/forgot-password", json={"email": "nonexistent@example.com"}
-    )
+    unique_email = f"forgotnone_{uuid.uuid4().hex[:8]}@example.com"
+    response = await client.post("/api/auth/forgot-password", json={"email": unique_email})
 
     # 應該返回成功（防止 email 枚舉）
     assert response.status_code == 200
