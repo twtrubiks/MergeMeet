@@ -28,7 +28,7 @@ from app.core.database import close_db
 from app.core.rate_limit import limiter, rate_limit_exceeded_handler
 from app.middleware.last_active import LastActiveMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
-from app.services import account_cleanup, trust_score_recovery
+from app.services import account_cleanup, pass_cleanup, trust_score_recovery
 from app.services.content_moderation import ContentModerationService
 from app.services.redis_client import get_redis, redis_client
 from app.services.token_blacklist import token_blacklist
@@ -79,9 +79,15 @@ async def lifespan(app: FastAPI):
     # 啟動信任分數每日恢復任務（低於預設分的用戶每日 +1）
     await trust_score_recovery.start_recovery_task()
 
+    # 啟動 Pass 記錄清理任務（刪除 7 天前的跳過記錄）
+    await pass_cleanup.start_cleanup_task()
+
     yield
     # 關閉時執行
     logger.info("👋 MergeMeet 關閉中...")
+
+    # 停止 Pass 記錄清理任務
+    await pass_cleanup.stop_cleanup_task()
 
     # 停止信任分數每日恢復任務
     await trust_score_recovery.stop_recovery_task()

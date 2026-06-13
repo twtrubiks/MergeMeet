@@ -43,25 +43,8 @@ class Pass(Base):
 
     簡化實現：不需要 expires_at 欄位，直接在查詢時用 passed_at 計算。
 
-    效能優化建議（未來可改善）：
-    - 資料庫會持續累積跳過記錄，可用背景任務定期清理 7 天前的記錄
-    - 方案 1: APScheduler（輕量級，適合單實例）
-      @scheduler.scheduled_job('cron', hour=3)  # 每天凌晨 3 點執行
-      async def cleanup_old_passes():
-          cutoff = datetime.now() - timedelta(days=7)
-          await db.execute(delete(Pass).where(Pass.passed_at < cutoff))
-
-    - 方案 2: Celery（適合分散式部署）
-      @celery.task
-      def cleanup_old_passes():
-          # 定期清理邏輯
-
-    - 方案 3: PostgreSQL 自動清理（最簡單）
-      CREATE INDEX ix_passes_cleanup ON passes(passed_at)
-      WHERE passed_at < NOW() - INTERVAL '7 days';
-      -- 然後定期 VACUUM 即可
-
-    目前簡化版無背景清理，資料表會持續增長但影響不大（索引已優化查詢）。
+    記錄清理：7 天前的記錄由背景任務每日刪除，
+    避免資料表無限增長（見 services/pass_cleanup.py）。
     """
 
     __tablename__ = "passes"
