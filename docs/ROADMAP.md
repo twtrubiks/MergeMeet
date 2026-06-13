@@ -20,7 +20,7 @@
 
 ### 安全
 - [ ] 全局速率限制（slowapi）
-- [ ] 安全 Header（CSP、HSTS、X-Frame-Options、X-Content-Type-Options）
+- [x] 安全 Header（CSP、HSTS、X-Frame-Options、X-Content-Type-Options）
 
 ### 基礎設施
 - [ ] 整合 AWS S3 檔案儲存

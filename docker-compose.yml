@@ -5,7 +5,8 @@ services:
     container_name: mergemeet_postgres
     environment:
       POSTGRES_USER: mergemeet
-      POSTGRES_PASSWORD: mergemeet123  # TODO: 正式環境請更換為安全密碼
+      # 密碼可由專案根目錄 .env 覆寫（見 .env.example），未設定時使用開發預設值
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mergemeet123}
       POSTGRES_DB: mergemeet
     ports:
       - "5432:5432"
@@ -21,13 +22,14 @@ services:
   redis:
     image: redis:8-alpine
     container_name: mergemeet_redis
-    command: redis-server --requirepass mergemeet_redis123
+    # 密碼可由專案根目錄 .env 覆寫（見 .env.example），未設定時使用開發預設值
+    command: redis-server --requirepass ${REDIS_PASSWORD:-mergemeet_redis123}
     ports:
       - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "mergemeet_redis123", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-mergemeet_redis123}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5

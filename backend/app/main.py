@@ -32,6 +32,7 @@ from app.api import (
 from app.core.config import settings
 from app.core.database import close_db
 from app.middleware.last_active import LastActiveMiddleware
+from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.services import account_cleanup
 from app.services.content_moderation import ContentModerationService
 from app.services.redis_client import get_redis, redis_client
@@ -121,6 +122,9 @@ app.add_middleware(
         "X-Lockout-Seconds",  # 鎖定剩餘秒數
     ],
 )
+
+# 安全 Headers Middleware（最後註冊 = 最外層，確保 CORS preflight 響應也帶安全 Headers）
+app.add_middleware(SecurityHeadersMiddleware)
 
 # 用戶活躍時間更新 Middleware
 # 在每個已認證請求成功後自動更新 Profile.last_active

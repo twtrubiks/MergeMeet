@@ -86,6 +86,8 @@ docker compose up -d
 
 啟動 PostgreSQL、Redis 和 Mailpit
 
+> 開發環境使用預設密碼，可直接啟動。正式環境請複製根目錄 `.env.example` 為 `.env` 並設定安全密碼（會覆寫 docker-compose.yml 中的預設值）。
+
 #### 2. 設置後端
 
 ```bash

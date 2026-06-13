@@ -52,6 +52,25 @@ def large_image_bytes():
 
 
 @pytest.fixture
+def exif_image_bytes():
+    """產生帶 EXIF 的測試圖片（Orientation=6、設備資訊、GPS 座標）"""
+    img = Image.new("RGB", (800, 600), color="green")
+    exif = Image.Exif()
+    exif[0x0112] = 6  # Orientation: Rotate 90 CW（顯示時需轉正為 600x800）
+    exif[0x010F] = "TestPhone"  # Make（設備資訊）
+    exif[0x8825] = {  # GPSInfo（隱私敏感）
+        1: "N",
+        2: (25.0, 2.0, 0.0),  # 緯度
+        3: "E",
+        4: (121.0, 31.0, 0.0),  # 經度
+    }
+    buffer = io.BytesIO()
+    img.save(buffer, format="JPEG", exif=exif)
+    buffer.seek(0)
+    return buffer.read()
+
+
+@pytest.fixture
 def png_image_bytes():
     """產生測試用 PNG 圖片（含透明通道）"""
     img = Image.new("RGBA", (400, 400), color=(255, 0, 0, 128))
@@ -179,6 +198,70 @@ class TestImageProcessing:
         img = Image.open(io.BytesIO(thumbnail))
         assert img.width == 200
         assert img.height == 200
+
+
+class TestExifHandling:
+    """EXIF 元資料處理測試（隱私保護）"""
+
+    def test_process_image_strips_exif(self, storage_service, exif_image_bytes):
+        """測試處理後的圖片不含任何 EXIF（GPS、設備資訊）"""
+        processed = storage_service._process_image(exif_image_bytes, (1200, 1200))
+
+        img = Image.open(io.BytesIO(processed))
+        assert dict(img.getexif()) == {}
+
+    def test_process_image_applies_orientation(self, storage_service, exif_image_bytes):
+        """測試去除 EXIF 前先套用 Orientation（避免照片橫躺）"""
+        processed = storage_service._process_image(exif_image_bytes, (1200, 1200))
+
+        img = Image.open(io.BytesIO(processed))
+        # 原始 800x600 + Orientation=6（旋轉 90 度）→ 600x800
+        assert (img.width, img.height) == (600, 800)
+
+    def test_create_thumbnail_strips_exif(self, storage_service, exif_image_bytes):
+        """測試縮圖不含任何 EXIF"""
+        thumbnail = storage_service._create_thumbnail(exif_image_bytes)
+
+        img = Image.open(io.BytesIO(thumbnail))
+        assert dict(img.getexif()) == {}
+
+    @pytest.mark.asyncio
+    async def test_save_photo_strips_exif(self, storage_service, exif_image_bytes, temp_upload_dir):
+        """測試儲存的主圖與縮圖都不含 EXIF（端到端）"""
+        user_id = "exif-user"
+
+        photo_id, _, _ = await storage_service.save_photo(
+            user_id=user_id,
+            file_content=exif_image_bytes,
+            filename="with_gps.jpg",
+            content_type="image/jpeg",
+        )
+
+        photo_path = Path(temp_upload_dir) / "photos" / user_id / f"{photo_id}.jpg"
+        thumbnail_path = Path(temp_upload_dir) / "photos" / user_id / f"{photo_id}_thumb.jpg"
+
+        with open(photo_path, "rb") as f:
+            assert dict(Image.open(f).getexif()) == {}
+
+        with open(thumbnail_path, "rb") as f:
+            assert dict(Image.open(f).getexif()) == {}
+
+    @pytest.mark.asyncio
+    async def test_save_chat_image_returns_transposed_dimensions(
+        self, storage_service, exif_image_bytes
+    ):
+        """測試聊天圖片回傳的尺寸與轉正後的實際儲存尺寸一致"""
+        _, _, _, width, height, is_gif = await storage_service.save_chat_image(
+            match_id="match-exif",
+            user_id="exif-user",
+            file_content=exif_image_bytes,
+            filename="with_gps.jpg",
+            content_type="image/jpeg",
+        )
+
+        # 原始 800x600 + Orientation=6 → 轉正後 600x800
+        assert (width, height) == (600, 800)
+        assert is_gif is False
 
 
 class TestSavePhoto:

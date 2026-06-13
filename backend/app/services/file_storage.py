@@ -6,7 +6,7 @@ import shutil
 import uuid
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageOps
 
 from app.core.config import settings
 
@@ -75,6 +75,9 @@ class FileStorageService:
         """
         處理圖片：調整大小並壓縮
 
+        重新編碼會去除所有 EXIF 元資料（GPS、設備資訊等，隱私保護），
+        因此需先套用 EXIF Orientation，避免手機照片方向錯誤。
+
         Args:
             file_content: 原始檔案內容
             max_size: 最大尺寸 (width, height)
@@ -83,6 +86,9 @@ class FileStorageService:
             處理後的圖片內容
         """
         img = Image.open(io.BytesIO(file_content))
+
+        # 套用 EXIF Orientation（去除 EXIF 前必須先轉正）
+        img = ImageOps.exif_transpose(img)
 
         # 轉換為 RGB（處理 RGBA 或其他模式）
         if img.mode in ("RGBA", "P"):
@@ -109,6 +115,9 @@ class FileStorageService:
             縮圖內容
         """
         img = Image.open(io.BytesIO(file_content))
+
+        # 套用 EXIF Orientation（去除 EXIF 前必須先轉正）
+        img = ImageOps.exif_transpose(img)
 
         # 轉換為 RGB
         if img.mode in ("RGBA", "P"):
@@ -343,8 +352,10 @@ class FileStorageService:
         # 判斷是否為 GIF
         is_gif = content_type == "image/gif"
 
-        # 取得原始圖片尺寸
+        # 取得原始圖片尺寸（先套用 EXIF Orientation，與處理後的實際尺寸一致）
         img = Image.open(io.BytesIO(file_content))
+        if not is_gif:
+            img = ImageOps.exif_transpose(img)
         original_width, original_height = img.size
 
         if is_gif:

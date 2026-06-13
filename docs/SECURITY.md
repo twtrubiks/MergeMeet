@@ -86,8 +86,11 @@ MergeMeet 支援兩種認證方式，優先使用 HttpOnly Cookie 提供更高�
    - Token 存儲在 HttpOnly Cookie
    - JavaScript 無法讀取（即使發生 XSS）
 
-4. **Content Security Policy（建議）**
-   - 見「建議改進」清單
+4. **Content Security Policy**
+   - API 響應採最嚴格策略：`default-src 'none'; img-src 'self'; frame-ancestors 'none'`
+   - `/docs`、`/redoc` 豁免（Swagger UI / ReDoc 需載入 CDN 腳本）
+   - 同時設置 HSTS、X-Content-Type-Options、X-Frame-Options、Referrer-Policy
+   - 文件: `backend/app/middleware/security_headers.py`
 
 ---
 
@@ -251,6 +254,9 @@ MergeMeet 使用信任分數系統自動追蹤用戶行為，維護平台安全�
 - [x] 驗證碼使用加密安全隨機數生成（secrets.choice）
 - [x] 信任分數系統（自動行為監控 + 功能限制）
 - [x] Redis 密碼認證（requirepass + 端口僅綁定 127.0.0.1）
+- [x] HTTP 安全 Headers（HSTS、CSP、X-Frame-Options、X-Content-Type-Options、Referrer-Policy）
+- [x] 照片 EXIF 元資料去除（重新編碼去除 GPS / 設備資訊，並先套用 Orientation 轉正）
+- [x] Docker Compose 密碼可由環境變數覆寫（根目錄 `.env`，見 `.env.example`）
 
 ### ⚠️ 建議改進
 
