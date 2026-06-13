@@ -26,4 +26,25 @@ export const showSessionExpiredMessage = () => {
   })
 }
 
+// 速率限制提示節流：避免並發請求同時觸發 429 時洗版
+let lastRateLimitShownAt = 0
+
+/**
+ * 顯示速率限制提示（後端回傳 429 時）
+ * @param {string|number} [retryAfterSeconds] - Retry-After header 值（秒）
+ */
+export const showRateLimitMessage = (retryAfterSeconds) => {
+  // 3 秒內僅顯示一次
+  const now = Date.now()
+  if (now - lastRateLimitShownAt < 3000) return
+  lastRateLimitShownAt = now
+
+  const seconds = Number(retryAfterSeconds)
+  const suffix = seconds > 0 ? `，請 ${seconds} 秒後再試` : '，請稍後再試'
+  message.warning(`請求過於頻繁${suffix}`, {
+    duration: 3000,
+    closable: true
+  })
+}
+
 export { message as discreteMessage }

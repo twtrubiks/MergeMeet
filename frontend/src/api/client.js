@@ -6,7 +6,7 @@
  * 2. Bearer Token（回退）- 向後兼容，API 客戶端 / 移動端使用
  */
 import axios from 'axios'
-import { showSessionExpiredMessage } from '@/utils/discreteApi'
+import { showSessionExpiredMessage, showRateLimitMessage } from '@/utils/discreteApi'
 
 /**
  * 從 Cookie 中獲取指定的值
@@ -85,6 +85,13 @@ apiClient.interceptors.response.use(
     // 登入相關 API 不需要 Token 刷新（這些 API 本身就是獲取 Token 的）
     const authEndpoints = ['/auth/login', '/auth/register', '/auth/admin-login']
     const isAuthEndpoint = authEndpoints.some((endpoint) => originalRequest.url?.includes(endpoint))
+
+    // 429 速率限制：全域顯示提示
+    // 認證端點（登入/註冊）的 429 交由元件自行處理（如登入鎖定提示），避免重複提示
+    if (error.response?.status === 429 && !isAuthEndpoint) {
+      showRateLimitMessage(error.response.headers['retry-after'])
+      return Promise.reject(error)
+    }
 
     // 如果是 401 且還沒重試過，且不是登入相關 API，嘗試刷新 Token
     if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
