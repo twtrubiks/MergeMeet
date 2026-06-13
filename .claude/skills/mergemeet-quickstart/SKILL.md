@@ -21,7 +21,8 @@ docker compose up -d
 
 # 驗證服務
 docker compose ps
-# 預期結果: postgres (Up), redis (Up)
+# 預期結果: postgres (Up), redis (Up), mailpit (Up)
+# Mailpit Web UI: http://localhost:8025（Email 測試）
 ```
 
 ### 步驟 2：啟動後端
@@ -131,7 +132,7 @@ docker exec -it mergemeet_postgres psql -U mergemeet -d mergemeet -c "SELECT 1;"
 curl http://localhost:8000/health
 
 # 檢查 backend/app/core/config.py 中的 CORS 設定
-# 確保 CORS_ORIGINS 包含 "http://localhost:5173"
+# 確保 BACKEND_CORS_ORIGINS 包含 "http://localhost:5173"
 ```
 
 ### API 返回 404

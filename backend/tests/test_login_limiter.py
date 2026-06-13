@@ -23,7 +23,7 @@ def mock_redis():
     redis.ttl = AsyncMock(return_value=-2)  # Key 不存在
     redis.incr = AsyncMock(return_value=1)
     redis.expire = AsyncMock()
-    redis.setex = AsyncMock()
+    redis.set = AsyncMock()
     redis.delete = AsyncMock()
     return redis
 
@@ -101,7 +101,7 @@ class TestLoginLimiter:
         assert result.is_locked is True
         assert result.remaining_attempts == 0
         assert result.lockout_seconds == LOCKOUT_SECONDS
-        mock_redis.setex.assert_called_once()  # 設置鎖定
+        mock_redis.set.assert_called_once()  # 設置鎖定
         mock_redis.delete.assert_called_once()  # 清除嘗試計數
 
     @pytest.mark.asyncio

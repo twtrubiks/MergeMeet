@@ -148,7 +148,7 @@ async def _throttled_update(user_id: str) -> None:
     # 更新成功後設置節流 key
     if conn:
         with contextlib.suppress(Exception):
-            await conn.setex(redis_key, _throttle_seconds, "1")
+            await conn.set(redis_key, "1", ex=_throttle_seconds)
 
 
 async def _update_last_active(user_id: str) -> None:

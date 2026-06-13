@@ -42,7 +42,7 @@ grep -rn "/api/some-endpoint" frontend/src/
 | messages.py | `/api/messages/*` | chat.js |
 | safety.py | `/api/safety/*` | safety.js |
 | notifications.py | `/api/notifications/*` | notification.js |
-| moderation.py | `/api/moderation/*` | 相關組件 |
+| moderation.py | `/api/moderation/*` | AdminDashboard.vue |
 | photo_moderation.py | `/api/admin/photos/*` | AdminDashboard.vue |
 | websocket.py | `/ws/*` | websocket.js |
 | admin.py | `/api/admin/*` | AdminDashboard.vue |

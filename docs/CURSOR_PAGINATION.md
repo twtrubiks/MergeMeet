@@ -187,7 +187,11 @@ conditions = [
 
 # 如果有 cursor，添加 before 條件
 if before_id:
-    cursor_sent_at = get_message_sent_at(before_id)
+    # 反查游標訊息的 sent_at（端點內 inline 查詢）
+    cursor_result = await db.execute(
+        select(Message.sent_at).where(Message.id == before_id)
+    )
+    cursor_sent_at = cursor_result.scalar_one_or_none()
     if cursor_sent_at:
         # 處理相同時間戳的訊息
         conditions.append(

@@ -98,7 +98,7 @@ class LoginLimiter:
 
         # 達到上限，觸發鎖定
         if new_count >= MAX_ATTEMPTS:
-            await self._redis.setex(lockout_key, LOCKOUT_SECONDS, "1")
+            await self._redis.set(lockout_key, "1", ex=LOCKOUT_SECONDS)
             # 清除嘗試計數（鎖定期間不需要）
             await self._redis.delete(attempts_key)
             logger.warning(f"Account locked for {email} due to {new_count} failed attempts")

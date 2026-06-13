@@ -38,8 +38,8 @@ TEST_DATABASE_URL = os.getenv(
     "postgresql+asyncpg://mergemeet:YOUR_DB_PASSWORD_HERE@localhost:5432/mergemeet_test",
 )
 
-# 同步版本 URL（用於清除殘留連線）
-TEST_DATABASE_URL_SYNC = TEST_DATABASE_URL.replace("+asyncpg", "")
+# 同步版本 URL（用於清除殘留連線，使用 psycopg3 同步驅動）
+TEST_DATABASE_URL_SYNC = TEST_DATABASE_URL.replace("+asyncpg", "+psycopg")
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -167,13 +167,13 @@ def sample_user_data():
 def mock_redis():
     """建立 Mock Redis 連線
 
-    模擬 Redis 的基本操作：setex, get, exists, delete, ttl
+    模擬 Redis 的基本操作：set, get, exists, delete, ttl
     """
     redis = AsyncMock()
     # 內部存儲（模擬 Redis 行為）
     _storage = {}
 
-    async def mock_setex(key: str, ttl: int, value: str):
+    async def mock_set(key: str, value: str, ex: int | None = None):
         _storage[key] = value
         return True
 
@@ -192,7 +192,7 @@ def mock_redis():
     async def mock_ttl(key: str):
         return 300 if key in _storage else -2
 
-    redis.setex = AsyncMock(side_effect=mock_setex)
+    redis.set = AsyncMock(side_effect=mock_set)
     redis.get = AsyncMock(side_effect=mock_get)
     redis.exists = AsyncMock(side_effect=mock_exists)
     redis.delete = AsyncMock(side_effect=mock_delete)
@@ -211,7 +211,7 @@ def mock_redis_error():
     import redis.asyncio as aioredis
 
     redis = AsyncMock()
-    redis.setex = AsyncMock(side_effect=aioredis.RedisError("Connection refused"))
+    redis.set = AsyncMock(side_effect=aioredis.RedisError("Connection refused"))
     redis.get = AsyncMock(side_effect=aioredis.RedisError("Connection refused"))
     redis.exists = AsyncMock(side_effect=aioredis.RedisError("Connection refused"))
     redis.delete = AsyncMock(side_effect=aioredis.RedisError("Connection refused"))

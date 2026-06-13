@@ -58,7 +58,7 @@ npm run dev
 
 ## 2. 測試帳號資訊
 
-### 預設測試帳號
+### 建議測試帳號（需自行註冊）
 
 | 帳號 | Email | 密碼 | 性別 |
 |------|-------|------|------|
@@ -115,7 +115,7 @@ npm run dev
 **預期結果：**
 
 - 登入成功，跳轉到首頁
-- LocalStorage 儲存 `access_token`
+- LocalStorage 儲存 `access_token`（主驗證機制為 HttpOnly Cookie + CSRF Token，localStorage 僅為向後相容回退）
 - Network: `POST /api/auth/login` 返回 `200`
 
 ---
@@ -261,7 +261,7 @@ npm run dev
 #### 測試案例：舉報用戶
 
 1. 點擊「舉報」按鈕
-2. 選擇類型（INAPPROPRIATE / HARASSMENT / FAKE_PROFILE / SCAM / OTHER）
+2. 選擇類型（INAPPROPRIATE / HARASSMENT / FAKE / SCAM / OTHER）
 3. 填寫原因並提交
 
 **預期結果：**
@@ -414,6 +414,8 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 ## 自動化測試
 
+### 後端測試（pytest）
+
 ```bash
 # 運行 pytest 測試
 cd backend
@@ -421,6 +423,14 @@ pytest tests/ -v
 
 # 查看測試覆蓋率
 pytest --cov=app --cov-report=html
+```
+
+### 前端測試（Vitest）
+
+```bash
+cd frontend
+npm run test            # watch 模式
+npm run test:coverage   # 覆蓋率報告
 ```
 
 ---

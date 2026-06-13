@@ -21,12 +21,13 @@
 ### 安全
 - [x] 全局速率限制（slowapi + Redis，60 次/分鐘 per IP；認證端點 10 次/5 分鐘）
 - [x] 安全 Header（CSP、HSTS、X-Frame-Options、X-Content-Type-Options）
+- 其餘認證/安全細項（CSRF、Token 黑名單、登入鎖定、Email/驗證碼速率限制等）已實作，詳見 FEATURES.md
 
 ### 基礎設施
 - [ ] 整合 AWS S3 檔案儲存
 
 ### 用戶體驗
-- [ ] 每日喜歡次數限制
+- [x] 每日喜歡次數限制（免費用戶每日 50 次，Redis 原子計數，超限回傳 429）
 - [ ] 推播通知（FCM）
 
 ---
@@ -117,4 +118,4 @@ Internet
 
 ---
 
-最後更新：2025-12-28
+最後更新：2026-06-19

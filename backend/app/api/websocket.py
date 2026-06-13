@@ -303,7 +303,7 @@ async def _check_and_reward_positive_interaction(match: Match, sender_id: uuid.U
         last_sender = await redis.get(last_sender_key)
 
         # 2. 更新為當前發送者
-        await redis.setex(last_sender_key, 86400, sender_id_str)
+        await redis.set(last_sender_key, sender_id_str, ex=86400)
 
         # 3. 檢查是否為回應（發送者不同）
         if last_sender is None or last_sender == sender_id_str:
@@ -337,7 +337,7 @@ async def _check_and_reward_positive_interaction(match: Match, sender_id: uuid.U
                 "positive_interaction",
                 reason=f"Received response in match {match_id_str}",
             )
-            await redis.setex(previous_daily_key, 86400, str(previous_count + 1))
+            await redis.set(previous_daily_key, str(previous_count + 1), ex=86400)
             logger.debug(
                 f"Positive interaction: User {last_sender} rewarded +1 "
                 f"(match: {match_id_str}, match_count: {match_count}/3, daily: {previous_count + 1}/3)"
@@ -350,7 +350,7 @@ async def _check_and_reward_positive_interaction(match: Match, sender_id: uuid.U
             await TrustScoreService.adjust_score(
                 db, sender_id, "positive_interaction", reason=f"Responded in match {match_id_str}"
             )
-            await redis.setex(sender_daily_key, 86400, str(sender_count + 1))
+            await redis.set(sender_daily_key, str(sender_count + 1), ex=86400)
             logger.debug(
                 f"Positive interaction: User {sender_id_str} rewarded +1 "
                 f"(match: {match_id_str}, match_count: {match_count}/3, daily: {sender_count + 1}/3)"

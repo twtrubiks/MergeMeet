@@ -1,7 +1,7 @@
 # 🎉 MergeMeet 交友平台
 
 [![Python](https://img.shields.io/badge/Python-3.13+-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.135-green.svg)](https://fastapi.tiangolo.com/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.137-green.svg)](https://fastapi.tiangolo.com/)
 [![Vue.js](https://img.shields.io/badge/Vue.js-3.5-brightgreen.svg)](https://vuejs.org/)
 [![Vite](https://img.shields.io/badge/Vite-8.x-purple.svg)](https://vite.dev/)
 [![Pinia](https://img.shields.io/badge/Pinia-3.x-yellow.svg)](https://pinia.vuejs.org/)
@@ -24,7 +24,7 @@
 |------|------|
 | **版本** | 1.0.0 MVP |
 | **開發進度** | ✅ Week 1-6 已完成 |
-| **代碼規模** | 純程式碼約 30,716 行（後端 6,504 + 前端 17,194 + 測試 7,018），含空行和註釋共 44,146 行 |
+| **代碼規模** | 純程式碼約 33,867 行（後端 7,096 + 前端 17,477 + 測試 9,294），含空行和註釋共 48,651 行 |
 
 ### 技術棧
 
@@ -49,7 +49,7 @@
 
 配對頁面
 
-![](./docs/screenshots/02-discovery.png)
+![](./docs/screenshots/02-discovery-swipe.png)
 
 帳號設定
 
@@ -142,8 +142,8 @@ cd backend && pytest -v --cov=app    # 後端測試
 cd frontend && npm run test          # 前端測試
 ```
 
-- 後端測試: 389 個（覆蓋率 >80%）
-- 前端測試: 89 個（Vitest）
+- 後端測試: 454 個（覆蓋率約 66%，目標 >80%）
+- 前端測試: 82 個（Vitest）
 
 ## 📊 專案結構
 
@@ -153,6 +153,7 @@ mergemeet/
 │   ├── app/
 │   │   ├── api/              # API 路由
 │   │   ├── core/             # 核心配置 (config, security, database)
+│   │   ├── middleware/       # 中介層 (安全標頭、最後活躍時間)
 │   │   ├── models/           # SQLAlchemy 模型
 │   │   ├── schemas/          # Pydantic Schemas
 │   │   ├── services/         # 業務邏輯
@@ -167,6 +168,7 @@ mergemeet/
 │   └── src/
 │       ├── views/            # 頁面組件
 │       ├── components/       # 共用組件
+│       ├── assets/           # 靜態資源
 │       ├── stores/           # Pinia Stores
 │       ├── composables/      # Vue Composables
 │       ├── api/              # API 客戶端
@@ -183,6 +185,7 @@ mergemeet/
 |------|------|------|
 | API 文檔 (Swagger) | http://localhost:8000/docs | REST API 互動式文檔 |
 | Mailpit | http://localhost:8025 | Email 測試工具（查看驗證碼、密碼重置連結等） |
+| 管理後台 | http://localhost:5173/admin/login | 管理員登入入口（帳號設置見[管理員設置指南](./docs/管理員設置指南.md)） |
 
 **pgAdmin（資料庫管理）**：預設未啟用，需在 `docker-compose.yml` 中取消 pgadmin 服務的註解後執行 `docker compose up -d`
 

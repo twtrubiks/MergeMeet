@@ -100,12 +100,12 @@ class TestVerificationCodeStoreWithRedis:
 
         await store.set(email, code)
 
-        # 驗證 Redis setex 被調用
-        mock_redis.setex.assert_called_once()
-        call_args = mock_redis.setex.call_args[0]
-        assert call_args[0] == f"verify:{email.lower()}"
-        assert call_args[1] == 600  # 10 分鐘
-        assert call_args[2] == code
+        # 驗證 Redis set 被調用
+        mock_redis.set.assert_called_once()
+        call_args = mock_redis.set.call_args
+        assert call_args.args[0] == f"verify:{email.lower()}"
+        assert call_args.kwargs["ex"] == 600  # 10 分鐘
+        assert call_args.args[1] == code
 
     @pytest.mark.asyncio
     async def test_get_code_from_redis(self, mock_redis):

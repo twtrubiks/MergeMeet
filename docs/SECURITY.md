@@ -46,7 +46,7 @@ MergeMeet 支援兩種認證方式，優先使用 HttpOnly Cookie 提供更高�
 
 **運作流程：**
 1. **登入時**
-   - 後端生成 CSRF Token (32 字元隨機字串)
+   - 後端生成 CSRF Token (32 bytes 亂數，Base64 URL-safe 編碼後約 43 字元)
    - 設置為非 HttpOnly Cookie (`csrf_token`)
    - 前端可讀取此 Cookie
 
@@ -132,7 +132,7 @@ MergeMeet 支援兩種認證方式，優先使用 HttpOnly Cookie 提供更高�
 
 1. **Email 脫敏**
    - 管理後台顯示時自動脫敏
-   - 範例: `user@example.com` → `us***@example.com`
+   - 範例: `user@example.com` → `us***r@example.com`
    - 函數: `backend/app/core/utils.py` (`mask_email`)
    - 使用: `backend/app/api/admin.py`
 
@@ -151,7 +151,7 @@ MergeMeet 支援兩種認證方式，優先使用 HttpOnly Cookie 提供更高�
 4. **最小權限原則**
    - 普通用戶無法查看其他用戶的完整 email
    - 只有管理員可以查看（且經過脫敏）
-   - 密碼重置驗證返回遮罩 email（如 `us***@example.com`）
+   - 密碼重置驗證返回遮罩 email（如 `us***r@example.com`）
 
 ---
 

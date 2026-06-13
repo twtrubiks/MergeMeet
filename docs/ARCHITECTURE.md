@@ -86,19 +86,19 @@
 | 技術 | 版本 | 用途 | 狀態 |
 |------|------|------|------|
 | **Python** | 3.13+ | 主要開發語言 | ✅ |
-| **FastAPI** | 0.135+ | Web 框架 | ✅ |
+| **FastAPI** | 0.137+ | Web 框架 | ✅ |
 | **SQLAlchemy** | 2.0 | ORM（Async） | ✅ |
 | **PostgreSQL** | 17 | 主資料庫 | ✅ |
 | **PostGIS** | 3.5+ | 地理位置查詢 | ✅ |
-| **Redis** | 8.x | 快取/Session/登入限制 | 🔄 部分使用 |
-| **Pydantic** | 2.12+ | 資料驗證 | ✅ |
+| **Redis** | 8.x | 快取/Session/登入限制 | ✅ 核心多服務已整合（含內存回退模式） |
+| **Pydantic** | 2.13+ | 資料驗證 | ✅ |
 | **JWT** | PyJWT | 認證機制 | ✅ |
 | **aiosmtplib** | 5.1+ | Email 發送服務 | ✅ |
 | **Mailpit** | latest | Email 測試工具（開發） | ✅ |
 | **Alembic** | 1.18+ | 資料庫遷移 | ✅ |
-| **pytest** | 9.0+ | 測試框架 | ✅ |
-| **Ruff** | 0.15+ | Linter + Formatter | ✅ |
-| **pre-commit** | 4.0+ | Git Hook 管理 | ✅ |
+| **pytest** | 9.1+ | 測試框架 | ✅ |
+| **Ruff** | 由 pre-commit 管理（見 .pre-commit-config.yaml） | Linter + Formatter | ✅ |
+| **pre-commit** | 由 pre-commit 管理（見 .pre-commit-config.yaml） | Git Hook 管理 | ✅ |
 
 #### 前端技術棧
 
@@ -134,6 +134,7 @@
 │ banned_until              │
 │ password_reset_token      │
 │ password_reset_expires    │
+│ deleted_at                │  ← 軟刪除時間
 │ created_at                │
 │ updated_at                │
 └─────────────┬─────────────┘
@@ -279,6 +280,19 @@
 │ created_at          │   │ updated_at          │
 │ updated_at          │   └─────────────────────┘
 └─────────────────────┘
+
+
+┌─────────────────────┐
+│    TrustScoreLog    │  (信任分數變更審計日誌 - User 1:N，admin「信任歷史」UI)
+├─────────────────────┤
+│ id (PK)             │
+│ user_id (FK)        │  ← 對應 User，1:N
+│ action              │
+│ adjustment          │
+│ new_score           │
+│ reason              │
+│ created_at          │
+└─────────────────────┘
 ```
 
 ### 2.4 PostGIS 地理位置查詢
@@ -358,7 +372,7 @@ profile.location = ST_SetSRID(
     4326
 )
 
-# 2. 計算距離（get_discovery_candidates 函數）
+# 2. 計算距離（MatchingService.browse_candidates 方法）
 from sqlalchemy import func
 
 distance_km = (
@@ -369,7 +383,7 @@ distance_km = (
     ) / 1000
 ).label('distance_km')
 
-# 3. 範圍篩選（get_discovery_candidates 函數）
+# 3. 範圍篩選（MatchingService.browse_candidates 方法）
 from geoalchemy2.functions import ST_DWithin
 
 ST_DWithin(
@@ -390,7 +404,7 @@ ST_DWithin(
 
 ```txt
 # backend/requirements.txt
-geoalchemy2==0.14.3
+geoalchemy2==0.20.0
 ```
 
 **GeoAlchemy2 功能**：
@@ -430,7 +444,7 @@ if profile.location is None:
 |------|------|
 | `backend/app/models/profile.py` | Profile 模型定義（location 欄位） |
 | `backend/app/api/profile.py` | 位置設定 API |
-| `backend/app/api/discovery.py` | 距離搜索邏輯 |
+| `backend/app/services/matching_service.py` | 距離搜索邏輯（`browse_candidates`） |
 | `docs/MATCHING_ALGORITHM.md` | 配對算法（距離評分） |
 
 ---
@@ -476,6 +490,8 @@ if profile.location is None:
 | `src/composables/` | Vue Composables |
 | `src/api/` | API 客戶端 |
 | `src/router/` | 路由配置 |
+| `src/assets/` | 靜態資源 |
+| `src/utils/` | 工具函式 |
 
 ---
 
@@ -495,13 +511,13 @@ if profile.location is None:
 ### 7.2 測試工具
 
 ```python
-# pytest 配置
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-asyncio_mode = "auto"
+# backend/pytest.ini
+[pytest]
+testpaths = tests
+python_files = test_*.py
+python_classes = Test*
+python_functions = test_*
+asyncio_mode = auto
 
 # 測試命令
 pytest -v                    # 詳細輸出

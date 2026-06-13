@@ -87,7 +87,7 @@ class TokenBlacklist:
         # 嘗試 Redis
         if self._redis and self._use_redis:
             try:
-                await self._redis.setex(f"blacklist:{token_hash}", ttl, "1")
+                await self._redis.set(f"blacklist:{token_hash}", "1", ex=ttl)
                 logger.info(f"Token added to Redis blacklist, TTL: {ttl}s")
                 return
             except aioredis.RedisError as e:

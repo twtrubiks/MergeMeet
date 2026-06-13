@@ -22,7 +22,7 @@ def mock_redis():
     redis.ttl = AsyncMock(return_value=-2)  # Key 不存在
     redis.incr = AsyncMock(return_value=1)
     redis.expire = AsyncMock()
-    redis.setex = AsyncMock()
+    redis.set = AsyncMock()
     return redis
 
 
@@ -44,8 +44,8 @@ class TestEmailRateLimiter:
         assert result.cooldown_seconds == 0
         assert result.daily_limit_reached is False
         mock_redis.expire.assert_called_once()  # 首次計數設置 TTL 到午夜
-        mock_redis.setex.assert_called_once()  # 記錄 60 秒冷卻
-        assert mock_redis.setex.call_args[0][1] == COOLDOWN_SECONDS
+        mock_redis.set.assert_called_once()  # 記錄 60 秒冷卻
+        assert mock_redis.set.call_args.kwargs["ex"] == COOLDOWN_SECONDS
 
     @pytest.mark.asyncio
     async def test_cooldown_blocks_send(self, limiter, mock_redis):
@@ -68,7 +68,7 @@ class TestEmailRateLimiter:
 
         assert result.allowed is False
         assert result.daily_limit_reached is True
-        mock_redis.setex.assert_not_called()
+        mock_redis.set.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_subsequent_send_keeps_count_ttl(self, limiter, mock_redis):

@@ -67,6 +67,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 # 依賴
 pip install -r requirements.txt
 pip install -r requirements-dev.txt   # 開發工具（Ruff, pre-commit）
+pip install -r requirements-test.txt  # 測試相依套件（pytest, httpx, faker）
 
 # 程式碼品質
 ruff check app/                       # lint

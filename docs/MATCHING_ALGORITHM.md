@@ -52,7 +52,7 @@ score = min(2 * 10, 50) = 20 分
 
 **實現代碼**:
 ```python
-# backend/app/services/matching_service.py:130-133
+# backend/app/services/matching_service.py（calculate_match_score：興趣匹配）
 user_interests = set(user_profile.get("interests", []))
 candidate_interests = set(candidate.get("interests", []))
 common_interests = user_interests & candidate_interests
@@ -86,7 +86,7 @@ else:                   score = 0 分   # 太遠（不會出現）
 
 **實現代碼**:
 ```python
-# backend/app/services/matching_service.py:6-23 (_calculate_distance_score 函數)
+# backend/app/services/matching_service.py（_calculate_distance_score 函數）
 def _calculate_distance_score(distance_km: float) -> float:
     if distance_km < 5:
         return 20
@@ -101,7 +101,7 @@ def _calculate_distance_score(distance_km: float) -> float:
 
 **PostGIS 計算**（在查詢時完成）:
 ```python
-# backend/app/api/discovery.py:105-111
+# backend/app/services/matching_service.py（browse_candidates：PostGIS 距離計算）
 distance_label = (
     func.ST_Distance(
         Profile.location,
@@ -141,7 +141,7 @@ else:                   score = 0 分   # 不活躍
 
 **實現代碼**:
 ```python
-# backend/app/services/matching_service.py:26-51 (_calculate_activity_score 函數)
+# backend/app/services/matching_service.py（_calculate_activity_score 函數）
 def _calculate_activity_score(last_active) -> float:
     if not last_active:
         return 0
@@ -185,7 +185,7 @@ Bio 分數 = 2 分（有）或 0 分（無）
 
 **實現代碼**:
 ```python
-# backend/app/services/matching_service.py:67-71
+# backend/app/services/matching_service.py（calculate_match_score：檔案完整度）
 photo_count = candidate.get("photo_count", 0)
 score += min(photo_count * 0.5, 3)  # 照片：最多 3 分
 if candidate.get("bio"):
@@ -224,12 +224,12 @@ trust_score = 10  → 0.0 分（幾乎不推薦）
 
 **實現代碼**:
 ```python
-# backend/app/services/matching_service.py:145-146
+# backend/app/services/matching_service.py（calculate_match_score：信任分數）
 trust_score = candidate.get("trust_score", 50)  # 預設 50 分
 score += _calculate_trust_score_weight(trust_score)
 ```
 
-**函數定義**: `_calculate_trust_score_weight()` 在第 75-99 行
+**函數定義**: `_calculate_trust_score_weight()`（位於 matching_service.py）
 
 **信任分數如何變化**: 參見 [TRUST_SCORE_SYSTEM.md](TRUST_SCORE_SYSTEM.md)
 
@@ -242,7 +242,7 @@ score += _calculate_trust_score_weight(trust_score)
 ### 基本篩選
 
 ```python
-# backend/app/api/discovery.py:121-146
+# backend/app/services/matching_service.py（browse_candidates：基本篩選）
 1. ✅ 排除自己
 2. ✅ 檔案可見且完整
 3. ✅ 帳號啟用中
@@ -254,7 +254,7 @@ score += _calculate_trust_score_weight(trust_score)
 ### 排除已互動用戶
 
 ```python
-# backend/app/api/discovery.py:148-187
+# backend/app/services/matching_service.py（browse_candidates：排除已互動用戶）
 7. ✅ 排除已喜歡的用戶（likes 表）
 8. ✅ 排除已配對的用戶（matches 表）
 9. ✅ 排除已封鎖的用戶（blocked_users 表）
@@ -265,10 +265,10 @@ score += _calculate_trust_score_weight(trust_score)
 ### 配對分數門檻
 
 ```python
-# backend/app/api/discovery.py:52-53
+# backend/app/services/matching_service.py（模組層級常數）
 MIN_MATCH_SCORE = 15.0  # 最低配對分數門檻
 
-# 計算分數後過濾（第 248-250 行）
+# 計算分數後過濾（browse_candidates 中）
 12. ✅ 配對分數 >= 15% 才會顯示
 ```
 
@@ -368,6 +368,7 @@ MIN_MATCH_SCORE = 15.0  # 最低配對分數門檻
    b. PostGIS 地理查詢（距離篩選）
    c. 排除已互動用戶（喜歡、配對、封鎖、跳過）
    d. 取 limit × 3 個候選人
+      （候選人不足時會分批續撈，每批 limit×3，最多 10 批）
    e. 計算每個候選人的配對分數
    f. 依分數排序
    g. 返回 top limit 個

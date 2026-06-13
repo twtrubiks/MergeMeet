@@ -27,9 +27,9 @@ target_metadata = Base.metadata
 # 從環境變數讀取資料庫 URL
 from app.core.config import settings
 
-# Alembic 需要使用同步驅動，將 asyncpg 替換為 psycopg2
+# Alembic 需要使用同步驅動，將 asyncpg 替換為 psycopg（psycopg3）
 sync_database_url = str(settings.DATABASE_URL).replace(
-    "postgresql+asyncpg://", "postgresql+psycopg2://"
+    "postgresql+asyncpg://", "postgresql+psycopg://"
 )
 config.set_main_option("sqlalchemy.url", sync_database_url)
 

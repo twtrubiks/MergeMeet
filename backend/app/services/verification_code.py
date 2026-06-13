@@ -56,7 +56,7 @@ class VerificationCodeStore:
         # 嘗試 Redis
         if self._redis and self._use_redis:
             try:
-                await self._redis.setex(key, self._ttl_seconds, code)
+                await self._redis.set(key, code, ex=self._ttl_seconds)
                 logger.debug(f"Verification code stored in Redis for {email}")
                 return
             except aioredis.RedisError as e:

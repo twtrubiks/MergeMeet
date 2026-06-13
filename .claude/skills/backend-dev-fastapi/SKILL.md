@@ -70,7 +70,7 @@ backend/
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-router = APIRouter(prefix="/api/profile", tags=["Profile"])
+router = APIRouter()  # prefix 與 tags 於 main.py 集中註冊
 
 @router.get("", response_model=ProfileResponse)
 async def get_profile(
@@ -102,7 +102,7 @@ async def get_profile(user_id: str, db: AsyncSession):
 ### Pydantic Schema
 
 ```python
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 
 class ProfileResponse(BaseModel):
@@ -112,49 +112,33 @@ class ProfileResponse(BaseModel):
     bio: Optional[str] = None
     photos: List[str] = []
 
-    class Config:
-        from_attributes = True  # Pydantic v2
+    model_config = ConfigDict(from_attributes=True)  # Pydantic v2
 ```
 
 ### JWT 認證
 
+> 實際認證為 Cookie+CSRF 雙模式並含黑名單/全局失效檢查，請勿自行重寫。
+> 直接使用既有依賴 `get_current_user`。
+
 ```python
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import jwt
-from jwt.exceptions import PyJWTError
+from fastapi import APIRouter, Depends
+from app.core.dependencies import get_current_user
 
-security = HTTPBearer()
-
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+@router.get("", response_model=ProfileResponse)
+async def get_profile(
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
-) -> User:
-    """從 JWT token 提取用戶。"""
-    token = credentials.credentials
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str = payload.get("sub")
-        if user_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials"
-            )
-    except PyJWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials"
-        )
+):
+    """獲取用戶檔案。"""
+    return current_user.profile
+```
 
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
+若需手動解碼 token，使用封裝的 `decode_token`：
 
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found"
-        )
-    return user
+```python
+from app.core.security import decode_token
+
+payload = decode_token(token)
 ```
 
 ---

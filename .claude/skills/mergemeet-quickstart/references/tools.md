@@ -52,9 +52,10 @@ context7: get-library-docs "/vuejs/router" topic="navigation guards"
 
 ### 認證問題排查
 
-1. Application → LocalStorage → 檢查 `token`
-2. Network → 選擇請求 → Headers → 檢查 `Authorization`
-3. 若 Token 無效：Console 執行 `localStorage.removeItem('token')`
+1. Application → Cookies → 優先檢查 `access_token`、`csrf_token`（HttpOnly Cookie + CSRF Token 為主驗證）
+2. Application → LocalStorage → 檢查 `access_token`（向後相容回退）
+3. Network → 選擇請求 → Headers → 檢查 `Authorization`
+4. 若 Token 無效：Console 執行 `localStorage.removeItem('access_token')`
 
 ### Vue 狀態檢查
 

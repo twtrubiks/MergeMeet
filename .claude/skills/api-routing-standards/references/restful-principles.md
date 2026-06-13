@@ -22,7 +22,7 @@
 
 ```
 GET    /api/profile                        # 獲取個人檔案
-PUT    /api/profile                        # 更新檔案
+PATCH  /api/profile                        # 更新檔案（部分更新）
 PUT    /api/profile/interests              # 更新興趣
 POST   /api/profile/photos                 # 上傳照片
 DELETE /api/profile/photos/{photo_id}      # 刪除照片
@@ -42,7 +42,7 @@ GET    /api/discovery/matches              # 配對列表
 ```
 GET    /api/messages/conversations                  # 對話列表
 GET    /api/messages/matches/{match_id}/messages    # 聊天記錄
-DELETE /api/messages/messages/{message_id}          # 刪除訊息
+DELETE /api/messages/{message_id}                   # 刪除訊息
 ```
 
 ### Safety（安全）

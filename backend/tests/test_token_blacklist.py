@@ -258,9 +258,9 @@ class TestTokenBlacklistWithRedis:
 
         await blacklist.add(token, expires_at)
 
-        # 驗證 Redis setex 被調用
-        mock_redis.setex.assert_called_once()
-        call_args = mock_redis.setex.call_args
+        # 驗證 Redis set 被調用
+        mock_redis.set.assert_called_once()
+        call_args = mock_redis.set.call_args
         assert call_args[0][0].startswith("blacklist:")
         assert blacklist.is_using_redis() is True
 
@@ -356,7 +356,7 @@ class TestTokenBlacklistFallback:
 
         await blacklist.add(token, expires_at)
 
-        # Redis setex 不應被調用
-        mock_redis.setex.assert_not_called()
+        # Redis set 不應被調用
+        mock_redis.set.assert_not_called()
         # 內存也不應有
         assert token not in blacklist._fallback

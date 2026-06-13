@@ -90,5 +90,5 @@ class EmailRateLimiter:
             return EmailRateLimitResult(allowed=False, daily_limit_reached=True)
 
         # 允許發送，記錄冷卻標記
-        await self._redis.setex(cooldown_key, COOLDOWN_SECONDS, "1")
+        await self._redis.set(cooldown_key, "1", ex=COOLDOWN_SECONDS)
         return EmailRateLimitResult(allowed=True)

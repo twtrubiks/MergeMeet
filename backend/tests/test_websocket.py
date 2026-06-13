@@ -475,7 +475,7 @@ def mock_redis(mock_redis_data):
     async def mock_get(key):
         return mock_redis_data.get(key)
 
-    async def mock_setex(key, ttl, value):
+    async def mock_set(key, value, ex=None):
         mock_redis_data[key] = value
 
     async def mock_expire(key, ttl):
@@ -483,7 +483,7 @@ def mock_redis(mock_redis_data):
 
     redis_mock.incr = mock_incr
     redis_mock.get = mock_get
-    redis_mock.setex = mock_setex
+    redis_mock.set = mock_set
     redis_mock.expire = mock_expire
 
     return redis_mock, mock_redis_data

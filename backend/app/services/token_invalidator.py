@@ -53,7 +53,7 @@ class TokenInvalidator:
         timestamp = int(datetime.now(UTC).timestamp())
 
         try:
-            await cls._redis.setex(key, INVALIDATION_TTL, str(timestamp))
+            await cls._redis.set(key, str(timestamp), ex=INVALIDATION_TTL)
             logger.info(f"All tokens invalidated for user {user_id}")
         except aioredis.RedisError as e:
             logger.error(f"Failed to invalidate tokens for user {user_id}: {e}")

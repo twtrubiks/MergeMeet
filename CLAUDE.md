@@ -8,15 +8,15 @@
 
 - **專案名稱**: MergeMeet 交友平台
 - **技術棧**: FastAPI + Vue 3 + PostgreSQL + PostGIS + Redis
-- **開發階段**: MVP（第 1-6 週）
-- **測試覆蓋率**: >80%
+- **開發階段**: MVP（Week 1-6 已完成）
+- **測試覆蓋率**: 目標 >80%（後端現約 66%）
 
 ---
 
 ## 快速開始（3 步驟）
 
 ```bash
-# 1. 啟動基礎設施
+# 1. 啟動基礎設施 (postgres / redis / mailpit)
 docker compose up -d
 
 # 2. 啟動後端 (http://localhost:8000/docs)
@@ -37,6 +37,7 @@ cd frontend && npm run dev
 | **frontend-dev-vue3** | Vue 3 Composition API + Pinia 開發模式 |
 | **mergemeet-quickstart** | 完整開發流程、指令和故障排除 |
 | **project-audit** | 專案健康檢查 - 功能完整性和一致性 |
+| **ui-ux-pro-max** | UI/UX 設計智能 - 67 種樣式、96 種配色、字型配對與元件範例 |
 
 ### Skills 結構
 
@@ -51,10 +52,14 @@ cd frontend && npm run dev
 │   └── SKILL.md
 ├── mergemeet-quickstart/
 │   ├── SKILL.md
-│   └── references/           # 指令、工具、故障排除
-└── project-audit/
+│   └── references/           # 指令、工具、故障排除、工作流程
+├── project-audit/
+│   ├── SKILL.md
+│   └── references/           # 功能狀態、前後端差異、E2E 測試指南
+└── ui-ux-pro-max/
     ├── SKILL.md
-    └── references/           # 功能狀態、已知問題
+    ├── data/
+    └── scripts/
 ```
 
 ---

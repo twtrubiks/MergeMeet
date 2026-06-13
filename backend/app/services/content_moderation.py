@@ -170,10 +170,10 @@ class ContentModerationService:
             return
 
         try:
-            await cls._redis.setex(
+            await cls._redis.set(
                 REDIS_KEY_SENSITIVE_WORDS,
-                cls._cache_ttl,
                 json.dumps(words_data, ensure_ascii=False),
+                ex=cls._cache_ttl,
             )
             logger.info(f"Sensitive words cached to Redis ({len(words_data)} words)")
         except aioredis.RedisError as e:
