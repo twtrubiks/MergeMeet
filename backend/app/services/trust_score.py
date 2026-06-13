@@ -22,6 +22,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.expression import func
 
+from app.models.trust_score_log import TrustScoreLog
 from app.models.user import User
 
 
@@ -63,7 +64,7 @@ class TrustScoreService:
             db: 資料庫 Session
             user_id: 用戶 ID
             action: 行為類型（見 ADJUSTMENTS）
-            reason: 調整原因（可選，用於日誌）
+            reason: 調整原因（可選，寫入審計日誌）
 
         Returns:
             調整後的分數
@@ -93,6 +94,16 @@ class TrustScoreService:
         if row is None:
             raise ValueError(f"用戶不存在: {user_id}")
 
+        # 審計日誌與分數更新在同一交易提交
+        db.add(
+            TrustScoreLog(
+                user_id=user_id,
+                action=action,
+                adjustment=adjustment,
+                new_score=row,
+                reason=reason,
+            )
+        )
         await db.commit()
 
         return row

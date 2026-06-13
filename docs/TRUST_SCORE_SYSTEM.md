@@ -81,14 +81,50 @@ class TrustScoreService:
 # Email 驗證加分
 await TrustScoreService.adjust_score(db, user.id, "email_verified")
 
-# 舉報確認扣分（管理員審核通過後才執行）
-await TrustScoreService.adjust_score(db, reported_user_id, "report_confirmed")
+# 舉報確認扣分（管理員審核通過後才執行，reason 寫入審計日誌）
+await TrustScoreService.adjust_score(
+    db, reported_user_id, "report_confirmed", reason=f"舉報 {report.id} 成立"
+)
 
 # 檢查訊息限制
 can_send, remaining = await TrustScoreService.check_message_rate_limit(
     user_id, trust_score, redis
 )
 ```
+
+---
+
+## 📜 審計日誌（trust_score_logs）
+
+每次 `adjust_score` 都會在**同一交易**中寫入一筆變更日誌，供用戶對扣分提出爭議時追溯原因與時間點。
+
+### 表結構
+
+| 欄位 | 類型 | 說明 |
+|------|------|------|
+| id | UUID | 主鍵 |
+| user_id | UUID | 用戶 ID（FK，CASCADE 刪除） |
+| action | String(50) | 行為類型（ADJUSTMENTS 的 key） |
+| adjustment | Integer | 名目調整值（實際變化受 0-100 邊界影響，以 new_score 為準） |
+| new_score | Integer | 調整後的實際分數 |
+| reason | Text | 調整原因（可選，如舉報 ID） |
+| created_at | timestamptz | 變更時間 |
+
+複合索引 `(user_id, created_at)` 支援依用戶查詢歷史。
+
+### 管理員查詢端點
+
+```
+GET /api/admin/users/{user_id}/trust-logs?limit=50
+```
+
+回傳該用戶的變更歷史（最新在前，limit 1-200，預設 50），需管理員權限。
+
+**實作位置**:
+- Model: `backend/app/models/trust_score_log.py`
+- Migration: `backend/alembic/versions/011_add_trust_score_logs.py`
+- 端點: `backend/app/api/admin.py` `get_user_trust_logs()`
+- 測試: `backend/tests/test_trust_score_log.py`
 
 ---
 
@@ -177,6 +213,8 @@ TTL: 86400 秒（24 小時）
 | `TestMessageRateLimiting` | 訊息速率限制 |
 | `TestMultipleAdjustments` | 累積調整 |
 | `TestPositiveInteractionMatchLimit` | 正向互動配對限制（位於 test_websocket.py） |
+| `TestAdjustScoreWritesLog` | 審計日誌寫入（位於 test_trust_score_log.py） |
+| `TestTrustLogsEndpoint` | 管理員日誌查詢端點（位於 test_trust_score_log.py） |
 
 ### 測試執行
 
@@ -344,10 +382,6 @@ if match_count > 3:
    - 沒有隨時間自動恢復機制
    - 用戶需透過正向行為（被喜歡、配對成功）手動提升
 
-2. **無歷史記錄**
-   - 不記錄分數變化歷史
-   - 無法追蹤具體扣分原因
-
-3. **單一閾值**
+2. **單一閾值**
    - 僅有一個限制閾值（20 分）
    - 未來可考慮多級限制

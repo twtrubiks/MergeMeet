@@ -13,6 +13,7 @@ from app.core.dependencies import get_current_admin_user
 from app.core.utils import mask_email
 from app.models.match import BlockedUser, Match, Message
 from app.models.report import Report
+from app.models.trust_score_log import TrustScoreLog
 from app.models.user import User
 from app.schemas.admin import (
     BanUserRequest,
@@ -21,6 +22,7 @@ from app.schemas.admin import (
     ReportDetailResponse,
     ReviewReportRequest,
     ReviewReportResponse,
+    TrustScoreLogResponse,
     UnbanUserRequest,
     UnbanUserResponse,
     UserManagementResponse,
@@ -217,7 +219,9 @@ async def review_report(
     await db.commit()
 
     if request.status == "APPROVED":
-        await TrustScoreService.adjust_score(db, report.reported_user_id, "report_confirmed")
+        await TrustScoreService.adjust_score(
+            db, report.reported_user_id, "report_confirmed", reason=f"舉報 {report.id} 成立"
+        )
         logger.info("Trust score -10 for user %s (report_confirmed)", report.reported_user_id)
 
     return {
@@ -307,6 +311,44 @@ async def get_all_users(
             email_verified=user.email_verified,
         )
         for user in users
+    ]
+
+
+@router.get("/users/{user_id}/trust-logs", response_model=list[TrustScoreLogResponse])
+async def get_user_trust_logs(
+    user_id: str,
+    limit: int = Query(50, ge=1, le=200, description="回傳筆數上限"),
+    current_admin: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    查詢用戶信任分數變更歷史（最新在前）
+
+    供用戶對扣分提出爭議時追溯原因與時間點
+    """
+    # 確認用戶存在
+    result = await db.execute(select(User.id).where(User.id == user_id))
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用戶不存在")
+
+    result = await db.execute(
+        select(TrustScoreLog)
+        .where(TrustScoreLog.user_id == user_id)
+        .order_by(TrustScoreLog.created_at.desc())
+        .limit(limit)
+    )
+    logs = result.scalars().all()
+
+    return [
+        TrustScoreLogResponse(
+            id=str(log.id),
+            action=log.action,
+            adjustment=log.adjustment,
+            new_score=log.new_score,
+            reason=log.reason,
+            created_at=log.created_at,
+        )
+        for log in logs
     ]
 
 

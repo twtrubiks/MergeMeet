@@ -5,6 +5,7 @@ from app.models.moderation import ContentAppeal, ModerationLog, SensitiveWord
 from app.models.notification import Notification
 from app.models.profile import InterestTag, Photo, Profile, profile_interests
 from app.models.report import Report
+from app.models.trust_score_log import TrustScoreLog
 from app.models.user import User
 
 __all__ = [
@@ -18,6 +19,7 @@ __all__ = [
     "Message",
     "BlockedUser",
     "Report",
+    "TrustScoreLog",
     "SensitiveWord",
     "ContentAppeal",
     "ModerationLog",

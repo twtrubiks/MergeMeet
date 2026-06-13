@@ -78,6 +78,17 @@ class UserManagementResponse(BaseModel):
         return v if v is not None else 0
 
 
+class TrustScoreLogResponse(BaseModel):
+    """信任分數變更日誌"""
+
+    id: str
+    action: str
+    adjustment: int
+    new_score: int
+    reason: str | None
+    created_at: datetime
+
+
 class ReviewReportResponse(BaseModel):
     """處理舉報回應"""
 
