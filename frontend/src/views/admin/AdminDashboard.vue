@@ -530,6 +530,32 @@
       </template>
     </n-modal>
 
+    <!-- 信任分數歷史 Modal -->
+    <n-modal
+      v-model:show="showTrustLogsModal"
+      preset="card"
+      title="信任分數歷史"
+      style="width: 720px; max-width: 90vw"
+    >
+      <div v-if="trustLogsUser" style="margin-bottom: 16px">
+        <p><strong>用戶:</strong> {{ trustLogsUser.email }}</p>
+        <p><strong>目前信任分數:</strong> {{ trustLogsUser.trust_score }}</p>
+      </div>
+      <n-spin :show="loadingTrustLogs">
+        <n-data-table
+          :columns="trustLogColumns"
+          :data="trustLogs"
+          :bordered="false"
+          size="small"
+          :max-height="400"
+        >
+          <template #empty>
+            <span style="color: #999">尚無信任分數變更紀錄</span>
+          </template>
+        </n-data-table>
+      </n-spin>
+    </n-modal>
+
     <!-- 拒絕照片理由 Modal -->
     <n-modal v-model:show="showRejectReasonModal" preset="dialog" title="拒絕照片">
       <n-form>
@@ -671,6 +697,7 @@ import {
   NButton,
   NTag,
   NSpin,
+  NSpace,
   NTabs,
   NTabPane,
   NDataTable,
@@ -780,6 +807,12 @@ const showBanUserModal = ref(false)
 const banningUser = ref(null)
 const banReason = ref('')
 const banDurationDays = ref(null)
+
+// Trust score logs related states
+const showTrustLogsModal = ref(false)
+const trustLogsUser = ref(null)
+const trustLogs = ref([])
+const loadingTrustLogs = ref(false)
 
 const userStatusOptions = [
   { label: '活躍', value: true },
@@ -931,33 +964,95 @@ const userColumns = [
   {
     title: '操作',
     key: 'actions',
-    width: 150,
+    width: 200,
     render: (row) => {
-      if (row.is_admin) {
-        return h('span', { style: 'color: #999;' }, '管理員')
-      }
-      if (row.is_active) {
-        return h(
+      const buttons = [
+        h(
           NButton,
           {
             size: 'small',
-            type: 'error',
-            onClick: () => showBanModal(row)
+            tertiary: true,
+            onClick: () => showTrustLogs(row)
           },
-          { default: () => '封禁' }
+          { default: () => '信任歷史' }
         )
-      } else {
-        return h(
-          NButton,
-          {
-            size: 'small',
-            type: 'success',
-            onClick: () => handleUnbanUser(row)
-          },
-          { default: () => '解封' }
+      ]
+      if (!row.is_admin) {
+        buttons.push(
+          row.is_active
+            ? h(
+                NButton,
+                {
+                  size: 'small',
+                  type: 'error',
+                  onClick: () => showBanModal(row)
+                },
+                { default: () => '封禁' }
+              )
+            : h(
+                NButton,
+                {
+                  size: 'small',
+                  type: 'success',
+                  onClick: () => handleUnbanUser(row)
+                },
+                { default: () => '解封' }
+              )
         )
       }
+      return h(NSpace, { size: 'small', wrap: false }, { default: () => buttons })
     }
+  }
+]
+
+// 信任分數行為中文標籤（對應 TrustScoreService.ADJUSTMENTS 的 key）
+const TRUST_ACTION_LABELS = {
+  email_verified: 'Email 驗證',
+  received_like: '收到喜歡',
+  match_created: '成功配對',
+  positive_interaction: '正常互動',
+  report_confirmed: '舉報成立',
+  content_violation: '內容違規',
+  blocked: '被封鎖',
+  report_rejected: '舉報駁回補償',
+  daily_recovery: '每日自動恢復'
+}
+
+// Trust score log columns for data table
+const trustLogColumns = [
+  {
+    title: '時間',
+    key: 'created_at',
+    width: 170,
+    render: (row) => formatDate(row.created_at)
+  },
+  {
+    title: '行為',
+    key: 'action',
+    width: 130,
+    render: (row) => TRUST_ACTION_LABELS[row.action] || row.action
+  },
+  {
+    title: '調整',
+    key: 'adjustment',
+    width: 80,
+    render: (row) =>
+      h(
+        NTag,
+        { type: row.adjustment >= 0 ? 'success' : 'error', size: 'small' },
+        { default: () => (row.adjustment > 0 ? `+${row.adjustment}` : `${row.adjustment}`) }
+      )
+  },
+  {
+    title: '變更後',
+    key: 'new_score',
+    width: 90
+  },
+  {
+    title: '原因',
+    key: 'reason',
+    ellipsis: { tooltip: true },
+    render: (row) => row.reason || '-'
   }
 ]
 
@@ -1285,6 +1380,23 @@ const showBanModal = (user) => {
   banReason.value = ''
   banDurationDays.value = null
   showBanUserModal.value = true
+}
+
+// 顯示信任分數歷史 Modal
+const showTrustLogs = async (user) => {
+  trustLogsUser.value = user
+  trustLogs.value = []
+  showTrustLogsModal.value = true
+  loadingTrustLogs.value = true
+  try {
+    const response = await apiClient.get(`/admin/users/${user.id}/trust-logs`)
+    trustLogs.value = response.data
+  } catch (error) {
+    logger.error('載入信任分數歷史失敗:', error)
+    message.error('載入信任分數歷史失敗')
+  } finally {
+    loadingTrustLogs.value = false
+  }
 }
 
 // 確認封禁用戶
