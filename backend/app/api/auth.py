@@ -15,7 +15,7 @@ from datetime import UTC, date, datetime, timedelta
 
 import redis.asyncio as aioredis
 from dateutil.relativedelta import relativedelta
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -25,6 +25,7 @@ from app.core.config import settings
 from app.core.cookie_utils import clear_auth_cookies, generate_csrf_token, set_auth_cookies
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
+from app.core.rate_limit import limiter as ip_limiter
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -135,12 +136,17 @@ def generate_verification_code() -> str:
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@ip_limiter.limit(settings.RATE_LIMIT_AUTH)
 async def register(
-    request: RegisterRequest, response: Response, db: AsyncSession = Depends(get_db)
+    request: Request,
+    payload: RegisterRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
 ):
     """
     用戶註冊（支援 HttpOnly Cookie + Bearer Token 雙模式）
 
+    - IP 速率限制：10 次/5 分鐘（slowapi）
     - 驗證年齡（必須 >= 18）
     - 檢查 Email 唯一性
     - 建立用戶帳號
@@ -150,7 +156,7 @@ async def register(
     """
     # 年齡驗證
     today = date.today()
-    age = relativedelta(today, request.date_of_birth).years
+    age = relativedelta(today, payload.date_of_birth).years
 
     if age < 18:
         raise HTTPException(
@@ -158,7 +164,7 @@ async def register(
         )
 
     # 檢查 Email 是否已註冊
-    result = await db.execute(select(User).where(User.email == request.email))
+    result = await db.execute(select(User).where(User.email == payload.email))
     existing_user = result.scalar_one_or_none()
 
     if existing_user:
@@ -170,9 +176,9 @@ async def register(
 
     # 建立用戶（修復：使用資料庫唯一約束處理並發註冊）
     new_user = User(
-        email=request.email,
-        password_hash=get_password_hash(request.password),
-        date_of_birth=request.date_of_birth,
+        email=payload.email,
+        password_hash=get_password_hash(payload.password),
+        date_of_birth=payload.date_of_birth,
         email_verified=False,
         is_active=True,  # 明確設置為啟用狀態
     )
@@ -185,25 +191,25 @@ async def register(
     except IntegrityError:
         # 並發情況下，另一個請求已創建了同樣的用戶
         await db.rollback()
-        logger.warning(f"Concurrent registration attempt for email: {mask_email(request.email)}")
+        logger.warning(f"Concurrent registration attempt for email: {mask_email(payload.email)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="註冊失敗，請檢查輸入資料"
         ) from None
 
     # 生成驗證碼並發送 Email
     verification_code = generate_verification_code()
-    await verification_codes.set(request.email, verification_code)
+    await verification_codes.set(payload.email, verification_code)
 
     # 發送驗證郵件
-    username = request.email.split("@")[0]
+    username = payload.email.split("@")[0]
     email_sent = await EmailService.send_verification_email(
-        to_email=request.email, username=username, verification_code=verification_code
+        to_email=payload.email, username=username, verification_code=verification_code
     )
 
     if email_sent:
-        logger.info(f"Verification email sent to {mask_email(request.email)}")
+        logger.info(f"Verification email sent to {mask_email(payload.email)}")
     else:
-        logger.error(f"Failed to send verification email to {mask_email(request.email)}")
+        logger.error(f"Failed to send verification email to {mask_email(payload.email)}")
 
     # 生成 JWT Token（包含 email 和 is_admin 資訊供前端使用）
     access_token, refresh_token = _generate_auth_tokens(
@@ -227,8 +233,10 @@ async def register(
 
 
 @router.post("/login", response_model=TokenResponse)
+@ip_limiter.limit(settings.RATE_LIMIT_AUTH)
 async def login(
-    request: LoginRequest,
+    request: Request,
+    payload: LoginRequest,
     response: Response,
     db: AsyncSession = Depends(get_db),
     redis_conn: aioredis.Redis = Depends(get_redis),
@@ -236,6 +244,7 @@ async def login(
     """
     用戶登入（支援 HttpOnly Cookie + Bearer Token 雙模式）
 
+    - IP 速率限制：10 次/5 分鐘（slowapi，與 email-based 登入失敗限制互補）
     - 驗證 Email 和密碼
     - 檢查帳號狀態
     - 登入失敗限制：5 次失敗後鎖定 15 分鐘
@@ -254,7 +263,7 @@ async def login(
     limiter = LoginLimiter(redis_conn)
 
     # 檢查是否被鎖定
-    limit_status = await limiter.check_status(request.email)
+    limit_status = await limiter.check_status(payload.email)
     if limit_status.is_locked:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -266,13 +275,13 @@ async def login(
         )
 
     # 查找用戶
-    result = await db.execute(select(User).where(User.email == request.email))
+    result = await db.execute(select(User).where(User.email == payload.email))
     user = result.scalar_one_or_none()
 
     # 驗證用戶存在且密碼正確
-    if not user or not verify_password(request.password, user.password_hash):
+    if not user or not verify_password(payload.password, user.password_hash):
         # 記錄失敗並獲取更新狀態
-        attempt_result = await limiter.record_failure(request.email)
+        attempt_result = await limiter.record_failure(payload.email)
 
         # 根據是否觸發鎖定決定狀態碼
         if attempt_result.is_locked:
@@ -319,7 +328,7 @@ async def login(
         )
 
     # 登入成功，清除失敗記錄
-    await limiter.clear_attempts(request.email)
+    await limiter.clear_attempts(payload.email)
 
     # 生成 JWT Token（包含 email 和 is_admin 資訊供前端使用）
     access_token, refresh_token = _generate_auth_tokens(
@@ -344,8 +353,10 @@ async def login(
 
 
 @router.post("/admin-login", response_model=TokenResponse)
+@ip_limiter.limit(settings.RATE_LIMIT_AUTH)
 async def admin_login(
-    request: LoginRequest,
+    request: Request,
+    payload: LoginRequest,
     response: Response,
     db: AsyncSession = Depends(get_db),
     redis_conn: aioredis.Redis = Depends(get_redis),
@@ -353,6 +364,7 @@ async def admin_login(
     """
     管理員登入（支援 HttpOnly Cookie + Bearer Token 雙模式）
 
+    - IP 速率限制：10 次/5 分鐘（slowapi）
     - 驗證 Email 和密碼
     - 檢查管理員權限
     - 登入失敗限制：5 次失敗後鎖定 15 分鐘
@@ -366,7 +378,7 @@ async def admin_login(
     limiter = LoginLimiter(redis_conn)
 
     # 檢查是否被鎖定
-    limit_status = await limiter.check_status(request.email)
+    limit_status = await limiter.check_status(payload.email)
     if limit_status.is_locked:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -378,13 +390,13 @@ async def admin_login(
         )
 
     # 查找用戶
-    result = await db.execute(select(User).where(User.email == request.email))
+    result = await db.execute(select(User).where(User.email == payload.email))
     user = result.scalar_one_or_none()
 
     # 驗證用戶存在且密碼正確
-    if not user or not verify_password(request.password, user.password_hash):
+    if not user or not verify_password(payload.password, user.password_hash):
         # 記錄失敗並獲取更新狀態
-        attempt_result = await limiter.record_failure(request.email)
+        attempt_result = await limiter.record_failure(payload.email)
 
         if attempt_result.is_locked:
             raise HTTPException(
@@ -421,7 +433,7 @@ async def admin_login(
         )
 
     # 登入成功，清除失敗記錄
-    await limiter.clear_attempts(request.email)
+    await limiter.clear_attempts(payload.email)
 
     # 生成 JWT Token（包含 email 和 is_admin 資訊供前端使用）
     access_token, refresh_token = _generate_auth_tokens(

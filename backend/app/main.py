@@ -1,12 +1,4 @@
-"""MergeMeet FastAPI 主應用
-
-TODO: 全局速率限制（上線前建議完成）
-- 目前無全局 API 速率限制，存在 DoS 攻擊風險
-- 建議：整合 slowapi 或 fastapi-limiter
-- 配置：每 IP 每分鐘最多 60 請求
-- 特殊端點（登入、註冊）可設置更嚴格限制
-- 參考：https://github.com/laurentS/slowapi
-"""
+"""MergeMeet FastAPI 主應用"""
 
 import asyncio
 import logging
@@ -16,6 +8,8 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.api import (
     admin,
@@ -31,6 +25,7 @@ from app.api import (
 )
 from app.core.config import settings
 from app.core.database import close_db
+from app.core.rate_limit import limiter, rate_limit_exceeded_handler
 from app.middleware.last_active import LastActiveMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.services import account_cleanup
@@ -104,6 +99,11 @@ app = FastAPI(
     redirect_slashes=False,  # 禁用自動重定向，統一不使用 trailing slash
 )
 
+# 全域 IP 速率限制（最先註冊 = 最內層，429 回應仍會經過 CORS 取得跨域 Headers）
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
 # CORS 中間件（安全配置）
 # 支援 HttpOnly Cookie + CSRF Token 雙重認證模式
 app.add_middleware(
@@ -118,7 +118,10 @@ app.add_middleware(
         "X-CSRF-Token",  # CSRF Token（Double Submit Cookie Pattern）
     ],
     expose_headers=[
-        "X-RateLimit-Remaining",  # 登入限制剩餘次數
+        "X-RateLimit-Limit",  # 速率限制上限
+        "X-RateLimit-Remaining",  # 剩餘可用次數（登入限制與全域速率限制共用）
+        "X-RateLimit-Reset",  # 限制重置時間
+        "Retry-After",  # 429 時建議的重試等待秒數
         "X-Lockout-Seconds",  # 鎖定剩餘秒數
     ],
 )
@@ -146,8 +149,9 @@ async def root():
 
 
 @app.get("/health")
+@limiter.exempt
 async def health_check():
-    """健康檢查（包含 Redis 狀態）
+    """健康檢查（包含 Redis 狀態，豁免速率限制供監控輪詢）
 
     Returns:
         健康狀態資訊，包含服務版本和 Redis 連接狀態

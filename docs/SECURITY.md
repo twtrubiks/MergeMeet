@@ -179,6 +179,15 @@ MergeMeet 支援兩種認證方式，優先使用 HttpOnly Cookie 提供更高�
 
 ### 已實施措施
 
+0. **全域 IP 速率限制（slowapi + Redis）**
+   - 所有 API 端點共用 60 次/分鐘 per IP（application-level 共享計數）
+   - 登入/註冊/管理員登入另設 10 次/5 分鐘 per IP（裝飾器獨立計數，與下方 email-based 限制互補）
+   - `/health` 健康檢查豁免（供監控輪詢）；`/uploads` 靜態檔案不計入
+   - Redis 不可用時自動回退內存計數（單實例部署下行為一致）
+   - 429 回應帶 `Retry-After` 與 `X-RateLimit-*` headers（已加入 CORS expose_headers）
+   - ⚠️ 反向代理部署時 uvicorn 需以 `--proxy-headers --forwarded-allow-ips='<代理 IP>'` 啟動，才能取得真實用戶 IP
+   - 文件: `backend/app/core/rate_limit.py`、測試: `backend/tests/test_rate_limit.py`
+
 1. **登入失敗限制**
    - 使用 Redis 追蹤失敗次數
    - 5 次失敗後鎖定 15 分鐘
@@ -257,6 +266,7 @@ MergeMeet 使用信任分數系統自動追蹤用戶行為，維護平台安全�
 - [x] HTTP 安全 Headers（HSTS、CSP、X-Frame-Options、X-Content-Type-Options、Referrer-Policy）
 - [x] 照片 EXIF 元資料去除（重新編碼去除 GPS / 設備資訊，並先套用 Orientation 轉正）
 - [x] Docker Compose 密碼可由環境變數覆寫（根目錄 `.env`，見 `.env.example`）
+- [x] 全域 IP 速率限制（slowapi + Redis，60 次/分鐘 per IP；認證端點 10 次/5 分鐘）
 
 ### ⚠️ 建議改進
 

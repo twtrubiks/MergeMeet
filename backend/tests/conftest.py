@@ -17,6 +17,7 @@ from sqlalchemy.pool import NullPool
 load_dotenv()
 
 from app.core.database import Base, get_db  # noqa: E402
+from app.core.rate_limit import limiter as ip_limiter  # noqa: E402
 from app.main import app  # noqa: E402
 from app.middleware.last_active import (  # noqa: E402
     reset_session_factory,
@@ -129,6 +130,9 @@ async def client(test_db: AsyncSession) -> AsyncGenerator[AsyncClient]:
         yield test_db
 
     app.dependency_overrides[get_db] = override_get_db
+
+    # 測試一律停用全域 IP 速率限制（test_rate_limit.py 會自行啟用）
+    ip_limiter.enabled = False
 
     # 手動初始化 Redis（httpx 不觸發 lifespan，需模擬 main.py 的啟動邏輯）
     try:

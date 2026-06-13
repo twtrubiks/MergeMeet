@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://:mergemeet_redis123@localhost:6379/0"
     REDIS_MAX_CONNECTIONS: int = 50
 
+    # 全域 IP 速率限制（slowapi，storage 共用 REDIS_URL）
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_GLOBAL: str = "60/minute"  # 所有端點共用的 per-IP 限制
+    RATE_LIMIT_AUTH: str = "10/5minutes"  # 登入/註冊（與 email-based LoginLimiter 互補）
+
     # 環境設定
     ENVIRONMENT: str = "development"
 

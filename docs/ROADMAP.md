@@ -19,7 +19,7 @@
 - [ ] 手機號碼驗證（SMS OTP）
 
 ### 安全
-- [ ] 全局速率限制（slowapi）
+- [x] 全局速率限制（slowapi + Redis，60 次/分鐘 per IP；認證端點 10 次/5 分鐘）
 - [x] 安全 Header（CSP、HSTS、X-Frame-Options、X-Content-Type-Options）
 
 ### 基礎設施
