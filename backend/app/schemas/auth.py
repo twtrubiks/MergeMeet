@@ -93,6 +93,9 @@ class TokenResponse(BaseModel):
     refresh_token: str = Field(..., description="刷新 Token（JWT）")
     token_type: str = Field(default="bearer", description="Token 類型")
     expires_in: int = Field(..., description="過期時間（秒）")
+    account_restored: bool = Field(
+        default=False, description="本次登入是否觸發帳號復原（取消刪除程序）"
+    )
 
 
 class RefreshTokenRequest(BaseModel):
@@ -298,3 +301,29 @@ class ResetPasswordResponse(BaseModel):
     )
 
     message: str = Field(..., description="結果訊息")
+
+
+class DeleteAccountRequest(BaseModel):
+    """刪除帳號請求"""
+
+    model_config = ConfigDict(json_schema_extra={"example": {"password": "Password123"}})
+
+    password: str = Field(..., min_length=1, description="當前密碼（驗證本人身分）")
+
+
+class DeleteAccountResponse(BaseModel):
+    """刪除帳號回應"""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "message": "帳號已排定刪除，30 天內重新登入可復原",
+                "deleted_at": "2026-06-12T00:00:00Z",
+                "restore_deadline": "2026-07-12T00:00:00Z",
+            }
+        }
+    )
+
+    message: str = Field(..., description="結果訊息")
+    deleted_at: datetime = Field(..., description="刪除請求時間")
+    restore_deadline: datetime = Field(..., description="復原期限（此時間後永久刪除）")

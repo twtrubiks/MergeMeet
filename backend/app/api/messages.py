@@ -150,11 +150,12 @@ async def get_conversations(
         match.user2_id if match.user1_id == current_user.id else match.user1_id for match in matches
     ]
 
-    # 批次查詢 1：所有對方的個人資料（1 次查詢取代 N 次）
+    # 批次查詢 1：所有對方的個人資料（1 次查詢取代 N 次，排除已停用/已刪除帳號）
     profiles_result = await db.execute(
         select(Profile)
+        .join(User, Profile.user_id == User.id)
         .options(selectinload(Profile.photos))
-        .where(Profile.user_id.in_(other_user_ids))
+        .where(and_(Profile.user_id.in_(other_user_ids), User.is_active.is_(True)))
     )
     profiles_by_user_id = {p.user_id: p for p in profiles_result.scalars().all()}
 
@@ -198,8 +199,11 @@ async def get_conversations(
         # 確定對方用戶 ID
         other_user_id = match.user2_id if match.user1_id == current_user.id else match.user1_id
 
-        # 從批次載入的數據中獲取
+        # 從批次載入的數據中獲取（無 profile 表示對方帳號已停用/已刪除，跳過該對話）
         other_profile = profiles_by_user_id.get(other_user_id)
+        if not other_profile:
+            continue
+
         last_message = last_messages_by_match.get(match.id)
         unread_count = unread_counts_by_match.get(match.id, 0)
 

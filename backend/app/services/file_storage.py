@@ -2,6 +2,7 @@
 
 import io
 import logging
+import shutil
 import uuid
 from pathlib import Path
 
@@ -238,6 +239,16 @@ class FileStorageService:
         except Exception as e:
             logger.error(f"Failed to delete photo {photo_url}: {e}")
             return False
+
+    def delete_user_photo_dir(self, user_id: str) -> None:
+        """刪除使用者整個照片目錄（含縮圖與孤兒檔案，刪除帳號時使用）"""
+        shutil.rmtree(self.photos_dir / str(user_id), ignore_errors=True)
+        logger.info(f"Deleted photo directory for user {user_id}")
+
+    def delete_chat_image_dir(self, match_id: str) -> None:
+        """刪除聊天圖片目錄（刪除帳號清理配對時使用）"""
+        shutil.rmtree(self.chat_dir / str(match_id), ignore_errors=True)
+        logger.info(f"Deleted chat image directory for match {match_id}")
 
     def validate_image(self, content_type: str, file_size: int) -> str | None:
         """

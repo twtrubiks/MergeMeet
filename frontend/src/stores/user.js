@@ -30,6 +30,9 @@ export const useUserStore = defineStore('user', () => {
     isLocked: false
   })
 
+  // 本次登入是否觸發帳號復原（取消刪除程序）
+  const accountRestored = ref(false)
+
   /**
    * 檢查 JWT Token 是否已過期
    * @returns {boolean} true 表示已過期或無法解析
@@ -116,6 +119,7 @@ export const useUserStore = defineStore('user', () => {
 
       if (result.success) {
         saveTokens(result.data)
+        accountRestored.value = !!result.data.account_restored
         // 從 Token 初始化用戶資訊（包含 user.id）
         initializeFromToken()
         return true
@@ -170,6 +174,32 @@ export const useUserStore = defineStore('user', () => {
     } finally {
       // 無論如何都清除本地狀態
       clearTokens()
+    }
+  }
+
+  /**
+   * 刪除帳號（軟刪除 + 30 天寬限期）
+   *
+   * 後端已使所有 Token 失效並清除 Cookie，
+   * 因此不呼叫 logout API（會 401），只清除本地狀態。
+   *
+   * @param {string} password - 當前密碼（驗證本人身分）
+   * @returns {Promise<boolean>} 是否成功
+   */
+  const deleteAccount = async (password) => {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      await authAPI.deleteAccount({ password })
+      clearTokens()
+      return true
+    } catch (err) {
+      error.value = err.response?.data?.detail || '刪除帳號失敗'
+      logger.error('刪除帳號錯誤:', err)
+      return false
+    } finally {
+      isLoading.value = false
     }
   }
 
@@ -329,6 +359,7 @@ export const useUserStore = defineStore('user', () => {
     isLoading,
     error,
     loginLimitInfo,
+    accountRestored,
     // 計算屬性
     isAuthenticated,
     userEmail,
@@ -337,6 +368,7 @@ export const useUserStore = defineStore('user', () => {
     register,
     login,
     logout,
+    deleteAccount,
     verifyEmail,
     resendVerification,
     clearError,

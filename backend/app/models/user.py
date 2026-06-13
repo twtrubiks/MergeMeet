@@ -42,6 +42,8 @@ class User(Base):
     is_admin = Column(Boolean, default=False)
     ban_reason = Column(Text, nullable=True)
     banned_until = Column(DateTime(timezone=True), nullable=True)
+    # 軟刪除：用戶請求刪除帳號的時間，30 天寬限期內重新登入可復原
+    deleted_at = Column(DateTime(timezone=True), nullable=True, index=True)
 
     # 時間戳記
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -240,6 +240,76 @@
                   </router-link>
                 </div>
               </div>
+
+              <!-- 危險區域：刪除帳號 -->
+              <div class="settings-section danger-zone">
+                <h3 class="subsection-title danger-title">
+                  <Icon name="warning" size="md" decorative />
+                  刪除帳號
+                </h3>
+
+                <!-- 成功狀態 -->
+                <div v-if="deleteSuccess" class="success-state">
+                  <div class="success-icon"><Icon name="check-circle" size="xl" decorative /></div>
+                  <h3>帳號已排定刪除</h3>
+                  <p class="success-text">30 天內重新登入即可復原帳號</p>
+                  <p class="redirect-text">{{ deleteRedirectCountdown }} 秒後自動跳轉至登入頁...</p>
+                </div>
+
+                <template v-else>
+                  <p class="danger-description">
+                    刪除後帳號將停用並進入 30 天寬限期，期間重新登入即可復原；
+                    逾期後所有個人資料、配對與聊天記錄將永久刪除，無法恢復。
+                  </p>
+
+                  <!-- 確認表單（點擊按鈕後展開） -->
+                  <form
+                    v-if="showDeleteForm"
+                    class="delete-form"
+                    @submit.prevent="handleDeleteAccount"
+                  >
+                    <FloatingInput
+                      id="delete-password"
+                      v-model="deletePassword"
+                      label="輸入密碼確認"
+                      type="password"
+                      autocomplete="current-password"
+                      :disabled="deleteLoading"
+                      :required="true"
+                      :error="deletePasswordError"
+                    />
+                    <div class="delete-actions">
+                      <AnimatedButton
+                        type="button"
+                        variant="ghost"
+                        :disabled="deleteLoading"
+                        @click="cancelDelete"
+                      >
+                        取消
+                      </AnimatedButton>
+                      <AnimatedButton
+                        type="submit"
+                        variant="danger"
+                        :disabled="!deletePassword || deleteLoading"
+                        :loading="deleteLoading"
+                      >
+                        <span v-if="!deleteLoading"
+                          ><Icon name="trash" size="sm" decorative /> 確認刪除</span
+                        >
+                      </AnimatedButton>
+                    </div>
+                  </form>
+
+                  <AnimatedButton
+                    v-else
+                    type="button"
+                    variant="danger"
+                    @click="showDeleteForm = true"
+                  >
+                    <Icon name="trash" size="sm" decorative /> 刪除我的帳號
+                  </AnimatedButton>
+                </template>
+              </div>
             </div>
           </n-tab-pane>
         </n-tabs>
@@ -265,7 +335,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { NTabs, NTabPane } from 'naive-ui'
+import { NTabs, NTabPane, useDialog } from 'naive-ui'
 import { useUserStore } from '@/stores/user'
 import { useProfileStore } from '@/stores/profile'
 import { authAPI } from '@/api/auth'
@@ -280,6 +350,7 @@ const activeTab = ref('matching')
 const router = useRouter()
 const userStore = useUserStore()
 const profileStore = useProfileStore()
+const dialog = useDialog()
 
 // 表單資料
 const formData = ref({
@@ -381,6 +452,64 @@ const startRedirectCountdown = () => {
 const goToLogin = () => {
   userStore.logout()
   router.push('/login')
+}
+
+// ==================== 刪除帳號 ====================
+
+const showDeleteForm = ref(false)
+const deletePassword = ref('')
+const deletePasswordError = ref('')
+const deleteLoading = ref(false)
+const deleteSuccess = ref(false)
+const deleteRedirectCountdown = ref(5)
+let deleteCountdownTimer = null
+
+// 取消刪除，收合表單
+const cancelDelete = () => {
+  showDeleteForm.value = false
+  deletePassword.value = ''
+  deletePasswordError.value = ''
+}
+
+// 處理刪除帳號（二次確認對話框）
+const handleDeleteAccount = () => {
+  deletePasswordError.value = ''
+
+  dialog.warning({
+    title: '刪除帳號',
+    content: '確定要刪除帳號嗎？帳號將於 30 天後永久刪除，期間重新登入即可復原。',
+    positiveText: '確定刪除',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      deleteLoading.value = true
+      const success = await userStore.deleteAccount(deletePassword.value)
+      deleteLoading.value = false
+
+      if (success) {
+        // Token 已清除（後端使所有 Token 失效），顯示成功狀態後跳轉
+        deleteSuccess.value = true
+        startDeleteRedirectCountdown()
+      } else {
+        const detail = userStore.error || ''
+        if (detail.includes('密碼錯誤')) {
+          deletePasswordError.value = '密碼錯誤'
+        } else {
+          deletePasswordError.value = detail || '刪除失敗，請稍後再試'
+        }
+      }
+    }
+  })
+}
+
+// 刪除成功後倒計時跳轉至登入頁
+const startDeleteRedirectCountdown = () => {
+  deleteCountdownTimer = setInterval(() => {
+    deleteRedirectCountdown.value--
+    if (deleteRedirectCountdown.value <= 0) {
+      clearInterval(deleteCountdownTimer)
+      router.push('/login')
+    }
+  }, 1000)
 }
 
 // ==================== 配對偏好設定 ====================
@@ -509,6 +638,9 @@ onMounted(() => {
 onUnmounted(() => {
   if (countdownTimer) {
     clearInterval(countdownTimer)
+  }
+  if (deleteCountdownTimer) {
+    clearInterval(deleteCountdownTimer)
   }
 })
 </script>
@@ -1098,6 +1230,39 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+/* 危險區域：刪除帳號 */
+.danger-zone {
+  margin-top: 24px;
+  padding: 20px;
+  border: 2px solid var(--color-error-500);
+  border-radius: var(--radius-md);
+  background: #fff5f5;
+}
+
+.danger-zone .danger-title {
+  color: var(--color-error-500);
+  border-bottom-color: var(--color-error-500);
+}
+
+.danger-description {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+.delete-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.delete-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
 }
 
 /* 響應式設計 */

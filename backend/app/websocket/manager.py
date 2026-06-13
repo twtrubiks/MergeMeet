@@ -37,6 +37,7 @@ from fastapi import WebSocket
 
 from app.core.security import decode_token
 from app.services.token_blacklist import token_blacklist
+from app.services.token_invalidator import TokenInvalidator
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +120,14 @@ class ConnectionManager:
             if not already_accepted:
                 await websocket.close(code=1008, reason="Token expired")
             logger.warning(f"WebSocket connection with expired token for user {user_id}")
+            return False
+
+        # 檢查 Token 是否已被全局失效（密碼重置、刪除帳號）
+        iat = payload.get("iat")
+        if iat is not None and not await TokenInvalidator.is_token_valid(user_id, iat):
+            if not already_accepted:
+                await websocket.close(code=1008, reason="Token revoked")
+            logger.warning(f"WebSocket connection with invalidated token for user {user_id}")
             return False
 
         # 接受連接（如果尚未接受）

@@ -32,6 +32,7 @@ from app.api import (
 from app.core.config import settings
 from app.core.database import close_db
 from app.middleware.last_active import LastActiveMiddleware
+from app.services import account_cleanup
 from app.services.content_moderation import ContentModerationService
 from app.services.redis_client import get_redis, redis_client
 from app.services.token_blacklist import token_blacklist
@@ -76,9 +77,15 @@ async def lifespan(app: FastAPI):
     # 啟動 WebSocket 心跳和清理任務
     await manager.start_background_tasks()
 
+    # 啟動刪除帳號到期清理任務（30 天寬限期）
+    await account_cleanup.start_cleanup_task()
+
     yield
     # 關閉時執行
     logger.info("👋 MergeMeet 關閉中...")
+
+    # 停止刪除帳號到期清理任務
+    await account_cleanup.stop_cleanup_task()
 
     # 停止 Token 黑名單清理任務
     await token_blacklist.stop_cleanup_task()

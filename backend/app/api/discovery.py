@@ -145,13 +145,16 @@ async def _validate_like_request(
     if result.scalar_one_or_none():
         return False, status.HTTP_400_BAD_REQUEST, "已經喜歡過此用戶", None
 
-    # 檢查對方用戶是否存在且可見
+    # 檢查對方用戶是否存在且可見（排除已停用/已刪除帳號）
     result = await db.execute(
-        select(Profile).where(
+        select(Profile)
+        .join(User, Profile.user_id == User.id)
+        .where(
             and_(
                 Profile.user_id == user_id,
                 Profile.is_visible.is_(True),
                 Profile.is_complete.is_(True),
+                User.is_active.is_(True),
             )
         )
     )
@@ -556,15 +559,16 @@ async def get_matches(
         match.user2_id if match.user1_id == current_user.id else match.user1_id for match in matches
     ]
 
-    # 批次查詢 1：所有配對用戶的 profiles（1 次查詢取代 N 次）
+    # 批次查詢 1：所有配對用戶的 profiles（1 次查詢取代 N 次，排除已停用/已刪除帳號）
     profiles_result = await db.execute(
         select(Profile)
+        .join(User, Profile.user_id == User.id)
         .options(
             selectinload(Profile.user),
             selectinload(Profile.photos),
             selectinload(Profile.interests),
         )
-        .where(Profile.user_id.in_(matched_user_ids))
+        .where(and_(Profile.user_id.in_(matched_user_ids), User.is_active.is_(True)))
     )
     profiles_by_user_id = {p.user_id: p for p in profiles_result.scalars().all()}
 

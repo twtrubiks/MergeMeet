@@ -37,6 +37,8 @@ from app.models.user import User
 from app.schemas.auth import (
     ChangePasswordRequest,
     ChangePasswordResponse,
+    DeleteAccountRequest,
+    DeleteAccountResponse,
     EmailVerificationRequest,
     EmailVerificationResponse,
     ForgotPasswordRequest,
@@ -52,6 +54,7 @@ from app.schemas.auth import (
     TokenResponse,
     VerifyResetTokenResponse,
 )
+from app.services.account_cleanup import GRACE_PERIOD_DAYS
 from app.services.email import EmailService
 from app.services.email_rate_limiter import EmailRateLimiter
 from app.services.login_limiter import LoginLimiter
@@ -61,6 +64,7 @@ from app.services.token_invalidator import TokenInvalidator
 from app.services.trust_score import TrustScoreService
 from app.services.verification_code import verification_codes
 from app.services.verification_limiter import VerificationLimiter
+from app.websocket.manager import manager
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -291,6 +295,19 @@ async def login(
                 },
             )
 
+    # 軟刪除帳號：寬限期內登入自動復原，逾期拒絕
+    account_restored = False
+    if user.deleted_at is not None:
+        if datetime.now(UTC) - user.deleted_at > timedelta(days=GRACE_PERIOD_DAYS):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="帳號已刪除，無法復原"
+            )
+        user.deleted_at = None
+        user.is_active = True
+        await db.commit()
+        account_restored = True
+        logger.info(f"Account restored for user: {mask_email(user.email)}")
+
     # 檢查帳號是否啟用
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="帳號已被停用")
@@ -322,6 +339,7 @@ async def login(
         refresh_token=refresh_token,
         token_type="bearer",
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        account_restored=account_restored,
     )
 
 
@@ -888,3 +906,86 @@ async def change_password(
     logger.info(f"Password changed for user: {mask_email(current_user.email)}")
 
     return ChangePasswordResponse(message="密碼修改成功，請重新登入", tokens_invalidated=True)
+
+
+@router.post("/delete-account", response_model=DeleteAccountResponse)
+async def delete_account(
+    request: DeleteAccountRequest,
+    response: Response,
+    current_user: User = Depends(get_current_user),
+    credentials: HTTPAuthorizationCredentials | None = Depends(HTTPBearer(auto_error=False)),
+    access_token_cookie: str | None = Cookie(None, alias="access_token"),
+    refresh_token_cookie: str | None = Cookie(None, alias="refresh_token"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    刪除帳號（軟刪除 + 30 天寬限期）
+
+    - 驗證當前密碼
+    - 標記 deleted_at 並停用帳號，寬限期內重新登入可自動復原
+    - 使所有 Token 失效、斷開 WebSocket、發送通知 Email
+    - 寬限期過後由背景清理任務永久刪除所有資料與照片
+
+    已知限制：寬限期內「忘記密碼」流程會因帳號停用而不可用，
+    需先重新登入復原帳號。
+    """
+    # 1. 驗證當前密碼
+    if not verify_password(request.password, current_user.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="密碼錯誤")
+
+    # 2. 防禦檢查
+    if current_user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="帳號已在刪除程序中")
+    if current_user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="管理員帳號無法自行刪除")
+
+    # 3. 標記軟刪除並停用（先 commit，後續任一步失敗時 is_active=False 仍會擋住所有請求）
+    deleted_at = datetime.now(UTC)
+    current_user.deleted_at = deleted_at
+    current_user.is_active = False
+    await db.commit()
+
+    # 4. 使該用戶所有現有 Token 失效（全裝置登出）
+    await TokenInvalidator.invalidate_all_tokens(str(current_user.id))
+
+    # 5. 黑名單化當前 Token 並清除 Cookie（優先 Cookie，回退 Bearer）
+    access_token = access_token_cookie or (credentials.credentials if credentials else None)
+    if access_token:
+        payload = decode_token(access_token)
+        if payload and payload.get("exp"):
+            expires_at = datetime.fromtimestamp(payload["exp"], tz=UTC)
+        else:
+            expires_at = datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        await token_blacklist.add(access_token, expires_at)
+
+    if refresh_token_cookie:
+        payload = decode_token(refresh_token_cookie)
+        if payload and payload.get("exp"):
+            expires_at = datetime.fromtimestamp(payload["exp"], tz=UTC)
+        else:
+            expires_at = datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        await token_blacklist.add(refresh_token_cookie, expires_at)
+
+    clear_auth_cookies(response)
+
+    # 6. 斷開 WebSocket 連接
+    await manager.disconnect(str(current_user.id))
+
+    # 7. 發送刪除通知 Email（best-effort，失敗不影響刪除流程）
+    restore_deadline = deleted_at + timedelta(days=GRACE_PERIOD_DAYS)
+    username = current_user.email.split("@")[0]
+    email_sent = await EmailService.send_account_deleted_email(
+        to_email=current_user.email, username=username, restore_deadline=restore_deadline
+    )
+    if not email_sent:
+        logger.warning(
+            f"Failed to send account deleted notification to {mask_email(current_user.email)}"
+        )
+
+    logger.info(f"Account deletion scheduled for user: {mask_email(current_user.email)}")
+
+    return DeleteAccountResponse(
+        message=f"帳號已排定刪除，{GRACE_PERIOD_DAYS} 天內重新登入可復原",
+        deleted_at=deleted_at,
+        restore_deadline=restore_deadline,
+    )

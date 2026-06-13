@@ -14,7 +14,8 @@ vi.mock('@/api/auth', () => ({
     logout: vi.fn(),
     verifyEmail: vi.fn(),
     resendVerification: vi.fn(),
-    refreshToken: vi.fn()
+    refreshToken: vi.fn(),
+    deleteAccount: vi.fn()
   }
 }))
 
@@ -153,6 +154,42 @@ describe('User Store', () => {
       })
     })
 
+    it('登入回應含 account_restored 時應更新狀態', async () => {
+      const store = useUserStore()
+      const mockResponse = {
+        success: true,
+        data: {
+          access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIiwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIn0.test',
+          refresh_token: 'mock_refresh_token',
+          account_restored: true
+        }
+      }
+
+      authAPI.login.mockResolvedValue(mockResponse)
+
+      await store.login({ email: 'test@example.com', password: 'Password123' })
+
+      expect(store.accountRestored).toBe(true)
+    })
+
+    it('一般登入 accountRestored 應為 false', async () => {
+      const store = useUserStore()
+      const mockResponse = {
+        success: true,
+        data: {
+          access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIiwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIn0.test',
+          refresh_token: 'mock_refresh_token',
+          account_restored: false
+        }
+      }
+
+      authAPI.login.mockResolvedValue(mockResponse)
+
+      await store.login({ email: 'test@example.com', password: 'Password123' })
+
+      expect(store.accountRestored).toBe(false)
+    })
+
     it('應該處理登入失敗（密碼錯誤）', async () => {
       const store = useUserStore()
       // authAPI.login 失敗時返回 { success: false, error, ... } 格式
@@ -197,6 +234,54 @@ describe('User Store', () => {
       expect(store.isAuthenticated).toBe(false)
       expect(localStorage.removeItem).toHaveBeenCalledWith('access_token')
       expect(localStorage.removeItem).toHaveBeenCalledWith('refresh_token')
+    })
+  })
+
+  describe('刪除帳號', () => {
+    it('應該成功刪除帳號並清除本地狀態', async () => {
+      const store = useUserStore()
+
+      // 設置已登入狀態
+      store.accessToken = 'test_token'
+      store.refreshToken = 'test_refresh'
+      store.user = { id: '123', email: 'test@example.com' }
+
+      authAPI.deleteAccount.mockResolvedValue({
+        message: '帳號已排定刪除，30 天內重新登入可復原',
+        deleted_at: '2026-06-12T00:00:00Z',
+        restore_deadline: '2026-07-12T00:00:00Z'
+      })
+
+      const result = await store.deleteAccount('Password123')
+
+      expect(result).toBe(true)
+      expect(authAPI.deleteAccount).toHaveBeenCalledWith({ password: 'Password123' })
+      expect(store.user).toBeNull()
+      expect(store.accessToken).toBeNull()
+      expect(localStorage.removeItem).toHaveBeenCalledWith('access_token')
+      expect(localStorage.removeItem).toHaveBeenCalledWith('refresh_token')
+    })
+
+    it('密碼錯誤時應保留狀態並設置錯誤訊息', async () => {
+      const store = useUserStore()
+
+      store.accessToken = 'test_token'
+      store.user = { id: '123', email: 'test@example.com' }
+
+      authAPI.deleteAccount.mockRejectedValue({
+        response: {
+          data: {
+            detail: '密碼錯誤'
+          }
+        }
+      })
+
+      const result = await store.deleteAccount('WrongPassword')
+
+      expect(result).toBe(false)
+      expect(store.error).toBe('密碼錯誤')
+      expect(store.accessToken).toBe('test_token')
+      expect(store.user).toBeTruthy()
     })
   })
 

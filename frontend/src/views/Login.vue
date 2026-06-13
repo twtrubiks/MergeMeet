@@ -89,6 +89,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { resetRedirectFlag } from '@/api/client'
+import { discreteMessage } from '@/utils/discreteApi'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 import FloatingInput from '@/components/ui/FloatingInput.vue'
 import Icon from '@/components/ui/Icon.vue'
@@ -182,6 +183,10 @@ const handleLogin = async () => {
   })
 
   if (success) {
+    // 寬限期內登入觸發帳號復原（取消刪除程序）
+    if (userStore.accountRestored) {
+      discreteMessage.success('帳號已成功復原，歡迎回來！')
+    }
     // 登入成功，導向首頁
     router.push('/')
   } else {

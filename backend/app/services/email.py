@@ -334,3 +334,96 @@ Hi {username},
             html_content=html_content,
             text_content=text_content,
         )
+
+    @staticmethod
+    async def send_account_deleted_email(
+        to_email: str, username: str, restore_deadline: datetime
+    ) -> bool:
+        """
+        發送帳號刪除通知郵件（30 天寬限期說明）
+
+        Args:
+            to_email: 收件人 Email
+            username: 用戶名稱
+            restore_deadline: 復原期限（此時間後永久刪除）
+
+        Returns:
+            bool: 是否成功發送
+        """
+        deadline_str = restore_deadline.strftime("%Y-%m-%d %H:%M:%S")
+
+        html_content = f"""  # noqa: E501
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }}
+        .container {{ max-width: 600px; margin: 20px auto; padding: 0; }}
+        .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0; }}
+        .header h1 {{ margin: 0; font-size: 28px; font-weight: 600; }}
+        .content {{ background: white; padding: 40px 30px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }}
+        .info-box {{ background: #e8f5e9; border-left: 4px solid #4caf50; padding: 16px; margin: 24px 0; border-radius: 0 8px 8px 0; }}
+        .warning {{ background: #fff3cd; border-left: 4px solid #ffc107; padding: 16px; margin: 24px 0; border-radius: 0 8px 8px 0; }}
+        .warning strong {{ color: #856404; }}
+        .footer {{ text-align: center; color: #999; font-size: 12px; margin-top: 30px; padding: 20px; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>👋 帳號刪除確認</h1>
+        </div>
+        <div class="content">
+            <p>Hi <strong>{username}</strong>,</p>
+            <p>我們已收到您的帳號刪除請求，帳號已停用並進入 30 天寬限期。</p>
+
+            <div class="warning">
+                <p><strong>⚠️ 重要資訊：</strong></p>
+                <ul style="margin: 8px 0; padding-left: 20px;">
+                    <li>您的帳號將於 <strong>{deadline_str}</strong> 後永久刪除</li>
+                    <li>屆時所有個人資料、配對與聊天記錄將無法恢復</li>
+                </ul>
+            </div>
+
+            <div class="info-box">
+                <p><strong>💡 改變心意了嗎？</strong></p>
+                <p>在期限前重新登入 MergeMeet，帳號即會自動復原。</p>
+            </div>
+
+            <p>感謝您曾使用 MergeMeet，期待未來再相見。</p>
+        </div>
+        <div class="footer">
+            <p>© 2025 MergeMeet. All rights reserved.</p>
+            <p>這是系統自動發送的郵件，請勿直接回覆。</p>
+        </div>
+    </div>
+</body>
+</html>
+        """
+
+        text_content = f"""
+Hi {username},
+
+我們已收到您的帳號刪除請求，帳號已停用並進入 30 天寬限期。
+
+⚠️ 重要資訊：
+- 您的帳號將於 {deadline_str} 後永久刪除
+- 屆時所有個人資料、配對與聊天記錄將無法恢復
+
+💡 改變心意了嗎？
+在期限前重新登入 MergeMeet，帳號即會自動復原。
+
+感謝您曾使用 MergeMeet，期待未來再相見。
+
+© 2025 MergeMeet
+這是系統自動發送的郵件，請勿直接回覆。
+        """
+
+        return await EmailService.send_email(
+            to_email=to_email,
+            subject="👋 MergeMeet - 帳號刪除確認",
+            html_content=html_content,
+            text_content=text_content,
+        )

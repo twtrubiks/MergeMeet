@@ -102,5 +102,16 @@ export const authAPI = {
   async logout() {
     const response = await apiClient.post('/auth/logout')
     return response.data
+  },
+
+  /**
+   * 刪除帳號（軟刪除 + 30 天寬限期）
+   * @param {Object} data - 驗證資料
+   * @param {string} data.password - 當前密碼
+   * @returns {Promise} 包含 message、deleted_at、restore_deadline
+   */
+  async deleteAccount(data) {
+    const response = await apiClient.post('/auth/delete-account', data)
+    return response.data
   }
 }
