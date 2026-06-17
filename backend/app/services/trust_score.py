@@ -51,7 +51,13 @@ class TrustScoreService:
         "report_confirmed": -10,
         "content_violation": -3,
         "blocked": -2,
+        # 恢復行為（上限為預設分 50，不降低現有分數）
+        "report_rejected": +5,  # 舉報被駁回的補償
+        "daily_recovery": +1,  # 每日自動恢復（由 trust_score_recovery 批次套用）
     }
+
+    # 恢復類行為：加分以 DEFAULT_SCORE 為上限，避免違規者輕易恢復高信任狀態
+    RECOVERY_ACTIONS = frozenset({"report_rejected", "daily_recovery"})
 
     @classmethod
     async def adjust_score(
@@ -77,16 +83,23 @@ class TrustScoreService:
 
         adjustment = cls.ADJUSTMENTS[action]
 
+        if action in cls.RECOVERY_ACTIONS:
+            # 恢復類行為：以預設分為上限，且不降低已高於上限的分數
+            new_score_expr = func.greatest(
+                User.trust_score,
+                func.least(cls.DEFAULT_SCORE, User.trust_score + adjustment),
+            )
+        else:
+            new_score_expr = func.least(
+                cls.MAX_SCORE,
+                func.greatest(cls.MIN_SCORE, User.trust_score + adjustment),
+            )
+
         # 原子更新：在資料庫端計算新分數，避免 read-then-write 競態條件
         result = await db.execute(
             update(User)
             .where(User.id == user_id)
-            .values(
-                trust_score=func.least(
-                    cls.MAX_SCORE,
-                    func.greatest(cls.MIN_SCORE, User.trust_score + adjustment),
-                )
-            )
+            .values(trust_score=new_score_expr)
             .returning(User.trust_score)
         )
         row = result.scalar_one_or_none()

@@ -48,6 +48,41 @@
 | 發送違規內容 | **-3** | 訊息包含敏感詞/可疑模式 | `websocket.py` handle_chat_message |
 | 被封鎖 | **-2** | 其他用戶封鎖你 | `safety.py` block_user |
 
+### 恢復行為（加分，上限為預設分 50）
+
+| 行為 | 分數變化 | 觸發條件 | 實作位置 |
+|------|----------|----------|----------|
+| 舉報被駁回 | **+5** | 管理員駁回舉報（每筆舉報僅補償一次） | `admin.py` review_report |
+| 每日自動恢復 | **+1** | 低於 50 分的活躍用戶，每日批次執行 | `trust_score_recovery.py` |
+
+> 恢復行為（`RECOVERY_ACTIONS`）以預設分 50 為上限且不降低現有分數：
+> 被誤報用戶可逐步翻身，真正違規者無法靠時間恢復高信任狀態。
+
+---
+
+## 🔄 自動恢復機制
+
+低信任分數會降低配對排序權重，導致被推薦機率減少，形成「被誤報 → 沒有互動 → 無法加分」的惡性循環。自動恢復機制提供兩條出路：
+
+### 1. 每日衰減恢復
+
+- **規則**: `trust_score < 50` 的用戶每日 +1，封頂於 50
+- **排除**: 軟刪除（`deleted_at`）與停權（`is_active = False`）用戶
+- **執行方式**: lifespan 背景任務每小時檢查，以 Redis 日期鎖（`trust:daily_recovery:{YYYY-MM-DD}`，SET NX，TTL 48h）確保每日只執行一次（應用重啟不重複加分；執行失敗時釋放鎖讓下一輪重試）
+- **審計**: 每筆恢復寫入 `trust_score_logs`（action = `daily_recovery`）
+- **恢復速度**: 舉報成立一次（-10）約需 10 天自然恢復，違規成本仍然顯著
+
+### 2. 舉報駁回補償
+
+- **規則**: 管理員駁回舉報（REJECTED）時，被舉報用戶 +5（上限 50）
+- **防重複**: 僅在舉報「首次轉為 REJECTED」時發放，重複審核不重複加分
+- **審計**: 寫入 `trust_score_logs`（action = `report_rejected`，reason 含舉報 ID）
+
+**實作位置**:
+- 服務: `backend/app/services/trust_score_recovery.py`
+- 駁回補償: `backend/app/api/admin.py` `review_report()`
+- 測試: `backend/tests/test_trust_score_recovery.py`
+
 ---
 
 ## 🔧 技術實作
@@ -215,6 +250,7 @@ TTL: 86400 秒（24 小時）
 | `TestPositiveInteractionMatchLimit` | 正向互動配對限制（位於 test_websocket.py） |
 | `TestAdjustScoreWritesLog` | 審計日誌寫入（位於 test_trust_score_log.py） |
 | `TestTrustLogsEndpoint` | 管理員日誌查詢端點（位於 test_trust_score_log.py） |
+| `TestDailyRecovery` 等 | 每日衰減恢復與舉報駁回補償（位於 test_trust_score_recovery.py） |
 
 ### 測試執行
 
@@ -378,10 +414,6 @@ if match_count > 3:
 
 ## 🐛 已知限制
 
-1. **無自動恢復機制**
-   - 沒有隨時間自動恢復機制
-   - 用戶需透過正向行為（被喜歡、配對成功）手動提升
-
-2. **單一閾值**
+1. **單一閾值**
    - 僅有一個限制閾值（20 分）
    - 未來可考慮多級限制

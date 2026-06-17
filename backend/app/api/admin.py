@@ -192,6 +192,12 @@ async def review_report(
     if not report:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="舉報不存在")
 
+    # 記錄原狀態：成立扣分／駁回補償都僅在「首次轉為該狀態」時發放，
+    # 避免重複審核對同一用戶重複加扣分
+    previous_status = report.status
+    newly_approved = request.status == "APPROVED" and previous_status != "APPROVED"
+    newly_rejected = request.status == "REJECTED" and previous_status != "REJECTED"
+
     # 更新舉報狀態
     report.status = request.status
     report.admin_notes = request.admin_notes
@@ -212,17 +218,24 @@ async def review_report(
         elif request.action == "WARNING":
             reported_user.warning_count += 1
 
-    # 舉報被確認時（APPROVED），扣分 -10 並增加警告次數（避免與 action=WARNING 重複累加）
-    if request.status == "APPROVED" and reported_user and request.action != "WARNING":
+    # 舉報被確認時（首次 APPROVED），扣分 -10 並增加警告次數（避免與 action=WARNING 重複累加）
+    if newly_approved and reported_user and request.action != "WARNING":
         reported_user.warning_count += 1
 
     await db.commit()
 
-    if request.status == "APPROVED":
+    if newly_approved:
         await TrustScoreService.adjust_score(
             db, report.reported_user_id, "report_confirmed", reason=f"舉報 {report.id} 成立"
         )
         logger.info("Trust score -10 for user %s (report_confirmed)", report.reported_user_id)
+
+    # 舉報駁回：補償被誤報用戶（上限為預設分 50，由 RECOVERY_ACTIONS 規則控制）
+    if newly_rejected:
+        await TrustScoreService.adjust_score(
+            db, report.reported_user_id, "report_rejected", reason=f"舉報 {report.id} 駁回補償"
+        )
+        logger.info("Trust score +5 for user %s (report_rejected)", report.reported_user_id)
 
     return {
         "success": True,
