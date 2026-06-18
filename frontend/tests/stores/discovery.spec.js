@@ -114,8 +114,9 @@ describe('Discovery Store', () => {
       expect(apiClient.post).toHaveBeenCalledWith('/discovery/like/user1')
       expect(result.liked).toBe(true)
       expect(result.matched).toBe(false)
-      expect(store.candidates.length).toBe(1)
-      expect(store.currentCandidate.id).toBe('user2')
+      // likeUser 不再移除候選人，移除改由呼叫端在退場動畫後呼叫
+      expect(store.candidates.length).toBe(2)
+      expect(store.currentCandidate.id).toBe('user1')
     })
 
     it('應該成功喜歡用戶並配對成功', async () => {
@@ -144,7 +145,7 @@ describe('Discovery Store', () => {
       expect(store.matches.length).toBe(1)
     })
 
-    it('應該移除最後一個候選人後設置 currentCandidate 為 null', async () => {
+    it('喜歡用戶後不應自動移除候選人（移除由呼叫端負責）', async () => {
       const store = useDiscoveryStore()
 
       store.candidates = [{ id: 'user1', display_name: 'Alice' }]
@@ -156,8 +157,9 @@ describe('Discovery Store', () => {
 
       await store.likeUser('user1')
 
-      expect(store.candidates).toEqual([])
-      expect(store.currentCandidate).toBeNull()
+      // likeUser 只負責 API 與配對處理，不移除候選人；移除改由呼叫端在退場動畫後執行
+      expect(store.candidates.length).toBe(1)
+      expect(store.currentCandidate.id).toBe('user1')
     })
 
     it('應該處理喜歡用戶失敗', async () => {
@@ -192,8 +194,9 @@ describe('Discovery Store', () => {
 
       expect(apiClient.post).toHaveBeenCalledWith('/discovery/pass/user1')
       expect(result).toBe(true)
-      expect(store.candidates.length).toBe(1)
-      expect(store.currentCandidate.id).toBe('user2')
+      // passUser 不再移除候選人，移除改由呼叫端在退場動畫後呼叫
+      expect(store.candidates.length).toBe(2)
+      expect(store.currentCandidate.id).toBe('user1')
     })
 
     it('應該處理跳過用戶失敗', async () => {

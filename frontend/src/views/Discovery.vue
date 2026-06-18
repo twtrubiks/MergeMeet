@@ -345,6 +345,8 @@ const handleCardAction = async (direction, apiCall) => {
     })
   ])
 
+  // 動畫播完 + API 完成後，才移除卡片並晉升下一張
+  discoveryStore.removeCurrentCandidate()
   exitDirection.value = ''
 
   if (result?.matched) {

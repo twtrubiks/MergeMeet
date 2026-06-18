@@ -68,9 +68,7 @@ export const useDiscoveryStore = defineStore('discovery', () => {
         await fetchMatches()
       }
 
-      // 移除當前候選人
-      removeCurrentCandidate()
-
+      // 候選人移除改由呼叫端在退場動畫結束後呼叫 removeCurrentCandidate()
       return result
     } catch (err) {
       const detail = err.response?.data?.detail
@@ -95,9 +93,7 @@ export const useDiscoveryStore = defineStore('discovery', () => {
     try {
       await apiClient.post(`/discovery/pass/${userId}`)
 
-      // 移除當前候選人
-      removeCurrentCandidate()
-
+      // 候選人移除改由呼叫端在退場動畫結束後呼叫 removeCurrentCandidate()
       return true
     } catch (err) {
       error.value = err.response?.data?.detail || '操作失敗'
