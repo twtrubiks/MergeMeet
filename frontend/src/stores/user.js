@@ -1,13 +1,16 @@
 /**
  * 用戶狀態管理 (Pinia Store)
  *
- * Token 存儲安全策略（雙模式支援）：
- * 1. HttpOnly Cookie（優先）- 後端自動設置，防止 XSS 攻擊
- * 2. localStorage（回退）- 向後兼容，支援開發過渡期
+ * Token 存儲安全策略：
+ * 1. Access Token：HttpOnly Cookie（優先）+ localStorage（回退，
+ *    供 WebSocket 首訊息認證與 Bearer 模式使用，效期僅 30 分鐘）
+ * 2. Refresh Token：僅存於後端設置的 HttpOnly Cookie，前端不持久化，
+ *    避免 XSS 竊取 30 天長效憑證
  *
  * 認證流程：
- * - 登入/註冊：後端設置 HttpOnly Cookie，同時返回 Token 給前端存儲
+ * - 登入/註冊：後端設置 HttpOnly Cookie，同時返回 Access Token 給前端存儲
  * - 請求：前端自動帶 Cookie + CSRF Token，或回退到 Bearer Token
+ * - 刷新：以 Cookie 中的 refresh token 呼叫 /auth/refresh（見 api/client.js）
  * - 登出：呼叫後端 API 使 Token 失效 + 清除 Cookie + 清除 localStorage
  */
 import { defineStore } from 'pinia'
@@ -16,10 +19,12 @@ import { authAPI } from '@/api/auth'
 import { logger } from '@/utils/logger'
 
 export const useUserStore = defineStore('user', () => {
+  // 遷移清理：舊版本曾將 refresh token 鏡射到 localStorage，現已改為僅存 HttpOnly Cookie
+  localStorage.removeItem('refresh_token')
+
   // 狀態
   const user = ref(null)
   const accessToken = ref(localStorage.getItem('access_token') || null)
-  const refreshToken = ref(localStorage.getItem('refresh_token') || null)
   const isLoading = ref(false)
   const error = ref(null)
 
@@ -55,14 +60,14 @@ export const useUserStore = defineStore('user', () => {
   const isAdmin = computed(() => user.value?.is_admin === true)
 
   /**
-   * 儲存 Token 到 localStorage 和狀態
+   * 儲存 Access Token 到 localStorage 和狀態
+   *
+   * Refresh Token 不經前端持久化，僅存於後端設置的 HttpOnly Cookie。
    */
   const saveTokens = (tokens) => {
     accessToken.value = tokens.access_token
-    refreshToken.value = tokens.refresh_token
 
     localStorage.setItem('access_token', tokens.access_token)
-    localStorage.setItem('refresh_token', tokens.refresh_token)
   }
 
   /**
@@ -70,11 +75,9 @@ export const useUserStore = defineStore('user', () => {
    */
   const clearTokens = () => {
     accessToken.value = null
-    refreshToken.value = null
     user.value = null
 
     localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
   }
 
   /**
@@ -334,9 +337,9 @@ export const useUserStore = defineStore('user', () => {
    */
   if (typeof window !== 'undefined') {
     window.addEventListener('token-refreshed', (event) => {
-      const { access_token, refresh_token } = event.detail
-      if (access_token && refresh_token) {
-        saveTokens({ access_token, refresh_token })
+      const { access_token } = event.detail
+      if (access_token) {
+        saveTokens({ access_token })
         initializeFromToken()
         logger.debug('Token refreshed, store updated')
       }
@@ -355,7 +358,6 @@ export const useUserStore = defineStore('user', () => {
     // 狀態
     user,
     accessToken,
-    refreshToken,
     isLoading,
     error,
     loginLimitInfo,

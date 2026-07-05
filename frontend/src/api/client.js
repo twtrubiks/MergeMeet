@@ -118,20 +118,17 @@ apiClient.interceptors.response.use(
         const response = await refreshPromise
 
         // 刷新成功後，Cookie 已自動更新
-        // 如果響應包含 Token（向後兼容），也存到 localStorage
+        // Access Token 也存到 localStorage（供 WebSocket 認證與 Bearer 回退）
+        // Refresh Token 僅存於 HttpOnly Cookie，不寫入 localStorage
         if (response.data.access_token) {
           localStorage.setItem('access_token', response.data.access_token)
-        }
-        if (response.data.refresh_token) {
-          localStorage.setItem('refresh_token', response.data.refresh_token)
         }
 
         // 通知 Pinia Store 更新狀態（避免循環依賴，使用 CustomEvent）
         window.dispatchEvent(
           new CustomEvent('token-refreshed', {
             detail: {
-              access_token: response.data.access_token,
-              refresh_token: response.data.refresh_token
+              access_token: response.data.access_token
             }
           })
         )

@@ -14,7 +14,6 @@ vi.mock('@/api/auth', () => ({
     logout: vi.fn(),
     verifyEmail: vi.fn(),
     resendVerification: vi.fn(),
-    refreshToken: vi.fn(),
     deleteAccount: vi.fn()
   }
 }))
@@ -41,23 +40,26 @@ describe('User Store', () => {
 
       expect(store.user).toBeNull()
       expect(store.accessToken).toBeNull()
-      expect(store.refreshToken).toBeNull()
       expect(store.isAuthenticated).toBe(false)
       expect(store.isLoading).toBe(false)
       expect(store.error).toBeNull()
     })
 
-    it('應該從 localStorage 載入 token', () => {
+    it('應該從 localStorage 載入 access token', () => {
       localStorage.getItem.mockImplementation((key) => {
         if (key === 'access_token') return 'stored_access_token'
-        if (key === 'refresh_token') return 'stored_refresh_token'
         return null
       })
 
       const store = useUserStore()
 
       expect(store.accessToken).toBe('stored_access_token')
-      expect(store.refreshToken).toBe('stored_refresh_token')
+    })
+
+    it('初始化時應清除舊版遺留在 localStorage 的 refresh token', () => {
+      useUserStore()
+
+      expect(localStorage.removeItem).toHaveBeenCalledWith('refresh_token')
     })
   })
 
@@ -79,13 +81,13 @@ describe('User Store', () => {
 
       expect(result).toBe(true)
       expect(store.accessToken).toBe(mockResponse.access_token)
-      expect(store.refreshToken).toBe(mockResponse.refresh_token)
       expect(store.isAuthenticated).toBe(true)
       expect(store.user).toBeTruthy()
       expect(store.user.id).toBe('user123')
       expect(store.user.email).toBe('test@example.com')
       expect(localStorage.setItem).toHaveBeenCalledWith('access_token', mockResponse.access_token)
-      expect(localStorage.setItem).toHaveBeenCalledWith('refresh_token', mockResponse.refresh_token)
+      // refresh token 僅存於 HttpOnly Cookie，不寫入 localStorage
+      expect(localStorage.setItem).not.toHaveBeenCalledWith('refresh_token', expect.anything())
     })
 
     it('應該處理註冊失敗（電子郵件已被使用）', async () => {
@@ -220,7 +222,6 @@ describe('User Store', () => {
 
       // 設置已登入狀態
       store.accessToken = 'test_token'
-      store.refreshToken = 'test_refresh'
       store.user = { id: '123', email: 'test@example.com' }
 
       // Mock logout API
@@ -230,10 +231,8 @@ describe('User Store', () => {
 
       expect(store.user).toBeNull()
       expect(store.accessToken).toBeNull()
-      expect(store.refreshToken).toBeNull()
       expect(store.isAuthenticated).toBe(false)
       expect(localStorage.removeItem).toHaveBeenCalledWith('access_token')
-      expect(localStorage.removeItem).toHaveBeenCalledWith('refresh_token')
     })
   })
 
@@ -243,7 +242,6 @@ describe('User Store', () => {
 
       // 設置已登入狀態
       store.accessToken = 'test_token'
-      store.refreshToken = 'test_refresh'
       store.user = { id: '123', email: 'test@example.com' }
 
       authAPI.deleteAccount.mockResolvedValue({
@@ -259,7 +257,6 @@ describe('User Store', () => {
       expect(store.user).toBeNull()
       expect(store.accessToken).toBeNull()
       expect(localStorage.removeItem).toHaveBeenCalledWith('access_token')
-      expect(localStorage.removeItem).toHaveBeenCalledWith('refresh_token')
     })
 
     it('密碼錯誤時應保留狀態並設置錯誤訊息', async () => {
@@ -356,7 +353,7 @@ describe('User Store', () => {
   })
 
   describe('Token 管理', () => {
-    it('應該正確儲存 Tokens', () => {
+    it('應該正確儲存 Access Token（refresh token 不寫入 localStorage）', () => {
       const store = useUserStore()
 
       store.saveTokens({
@@ -365,9 +362,8 @@ describe('User Store', () => {
       })
 
       expect(store.accessToken).toBe('new_access_token')
-      expect(store.refreshToken).toBe('new_refresh_token')
       expect(localStorage.setItem).toHaveBeenCalledWith('access_token', 'new_access_token')
-      expect(localStorage.setItem).toHaveBeenCalledWith('refresh_token', 'new_refresh_token')
+      expect(localStorage.setItem).not.toHaveBeenCalledWith('refresh_token', expect.anything())
     })
 
     it('應該正確清除 Tokens', () => {
@@ -378,10 +374,8 @@ describe('User Store', () => {
       store.clearTokens()
 
       expect(store.accessToken).toBeNull()
-      expect(store.refreshToken).toBeNull()
       expect(store.user).toBeNull()
       expect(localStorage.removeItem).toHaveBeenCalledWith('access_token')
-      expect(localStorage.removeItem).toHaveBeenCalledWith('refresh_token')
     })
 
     it('應該從 JWT Token 正確解析用戶資料', () => {

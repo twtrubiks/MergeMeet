@@ -82,10 +82,9 @@ const handleLogin = async () => {
       password: formData.value.password
     })
 
-    // 儲存 token
+    // 儲存 token（refresh token 僅存於 HttpOnly Cookie）
     userStore.saveTokens({
-      access_token: response.data.access_token,
-      refresh_token: response.data.refresh_token
+      access_token: response.data.access_token
     })
 
     // 初始化用戶狀態（is_admin 會從 token 解析）

@@ -45,18 +45,6 @@ export const authAPI = {
   },
 
   /**
-   * 刷新 Access Token
-   * @param {string} refreshToken - Refresh Token
-   * @returns {Promise} 新的 Token
-   */
-  async refreshToken(refreshToken) {
-    const response = await apiClient.post('/auth/refresh', {
-      refresh_token: refreshToken
-    })
-    return response.data
-  },
-
-  /**
    * 驗證 Email
    * @param {Object} data - 驗證資料
    * @param {string} data.email - Email
