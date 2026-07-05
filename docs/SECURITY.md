@@ -14,9 +14,14 @@ MergeMeet 支援兩種認證方式，優先使用 HttpOnly Cookie 提供更高�
 - CSRF 防護: Double Submit Cookie Pattern
 
 **備用認證方式：Bearer Token**
-- 存儲位置: localStorage（向下相容）
+- 存儲位置: localStorage（僅 Access Token；Refresh Token 僅存於 HttpOnly Cookie，前端不持久化，避免 XSS 竊取長效憑證）
 - 傳輸方式: HTTP Authorization Header (`Bearer <token>`)
 - CSRF 防護: 不需要（Token 本身即防護）
+
+**Token 刷新（靜默續期）：**
+- 前端以 Cookie 中的 Refresh Token 呼叫 `/api/auth/refresh`（此端點不要求 CSRF Header）
+- 觸發時機：API 回 401 時（axios 攔截器）與進入需認證路由時（router guard），共用刷新 Mutex 避免 Token Rotation 競態
+- Refresh Token 每次刷新即輪換，舊 Token 加入黑名單
 
 **技術實現位置：**
 - Cookie 工具: `backend/app/core/cookie_utils.py`

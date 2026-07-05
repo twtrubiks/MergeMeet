@@ -5,6 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import axios from 'axios'
+import { refreshAuthToken } from '@/api/client'
 
 // Mock axios
 vi.mock('axios', () => {
@@ -112,5 +113,44 @@ describe('Token Refresh Mutex', () => {
 
     // axios.post 應該只被呼叫一次
     expect(axios.post).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('refreshAuthToken', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('並發呼叫只發送一次刷新請求，並只將 access token 存入 localStorage', async () => {
+    axios.post.mockResolvedValueOnce({ data: { access_token: 'new_access' } })
+
+    await Promise.all([refreshAuthToken(), refreshAuthToken(), refreshAuthToken()])
+
+    expect(axios.post).toHaveBeenCalledTimes(1)
+    expect(axios.post).toHaveBeenCalledWith('/api/auth/refresh', {}, { withCredentials: true })
+    expect(localStorage.setItem).toHaveBeenCalledWith('access_token', 'new_access')
+    // refresh token 僅存於 HttpOnly Cookie，不寫入 localStorage
+    expect(localStorage.setItem).not.toHaveBeenCalledWith('refresh_token', expect.anything())
+  })
+
+  it('刷新成功應廣播 token-refreshed 事件同步 Pinia Store', async () => {
+    axios.post.mockResolvedValueOnce({ data: { access_token: 'evt_token' } })
+    const handler = vi.fn()
+    window.addEventListener('token-refreshed', handler)
+
+    await refreshAuthToken()
+
+    expect(handler).toHaveBeenCalledTimes(1)
+    expect(handler.mock.calls[0][0].detail).toEqual({ access_token: 'evt_token' })
+
+    window.removeEventListener('token-refreshed', handler)
+  })
+
+  it('刷新失敗應拋出錯誤且不寫入 localStorage', async () => {
+    const error = new Error('Refresh failed')
+    axios.post.mockRejectedValueOnce(error)
+
+    await expect(refreshAuthToken()).rejects.toThrow('Refresh failed')
+    expect(localStorage.setItem).not.toHaveBeenCalled()
   })
 })

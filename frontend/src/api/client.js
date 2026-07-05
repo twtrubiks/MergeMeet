@@ -41,6 +41,53 @@ export function resetRedirectFlag() {
   isRedirectingToLogin = false
 }
 
+/**
+ * 以 HttpOnly Cookie 中的 refresh token 靜默刷新 Access Token
+ *
+ * Mutex：多處同時呼叫（多個 401 請求、router guard）只會發出一次刷新請求，
+ * 避免 Token Rotation 機制導致舊 Token 被 blacklist 後第二次刷新失敗。
+ *
+ * 成功時更新 localStorage 並透過 'token-refreshed' 事件同步 Pinia Store。
+ *
+ * @returns {Promise} /auth/refresh 的 axios 回應
+ */
+export function refreshAuthToken() {
+  if (!refreshPromise) {
+    refreshPromise = axios
+      .post(
+        '/api/auth/refresh',
+        {},
+        {
+          withCredentials: true
+        }
+      )
+      .then((response) => {
+        // 刷新成功後，Cookie 已自動更新
+        // Access Token 也存到 localStorage（供 WebSocket 認證與 Bearer 回退）
+        // Refresh Token 僅存於 HttpOnly Cookie，不寫入 localStorage
+        if (response.data.access_token) {
+          localStorage.setItem('access_token', response.data.access_token)
+        }
+
+        // 通知 Pinia Store 更新狀態（避免循環依賴，使用 CustomEvent）
+        window.dispatchEvent(
+          new CustomEvent('token-refreshed', {
+            detail: {
+              access_token: response.data.access_token
+            }
+          })
+        )
+
+        return response
+      })
+      .finally(() => {
+        // 刷新完成後清除 Promise，允許下次刷新
+        refreshPromise = null
+      })
+  }
+  return refreshPromise
+}
+
 // 建立 axios 實例
 const apiClient = axios.create({
   baseURL: '/api',
@@ -98,40 +145,7 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true
 
       try {
-        // Mutex：如果已經有刷新請求在進行，等待它完成
-        // 這樣可以避免多個請求同時刷新導致 Token Rotation 失敗
-        if (!refreshPromise) {
-          refreshPromise = axios
-            .post(
-              '/api/auth/refresh',
-              {},
-              {
-                withCredentials: true
-              }
-            )
-            .finally(() => {
-              // 刷新完成後清除 Promise，允許下次刷新
-              refreshPromise = null
-            })
-        }
-
-        const response = await refreshPromise
-
-        // 刷新成功後，Cookie 已自動更新
-        // Access Token 也存到 localStorage（供 WebSocket 認證與 Bearer 回退）
-        // Refresh Token 僅存於 HttpOnly Cookie，不寫入 localStorage
-        if (response.data.access_token) {
-          localStorage.setItem('access_token', response.data.access_token)
-        }
-
-        // 通知 Pinia Store 更新狀態（避免循環依賴，使用 CustomEvent）
-        window.dispatchEvent(
-          new CustomEvent('token-refreshed', {
-            detail: {
-              access_token: response.data.access_token
-            }
-          })
-        )
+        await refreshAuthToken()
 
         // 重新發送原本的請求
         return apiClient(originalRequest)

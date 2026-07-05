@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useProfileStore } from '@/stores/profile'
+import { refreshAuthToken } from '@/api/client'
 import { discreteMessage } from '@/utils/discreteApi'
 import Home from '@/views/Home.vue'
 import Login from '@/views/Login.vue'
@@ -119,9 +120,23 @@ router.beforeEach(async (to, from, next) => {
 
   // 檢查是否需要認證
   if (to.meta.requiresAuth && !userStore.isAuthenticated) {
-    // 需要認證但未登入，導向登入頁
-    next('/login')
-    return
+    // 曾登入過（localStorage 留有 access token）→ 先以 refresh cookie 靜默續期，
+    // 避免回訪用戶 access token 過期（30 分鐘）就被踢回登入頁
+    if (localStorage.getItem('access_token')) {
+      try {
+        // 成功時 'token-refreshed' 事件會同步更新 Pinia Store
+        await refreshAuthToken()
+      } catch {
+        // 續期失敗（refresh cookie 過期或失效），清除殘留 token 走登入流程
+        userStore.clearTokens()
+      }
+    }
+
+    if (!userStore.isAuthenticated) {
+      // 需要認證但未登入，導向登入頁
+      next('/login')
+      return
+    }
   }
 
   // 檢查是否需要 Email 驗證（已登入但未驗證）
