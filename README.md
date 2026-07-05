@@ -142,8 +142,8 @@ cd backend && pytest -v --cov=app    # 後端測試
 cd frontend && npm run test          # 前端測試
 ```
 
-- 後端測試: 454 個（覆蓋率約 66%，目標 >80%）
-- 前端測試: 82 個（Vitest）
+- 後端測試: 498 個（覆蓋率約 68%，目標 >80%）
+- 前端測試: 86 個（Vitest）
 
 ## 📊 專案結構
 

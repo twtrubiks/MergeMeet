@@ -324,6 +324,33 @@ async def test_browse_returns_all_qualified_when_fewer_than_limit(
 
 
 @pytest.mark.asyncio
+async def test_browse_sorted_by_match_score_desc(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """測試：回傳結果依配對分數由高到低排序
+
+    inactive 組（近距離但無活躍紀錄）約 24 分，active 組約 44 分，
+    先插入低分組確保排序不是插入順序的巧合。
+    """
+    await _create_candidate_pool(test_db, 3, prefix="inactive", latitude=25.034)
+    await _create_candidate_pool(
+        test_db, 3, prefix="active", latitude=25.034, last_active=datetime.now(UTC)
+    )
+
+    response = await client.get(
+        "/api/discovery/browse?limit=10",
+        headers=viewer_with_profile["headers"],
+    )
+
+    assert response.status_code == 200
+    candidates = response.json()
+    assert len(candidates) == 6
+    scores = [c["match_score"] for c in candidates]
+    assert scores == sorted(scores, reverse=True), f"分數未由高到低排序: {scores}"
+    assert all(c["display_name"].startswith("active") for c in candidates[:3])
+
+
+@pytest.mark.asyncio
 async def test_like_user_success(
     client: AsyncClient, completed_profiles: dict, test_db: AsyncSession
 ):

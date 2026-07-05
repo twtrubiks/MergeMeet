@@ -161,68 +161,6 @@ class MatchingService:
 
         return min(score, 100)
 
-    def rank_candidates(self, user_profile: dict, candidates: list[dict]) -> list[dict]:
-        """
-        對候選人進行排序
-
-        Args:
-            user_profile: 當前用戶的檔案資料
-            candidates: 候選人列表
-
-        Returns:
-            排序後的候選人列表（包含分數）
-        """
-        # 計算每個候選人的分數
-        scored_candidates = []
-        for candidate in candidates:
-            score = self.calculate_match_score(user_profile, candidate)
-            candidate_with_score = {**candidate, "match_score": score}
-            scored_candidates.append(candidate_with_score)
-
-        # 依分數排序（高到低）
-        scored_candidates.sort(key=lambda x: x["match_score"], reverse=True)
-
-        return scored_candidates
-
-    def filter_by_preferences(self, user_profile: dict, candidate: dict) -> bool:
-        """
-        根據用戶偏好篩選候選人
-
-        Args:
-            user_profile: 當前用戶的檔案資料
-            candidate: 候選人資料
-
-        Returns:
-            是否符合偏好
-        """
-        # 檢查年齡偏好
-        min_age = user_profile.get("min_age_preference", 18)
-        max_age = user_profile.get("max_age_preference", 99)
-        candidate_age = candidate.get("age", 0)
-
-        if not (min_age <= candidate_age <= max_age):
-            return False
-
-        # 檢查距離偏好
-        max_distance_km = user_profile.get("max_distance_km", 50)
-        distance_km = candidate.get("distance_km", 999)
-
-        if distance_km > max_distance_km:
-            return False
-
-        # 檢查性別偏好
-        gender_preference = user_profile.get("gender_preference")
-        if gender_preference and gender_preference != "all":
-            candidate_gender = candidate.get("gender")
-            if gender_preference == "both":
-                # "both" 表示 male 或 female，不包含 non_binary
-                if candidate_gender not in ["male", "female"]:
-                    return False
-            elif gender_preference != candidate_gender:
-                return False
-
-        return True
-
     async def browse_candidates(
         self,
         db: AsyncSession,
