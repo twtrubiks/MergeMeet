@@ -11,7 +11,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.websocket import handle_join_match
+from app.api.websocket import handle_join_match, handle_typing_indicator
 from app.models.match import Match, Message
 from app.models.moderation import SensitiveWord
 from app.models.user import User
@@ -192,6 +192,31 @@ async def test_join_match_requires_membership(
     finally:
         # 清理全域 manager 狀態，避免影響其他測試
         await manager.leave_match_room(match_id, alice_user_id)
+
+
+@pytest.mark.asyncio
+async def test_typing_indicator_requires_room_membership(monkeypatch):
+    """測試只有房間內的用戶可以廣播打字狀態（防止非成員偽造打字事件）"""
+    match_id = str(uuid.uuid4())
+    member_id = str(uuid.uuid4())
+    outsider_id = str(uuid.uuid4())
+
+    send_mock = AsyncMock()
+    monkeypatch.setattr(manager, "send_to_match", send_mock)
+
+    try:
+        await manager.join_match_room(match_id, member_id)
+
+        # 非房間成員：打字事件被忽略，不廣播
+        await handle_typing_indicator({"match_id": match_id, "is_typing": True}, outsider_id)
+        send_mock.assert_not_awaited()
+
+        # 房間成員：正常廣播
+        await handle_typing_indicator({"match_id": match_id, "is_typing": True}, member_id)
+        send_mock.assert_awaited_once()
+    finally:
+        # 清理全域 manager 狀態，避免影響其他測試
+        await manager.leave_match_room(match_id, member_id)
 
 
 @pytest.mark.asyncio

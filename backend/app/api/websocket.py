@@ -692,6 +692,12 @@ async def handle_typing_indicator(data: dict, user_id: str):
     if not match_id:
         return
 
+    # 成員檢查：發送者必須已在房間內（join_match 已做過 DB 成員驗證）
+    # 打字事件頻率高，用 in-memory 房間成員檢查取代逐事件 DB 查詢
+    if user_id not in manager.match_rooms.get(str(match_id), []):
+        logger.warning(f"User {user_id} not in match room {match_id}, typing ignored")
+        return
+
     # 發送打字狀態給配對中的其他用戶
     await manager.send_to_match(
         str(match_id),

@@ -178,6 +178,23 @@ MergeMeet 支援兩種認證方式，優先使用 HttpOnly Cookie 提供更高�
    - 防止資源洩漏
    - 文件: `backend/app/websocket/manager.py`
 
+### 配對授權檢查
+
+1. **聊天訊息（chat_message）**
+   - 發送前驗證發送者為配對成員且配對為 ACTIVE（DB 查詢）
+   - 非成員無法向配對發送訊息
+
+2. **加入聊天室（join_match）**
+   - 加入房間前驗證成員資格（DB 查詢）
+   - 防止非成員取得 match_id 後加入房間竊聽訊息
+
+3. **打字指示器（typing）**
+   - 發送者必須已在房間內才可廣播（in-memory 檢查）
+   - 房間成員資格已由 join_match 的 DB 驗證把關，
+     高頻打字事件因此無需逐次查詢 DB
+   - 防止非成員對任意配對偽造打字狀態
+   - 文件: `backend/app/api/websocket.py`
+
 ---
 
 ## 速率限制（Rate Limiting）
@@ -256,6 +273,7 @@ MergeMeet 使用信任分數系統自動追蹤用戶行為，維護平台安全�
 - [x] SQL 注入防護 (ORM)
 - [x] XSS 輸入驗證
 - [x] WebSocket token 驗證
+- [x] WebSocket 配對授權檢查（chat_message / join_match / typing）
 - [x] 異常連接清理
 - [x] 資料庫索引優化
 - [x] Email 脫敏
