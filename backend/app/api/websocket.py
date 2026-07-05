@@ -767,6 +767,14 @@ async def handle_join_match(data: dict, user_id: str):
     if not match_id:
         return
 
+    # 驗證成員資格，防止非成員取得 match_id 後加入房間竊聽訊息
+    user_uuid = uuid.UUID(user_id)
+    async with AsyncSessionLocal() as db:
+        is_valid, error, _ = await _validate_match_access(match_id, user_uuid, db)
+    if not is_valid:
+        await _send_error(user_uuid, error)
+        return
+
     await manager.join_match_room(str(match_id), user_id)
 
     # 通知用戶已加入聊天室

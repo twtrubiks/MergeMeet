@@ -2,6 +2,7 @@
 
 import asyncio
 import uuid
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
@@ -10,6 +11,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.websocket import handle_join_match
 from app.models.match import Match, Message
 from app.models.moderation import SensitiveWord
 from app.models.user import User
@@ -161,6 +163,35 @@ async def test_message_sender_must_be_match_member(
 
     # Charlie 不應該在配對中
     assert str(charlie.id) not in [str(match.user1_id), str(match.user2_id)]
+
+
+@pytest.mark.asyncio
+async def test_join_match_requires_membership(
+    matched_users_for_ws: dict, test_db: AsyncSession, monkeypatch
+):
+    """測試只有配對成員可以加入聊天室（防止非成員竊聽）"""
+
+    @asynccontextmanager
+    async def fake_session_factory():
+        yield test_db
+
+    monkeypatch.setattr("app.api.websocket.AsyncSessionLocal", fake_session_factory)
+
+    match_id = matched_users_for_ws["match_id"]
+    alice_user_id = matched_users_for_ws["alice"]["user_id"]
+    outsider_id = str(uuid.uuid4())
+
+    try:
+        # 非成員：拒絕加入
+        await handle_join_match({"match_id": match_id}, outsider_id)
+        assert outsider_id not in manager.match_rooms.get(match_id, set())
+
+        # 成員：允許加入
+        await handle_join_match({"match_id": match_id}, alice_user_id)
+        assert alice_user_id in manager.match_rooms.get(match_id, set())
+    finally:
+        # 清理全域 manager 狀態，避免影響其他測試
+        await manager.leave_match_room(match_id, alice_user_id)
 
 
 @pytest.mark.asyncio
