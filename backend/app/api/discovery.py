@@ -33,7 +33,8 @@ from datetime import UTC, datetime, timedelta
 import redis.asyncio as redis
 from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import and_, delete, func, or_, select
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -503,25 +504,19 @@ async def pass_user(
     if user_id == current_user.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不能跳過自己")
 
-    # 創建或更新跳過記錄（先查詢再決定）
-    # 檢查是否已經跳過過
-    result = await db.execute(
-        select(Pass).where(and_(Pass.from_user_id == current_user.id, Pass.to_user_id == user_id))
+    # 原子 upsert：已跳過則更新時間，避免「先查再刪再插」在併發雙擊時撞唯一約束回 500
+    stmt = (
+        pg_insert(Pass)
+        .values(from_user_id=current_user.id, to_user_id=user_id)
+        .on_conflict_do_update(constraint="unique_pass", set_={"passed_at": func.now()})
     )
-    existing_pass = result.scalar_one_or_none()
-
-    if existing_pass:
-        # 已經跳過過，刪除舊記錄
-        await db.execute(
-            delete(Pass).where(
-                and_(Pass.from_user_id == current_user.id, Pass.to_user_id == user_id)
-            )
-        )
-
-    # 創建新記錄（時間會是當前時間）
-    new_pass = Pass(from_user_id=current_user.id, to_user_id=user_id)
-    db.add(new_pass)
-    await db.commit()
+    try:
+        await db.execute(stmt)
+        await db.commit()
+    except IntegrityError:
+        # 目標用戶不存在（外鍵違反）
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用戶不存在") from None
 
     return {"passed": True, "message": "已跳過此用戶"}
 

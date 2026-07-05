@@ -1,6 +1,7 @@
 """探索與配對功能測試"""
 
 import asyncio
+import uuid
 from datetime import UTC, date, datetime, timedelta
 from io import BytesIO
 from unittest.mock import AsyncMock, patch
@@ -452,6 +453,17 @@ async def test_pass_user(client: AsyncClient, completed_profiles: dict):
     assert response.status_code == 200
     data = response.json()
     assert data["passed"] is True
+
+
+@pytest.mark.asyncio
+async def test_pass_nonexistent_user_returns_404(client: AsyncClient, completed_profiles: dict):
+    """測試：跳過不存在的用戶回 404（外鍵違反不應回 500）"""
+    response = await client.post(
+        f"/api/discovery/pass/{uuid.uuid4()}",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+    )
+
+    assert response.status_code == 404
 
 
 @pytest.mark.asyncio
