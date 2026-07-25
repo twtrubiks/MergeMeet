@@ -18,7 +18,7 @@ from sqlalchemy.orm import selectinload
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.dependencies import get_current_admin_user, get_current_user
-from app.models.profile import InterestTag, Photo, Profile
+from app.models.profile import InterestTag, Photo, Profile, check_profile_completeness
 from app.models.user import User
 from app.schemas.profile import (
     InterestTagCreateRequest,
@@ -43,22 +43,6 @@ def calculate_age(date_of_birth: date) -> int:
     today = date.today()
     age = relativedelta(today, date_of_birth).years
     return age
-
-
-def check_profile_completeness(profile: Profile) -> bool:
-    """
-    檢查個人檔案完整度
-
-    完整的檔案需要：
-    - 基本資料：顯示名稱、性別、自我介紹
-    - 至少 1 張照片
-    - 3-10 個興趣標籤
-    """
-    has_basic_info = bool(profile.display_name and profile.gender and profile.bio)
-    has_photos = len(profile.photos) >= 1
-    has_interests = 3 <= len(profile.interests) <= 10
-
-    return has_basic_info and has_photos and has_interests
 
 
 @router.post("", response_model=ProfileResponse, status_code=status.HTTP_201_CREATED)
@@ -218,26 +202,19 @@ def _apply_profile_updates(profile: Profile, request: ProfileUpdateRequest) -> N
         profile.gender_preference = request.gender_preference.value
 
 
-def _build_profile_response(
-    profile: Profile, age: int, include_all_photos: bool = True
-) -> ProfileResponse:
+def _build_profile_response(profile: Profile, age: int) -> ProfileResponse:
     """構建 ProfileResponse（共用輔助函數）
+
+    僅用於用戶查看自己的檔案，因此包含所有照片（含待審核與被駁回，
+    用戶需要看到駁回原因）。對其他用戶輸出照片請使用 Profile.public_photos。
 
     Args:
         profile: 個人檔案對象（需預載入 photos 和 interests）
         age: 用戶年齡
-        include_all_photos: 是否包含所有照片（含待審核）。用戶自己查看時為 True，其他人查看時為 False
 
     Returns:
         ProfileResponse 對象
     """
-    # 過濾照片：用戶自己可看到所有照片，其他用戶只能看到已審核的照片
-    filtered_photos = (
-        profile.photos
-        if include_all_photos
-        else [photo for photo in profile.photos if photo.moderation_status == "APPROVED"]
-    )
-
     photos = [
         PhotoResponse(
             id=str(photo.id),
@@ -249,7 +226,7 @@ def _build_profile_response(
             rejection_reason=photo.rejection_reason,
             created_at=photo.created_at,
         )
-        for photo in filtered_photos
+        for photo in profile.photos
     ]
 
     interests = [
@@ -674,13 +651,9 @@ async def delete_photo(
         for index, photo_item in enumerate(remaining_photos):
             photo_item.display_order = index
 
-        # 如果刪除的是第一張照片，且還有其他照片，將第一張照片設為主頭像
+        # 如果刪除的是第一張照片，且還有其他照片，將第一張未被駁回的照片設為主頭像
         if deleted_order == 0 and remaining_photos:
-            # 先清除所有照片的主頭像標記
-            for photo_item in remaining_photos:
-                photo_item.is_profile_picture = False
-            # 將第一張設為主頭像
-            remaining_photos[0].is_profile_picture = True
+            profile.reassign_primary_photo()
 
         # 檢查檔案完整度
         profile.is_complete = check_profile_completeness(profile)
@@ -770,7 +743,8 @@ async def set_profile_picture(
     """設定主頭像
 
     將指定照片設為主頭像，並自動移到第一位。
-    只有已通過審核 (APPROVED) 的照片可以設為主頭像。
+    審核駁回 (REJECTED) 的照片不可設為主頭像；待審核 (PENDING) 照片
+    比照公開可見規則允許設定。
     """
     # 取得用戶的 Profile 及其照片
     result = await db.execute(
@@ -796,9 +770,9 @@ async def set_profile_picture(
         )
 
     # 檢查審核狀態
-    if target_photo.moderation_status != "APPROVED":
+    if target_photo.moderation_status == "REJECTED":
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="只有已通過審核的照片可以設為主頭像"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="審核駁回的照片不可設為主頭像"
         )
 
     # 更新主頭像標記並重新排序

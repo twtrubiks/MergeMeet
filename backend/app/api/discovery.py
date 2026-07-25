@@ -98,8 +98,8 @@ async def browse_users(
 # ========== like_user 輔助函數 ==========
 
 
-def _get_user_avatar(profile: Profile) -> str | None:
-    """取得用戶頭像 URL
+def _get_user_avatar(profile: Profile | None) -> str | None:
+    """取得用戶頭像 URL（僅公開可見照片，排除審核駁回）
 
     Args:
         profile: 用戶的 Profile 對象
@@ -107,14 +107,14 @@ def _get_user_avatar(profile: Profile) -> str | None:
     Returns:
         頭像 URL，如果沒有則返回 None
     """
-    if not profile or not profile.photos:
+    if not profile:
         return None
-    # 優先取 is_profile_picture 的照片
-    profile_photo = next((p for p in profile.photos if p.is_profile_picture), None)
-    if profile_photo:
-        return profile_photo.url
-    # 否則取第一張照片
-    return profile.photos[0].url if profile.photos else None
+    public_photos = profile.public_photos
+    if not public_photos:
+        return None
+    # 優先取 is_profile_picture 的照片，否則取第一張
+    profile_photo = next((p for p in public_photos if p.is_profile_picture), None)
+    return profile_photo.url if profile_photo else public_photos[0].url
 
 
 async def _validate_like_request(
@@ -599,11 +599,9 @@ async def get_matches(
         # 計算年齡
         age = relativedelta(today, matched_profile.user.date_of_birth).years
 
-        # 取得興趣和照片
+        # 取得興趣和照片（僅公開可見照片，排除審核駁回）
         interests = [interest.name for interest in matched_profile.interests]
-        photos = [
-            photo.url for photo in sorted(matched_profile.photos, key=lambda p: p.display_order)
-        ]
+        photos = [photo.url for photo in matched_profile.public_photos]
 
         # 建立 ProfileCard
         profile_card = ProfileCard(

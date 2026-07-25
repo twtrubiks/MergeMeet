@@ -61,8 +61,44 @@ class Profile(Base):
         "InterestTag", secondary="profile_interests", back_populates="profiles"
     )
 
+    @property
+    def public_photos(self) -> list["Photo"]:
+        """公開可見的照片（排除審核駁回），依 display_order 排序
+
+        巡邏制審核語意：PENDING 照片先上架、事後審核，REJECTED 立即下架。
+        所有對其他用戶輸出照片的地方（探索、配對、對話頭像）都必須使用此屬性。
+        """
+        return sorted(
+            (photo for photo in self.photos if photo.moderation_status != "REJECTED"),
+            key=lambda photo: photo.display_order,
+        )
+
+    def reassign_primary_photo(self) -> None:
+        """將主頭像指到第一張未被駁回的照片；無合格照片時清除所有主頭像標記"""
+        for photo in self.photos:
+            photo.is_profile_picture = False
+        candidates = self.public_photos
+        if candidates:
+            candidates[0].is_profile_picture = True
+
     def __repr__(self):
         return f"<Profile {self.display_name}>"
+
+
+def check_profile_completeness(profile: Profile) -> bool:
+    """
+    檢查個人檔案完整度
+
+    完整的檔案需要：
+    - 基本資料：顯示名稱、性別、自我介紹
+    - 至少 1 張未被駁回的照片
+    - 3-10 個興趣標籤
+    """
+    has_basic_info = bool(profile.display_name and profile.gender and profile.bio)
+    has_photos = len(profile.public_photos) >= 1
+    has_interests = 3 <= len(profile.interests) <= 10
+
+    return has_basic_info and has_photos and has_interests
 
 
 class Photo(Base):

@@ -207,14 +207,12 @@ async def get_conversations(
         last_message = last_messages_by_match.get(match.id)
         unread_count = unread_counts_by_match.get(match.id, 0)
 
-        # 獲取對方的頭像
+        # 獲取對方的頭像（僅公開可見照片，排除審核駁回）
         other_user_avatar = None
-        if other_profile and other_profile.photos:
-            profile_photo = next((p for p in other_profile.photos if p.is_profile_picture), None)
-            if profile_photo:
-                other_user_avatar = profile_photo.url
-            elif other_profile.photos:
-                other_user_avatar = other_profile.photos[0].url
+        public_photos = other_profile.public_photos
+        if public_photos:
+            profile_photo = next((p for p in public_photos if p.is_profile_picture), None)
+            other_user_avatar = profile_photo.url if profile_photo else public_photos[0].url
 
         conversations.append(
             MatchWithLastMessageResponse(

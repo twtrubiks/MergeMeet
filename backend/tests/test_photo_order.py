@@ -302,17 +302,19 @@ class TestSetProfilePicture:
     async def test_set_profile_picture_pending_photo(
         self, client: AsyncClient, auth_headers: dict, mock_file_storage
     ):
-        """錯誤：待審核的照片不能設為主頭像"""
+        """待審核 (PENDING) 照片允許設為主頭像（巡邏制：先上架、事後審核）"""
         # 建立照片（預設為 PENDING 狀態）
         photo_ids = await create_profile_with_photos(
             client, auth_headers, mock_file_storage, num_photos=2
         )
 
-        # 嘗試將 PENDING 照片設為主頭像
+        # 將 PENDING 照片設為主頭像
         resp = await client.put(f"/api/profile/photos/{photo_ids[1]}/primary", headers=auth_headers)
 
-        assert resp.status_code == 400
-        assert "已通過審核" in resp.json()["detail"]
+        assert resp.status_code == 200
+        result = resp.json()
+        assert result["is_profile_picture"] is True
+        assert result["display_order"] == 0
 
     @pytest.mark.asyncio
     async def test_set_profile_picture_rejected_photo(
@@ -333,7 +335,7 @@ class TestSetProfilePicture:
         resp = await client.put(f"/api/profile/photos/{photo_ids[1]}/primary", headers=auth_headers)
 
         assert resp.status_code == 400
-        assert "已通過審核" in resp.json()["detail"]
+        assert "駁回" in resp.json()["detail"]
 
     @pytest.mark.asyncio
     async def test_set_profile_picture_invalid_id(

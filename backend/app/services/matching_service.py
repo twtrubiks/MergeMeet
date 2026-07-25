@@ -294,11 +294,9 @@ class MatchingService:
                 # 計算年齡
                 age = relativedelta(today, profile.user.date_of_birth).years
 
-                # 取得興趣標籤與照片
+                # 取得興趣標籤與照片（僅公開可見照片，排除審核駁回）
                 interests = [interest.name for interest in profile.interests]
-                photos = [
-                    photo.url for photo in sorted(profile.photos, key=lambda p: p.display_order)
-                ]
+                photos = [photo.url for photo in profile.public_photos]
 
                 # 計算配對分數
                 match_score = self.calculate_match_score(
