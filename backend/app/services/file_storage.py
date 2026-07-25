@@ -30,6 +30,9 @@ class FileStorageService:
         self.upload_dir = Path(settings.UPLOAD_DIR)
         self.photos_dir = self.upload_dir / "photos"
         self.chat_dir = self.upload_dir / "chat"
+        # 隔離目錄必須在 /uploads 靜態掛載之外，駁回照片搬入後即不對外服務，
+        # 僅供管理員審閱申訴（見 api/photo_moderation.py 的 quarantine 端點）
+        self.quarantine_dir = self.upload_dir.parent / f"{self.upload_dir.name}_quarantine"
         self._ensure_directories()
 
     def _ensure_directories(self):
@@ -37,6 +40,14 @@ class FileStorageService:
         self.upload_dir.mkdir(parents=True, exist_ok=True)
         self.photos_dir.mkdir(parents=True, exist_ok=True)
         self.chat_dir.mkdir(parents=True, exist_ok=True)
+        self.quarantine_dir.mkdir(parents=True, exist_ok=True)
+
+    def _url_to_relative_path(self, photo_url: str) -> str:
+        """將 /uploads/... URL 轉為相對於上傳根目錄的路徑"""
+        relative_path = photo_url.lstrip("/")
+        if relative_path.startswith("uploads/"):
+            relative_path = relative_path[8:]  # 移除 "uploads/"
+        return relative_path
 
     def _get_user_photo_dir(self, user_id: str) -> Path:
         """取得使用者照片目錄"""
@@ -217,14 +228,7 @@ class FileStorageService:
             return False
 
         try:
-            # 從 URL 路徑取得檔案路徑
-            # /uploads/photos/{user_id}/{filename} -> photos/{user_id}/{filename}
-            # 移除 /uploads/ 前綴
-            relative_path = photo_url.lstrip("/")
-            if relative_path.startswith("uploads/"):
-                relative_path = relative_path[8:]  # 移除 "uploads/"
-
-            photo_path = self.upload_dir / relative_path
+            photo_path = self.upload_dir / self._url_to_relative_path(photo_url)
 
             # 刪除主圖
             if photo_path.exists():
@@ -249,9 +253,117 @@ class FileStorageService:
             logger.error(f"Failed to delete photo {photo_url}: {e}")
             return False
 
+    async def quarantine_photo(self, photo_url: str) -> bool:
+        """
+        將照片及縮圖移入隔離目錄（駁回下架，保留供申訴審閱）
+
+        Args:
+            photo_url: 照片 URL 路徑
+
+        Returns:
+            是否搬移成功
+        """
+        if not photo_url:
+            return False
+
+        try:
+            relative_path = self._url_to_relative_path(photo_url)
+            photo_path = self.upload_dir / relative_path
+            dest_path = self.quarantine_dir / relative_path
+
+            if not photo_path.exists():
+                logger.warning(f"Photo not found for quarantine: {photo_path}")
+                return False
+
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(photo_path), str(dest_path))
+            logger.info(f"Quarantined photo: {photo_path} -> {dest_path}")
+
+            # 縮圖一併隔離
+            if "_thumb" not in photo_path.stem:
+                thumbnail_path = photo_path.with_name(
+                    photo_path.stem + "_thumb" + photo_path.suffix
+                )
+                if thumbnail_path.exists():
+                    shutil.move(str(thumbnail_path), str(dest_path.parent / thumbnail_path.name))
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to quarantine photo {photo_url}: {e}")
+            return False
+
+    async def restore_photo(self, photo_url: str) -> bool:
+        """
+        將隔離中的照片及縮圖搬回上傳目錄（申訴通過重新上架）
+
+        Args:
+            photo_url: 原照片 URL 路徑
+
+        Returns:
+            是否搬回成功
+        """
+        quarantined_path = self.get_quarantined_path(photo_url)
+        if quarantined_path is None:
+            logger.warning(f"Quarantined photo not found for restore: {photo_url}")
+            return False
+
+        try:
+            dest_path = self.upload_dir / self._url_to_relative_path(photo_url)
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(quarantined_path), str(dest_path))
+            logger.info(f"Restored photo: {quarantined_path} -> {dest_path}")
+
+            # 縮圖一併搬回
+            thumbnail_path = quarantined_path.with_name(
+                quarantined_path.stem + "_thumb" + quarantined_path.suffix
+            )
+            if thumbnail_path.exists():
+                shutil.move(str(thumbnail_path), str(dest_path.parent / thumbnail_path.name))
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to restore photo {photo_url}: {e}")
+            return False
+
+    def get_quarantined_path(self, photo_url: str) -> Path | None:
+        """
+        取得隔離中照片的實體路徑
+
+        Args:
+            photo_url: 原照片 URL 路徑
+
+        Returns:
+            實體路徑；檔案不存在或路徑逸出隔離目錄時回傳 None
+        """
+        if not photo_url:
+            return None
+
+        path = (self.quarantine_dir / self._url_to_relative_path(photo_url)).resolve()
+
+        # 防止路徑穿越（URL 可能來自用戶提交的申訴內容）
+        if not path.is_relative_to(self.quarantine_dir.resolve()):
+            logger.warning(f"Quarantine path traversal blocked: {photo_url}")
+            return None
+
+        return path if path.is_file() else None
+
+    def delete_quarantined_photo(self, photo_url: str) -> None:
+        """申訴審結後清除隔離檔案（含縮圖）"""
+        path = self.get_quarantined_path(photo_url)
+        if path is None:
+            return
+
+        path.unlink(missing_ok=True)
+        thumbnail_path = path.with_name(path.stem + "_thumb" + path.suffix)
+        thumbnail_path.unlink(missing_ok=True)
+        logger.info(f"Purged quarantined photo: {path}")
+
     def delete_user_photo_dir(self, user_id: str) -> None:
-        """刪除使用者整個照片目錄（含縮圖與孤兒檔案，刪除帳號時使用）"""
+        """刪除使用者整個照片目錄（含縮圖、孤兒檔案與隔離區檔案，刪除帳號時使用）"""
         shutil.rmtree(self.photos_dir / str(user_id), ignore_errors=True)
+        shutil.rmtree(self.quarantine_dir / "photos" / str(user_id), ignore_errors=True)
         logger.info(f"Deleted photo directory for user {user_id}")
 
     def delete_chat_image_dir(self, match_id: str) -> None:

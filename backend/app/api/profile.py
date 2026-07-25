@@ -618,7 +618,6 @@ async def delete_photo(
 
     # 取得 profile 以便檢查完整度和重新排序
     profile_id = photo.profile_id
-    deleted_order = photo.display_order
     photo_url = photo.url
     thumbnail_url = photo.thumbnail_url
 
@@ -651,8 +650,9 @@ async def delete_photo(
         for index, photo_item in enumerate(remaining_photos):
             photo_item.display_order = index
 
-        # 如果刪除的是第一張照片，且還有其他照片，將第一張未被駁回的照片設為主頭像
-        if deleted_order == 0 and remaining_photos:
+        # 若刪除後沒有任何照片持有主頭像標記（含刪掉主頭像本身，
+        # 以及主頭像先前被駁回遞補到非首位的情況），遞補第一張未被駁回的照片
+        if remaining_photos and not any(p.is_profile_picture for p in remaining_photos):
             profile.reassign_primary_photo()
 
         # 檢查檔案完整度

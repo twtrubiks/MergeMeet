@@ -55,6 +55,8 @@ class TrustScoreService:
         # 恢復行為（上限為預設分 50，不降低現有分數）
         "report_rejected": +5,  # 舉報被駁回的補償
         "daily_recovery": +1,  # 每日自動恢復（由 trust_score_recovery 批次套用）
+        # 誤判救濟：content_violation 的鏡像退還，不設 50 分上限
+        "appeal_approved": +3,
     }
 
     # 恢復類行為：加分以 DEFAULT_SCORE 為上限，避免違規者輕易恢復高信任狀態

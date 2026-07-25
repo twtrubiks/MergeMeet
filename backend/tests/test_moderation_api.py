@@ -6,6 +6,7 @@
 
 import uuid
 from datetime import date
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
@@ -13,7 +14,8 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_password_hash
-from app.models.moderation import SensitiveWord
+from app.models.moderation import ContentAppeal, SensitiveWord
+from app.models.profile import Photo, Profile
 from app.models.user import User
 
 # ==================== Fixtures ====================
@@ -218,3 +220,382 @@ class TestModerationStats:
         assert isinstance(data["total_appeals"], int)
         assert isinstance(data["pending_appeals"], int)
         assert data["total_sensitive_words"] >= 2
+
+
+# ==================== 申訴審核 API 測試 ====================
+
+
+@pytest_asyncio.fixture
+async def photo_appeal(test_db: AsyncSession, normal_user: User) -> ContentAppeal:
+    """建立照片類申訴（照片已駁回、實體檔案在隔離區）"""
+    appeal = ContentAppeal(
+        id=uuid.uuid4(),
+        user_id=normal_user.id,
+        appeal_type="PHOTO",
+        rejected_content="/uploads/photos/test-user/rejected.jpg",
+        violations='["垃圾內容"]',
+        reason="這張照片是我本人的生活照，並沒有任何違規內容，請重新審視。",
+    )
+    test_db.add(appeal)
+    await test_db.commit()
+    await test_db.refresh(appeal)
+    return appeal
+
+
+@pytest.mark.asyncio
+class TestReviewAppeal:
+    """POST /api/moderation/appeals/{id}/review 測試"""
+
+    async def test_approve_refunds_trust_score_and_purges_quarantine(
+        self,
+        client: AsyncClient,
+        test_db: AsyncSession,
+        admin_headers: dict,
+        normal_user: User,
+        photo_appeal: ContentAppeal,
+    ):
+        """申訴通過：退還信任分（content_violation 的鏡像 +3）並清除隔離檔案"""
+        normal_user.trust_score = 40
+        await test_db.commit()
+
+        with patch("app.api.moderation.file_storage.delete_quarantined_photo") as mock_purge:
+            response = await client.post(
+                f"/api/moderation/appeals/{photo_appeal.id}/review",
+                headers=admin_headers,
+                json={"status": "APPROVED", "admin_response": "確認為誤判，造成不便敬請見諒"},
+            )
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "APPROVED"
+
+        await test_db.refresh(normal_user)
+        assert normal_user.trust_score == 43
+
+        mock_purge.assert_called_once_with("/uploads/photos/test-user/rejected.jpg")
+
+    async def test_reject_appeal_no_refund_but_purges_quarantine(
+        self,
+        client: AsyncClient,
+        test_db: AsyncSession,
+        admin_headers: dict,
+        normal_user: User,
+        photo_appeal: ContentAppeal,
+    ):
+        """申訴駁回：不退分，但照片申訴已審結、隔離檔案一樣清除"""
+        normal_user.trust_score = 40
+        await test_db.commit()
+
+        with patch("app.api.moderation.file_storage.delete_quarantined_photo") as mock_purge:
+            response = await client.post(
+                f"/api/moderation/appeals/{photo_appeal.id}/review",
+                headers=admin_headers,
+                json={"status": "REJECTED", "admin_response": "經複審後確認仍屬違規內容"},
+            )
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "REJECTED"
+
+        await test_db.refresh(normal_user)
+        assert normal_user.trust_score == 40
+
+        mock_purge.assert_called_once_with("/uploads/photos/test-user/rejected.jpg")
+
+    async def test_approve_non_photo_appeal_refunds_without_purge(
+        self,
+        client: AsyncClient,
+        test_db: AsyncSession,
+        admin_headers: dict,
+        normal_user: User,
+    ):
+        """非照片類申訴通過：退分但不動隔離區"""
+        appeal = ContentAppeal(
+            id=uuid.uuid4(),
+            user_id=normal_user.id,
+            appeal_type="MESSAGE",
+            rejected_content="被誤判的訊息內容",
+            violations='["測試敏感詞"]',
+            reason="這句話只是日常對話，沒有任何違規意圖，請重新審視。",
+        )
+        test_db.add(appeal)
+        normal_user.trust_score = 40
+        await test_db.commit()
+
+        with patch("app.api.moderation.file_storage.delete_quarantined_photo") as mock_purge:
+            response = await client.post(
+                f"/api/moderation/appeals/{appeal.id}/review",
+                headers=admin_headers,
+                json={"status": "APPROVED", "admin_response": "經複審確認為系統誤判"},
+            )
+
+        assert response.status_code == 200
+
+        await test_db.refresh(normal_user)
+        assert normal_user.trust_score == 43
+
+        mock_purge.assert_not_called()
+
+    async def test_review_appeal_requires_admin(
+        self,
+        client: AsyncClient,
+        normal_headers: dict,
+        photo_appeal: ContentAppeal,
+    ):
+        """一般用戶無法審核申訴"""
+        response = await client.post(
+            f"/api/moderation/appeals/{photo_appeal.id}/review",
+            headers=normal_headers,
+            json={"status": "APPROVED", "admin_response": "回覆"},
+        )
+        assert response.status_code == 403
+
+
+# ==================== 申訴建立與照片還原測試 ====================
+
+
+@pytest_asyncio.fixture
+async def rejected_photo(test_db: AsyncSession, normal_user: User) -> Photo:
+    """建立 normal_user 名下的駁回照片"""
+    profile = Profile(
+        id=uuid.uuid4(),
+        user_id=normal_user.id,
+        display_name="申訴測試用戶",
+        gender="female",
+        bio="測試簡介",
+    )
+    test_db.add(profile)
+    await test_db.commit()
+
+    photo = Photo(
+        id=uuid.uuid4(),
+        profile_id=profile.id,
+        url=f"/uploads/photos/{normal_user.id}/rejected.jpg",
+        thumbnail_url=f"/uploads/photos/{normal_user.id}/rejected_thumb.jpg",
+        display_order=0,
+        is_profile_picture=False,
+        moderation_status="REJECTED",
+        rejection_reason="仇恨言論",
+        file_size=102400,
+        width=800,
+        height=600,
+        mime_type="image/jpeg",
+    )
+    test_db.add(photo)
+    await test_db.commit()
+    await test_db.refresh(photo)
+    return photo
+
+
+APPEAL_REASON = "這張照片是我本人的生活照，並沒有任何違規內容，請重新審視，謝謝。"
+
+
+@pytest.mark.asyncio
+class TestCreateAppeal:
+    """POST /api/moderation/appeals 測試（防重複與歸屬驗證）"""
+
+    async def test_create_photo_appeal_success(
+        self, client: AsyncClient, normal_headers: dict, rejected_photo: Photo
+    ):
+        """本人的駁回照片可以申訴"""
+        response = await client.post(
+            "/api/moderation/appeals",
+            headers=normal_headers,
+            json={
+                "appeal_type": "PHOTO",
+                "rejected_content": rejected_photo.url,
+                "violations": '["仇恨言論"]',
+                "reason": APPEAL_REASON,
+            },
+        )
+        assert response.status_code == 201
+        assert response.json()["status"] == "PENDING"
+
+    async def test_duplicate_appeal_blocked(
+        self, client: AsyncClient, normal_headers: dict, rejected_photo: Photo
+    ):
+        """同一內容不可重複申訴（防重複退分刷分）"""
+        payload = {
+            "appeal_type": "PHOTO",
+            "rejected_content": rejected_photo.url,
+            "violations": '["仇恨言論"]',
+            "reason": APPEAL_REASON,
+        }
+        first = await client.post("/api/moderation/appeals", headers=normal_headers, json=payload)
+        assert first.status_code == 201
+
+        second = await client.post("/api/moderation/appeals", headers=normal_headers, json=payload)
+        assert second.status_code == 400
+        assert "已提出過申訴" in second.json()["detail"]
+
+    async def test_appeal_nonexistent_photo_blocked(
+        self, client: AsyncClient, normal_headers: dict
+    ):
+        """不存在的照片 URL 不可申訴"""
+        response = await client.post(
+            "/api/moderation/appeals",
+            headers=normal_headers,
+            json={
+                "appeal_type": "PHOTO",
+                "rejected_content": "/uploads/photos/nobody/ghost.jpg",
+                "violations": '["垃圾內容"]',
+                "reason": APPEAL_REASON,
+            },
+        )
+        assert response.status_code == 400
+        assert "只能申訴自己被駁回的照片" in response.json()["detail"]
+
+    async def test_appeal_non_rejected_photo_blocked(
+        self,
+        client: AsyncClient,
+        test_db: AsyncSession,
+        normal_headers: dict,
+        rejected_photo: Photo,
+    ):
+        """非駁回狀態的照片不可申訴（還原後不可再申訴）"""
+        rejected_photo.moderation_status = "APPROVED"
+        await test_db.commit()
+
+        response = await client.post(
+            "/api/moderation/appeals",
+            headers=normal_headers,
+            json={
+                "appeal_type": "PHOTO",
+                "rejected_content": rejected_photo.url,
+                "violations": '["仇恨言論"]',
+                "reason": APPEAL_REASON,
+            },
+        )
+        assert response.status_code == 400
+        assert "只能申訴自己被駁回的照片" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+class TestAppealPhotoRestore:
+    """申訴通過還原照片測試"""
+
+    async def test_approve_restores_photo(
+        self,
+        client: AsyncClient,
+        test_db: AsyncSession,
+        admin_headers: dict,
+        normal_user: User,
+        rejected_photo: Photo,
+    ):
+        """申訴通過：照片還原為 APPROVED、清駁回原因、補主頭像、檔案搬回、不清隔離檔"""
+        appeal = ContentAppeal(
+            id=uuid.uuid4(),
+            user_id=normal_user.id,
+            appeal_type="PHOTO",
+            rejected_content=rejected_photo.url,
+            violations='["仇恨言論"]',
+            reason=APPEAL_REASON,
+        )
+        test_db.add(appeal)
+        await test_db.commit()
+
+        with (
+            patch(
+                "app.services.photo_moderation.file_storage.get_quarantined_path",
+                return_value="/quarantine/rejected.jpg",
+            ),
+            patch(
+                "app.services.photo_moderation.file_storage.restore_photo",
+                new_callable=AsyncMock,
+                return_value=True,
+            ) as mock_restore,
+            patch("app.api.moderation.file_storage.delete_quarantined_photo") as mock_purge,
+        ):
+            response = await client.post(
+                f"/api/moderation/appeals/{appeal.id}/review",
+                headers=admin_headers,
+                json={"status": "APPROVED", "admin_response": "確認為誤判，照片已恢復上架"},
+            )
+
+        assert response.status_code == 200
+
+        await test_db.refresh(rejected_photo)
+        assert rejected_photo.moderation_status == "APPROVED"
+        assert rejected_photo.rejection_reason is None
+        # 原本沒有主頭像，還原的照片遞補
+        assert rejected_photo.is_profile_picture is True
+
+        mock_restore.assert_awaited_once_with(rejected_photo.url)
+        mock_purge.assert_not_called()
+
+    async def test_approve_not_owned_photo_no_restore(
+        self,
+        client: AsyncClient,
+        test_db: AsyncSession,
+        admin_headers: dict,
+        admin_user: User,
+        rejected_photo: Photo,
+    ):
+        """申訴人非照片擁有者：不還原、也不動他人的隔離檔"""
+        appeal = ContentAppeal(
+            id=uuid.uuid4(),
+            user_id=admin_user.id,  # 申訴人不是照片擁有者
+            appeal_type="PHOTO",
+            rejected_content=rejected_photo.url,
+            violations='["仇恨言論"]',
+            reason=APPEAL_REASON,
+        )
+        test_db.add(appeal)
+        await test_db.commit()
+
+        with (
+            patch(
+                "app.services.photo_moderation.file_storage.restore_photo",
+                new_callable=AsyncMock,
+            ) as mock_restore,
+            patch("app.api.moderation.file_storage.delete_quarantined_photo") as mock_purge,
+        ):
+            response = await client.post(
+                f"/api/moderation/appeals/{appeal.id}/review",
+                headers=admin_headers,
+                json={"status": "APPROVED", "admin_response": "測試用歸屬不符情境回覆"},
+            )
+
+        assert response.status_code == 200
+
+        await test_db.refresh(rejected_photo)
+        assert rejected_photo.moderation_status == "REJECTED"
+        mock_restore.assert_not_awaited()
+        mock_purge.assert_not_called()
+
+    async def test_approve_quarantine_file_missing_no_restore(
+        self,
+        client: AsyncClient,
+        test_db: AsyncSession,
+        admin_headers: dict,
+        normal_user: User,
+        rejected_photo: Photo,
+    ):
+        """隔離檔不存在：不改狀態（避免公開面出現破圖），也不清檔"""
+        appeal = ContentAppeal(
+            id=uuid.uuid4(),
+            user_id=normal_user.id,
+            appeal_type="PHOTO",
+            rejected_content=rejected_photo.url,
+            violations='["仇恨言論"]',
+            reason=APPEAL_REASON,
+        )
+        test_db.add(appeal)
+        await test_db.commit()
+
+        with (
+            patch(
+                "app.services.photo_moderation.file_storage.get_quarantined_path",
+                return_value=None,
+            ),
+            patch("app.api.moderation.file_storage.delete_quarantined_photo") as mock_purge,
+        ):
+            response = await client.post(
+                f"/api/moderation/appeals/{appeal.id}/review",
+                headers=admin_headers,
+                json={"status": "APPROVED", "admin_response": "測試用隔離檔遺失情境回覆"},
+            )
+
+        assert response.status_code == 200
+
+        await test_db.refresh(rejected_photo)
+        assert rejected_photo.moderation_status == "REJECTED"
+        mock_purge.assert_not_called()

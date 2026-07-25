@@ -19,8 +19,9 @@ def temp_upload_dir():
     """建立臨時上傳目錄"""
     temp_dir = tempfile.mkdtemp()
     yield temp_dir
-    # 清理
+    # 清理（隔離目錄是上傳目錄的同層 sibling，需一併清除）
     shutil.rmtree(temp_dir, ignore_errors=True)
+    shutil.rmtree(f"{temp_dir}_quarantine", ignore_errors=True)
 
 
 @pytest.fixture
@@ -389,6 +390,146 @@ class TestDeletePhoto:
 
         result = await storage_service.delete_photo(None)
         assert result is False
+
+
+class TestQuarantinePhoto:
+    """照片隔離測試（駁回下架，保留供申訴審閱）"""
+
+    @pytest.mark.asyncio
+    async def test_quarantine_moves_files(
+        self, storage_service, sample_image_bytes, temp_upload_dir
+    ):
+        """隔離會把主圖與縮圖移出上傳目錄，搬入隔離目錄"""
+        user_id = "user-q-1"
+        photo_id, photo_url, _ = await storage_service.save_photo(
+            user_id=user_id,
+            file_content=sample_image_bytes,
+            filename="to_quarantine.jpg",
+            content_type="image/jpeg",
+        )
+
+        photo_path = Path(temp_upload_dir) / "photos" / user_id / f"{photo_id}.jpg"
+        thumbnail_path = Path(temp_upload_dir) / "photos" / user_id / f"{photo_id}_thumb.jpg"
+        assert photo_path.exists()
+        assert thumbnail_path.exists()
+
+        result = await storage_service.quarantine_photo(photo_url)
+        assert result is True
+
+        # 原目錄不再有檔案（公開面即刻下架）
+        assert not photo_path.exists()
+        assert not thumbnail_path.exists()
+
+        # 隔離目錄保留主圖與縮圖
+        quarantine_dir = storage_service.quarantine_dir / "photos" / user_id
+        assert (quarantine_dir / f"{photo_id}.jpg").exists()
+        assert (quarantine_dir / f"{photo_id}_thumb.jpg").exists()
+
+    @pytest.mark.asyncio
+    async def test_quarantine_nonexistent_photo(self, storage_service):
+        """隔離不存在的照片回傳 False"""
+        result = await storage_service.quarantine_photo("/uploads/photos/fake/nonexistent.jpg")
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_quarantine_empty_url(self, storage_service):
+        """隔離空 URL 回傳 False"""
+        assert await storage_service.quarantine_photo("") is False
+        assert await storage_service.quarantine_photo(None) is False
+
+    @pytest.mark.asyncio
+    async def test_get_quarantined_path(self, storage_service, sample_image_bytes):
+        """可解析隔離中照片的實體路徑；未隔離的回傳 None"""
+        user_id = "user-q-2"
+        _, photo_url, _ = await storage_service.save_photo(
+            user_id=user_id,
+            file_content=sample_image_bytes,
+            filename="path_test.jpg",
+            content_type="image/jpeg",
+        )
+
+        # 尚未隔離
+        assert storage_service.get_quarantined_path(photo_url) is None
+
+        await storage_service.quarantine_photo(photo_url)
+
+        path = storage_service.get_quarantined_path(photo_url)
+        assert path is not None
+        assert path.is_file()
+
+    def test_get_quarantined_path_blocks_traversal(self, storage_service):
+        """路徑穿越攻擊被阻擋（URL 可能來自用戶提交的申訴內容）"""
+        assert storage_service.get_quarantined_path("/uploads/photos/../../etc/passwd") is None
+
+    @pytest.mark.asyncio
+    async def test_restore_photo_moves_files_back(
+        self, storage_service, sample_image_bytes, temp_upload_dir
+    ):
+        """還原會把主圖與縮圖從隔離區搬回上傳目錄（申訴通過重新上架）"""
+        user_id = "user-q-restore"
+        photo_id, photo_url, _ = await storage_service.save_photo(
+            user_id=user_id,
+            file_content=sample_image_bytes,
+            filename="restore_test.jpg",
+            content_type="image/jpeg",
+        )
+        await storage_service.quarantine_photo(photo_url)
+
+        result = await storage_service.restore_photo(photo_url)
+        assert result is True
+
+        # 檔案回到上傳目錄
+        photo_path = Path(temp_upload_dir) / "photos" / user_id / f"{photo_id}.jpg"
+        thumbnail_path = Path(temp_upload_dir) / "photos" / user_id / f"{photo_id}_thumb.jpg"
+        assert photo_path.exists()
+        assert thumbnail_path.exists()
+
+        # 隔離區已清空
+        assert storage_service.get_quarantined_path(photo_url) is None
+
+    @pytest.mark.asyncio
+    async def test_restore_photo_not_quarantined(self, storage_service):
+        """還原不在隔離區的照片回傳 False"""
+        result = await storage_service.restore_photo("/uploads/photos/fake/nonexistent.jpg")
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_delete_quarantined_photo(self, storage_service, sample_image_bytes):
+        """申訴審結後清除隔離檔案（含縮圖）"""
+        user_id = "user-q-3"
+        photo_id, photo_url, _ = await storage_service.save_photo(
+            user_id=user_id,
+            file_content=sample_image_bytes,
+            filename="purge_test.jpg",
+            content_type="image/jpeg",
+        )
+        await storage_service.quarantine_photo(photo_url)
+
+        storage_service.delete_quarantined_photo(photo_url)
+
+        quarantine_dir = storage_service.quarantine_dir / "photos" / user_id
+        assert not (quarantine_dir / f"{photo_id}.jpg").exists()
+        assert not (quarantine_dir / f"{photo_id}_thumb.jpg").exists()
+        assert storage_service.get_quarantined_path(photo_url) is None
+
+    @pytest.mark.asyncio
+    async def test_delete_user_photo_dir_cleans_quarantine(
+        self, storage_service, sample_image_bytes
+    ):
+        """刪除帳號時一併清除該用戶的隔離區檔案"""
+        user_id = "user-q-4"
+        _, photo_url, _ = await storage_service.save_photo(
+            user_id=user_id,
+            file_content=sample_image_bytes,
+            filename="account_delete.jpg",
+            content_type="image/jpeg",
+        )
+        await storage_service.quarantine_photo(photo_url)
+        assert storage_service.get_quarantined_path(photo_url) is not None
+
+        storage_service.delete_user_photo_dir(user_id)
+
+        assert storage_service.get_quarantined_path(photo_url) is None
 
 
 class TestIntegration:

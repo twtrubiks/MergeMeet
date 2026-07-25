@@ -346,3 +346,55 @@ class TestPhotoUploadWithModeration:
             assert response.status_code == 201
             data = response.json()
             assert data["moderation_status"] == "PENDING"
+
+
+@pytest.mark.asyncio
+class TestQuarantinePhotoAPI:
+    """隔離照片檢視端點測試（申訴審閱用）"""
+
+    async def test_get_quarantined_photo_requires_admin(self, client: AsyncClient, user_token: str):
+        """測試：一般用戶無法檢視隔離照片"""
+        response = await client.get(
+            "/api/admin/photos/quarantine/some-user/photo.jpg",
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert response.status_code == 403
+
+    async def test_get_quarantined_photo_requires_auth(self, client: AsyncClient):
+        """測試：未認證無法檢視隔離照片"""
+        response = await client.get("/api/admin/photos/quarantine/some-user/photo.jpg")
+        assert response.status_code == 401
+
+    async def test_get_quarantined_photo_success(
+        self, client: AsyncClient, admin_token: str, sample_image_bytes, tmp_path
+    ):
+        """測試：管理員可取得隔離中的照片"""
+        quarantined_file = tmp_path / "photo.jpg"
+        quarantined_file.write_bytes(sample_image_bytes)
+
+        with patch(
+            "app.api.photo_moderation.file_storage.get_quarantined_path",
+            return_value=quarantined_file,
+        ) as mock_path:
+            response = await client.get(
+                "/api/admin/photos/quarantine/some-user/photo.jpg",
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/jpeg"
+        assert response.content == sample_image_bytes
+        mock_path.assert_called_once_with("/uploads/photos/some-user/photo.jpg")
+
+    async def test_get_quarantined_photo_not_found(self, client: AsyncClient, admin_token: str):
+        """測試：隔離照片不存在（已清除或路徑無效）回 404"""
+        with patch(
+            "app.api.photo_moderation.file_storage.get_quarantined_path",
+            return_value=None,
+        ):
+            response = await client.get(
+                "/api/admin/photos/quarantine/some-user/gone.jpg",
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+
+        assert response.status_code == 404

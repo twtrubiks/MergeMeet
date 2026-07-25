@@ -3,13 +3,14 @@
 import io
 import uuid
 from datetime import UTC, date, datetime
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
 from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.profile import Photo, Profile
+from app.models.profile import InterestTag, Photo, Profile
 from app.models.user import User
 from app.services.photo_moderation import PhotoModerationService
 
@@ -342,3 +343,128 @@ class TestPhotoModel:
 
         assert photo.auto_moderation_score == 85
         assert photo.auto_moderation_labels == '["safe", "portrait"]'
+
+
+# ========== Rejection Takedown Tests ==========
+
+
+@pytest.mark.asyncio
+class TestRejectionTakedown:
+    """照片駁回下架鏈測試"""
+
+    async def test_reject_primary_promotes_next_photo(
+        self,
+        test_db: AsyncSession,
+        pending_photo: Photo,
+        approved_photo: Photo,
+        admin_user: User,
+    ):
+        """駁回主頭像後，主頭像遞補到下一張未被駁回的照片"""
+        success, _ = await PhotoModerationService.review_photo(
+            db=test_db,
+            photo_id=pending_photo.id,
+            admin_id=admin_user.id,
+            status="REJECTED",
+            rejection_reason="違規內容",
+        )
+
+        assert success is True
+        await test_db.refresh(pending_photo)
+        await test_db.refresh(approved_photo)
+        assert pending_photo.is_profile_picture is False
+        assert approved_photo.is_profile_picture is True
+
+    async def test_reject_last_photo_marks_profile_incomplete(
+        self,
+        test_db: AsyncSession,
+        test_profile: Profile,
+        pending_photo: Photo,
+        admin_user: User,
+    ):
+        """駁回唯一照片後，檔案完整度轉為 False（自動退出探索池）"""
+        # 補齊興趣讓檔案先處於完整狀態
+        tags = [
+            InterestTag(name=f"下架測試-{uuid.uuid4().hex[:6]}", category="lifestyle")
+            for _ in range(3)
+        ]
+        for tag in tags:
+            test_db.add(tag)
+        await test_db.commit()
+
+        await test_db.refresh(test_profile, ["interests"])
+        test_profile.interests.extend(tags)
+        test_profile.is_complete = True
+        await test_db.commit()
+
+        await PhotoModerationService.review_photo(
+            db=test_db,
+            photo_id=pending_photo.id,
+            admin_id=admin_user.id,
+            status="REJECTED",
+            rejection_reason="違規內容",
+        )
+
+        await test_db.refresh(test_profile)
+        assert test_profile.is_complete is False
+
+    async def test_reject_quarantines_photo_file(
+        self, test_db: AsyncSession, pending_photo: Photo, admin_user: User
+    ):
+        """駁回後實體檔案移入隔離區（下架但保留供申訴審閱）"""
+        with patch(
+            "app.services.photo_moderation.file_storage.quarantine_photo",
+            new_callable=AsyncMock,
+            return_value=True,
+        ) as mock_quarantine:
+            success, _ = await PhotoModerationService.review_photo(
+                db=test_db,
+                photo_id=pending_photo.id,
+                admin_id=admin_user.id,
+                status="REJECTED",
+                rejection_reason="違規內容",
+            )
+
+        assert success is True
+        mock_quarantine.assert_awaited_once_with(pending_photo.url)
+
+    async def test_rejected_photo_cannot_be_rereviewed(
+        self, test_db: AsyncSession, pending_photo: Photo, admin_user: User
+    ):
+        """REJECTED 為終態：檔案已下架，不可重審復活（申訴成功應重新上傳）"""
+        await PhotoModerationService.review_photo(
+            db=test_db,
+            photo_id=pending_photo.id,
+            admin_id=admin_user.id,
+            status="REJECTED",
+            rejection_reason="違規內容",
+        )
+
+        success, message = await PhotoModerationService.review_photo(
+            db=test_db,
+            photo_id=pending_photo.id,
+            admin_id=admin_user.id,
+            status="APPROVED",
+        )
+
+        assert success is False
+        assert "重新上傳" in message
+
+    async def test_approve_keeps_primary_and_file(
+        self, test_db: AsyncSession, pending_photo: Photo, admin_user: User
+    ):
+        """通過審核不影響主頭像，檔案也不會被隔離"""
+        with patch(
+            "app.services.photo_moderation.file_storage.quarantine_photo",
+            new_callable=AsyncMock,
+        ) as mock_quarantine:
+            success, _ = await PhotoModerationService.review_photo(
+                db=test_db,
+                photo_id=pending_photo.id,
+                admin_id=admin_user.id,
+                status="APPROVED",
+            )
+
+        assert success is True
+        mock_quarantine.assert_not_awaited()
+        await test_db.refresh(pending_photo)
+        assert pending_photo.is_profile_picture is True

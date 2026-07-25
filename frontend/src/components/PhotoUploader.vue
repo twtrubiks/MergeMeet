@@ -12,6 +12,7 @@
       ghost-class="photo-ghost"
       drag-class="photo-dragging"
       :disabled="reordering"
+      filter=".photo-rejected"
       @end="handleDragEnd"
     >
       <template #item="{ element: photo }">
@@ -22,8 +23,14 @@
             'photo-rejected': photo.moderation_status === 'REJECTED'
           }"
         >
-          <img :src="photo.url" :alt="'Photo ' + photo.display_order" />
-          <div class="photo-overlay">
+          <!-- 駁回照片的實體檔案已下架，不載入避免破圖（卡片底色 + 遮罩仍完整呈現狀態） -->
+          <img
+            v-if="photo.moderation_status !== 'REJECTED'"
+            :src="photo.url"
+            :alt="'Photo ' + photo.display_order"
+          />
+          <!-- 駁回卡片的操作集中在 rejected-mask（設主頭像後端會拒絕，拖拽也已停用） -->
+          <div v-if="photo.moderation_status !== 'REJECTED'" class="photo-overlay">
             <button
               class="btn-delete"
               title="刪除"
@@ -32,8 +39,9 @@
             >
               <Icon name="trash" size="sm" decorative />
             </button>
+            <!-- 審核中的照片不提供手動設主頭像（後端允許，但 UI 引導用戶等審核通過） -->
             <button
-              v-if="!photo.is_profile_picture"
+              v-if="!photo.is_profile_picture && photo.moderation_status !== 'PENDING'"
               class="btn-set-primary"
               title="設為主頭像"
               aria-label="將此照片設為主頭像"
@@ -43,12 +51,11 @@
             </button>
             <div v-if="photo.is_profile_picture" class="photo-badge">主頭像</div>
           </div>
-          <!-- 審核狀態標籤 -->
+          <!-- 審核狀態標籤（REJECTED 已有整面遮罩呈現狀態與原因，不重複顯示角標） -->
           <div
-            v-if="photo.moderation_status"
+            v-if="photo.moderation_status && photo.moderation_status !== 'REJECTED'"
             class="moderation-badge"
             :class="getModerationStatusClass(photo.moderation_status)"
-            :title="photo.moderation_status === 'REJECTED' ? photo.rejection_reason : ''"
           >
             {{ getModerationStatusText(photo.moderation_status) }}
           </div>
@@ -60,10 +67,19 @@
           <div v-if="photo.moderation_status === 'REJECTED'" class="rejected-mask">
             <span>❌ 未通過</span>
             <small v-if="photo.rejection_reason">{{ photo.rejection_reason }}</small>
-            <button class="appeal-btn" @click.stop="openAppealModal(photo)">提出申訴</button>
+            <div class="rejected-actions">
+              <button class="appeal-btn" @click.stop="openAppealModal(photo)">提出申訴</button>
+              <button
+                class="rejected-delete-btn"
+                aria-label="刪除此照片"
+                @click.stop="handleDelete(photo.id)"
+              >
+                刪除照片
+              </button>
+            </div>
           </div>
           <!-- 拖拽提示 -->
-          <div class="drag-hint">⋮⋮</div>
+          <div v-if="photo.moderation_status !== 'REJECTED'" class="drag-hint">⋮⋮</div>
         </div>
       </template>
     </draggable>
@@ -107,9 +123,9 @@
           <div class="appeal-modal" @click.stop>
             <h3>照片申訴</h3>
 
-            <!-- 照片預覽 -->
-            <div class="appeal-photo-preview">
-              <img :src="appealingPhoto?.url" alt="被拒絕的照片" />
+            <!-- 照片預覽（駁回照片的實體檔案已下架，顯示佔位提示） -->
+            <div class="appeal-photo-preview appeal-photo-offline">
+              <span>📷 照片已下架</span>
             </div>
 
             <!-- 拒絕原因 -->
@@ -117,6 +133,11 @@
               <label>拒絕原因：</label>
               <p>{{ appealingPhoto?.rejection_reason || '未說明' }}</p>
             </div>
+
+            <!-- 申訴結果說明 -->
+            <p class="appeal-note">
+              申訴通過後照片將自動恢復上架，並退還被扣除的信任分數；每張照片僅能申訴一次。
+            </p>
 
             <!-- 申訴理由 -->
             <div class="appeal-form">
@@ -128,7 +149,12 @@
                 maxlength="1000"
                 rows="4"
               ></textarea>
-              <div class="char-count">{{ appealReason.length }}/1000</div>
+              <div class="char-count" :class="{ 'char-count-short': appealReason.length < 20 }">
+                <template v-if="appealReason.length < 20">
+                  至少需要 20 字，還差 {{ 20 - appealReason.length }} 字
+                </template>
+                <template v-else>{{ appealReason.length }}/1000</template>
+              </div>
             </div>
 
             <!-- 操作按鈕 -->
@@ -359,7 +385,11 @@ const submitAppeal = async () => {
     closeAppealModal()
   } catch (err) {
     logger.error('[PhotoUploader] Appeal failed:', err)
-    error.value = err.response?.data?.detail || '申訴提交失敗'
+    // 422 驗證錯誤的 detail 是陣列，直接顯示會變成 [object Object]
+    const detail = err.response?.data?.detail
+    const msg = typeof detail === 'string' ? detail : '申訴提交失敗'
+    error.value = msg
+    alert(msg)
   } finally {
     appealLoading.value = false
   }
@@ -676,9 +706,15 @@ const submitAppeal = async () => {
   }
 }
 
+/* 駁回卡片操作列 */
+.rejected-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 /* 申訴按鈕 */
 .appeal-btn {
-  margin-top: 8px;
   padding: 6px 12px;
   background: rgba(255, 255, 255, 0.9);
   color: var(--color-like);
@@ -694,6 +730,25 @@ const submitAppeal = async () => {
 .appeal-btn:hover {
   background: var(--color-like);
   color: white;
+}
+
+/* 駁回卡片刪除按鈕 */
+.rejected-delete-btn {
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: all 0.2s;
+}
+
+.rejected-delete-btn:hover {
+  background: rgba(0, 0, 0, 0.9);
+  border-color: white;
 }
 
 /* 申訴 Modal */
@@ -732,10 +787,12 @@ const submitAppeal = async () => {
   margin-bottom: 16px;
 }
 
-.appeal-photo-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.appeal-photo-offline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-background-light);
+  color: var(--color-text-muted);
 }
 
 .appeal-reason-display {
@@ -757,6 +814,17 @@ const submitAppeal = async () => {
   border-radius: 6px;
   color: var(--color-error-500);
   font-size: 0.9rem;
+}
+
+.appeal-note {
+  margin: 0 0 16px;
+  padding: 10px;
+  background: #fffbeb;
+  border: 1px solid rgba(255, 152, 0, 0.3);
+  border-radius: 6px;
+  color: #92400e;
+  font-size: 0.85rem;
+  line-height: 1.6;
 }
 
 .appeal-form {
@@ -791,6 +859,11 @@ const submitAppeal = async () => {
   font-size: 0.75rem;
   color: var(--color-text-muted);
   margin-top: 4px;
+}
+
+.char-count-short {
+  color: #e65100;
+  font-weight: 600;
 }
 
 .appeal-actions {

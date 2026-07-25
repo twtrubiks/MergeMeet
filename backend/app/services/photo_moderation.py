@@ -15,8 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
 from app.models.moderation import ModerationLog
-from app.models.profile import Photo, Profile
+from app.models.profile import Photo, Profile, check_profile_completeness
 from app.models.user import User
+from app.services.file_storage import file_storage
 from app.services.trust_score import TrustScoreService
 
 logger = logging.getLogger(__name__)
@@ -216,8 +217,17 @@ class PhotoModerationService:
         if not photo:
             return False, "照片不存在"
 
-        # 取得用戶 ID
-        profile_result = await db.execute(select(Profile).where(Profile.id == photo.profile_id))
+        # REJECTED 不可經此端點重審：重新上架的正規途徑是申訴通過
+        # （restore_photo_from_appeal）或用戶重新上傳
+        if photo.moderation_status == cls.STATUS_REJECTED:
+            return False, "照片已駁回下架，重新上架請透過申訴或重新上傳"
+
+        # 取得用戶檔案（含照片與興趣：駁回時需遞補主頭像並重算完整度）
+        profile_result = await db.execute(
+            select(Profile)
+            .options(selectinload(Profile.photos), selectinload(Profile.interests))
+            .where(Profile.id == photo.profile_id)
+        )
         profile = profile_result.scalar_one_or_none()
         if not profile:
             return False, "個人檔案不存在"
@@ -229,6 +239,12 @@ class PhotoModerationService:
 
         if status == cls.STATUS_REJECTED:
             photo.rejection_reason = rejection_reason
+
+            # 下架：駁回照片不可再作為主頭像，並重算檔案完整度
+            # （沒有未駁回照片時 is_complete 轉為 False，用戶自動退出探索池）
+            if photo.is_profile_picture:
+                profile.reassign_primary_photo()
+            profile.is_complete = check_profile_completeness(profile)
 
             # 扣除信任分數
             await TrustScoreService.adjust_score(db, profile.user_id, "content_violation")
@@ -244,7 +260,71 @@ class PhotoModerationService:
 
         await db.commit()
 
+        # 實體檔案移入隔離區：即刻下架但保留供申訴審閱，
+        # 申訴審結後由 review_appeal 清除（best-effort：搬移失敗不影響審核結果）
+        if status == cls.STATUS_REJECTED and not await file_storage.quarantine_photo(photo.url):
+            logger.warning(f"Rejected photo file not quarantined: {photo.url}")
+
         return True, "審核完成"
+
+    # 申訴還原結果代碼（供 review_appeal 決定隔離檔案處置）
+    RESTORE_RESTORED = "RESTORED"  # 已還原，檔案已搬回上傳目錄
+    RESTORE_NOT_FOUND = "NOT_FOUND"  # 照片記錄不存在（用戶已刪除），隔離檔可清
+    RESTORE_NOT_OWNED = "NOT_OWNED"  # 照片不屬於申訴人，不可動他人的隔離檔
+    RESTORE_NOT_REJECTED = "NOT_REJECTED"  # 照片已非駁回狀態（如已被先前申訴還原）
+    RESTORE_FILE_MISSING = "FILE_MISSING"  # 隔離檔不存在，還原會產生破圖，不改狀態
+
+    @classmethod
+    async def restore_photo_from_appeal(
+        cls, db: AsyncSession, photo_url: str, appellant_user_id: uuid.UUID
+    ) -> str:
+        """
+        申訴通過後還原照片（重新上架）
+
+        照片狀態直接改 APPROVED（管理員審申訴時已人工看過圖），
+        並補主頭像、重算檔案完整度。不負責 commit，由呼叫端統一提交。
+
+        Args:
+            db: 資料庫 Session
+            photo_url: 照片 URL（來自申訴的 rejected_content，用戶提交、不可信）
+            appellant_user_id: 申訴人 ID（用於歸屬驗證）
+
+        Returns:
+            RESTORE_* 結果代碼
+        """
+        result = await db.execute(select(Photo).where(Photo.url == photo_url))
+        photo = result.scalar_one_or_none()
+        if not photo:
+            return cls.RESTORE_NOT_FOUND
+
+        profile_result = await db.execute(
+            select(Profile)
+            .options(selectinload(Profile.photos), selectinload(Profile.interests))
+            .where(Profile.id == photo.profile_id)
+        )
+        profile = profile_result.scalar_one_or_none()
+        if not profile or profile.user_id != appellant_user_id:
+            return cls.RESTORE_NOT_OWNED
+
+        if photo.moderation_status != cls.STATUS_REJECTED:
+            return cls.RESTORE_NOT_REJECTED
+
+        if file_storage.get_quarantined_path(photo_url) is None:
+            return cls.RESTORE_FILE_MISSING
+
+        photo.moderation_status = cls.STATUS_APPROVED
+        photo.rejection_reason = None
+
+        # 駁回時主頭像可能已被遞補；若目前沒有主頭像，還原的這張補上
+        if not any(p.is_profile_picture for p in profile.photos):
+            photo.is_profile_picture = True
+        profile.is_complete = check_profile_completeness(profile)
+
+        # 實體檔案搬回（best-effort：失敗僅記錄警告，照片仍為 APPROVED 可由用戶重傳補救）
+        if not await file_storage.restore_photo(photo_url):
+            logger.warning(f"Restored photo file not moved back: {photo_url}")
+
+        return cls.RESTORE_RESTORED
 
     @classmethod
     async def get_stats(cls, db: AsyncSession) -> dict[str, int]:

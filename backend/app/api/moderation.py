@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies import get_current_admin_user, get_current_user
 from app.models.moderation import ContentAppeal, ModerationLog, SensitiveWord
+from app.models.profile import Photo, Profile
 from app.models.user import User
 from app.schemas.moderation import (
     ContentAppealCreate,
@@ -25,6 +26,9 @@ from app.schemas.moderation import (
     SensitiveWordUpdate,
 )
 from app.services.content_moderation import ContentModerationService
+from app.services.file_storage import file_storage
+from app.services.photo_moderation import PhotoModerationService
+from app.services.trust_score import TrustScoreService
 
 router = APIRouter()
 
@@ -206,7 +210,38 @@ async def create_appeal(
 ):
     """
     提交內容申訴（一般用戶）
+
+    - 同一內容不可重複申訴（含已審結的，防止重複退分刷分）
+    - 照片類申訴僅接受本人且目前為駁回狀態的照片
     """
+    # 防重複：同一用戶對同一內容只能申訴一次
+    existing_result = await db.execute(
+        select(func.count(ContentAppeal.id)).where(
+            ContentAppeal.user_id == current_user.id,
+            ContentAppeal.rejected_content == appeal_data.rejected_content,
+        )
+    )
+    if existing_result.scalar():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="此內容已提出過申訴，請至申訴紀錄查看"
+        )
+
+    # 照片申訴：驗證照片存在、屬於本人且目前為駁回狀態（還原後不可再申訴）
+    if appeal_data.appeal_type == "PHOTO":
+        photo_result = await db.execute(
+            select(Photo)
+            .join(Profile, Photo.profile_id == Profile.id)
+            .where(
+                Photo.url == appeal_data.rejected_content,
+                Profile.user_id == current_user.id,
+                Photo.moderation_status == "REJECTED",
+            )
+        )
+        if photo_result.scalar_one_or_none() is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="只能申訴自己被駁回的照片"
+            )
+
     # 創建申訴
     appeal = ContentAppeal(
         user_id=current_user.id,
@@ -316,8 +351,29 @@ async def review_appeal(
     appeal.reviewed_at = func.now()
     appeal.updated_at = func.now()
 
+    # 誤判救濟：申訴通過退還駁回時扣除的信任分（content_violation 的鏡像）
+    if review_data.status == "APPROVED":
+        await TrustScoreService.adjust_score(
+            db, appeal.user_id, "appeal_approved", reason=f"申訴通過: {appeal.id}"
+        )
+
+    # 照片申訴通過：還原照片重新上架（狀態改 APPROVED、檔案搬回、補主頭像、重算完整度）
+    restore_result = None
+    if appeal.appeal_type == "PHOTO" and review_data.status == "APPROVED":
+        restore_result = await PhotoModerationService.restore_photo_from_appeal(
+            db, appeal.rejected_content, appeal.user_id
+        )
+
     await db.commit()
     await db.refresh(appeal)
+
+    # 隔離檔案處置：申訴駁回即審結可清；照片記錄已被用戶刪除時為孤兒檔也清。
+    # 還原成功時檔案已搬回；歸屬不符時不可動他人的隔離檔。
+    if appeal.appeal_type == "PHOTO" and (
+        review_data.status == "REJECTED"
+        or restore_result == PhotoModerationService.RESTORE_NOT_FOUND
+    ):
+        file_storage.delete_quarantined_photo(appeal.rejected_content)
 
     return ContentAppealResponse.model_validate(appeal)
 

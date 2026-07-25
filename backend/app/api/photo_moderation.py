@@ -6,6 +6,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -19,9 +20,29 @@ from app.schemas.photo_moderation import (
     PhotoReviewResponse,
     PhotoStatsResponse,
 )
+from app.services.file_storage import file_storage
 from app.services.photo_moderation import PhotoModerationService
 
 router = APIRouter()
+
+
+@router.get("/quarantine/{user_id}/{filename}")
+async def get_quarantined_photo(
+    user_id: str,
+    filename: str,
+    current_admin: User = Depends(get_current_admin_user),
+):
+    """
+    檢視隔離區照片（申訴審閱用）
+
+    駁回下架的照片已移出 /uploads 靜態目錄，不對外服務；
+    僅管理員可透過此端點檢視，作為申訴審閱的依據。
+    """
+    path = file_storage.get_quarantined_path(f"/uploads/photos/{user_id}/{filename}")
+    if path is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="隔離照片不存在")
+
+    return FileResponse(path, media_type="image/jpeg")
 
 
 @router.get("/pending", response_model=PendingPhotosListResponse)

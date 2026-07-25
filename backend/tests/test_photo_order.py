@@ -413,3 +413,38 @@ class TestSetProfilePicture:
         # 其他照片不是主頭像
         assert photos[1]["is_profile_picture"] is False
         assert photos[2]["is_profile_picture"] is False
+
+
+class TestDeletePrimaryPhotoReassign:
+    """刪除主頭像後的遞補測試"""
+
+    @pytest.mark.asyncio
+    async def test_delete_non_first_primary_reassigns(
+        self, client: AsyncClient, auth_headers: dict, mock_file_storage, test_db: AsyncSession
+    ):
+        """主頭像不在第一位時（駁回遞補造成），刪除它仍會遞補主頭像"""
+        photo_ids = await create_profile_with_photos(
+            client, auth_headers, mock_file_storage, num_photos=3
+        )
+
+        # 模擬「主頭像被駁回後遞補」的狀態：
+        # photo0 (order 0) REJECTED 且非主頭像、photo1 (order 1) 為主頭像
+        result = await test_db.execute(select(Photo).where(Photo.id == uuid.UUID(photo_ids[0])))
+        photo0 = result.scalar_one()
+        photo0.moderation_status = "REJECTED"
+        photo0.is_profile_picture = False
+
+        result = await test_db.execute(select(Photo).where(Photo.id == uuid.UUID(photo_ids[1])))
+        photo1 = result.scalar_one()
+        photo1.is_profile_picture = True
+        await test_db.commit()
+
+        # 刪除 order 1 的主頭像
+        resp = await client.delete(f"/api/profile/photos/{photo_ids[1]}", headers=auth_headers)
+        assert resp.status_code == 204
+
+        # 剩餘唯一未被駁回的 photo2 應遞補為主頭像
+        result = await test_db.execute(select(Photo).where(Photo.id == uuid.UUID(photo_ids[2])))
+        photo2 = result.scalar_one()
+        await test_db.refresh(photo2)
+        assert photo2.is_profile_picture is True
