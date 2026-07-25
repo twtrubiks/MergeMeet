@@ -39,6 +39,7 @@
 | 被喜歡 | **+1** | 其他用戶喜歡你 | `discovery.py` like_user |
 | 配對成功 | **+2** | 雙方互相喜歡 | `discovery.py` like_user |
 | 正向互動 | **+1** | 用戶輪流發送訊息時雙方各獲得（上一發送者≠當前發送者才算回應，每配對每日三次，每人每日上限 +3） | `websocket.py` handle_chat_message |
+| 申訴通過（誤判救濟） | **+3** | 照片/內容申訴通過，退還駁回時扣除的分（`content_violation` 的鏡像退還，不受恢復行為的 50 分上限限制；同一內容限申訴一次防刷分） | `moderation.py` review_appeal |
 
 ### 負向行為（扣分）
 
@@ -46,6 +47,7 @@
 |------|----------|----------|----------|
 | 舉報被確認 | **-10** | 管理員確認舉報成立 | `admin.py` review_report |
 | 發送違規內容 | **-3** | 訊息包含敏感詞/可疑模式 | `websocket.py` handle_chat_message |
+| 照片審核駁回 | **-3** | 管理員駁回照片（同 `content_violation` 事件） | `photo_moderation.py` review_photo |
 | 被封鎖 | **-2** | 其他用戶封鎖你 | `safety.py` block_user |
 
 ### 恢復行為（加分，上限為預設分 50）

@@ -288,6 +288,7 @@ MergeMeet 使用信任分數系統自動追蹤用戶行為，維護平台安全�
 - [x] Redis 密碼認證（requirepass + 端口僅綁定 127.0.0.1）
 - [x] HTTP 安全 Headers（HSTS、CSP、X-Frame-Options、X-Content-Type-Options、Referrer-Policy）
 - [x] 照片 EXIF 元資料去除（重新編碼去除 GPS / 設備資訊，並先套用 Orientation 轉正）
+- [x] 駁回照片移出公開服務（實體檔案移入 `/uploads` 靜態掛載之外的隔離目錄，僅管理員預覽端點可存取，含認證與路徑穿越防護）
 - [x] Docker Compose 密碼可由環境變數覆寫（根目錄 `.env`，見 `.env.example`）
 - [x] 全域 IP 速率限制（slowapi + Redis，60 次/分鐘 per IP；認證端點 10 次/5 分鐘）
 

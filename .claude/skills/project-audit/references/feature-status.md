@@ -62,7 +62,7 @@
 |-----|------|------|------|
 | 內容/敏感詞審核 | `services/content_moderation.py` + 敏感詞 CRUD `GET/POST/PATCH/DELETE /api/moderation/sensitive-words` | AdminDashboard | ✅ |
 | 審核日誌/統計 | `GET /api/moderation/logs`、`GET /api/moderation/stats` | AdminDashboard | ✅ |
-| 申訴 appeals | `POST /api/moderation/appeals`、`GET /api/moderation/appeals\|appeals/my`、`POST /api/moderation/appeals/{id}/review` | AdminDashboard | ✅ |
+| 申訴 appeals | `POST /api/moderation/appeals`、`GET /api/moderation/appeals\|appeals/my`、`POST /api/moderation/appeals/{id}/review`（照片申訴通過自動還原上架＋退信任分；同一內容限申訴一次） | AdminDashboard 申訴管理分頁 | ✅ |
 | 信任分數系統 | `services/trust_score.py` + 每日恢復 `trust_score_recovery.py` + 配對加權 `matching_service.py` | — | ✅ |
 | 帳號刪除 30 天寬限 | `POST /api/auth/delete-account`（auth.py:923）+ `services/account_cleanup.py` | Settings | ✅ |
 
@@ -79,7 +79,7 @@
 |-----|------|------|------|
 | 統計數據 | `GET /api/admin/stats` | AdminDashboard | ✅ |
 | 舉報處理 | `GET/POST /api/admin/reports` | AdminDashboard | ✅ |
-| 照片審核 | `GET/POST /api/admin/photos` | AdminDashboard | ✅ |
+| 照片審核 | `GET/POST /api/admin/photos/*`（pending/stats/{id}/review，駁回入隔離區；隔離照片預覽 `GET /api/admin/photos/quarantine/{user_id}/{filename}`） | AdminDashboard | ✅ |
 | 用戶管理 | `GET /api/admin/users`（admin.py:270） | AdminDashboard | ✅ |
 | 封禁/解封 | `POST /api/admin/users/ban\|unban`（admin.py:368,409） | AdminDashboard | ✅ |
 | 信任分數歷史 | `GET /api/admin/users/{user_id}/trust-logs`（admin.py:330） | AdminDashboard「信任分數歷史」Modal | ✅ |
