@@ -8,6 +8,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { useUserStore } from './user'
 import { logger } from '@/utils/logger'
+import { getWebSocketUrl } from '@/config'
 
 // WebSocket 連接狀態
 export const ConnectionState = {
@@ -82,12 +83,10 @@ export const useWebSocketStore = defineStore('websocket', () => {
 
     connectingPromise = new Promise((resolve, reject) => {
       try {
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-        const wsHost = import.meta.env.VITE_WS_URL || 'localhost:8000'
         const token = userStore.accessToken
         const userId = userStore.user.id
 
-        const wsUrl = `${wsProtocol}//${wsHost}/ws`
+        const wsUrl = getWebSocketUrl()
         logger.log(`[GlobalWS] Connecting to ${wsUrl}...`)
 
         socket.value = new WebSocket(wsUrl)

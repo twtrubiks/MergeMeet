@@ -458,7 +458,7 @@
                 <div v-else class="photos-grid">
                   <div v-for="photo in pendingPhotos" :key="photo.id" class="photo-card">
                     <div class="photo-image" @click="showPhotoDetail(photo)">
-                      <img :src="getPhotoUrl(photo.url)" :alt="photo.display_name" />
+                      <img :src="getMediaUrl(photo.url)" :alt="photo.display_name" />
                     </div>
                     <div class="photo-info">
                       <p class="photo-name">
@@ -589,7 +589,7 @@
       style="width: 600px"
     >
       <div v-if="selectedPhoto" class="photo-detail">
-        <img :src="getPhotoUrl(selectedPhoto.url)" style="max-width: 100%; border-radius: 8px" />
+        <img :src="getMediaUrl(selectedPhoto.url)" style="max-width: 100%; border-radius: 8px" />
         <div class="detail-info">
           <p><strong>用戶:</strong> {{ selectedPhoto.display_name }}</p>
           <p><strong>Email:</strong> {{ selectedPhoto.user_email }}</p>
@@ -713,6 +713,7 @@ import {
   useDialog
 } from 'naive-ui'
 import apiClient from '@/api/client'
+import { getMediaUrl } from '@/config'
 import { useUserStore } from '@/stores/user'
 import { logger } from '@/utils/logger'
 import Icon from '@/components/ui/Icon.vue'
@@ -1548,14 +1549,6 @@ const confirmRejectPhoto = async () => {
 const showPhotoDetail = (photo) => {
   selectedPhoto.value = photo
   showPhotoDetailModal.value = true
-}
-
-// 取得照片 URL（處理相對路徑）
-const getPhotoUrl = (url) => {
-  if (!url) return ''
-  if (url.startsWith('http')) return url
-  // 後端 URL
-  return `http://localhost:8000${url}`
 }
 
 // 格式化檔案大小

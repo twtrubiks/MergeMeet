@@ -7,6 +7,7 @@
  */
 import axios from 'axios'
 import { showSessionExpiredMessage, showRateLimitMessage } from '@/utils/discreteApi'
+import { API_BASE_URL } from '@/config'
 
 /**
  * 從 Cookie 中獲取指定的值
@@ -90,7 +91,7 @@ export function refreshAuthToken() {
 
 // 建立 axios 實例
 const apiClient = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE_URL,
   timeout: 10000,
   withCredentials: true, // 允許 Cookie 跨域傳送
   headers: {

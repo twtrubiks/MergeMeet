@@ -43,16 +43,6 @@ window.location = {
   href: 'http://localhost:5173/'
 }
 
-// Mock import.meta.env
-global.import = {
-  meta: {
-    env: {
-      VITE_API_BASE_URL: 'http://localhost:8000',
-      VITE_WS_URL: 'localhost:8000'
-    }
-  }
-}
-
 // 減少測試噪音 - 保留 error 和 warn
 const originalConsole = { ...console }
 global.console = {
