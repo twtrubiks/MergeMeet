@@ -233,7 +233,19 @@
                 />
               </n-spin>
             </div>
+          </div>
+        </n-tab-pane>
 
+        <n-tab-pane name="appeals">
+          <template #tab>
+            <span class="tab-label">
+              <Icon name="clipboard" size="sm" decorative /> 申訴管理
+              <span v-if="moderationStats.pending_appeals > 0" class="tab-badge">
+                {{ moderationStats.pending_appeals }}
+              </span>
+            </span>
+          </template>
+          <div class="tab-content">
             <!-- 內容申訴管理 -->
             <div class="appeals-section">
               <div class="section-header">
@@ -265,6 +277,16 @@
                     <div class="appeal-body">
                       <p><strong>用戶 ID:</strong> {{ appeal.user_id }}</p>
                       <p><strong>被拒絕的內容:</strong> {{ appeal.rejected_content }}</p>
+                      <div v-if="appeal.appeal_type === 'PHOTO'" class="appeal-photo">
+                        <img
+                          v-if="
+                            appealPhotoUrls[appeal.id] && appealPhotoUrls[appeal.id] !== 'error'
+                          "
+                          :src="appealPhotoUrls[appeal.id]"
+                          alt="申訴照片（隔離區）"
+                        />
+                        <p v-else class="appeal-photo-missing">📷 隔離照片已清除或不存在</p>
+                      </div>
                       <p><strong>觸發的違規:</strong> {{ appeal.violations }}</p>
                       <p><strong>申訴理由:</strong> {{ appeal.reason }}</p>
                       <p class="appeal-time">{{ formatDate(appeal.created_at) }}</p>
@@ -274,7 +296,7 @@
                       <n-input
                         v-model:value="appealResponses[appeal.id]"
                         type="textarea"
-                        placeholder="輸入管理員回覆..."
+                        placeholder="輸入管理員回覆（至少 10 字）..."
                         :rows="2"
                         style="margin-bottom: 8px"
                       />
@@ -754,6 +776,8 @@ const moderationStats = ref({
 const sensitiveWords = ref([])
 const appeals = ref([])
 const appealResponses = ref({})
+// 申訴照片預覽（appeal.id -> objectURL 或 'error'）
+const appealPhotoUrls = ref({})
 const loadingWords = ref(false)
 const loadingAppeals = ref(false)
 
@@ -1311,6 +1335,13 @@ const loadAppeals = async () => {
       params: { status_filter: 'PENDING', page_size: 50 }
     })
     appeals.value = response.data.appeals
+
+    // 釋放舊的預覽 objectURL 後重新載入照片申訴的隔離區預覽
+    Object.values(appealPhotoUrls.value).forEach((url) => {
+      if (url !== 'error') URL.revokeObjectURL(url)
+    })
+    appealPhotoUrls.value = {}
+    appeals.value.filter((a) => a.appeal_type === 'PHOTO').forEach(loadAppealPhoto)
   } catch (error) {
     logger.error('載入申訴失敗:', error)
     message.error('載入申訴失敗')
@@ -1319,11 +1350,30 @@ const loadAppeals = async () => {
   }
 }
 
+// 隔離照片不在 /uploads 靜態目錄（駁回即下架），需經管理員授權端點以 blob 取回
+const loadAppealPhoto = async (appeal) => {
+  const match = appeal.rejected_content?.match(/^\/uploads\/photos\/([^/]+)\/([^/]+)$/)
+  if (!match) {
+    appealPhotoUrls.value[appeal.id] = 'error'
+    return
+  }
+
+  try {
+    const response = await apiClient.get(`/admin/photos/quarantine/${match[1]}/${match[2]}`, {
+      responseType: 'blob'
+    })
+    appealPhotoUrls.value[appeal.id] = URL.createObjectURL(response.data)
+  } catch {
+    appealPhotoUrls.value[appeal.id] = 'error'
+  }
+}
+
 // 審核申訴
 const reviewAppeal = async (appealId, status) => {
   const adminResponse = appealResponses.value[appealId]
-  if (!adminResponse) {
-    message.error('請輸入管理員回覆')
+  // 與後端 ContentAppealReview 的 min_length=10 對齊
+  if (!adminResponse || adminResponse.trim().length < 10) {
+    message.error('管理員回覆至少需要 10 字')
     return
   }
 
@@ -1338,7 +1388,9 @@ const reviewAppeal = async (appealId, status) => {
     await loadModerationStats()
   } catch (error) {
     logger.error('處理申訴失敗:', error)
-    message.error(error.response?.data?.detail || '處理失敗')
+    // 422 驗證錯誤的 detail 是陣列，直接顯示會變成 [object Object]
+    const detail = error.response?.data?.detail
+    message.error(typeof detail === 'string' ? detail : '處理失敗')
   }
 }
 
@@ -1694,6 +1746,9 @@ const handleTabChange = (value) => {
   if (value === 'moderation') {
     loadModerationStats()
     loadSensitiveWords()
+  } else if (value === 'appeals') {
+    // 統計一併刷新，讓分頁徽章的待處理數量保持準確
+    loadModerationStats()
     loadAppeals()
   } else if (value === 'users') {
     loadUsers()
@@ -1706,6 +1761,8 @@ const handleTabChange = (value) => {
 onMounted(() => {
   loadStats()
   loadReports()
+  // 申訴分頁徽章需要 pending_appeals，進入後台即載入
+  loadModerationStats()
 })
 </script>
 
@@ -1898,6 +1955,21 @@ onMounted(() => {
   gap: 8px;
 }
 
+.tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  background: var(--color-primary-500, #e11d48);
+  color: white;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .tab-content {
   padding: 40px;
   max-width: 1400px;
@@ -1965,6 +2037,26 @@ onMounted(() => {
   font-size: 12px;
   color: var(--color-text-light);
   margin-top: 8px;
+}
+
+.appeal-photo {
+  margin: 8px 0;
+}
+
+.appeal-photo img {
+  max-width: 200px;
+  max-height: 200px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border, #eee);
+  object-fit: cover;
+}
+
+.appeal-photo-missing {
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  color: var(--color-text-light);
+  font-size: 13px;
 }
 
 .appeal-actions {
