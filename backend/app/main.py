@@ -197,12 +197,6 @@ async def health_check():
     return health_status
 
 
-@app.get("/api/hello")
-async def hello_world():
-    """Hello World 測試端點"""
-    return {"message": "Hello from MergeMeet! 🎉", "status": "success"}
-
-
 # ==================== API 路由 ====================
 
 app.include_router(auth.router, prefix=f"{settings.API_V1_PREFIX}/auth", tags=["認證"])
@@ -223,9 +217,6 @@ app.include_router(
 app.include_router(
     photo_moderation.router, prefix=f"{settings.API_V1_PREFIX}/admin/photos", tags=["照片審核"]
 )
-
-# 未來將加入的路由
-# app.include_router(matches.router, prefix=f"{settings.API_V1_PREFIX}/matches", tags=["配對管理"])
 
 
 if __name__ == "__main__":

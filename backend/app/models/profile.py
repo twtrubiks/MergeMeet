@@ -99,7 +99,7 @@ class Photo(Base):
     )
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
 
-    # 預留自動審核擴展
+    # 自動審核結果（目前由人工審核流程留白，僅在管理後台照片詳情回傳）
     auto_moderation_score = Column(Integer, nullable=True)  # 0-100
     auto_moderation_labels = Column(Text, nullable=True)  # JSON 格式
 

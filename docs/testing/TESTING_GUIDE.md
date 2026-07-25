@@ -37,7 +37,7 @@ npm run dev
 
 | 服務 | 網址 | 預期結果 |
 |------|------|----------|
-| 後端 API | http://localhost:8000/api/hello | JSON 回應 |
+| 後端 API | http://localhost:8000/health | `status: healthy` JSON 回應 |
 | API 文檔 | http://localhost:8000/docs | Swagger UI |
 | 前端應用 | http://localhost:5173 | Vue 應用 |
 

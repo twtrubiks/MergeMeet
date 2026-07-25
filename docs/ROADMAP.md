@@ -26,6 +26,11 @@
 ### 基礎設施
 - [ ] 整合 AWS S3 檔案儲存
 
+### 內容安全
+- [ ] 照片自動審核（整合 AWS Rekognition / Google Cloud Vision / Azure Computer Vision 或自建 ML 模型）
+      目前照片一律走人工審核；`PhotoModerationService.auto_moderate()` 已預留接口，
+      `photos.auto_moderation_score` / `auto_moderation_labels` 欄位可直接承接審核結果
+
 ### 用戶體驗
 - [x] 每日喜歡次數限制（免費用戶每日 50 次，Redis 原子計數，超限回傳 429）
 - [ ] 推播通知（FCM）

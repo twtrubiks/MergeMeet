@@ -46,7 +46,8 @@ class TrustScoreService:
         "email_verified": +5,
         "received_like": +1,
         "match_created": +2,
-        "positive_interaction": +1,  # 預留：未來正常互動使用
+        # 配對內雙向回訊（websocket 觸發，每配對每日 3 次、每人每日 +3 上限）
+        "positive_interaction": +1,
         # 負向行為（舉報需管理員確認後才扣分）
         "report_confirmed": -10,
         "content_violation": -3,

@@ -37,7 +37,7 @@ class TestGlobalRateLimit:
 
     async def test_response_contains_rate_limit_headers(self, rate_limited_client: AsyncClient):
         """正常請求回應帶有 X-RateLimit-* headers"""
-        response = await rate_limited_client.get("/api/hello")
+        response = await rate_limited_client.get("/")
 
         assert response.status_code == 200
         assert response.headers["X-RateLimit-Limit"] == str(GLOBAL_LIMIT)
@@ -46,15 +46,15 @@ class TestGlobalRateLimit:
     async def test_exceeding_global_limit_returns_429(self, rate_limited_client: AsyncClient):
         """超過全域限制回傳 429，且計數跨端點共用"""
         for _ in range(GLOBAL_LIMIT - 1):
-            response = await rate_limited_client.get("/api/hello")
+            response = await rate_limited_client.get("/")
             assert response.status_code == 200
 
-        # 第 60 次改打根路徑：共用計數，仍可成功
-        response = await rate_limited_client.get("/")
+        # 第 60 次改打 /openapi.json：不同端點共用同一組計數，仍可成功
+        response = await rate_limited_client.get("/openapi.json")
         assert response.status_code == 200
 
         # 第 61 次：超限，無論打哪個端點都被拒絕
-        response = await rate_limited_client.get("/api/hello")
+        response = await rate_limited_client.get("/")
         assert response.status_code == 429
         assert response.json() == {"detail": "請求過於頻繁，請稍後再試"}
         assert "Retry-After" in response.headers
@@ -63,10 +63,10 @@ class TestGlobalRateLimit:
     async def test_health_check_is_exempt(self, rate_limited_client: AsyncClient):
         """/health 豁免：即使全域計數已耗盡仍可存取（供監控輪詢）"""
         for _ in range(GLOBAL_LIMIT):
-            await rate_limited_client.get("/api/hello")
+            await rate_limited_client.get("/")
 
         # 全域計數已滿，一般端點被拒絕
-        response = await rate_limited_client.get("/api/hello")
+        response = await rate_limited_client.get("/")
         assert response.status_code == 429
 
         # /health 不受影響
@@ -117,7 +117,7 @@ class TestAuthRateLimit:
         assert response.status_code == 401
 
         # 全域計數未被登入請求消耗
-        response = await rate_limited_client.get("/api/hello")
+        response = await rate_limited_client.get("/")
         assert int(response.headers["X-RateLimit-Remaining"]) == GLOBAL_LIMIT - 1
 
 
@@ -126,6 +126,6 @@ class TestRateLimitDisabled:
 
     async def test_disabled_limiter_allows_unlimited_requests(self, client: AsyncClient):
         for _ in range(GLOBAL_LIMIT + 5):
-            response = await client.get("/api/hello")
+            response = await client.get("/")
             assert response.status_code == 200
         assert "X-RateLimit-Limit" not in response.headers
