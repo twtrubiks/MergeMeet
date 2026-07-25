@@ -240,15 +240,34 @@
             <p class="bio">{{ profileStore.profile.bio }}</p>
           </div>
 
-          <!-- 照片 -->
-          <div v-if="profileStore.profilePhotos.length > 0" class="profile-section">
-            <h3>照片 ({{ profileStore.profilePhotos.length }}/6)</h3>
-            <div class="photo-grid">
-              <div v-for="photo in profileStore.profilePhotos" :key="photo.id" class="photo-item">
+          <!-- 照片（駁回照片已下架，不在此顯示） -->
+          <div
+            v-if="profileStore.visiblePhotos.length > 0 || profileStore.rejectedPhotosCount > 0"
+            class="profile-section"
+          >
+            <h3>照片 ({{ profileStore.visiblePhotos.length }}/6)</h3>
+            <div v-if="profileStore.visiblePhotos.length > 0" class="photo-grid">
+              <div v-for="photo in profileStore.visiblePhotos" :key="photo.id" class="photo-item">
                 <img :src="photo.url" :alt="'Photo ' + photo.display_order" />
                 <div v-if="photo.is_profile_picture" class="photo-badge">主頭像</div>
+                <!-- 巡邏制：PENDING 照片已公開上架，角標僅提示審核進行中 -->
+                <div v-if="photo.moderation_status === 'PENDING'" class="photo-pending-badge">
+                  審核中
+                </div>
               </div>
             </div>
+            <button
+              v-if="profileStore.rejectedPhotosCount > 0"
+              type="button"
+              class="rejected-notice"
+              @click="goToPhotoStep"
+            >
+              <Icon name="warning" size="sm" decorative />
+              <span>
+                有
+                {{ profileStore.rejectedPhotosCount }} 張照片未通過審核，前往編輯查看原因或提出申訴
+              </span>
+            </button>
           </div>
 
           <!-- 興趣標籤 -->
@@ -405,6 +424,14 @@ const startEditing = () => {
   // 儲存原始資料用於髒狀態檢測
   originalFormData.value = { ...existingData }
   selectedInterests.value = profileStore.profileInterests.map((i) => i.id)
+}
+
+/**
+ * 從檢視模式直接前往照片編輯步驟（處理未通過審核的照片）
+ */
+const goToPhotoStep = () => {
+  startEditing()
+  currentStep.value = 2
 }
 
 /**
@@ -1253,6 +1280,43 @@ onMounted(async () => {
   font-size: 0.75rem;
   font-weight: 700;
   box-shadow: 0 2px 8px rgba(225, 29, 72, 0.4);
+}
+
+.photo-pending-badge {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  background: rgba(255, 152, 0, 0.92);
+  color: white;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* 未通過審核提示 */
+.rejected-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 1rem;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(255, 152, 0, 0.1), rgba(255, 193, 7, 0.1));
+  border: 1px solid rgba(255, 152, 0, 0.3);
+  border-radius: var(--radius-md);
+  color: #e65100;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rejected-notice:hover {
+  background: linear-gradient(135deg, rgba(255, 152, 0, 0.15), rgba(255, 193, 7, 0.15));
+  transform: translateY(-1px);
 }
 
 /* 興趣標籤 */

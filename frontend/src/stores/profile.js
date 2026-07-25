@@ -17,9 +17,16 @@ export const useProfileStore = defineStore('profile', () => {
   const hasProfile = computed(() => profile.value !== null)
   const isProfileComplete = computed(() => profile.value?.is_complete || false)
   const profilePhotos = computed(() => profile.value?.photos || [])
+  // 駁回照片實體檔案已刪除，url 會 404，展示面一律使用此清單
+  const visiblePhotos = computed(() =>
+    profilePhotos.value.filter((p) => p.moderation_status !== 'REJECTED')
+  )
+  const rejectedPhotosCount = computed(
+    () => profilePhotos.value.length - visiblePhotos.value.length
+  )
   const profileInterests = computed(() => profile.value?.interests || [])
   const profilePicture = computed(() => {
-    const photos = profile.value?.photos || []
+    const photos = visiblePhotos.value
     const mainPhoto = photos.find((p) => p.is_profile_picture)
     return mainPhoto?.url || photos[0]?.url || null
   })
@@ -259,6 +266,8 @@ export const useProfileStore = defineStore('profile', () => {
     hasProfile,
     isProfileComplete,
     profilePhotos,
+    visiblePhotos,
+    rejectedPhotosCount,
     profileInterests,
     profilePicture,
     getTagsByCategory,
