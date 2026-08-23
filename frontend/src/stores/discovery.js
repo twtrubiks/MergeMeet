@@ -14,6 +14,8 @@ export const useDiscoveryStore = defineStore('discovery', () => {
   const loading = ref(false)
   const error = ref(null)
   const lastMatchedUser = ref(null) // 用於顯示配對成功彈窗
+  const expandSuggestions = ref([]) // 空池時的偏好放寬建議
+  const suggestionsLoading = ref(false)
 
   // Getters
   const hasCandidates = computed(() => candidates.value.length > 0)
@@ -47,6 +49,49 @@ export const useDiscoveryStore = defineStore('discovery', () => {
     } finally {
       loading.value = false
     }
+  }
+
+  /**
+   * 取得空池時的偏好放寬建議
+   * 建議屬加值功能：失敗時回傳空陣列、不拋錯，空池畫面仍可正常顯示
+   * @returns {Promise<Array>} 建議列表（type: 'distance' | 'age'）
+   */
+  const fetchExpandSuggestions = async () => {
+    suggestionsLoading.value = true
+    try {
+      const response = await apiClient.get('/discovery/expand-suggestions')
+      expandSuggestions.value = response.data?.suggestions || []
+    } catch {
+      expandSuggestions.value = []
+    } finally {
+      suggestionsLoading.value = false
+    }
+    return expandSuggestions.value
+  }
+
+  /**
+   * 套用一則放寬建議：真的更新用戶偏好（PATCH /profile），再重新載入候選人
+   * @param {Object} suggestion - fetchExpandSuggestions 回傳的其中一則
+   */
+  const applyExpandSuggestion = async (suggestion) => {
+    const patch =
+      suggestion.type === 'distance'
+        ? { max_distance_km: suggestion.suggested_max_distance_km }
+        : {
+            min_age_preference: suggestion.suggested_min_age,
+            max_age_preference: suggestion.suggested_max_age
+          }
+
+    error.value = null
+    try {
+      await apiClient.patch('/profile', patch)
+    } catch (err) {
+      error.value = err.response?.data?.detail || '更新偏好失敗'
+      throw err
+    }
+
+    expandSuggestions.value = []
+    return browseCandidates()
   }
 
   /**
@@ -177,6 +222,8 @@ export const useDiscoveryStore = defineStore('discovery', () => {
     loading.value = false
     error.value = null
     lastMatchedUser.value = null
+    expandSuggestions.value = []
+    suggestionsLoading.value = false
   }
 
   return {
@@ -187,6 +234,8 @@ export const useDiscoveryStore = defineStore('discovery', () => {
     loading,
     error,
     lastMatchedUser,
+    expandSuggestions,
+    suggestionsLoading,
 
     // Getters
     hasCandidates,
@@ -195,6 +244,8 @@ export const useDiscoveryStore = defineStore('discovery', () => {
 
     // Actions
     browseCandidates,
+    fetchExpandSuggestions,
+    applyExpandSuggestion,
     likeUser,
     passUser,
     fetchMatches,

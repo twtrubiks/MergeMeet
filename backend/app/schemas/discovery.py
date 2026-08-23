@@ -1,6 +1,7 @@
 """探索與配對相關的 Schema"""
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -24,6 +25,25 @@ class ProfileCard(BaseModel):
     )
     photos: list[str] = []  # 照片 URL 列表
     match_score: float | None = Field(None, description="配對分數（0-100）")
+
+
+class ExpandSuggestion(BaseModel):
+    """空池時的偏好放寬建議（前端一鍵套用，後端不自動改偏好）"""
+
+    type: Literal["distance", "age"]
+    additional_candidates: int = Field(..., ge=1, description="放寬後可多看到的候選人數")
+    # type == "distance"
+    current_max_distance_km: int | None = None
+    suggested_max_distance_km: int | None = None
+    # type == "age"
+    current_min_age: int | None = None
+    current_max_age: int | None = None
+    suggested_min_age: int | None = None
+    suggested_max_age: int | None = None
+
+
+class ExpandSuggestionsResponse(BaseModel):
+    suggestions: list[ExpandSuggestion] = []
 
 
 class LikeAction(BaseModel):

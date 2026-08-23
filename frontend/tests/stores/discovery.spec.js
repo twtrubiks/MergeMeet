@@ -11,6 +11,7 @@ vi.mock('@/api/client', () => ({
   default: {
     get: vi.fn(),
     post: vi.fn(),
+    patch: vi.fn(),
     delete: vi.fn()
   }
 }))
@@ -392,6 +393,89 @@ describe('Discovery Store', () => {
       expect(store.lastMatchedUser).toBeNull()
       expect(store.error).toBeNull()
       expect(store.loading).toBe(false)
+    })
+  })
+  describe('expandSuggestions', () => {
+    const distanceSuggestion = {
+      type: 'distance',
+      current_max_distance_km: 50,
+      suggested_max_distance_km: 100,
+      additional_candidates: 12
+    }
+    const ageSuggestion = {
+      type: 'age',
+      current_min_age: 22,
+      current_max_age: 27,
+      suggested_min_age: 18,
+      suggested_max_age: 32,
+      additional_candidates: 3
+    }
+
+    it('應該取得空池放寬建議', async () => {
+      const store = useDiscoveryStore()
+      apiClient.get.mockResolvedValue({ data: { suggestions: [distanceSuggestion] } })
+
+      const result = await store.fetchExpandSuggestions()
+
+      expect(apiClient.get).toHaveBeenCalledWith('/discovery/expand-suggestions')
+      expect(result).toEqual([distanceSuggestion])
+      expect(store.expandSuggestions).toEqual([distanceSuggestion])
+    })
+
+    it('取得建議失敗時應回傳空陣列而不拋錯（建議為加值功能）', async () => {
+      const store = useDiscoveryStore()
+      store.expandSuggestions = [distanceSuggestion]
+      apiClient.get.mockRejectedValue(new Error('Network Error'))
+
+      const result = await store.fetchExpandSuggestions()
+
+      expect(result).toEqual([])
+      expect(store.expandSuggestions).toEqual([])
+    })
+
+    it('套用距離建議應 PATCH 偏好並重新載入候選人', async () => {
+      const store = useDiscoveryStore()
+      store.expandSuggestions = [distanceSuggestion]
+      apiClient.patch.mockResolvedValue({ data: {} })
+      apiClient.get.mockResolvedValue({ data: [{ user_id: 'u1', display_name: 'Far' }] })
+
+      await store.applyExpandSuggestion(distanceSuggestion)
+
+      expect(apiClient.patch).toHaveBeenCalledWith('/profile', { max_distance_km: 100 })
+      expect(apiClient.get).toHaveBeenCalledWith('/discovery/browse', { params: { limit: 20 } })
+      expect(store.candidates).toHaveLength(1)
+      expect(store.expandSuggestions).toEqual([])
+    })
+
+    it('套用年齡建議應 PATCH 年齡區間', async () => {
+      const store = useDiscoveryStore()
+      apiClient.patch.mockResolvedValue({ data: {} })
+      apiClient.get.mockResolvedValue({ data: [] })
+
+      await store.applyExpandSuggestion(ageSuggestion)
+
+      expect(apiClient.patch).toHaveBeenCalledWith('/profile', {
+        min_age_preference: 18,
+        max_age_preference: 32
+      })
+    })
+
+    it('套用建議失敗時應設定錯誤並拋出', async () => {
+      const store = useDiscoveryStore()
+      apiClient.patch.mockRejectedValue({ response: { data: { detail: '更新失敗' } } })
+
+      await expect(store.applyExpandSuggestion(distanceSuggestion)).rejects.toBeDefined()
+      expect(store.error).toBe('更新失敗')
+      expect(apiClient.get).not.toHaveBeenCalled()
+    })
+
+    it('$reset 應清除建議', () => {
+      const store = useDiscoveryStore()
+      store.expandSuggestions = [distanceSuggestion]
+
+      store.$reset()
+
+      expect(store.expandSuggestions).toEqual([])
     })
   })
 })

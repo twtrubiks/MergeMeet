@@ -46,6 +46,7 @@ from app.models.notification import Notification
 from app.models.profile import Profile
 from app.models.user import User
 from app.schemas.discovery import (
+    ExpandSuggestionsResponse,
     LikeResponse,
     MatchSummary,
     PassResponse,
@@ -64,6 +65,22 @@ FREE_DAILY_LIKE_LIMIT = 50
 router = APIRouter()
 
 
+async def _get_browse_profile(db: AsyncSession, user_id: uuid.UUID) -> Profile:
+    """取得瀏覽者 profile（預先加載 interests），未建檔或未設位置則 400"""
+    result = await db.execute(
+        select(Profile).options(selectinload(Profile.interests)).where(Profile.user_id == user_id)
+    )
+    my_profile = result.scalar_one_or_none()
+
+    if not my_profile:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="請先完成個人檔案設定")
+
+    if not my_profile.location:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="請先設定您的位置")
+
+    return my_profile
+
+
 @router.get("/browse", response_model=list[ProfileCard])
 async def browse_users(
     limit: int = Query(20, ge=1, le=50, description="返回數量"),
@@ -78,21 +95,28 @@ async def browse_users(
     - 排除已喜歡、已配對、已封鎖的用戶
     - 按配對分數排序
     """
-    # 取得當前用戶的 profile（預先加載 interests）
-    result = await db.execute(
-        select(Profile)
-        .options(selectinload(Profile.interests))
-        .where(Profile.user_id == current_user.id)
-    )
-    my_profile = result.scalar_one_or_none()
-
-    if not my_profile:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="請先完成個人檔案設定")
-
-    if not my_profile.location:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="請先設定您的位置")
-
+    my_profile = await _get_browse_profile(db, current_user.id)
     return await matching_service.browse_candidates(db, current_user.id, my_profile, limit)
+
+
+@router.get(
+    "/expand-suggestions",
+    response_model=ExpandSuggestionsResponse,
+    response_model_exclude_none=True,
+)
+async def get_expand_suggestions(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    空池時的偏好放寬建議
+
+    試算放寬距離（×2）或年齡（±5）後能多看到幾位候選人，只回傳有幫助的建議。
+    不會自動修改偏好，由前端讓用戶一鍵套用（PATCH /api/profile）。
+    """
+    my_profile = await _get_browse_profile(db, current_user.id)
+    suggestions = await matching_service.expand_suggestions(db, current_user.id, my_profile)
+    return ExpandSuggestionsResponse(suggestions=suggestions)
 
 
 # ========== like_user 輔助函數 ==========

@@ -465,6 +465,43 @@ async def test_browse_does_not_expose_liked_me_signal(
 
 
 @pytest.mark.asyncio
+async def test_browse_falls_back_to_low_score_when_no_qualified_candidates(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """合格池（>= MIN_MATCH_SCORE）為空時，自動放寬門檻回傳低分候選人，而非空列表"""
+    await _create_candidate_pool(test_db, 3, prefix="lowscore", latitude=25.33)
+
+    response = await client.get(
+        "/api/discovery/browse?limit=5", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    candidates = response.json()
+    assert len(candidates) == 3
+    assert all(c["display_name"].startswith("lowscore") for c in candidates)
+    assert all(c["match_score"] < 15 for c in candidates)
+
+
+@pytest.mark.asyncio
+async def test_browse_fallback_not_used_while_qualified_candidates_remain(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """只要還有合格候選人，就不混入低分者（門檻放寬只在合格池耗盡後啟動）"""
+    await _create_candidate_pool(test_db, 3, prefix="lowscore", latitude=25.33)
+    await _create_candidate_pool(
+        test_db, 1, prefix="highscore", latitude=25.034, last_active=datetime.now(UTC)
+    )
+
+    response = await client.get(
+        "/api/discovery/browse?limit=5", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    candidates = response.json()
+    assert [c["display_name"] for c in candidates] == ["highscore0"]
+
+
+@pytest.mark.asyncio
 async def test_browse_sorted_by_match_score_desc(
     client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
 ):
@@ -489,6 +526,122 @@ async def test_browse_sorted_by_match_score_desc(
     scores = [c["match_score"] for c in candidates]
     assert scores == sorted(scores, reverse=True), f"分數未由高到低排序: {scores}"
     assert all(c["display_name"].startswith("active") for c in candidates[:3])
+
+
+# ========== 空池放寬建議 ==========
+
+
+@pytest.mark.asyncio
+async def test_expand_suggestions_distance(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """距離 50km 內沒人、100km 內有 3 人 → 建議放寬距離到 100km（+3）"""
+    # viewer 在台北 (25.0330)；latitude=25.75 約 80km
+    await _create_candidate_pool(test_db, 3, prefix="far", latitude=25.75)
+    await client.patch(
+        "/api/profile", headers=viewer_with_profile["headers"], json={"max_distance_km": 50}
+    )
+
+    response = await client.get(
+        "/api/discovery/expand-suggestions", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    distance = next(s for s in data["suggestions"] if s["type"] == "distance")
+    assert distance["current_max_distance_km"] == 50
+    assert distance["suggested_max_distance_km"] == 100
+    assert distance["additional_candidates"] == 3
+    # 年齡偏好為預設 18–99，無法再放寬 → 不應出現年齡建議
+    assert not [s for s in data["suggestions"] if s["type"] == "age"]
+
+
+@pytest.mark.asyncio
+async def test_expand_suggestions_age(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """候選人 31 歲、偏好 22–27 → 建議放寬到 18–32（+N）"""
+    await _create_candidate_pool(
+        test_db, 2, prefix="near", latitude=25.034, last_active=datetime.now(UTC)
+    )
+    await client.patch(
+        "/api/profile",
+        headers=viewer_with_profile["headers"],
+        json={"min_age_preference": 22, "max_age_preference": 27},
+    )
+
+    response = await client.get(
+        "/api/discovery/expand-suggestions", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    age = next(s for s in data["suggestions"] if s["type"] == "age")
+    assert (age["current_min_age"], age["current_max_age"]) == (22, 27)
+    assert (age["suggested_min_age"], age["suggested_max_age"]) == (18, 32)
+    assert age["additional_candidates"] == 2
+    # 50km 內已有人但被年齡擋掉；距離放寬不會多出任何人 → 不建議距離
+    assert not [s for s in data["suggestions"] if s["type"] == "distance"]
+
+
+@pytest.mark.asyncio
+async def test_expand_suggestions_empty_when_relaxing_does_not_help(
+    client: AsyncClient, viewer_with_profile: dict
+):
+    """放寬後仍然沒人 → 不給任何建議"""
+    response = await client.get(
+        "/api/discovery/expand-suggestions", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    assert response.json()["suggestions"] == []
+
+
+@pytest.mark.asyncio
+async def test_expand_suggestions_skip_distance_at_cap(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """距離已是上限 500km 時不建議再放寬距離"""
+    await _create_candidate_pool(test_db, 1, prefix="far", latitude=25.75)
+    await client.patch(
+        "/api/profile", headers=viewer_with_profile["headers"], json={"max_distance_km": 500}
+    )
+
+    response = await client.get(
+        "/api/discovery/expand-suggestions", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    assert not [s for s in response.json()["suggestions"] if s["type"] == "distance"]
+
+
+@pytest.mark.asyncio
+async def test_expand_suggestions_excludes_liked_and_blocked(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """放寬後多出來的人數要套用與 browse 相同的排除規則（已喜歡者不計）"""
+    await _create_candidate_pool(test_db, 2, prefix="far", latitude=25.75)
+    await client.patch(
+        "/api/profile", headers=viewer_with_profile["headers"], json={"max_distance_km": 50}
+    )
+    viewer_id = await _viewer_user_id(test_db, viewer_with_profile)
+    liked_id = (await _candidate_user_ids_sorted(test_db, "far"))[0]
+    test_db.add(Like(from_user_id=viewer_id, to_user_id=liked_id))
+    await test_db.commit()
+
+    response = await client.get(
+        "/api/discovery/expand-suggestions", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    distance = next(s for s in response.json()["suggestions"] if s["type"] == "distance")
+    assert distance["additional_candidates"] == 1
+
+
+@pytest.mark.asyncio
+async def test_expand_suggestions_requires_profile(client: AsyncClient, auth_user: dict):
+    response = await client.get("/api/discovery/expand-suggestions", headers=auth_user["headers"])
+    assert response.status_code == 400
 
 
 @pytest.mark.asyncio

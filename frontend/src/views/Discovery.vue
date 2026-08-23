@@ -31,9 +31,45 @@
         <div class="empty-icon" aria-hidden="true">
           <Icon name="search" size="xl" decorative class="empty-search-icon" />
         </div>
-        <h2>沒有更多候選人了</h2>
-        <p>請稍後再回來查看</p>
-        <button class="btn-refresh" @click="loadCandidates">重新整理</button>
+
+        <!-- 有放寬建議：引導一鍵放寬，而非死路 -->
+        <template v-if="discoveryStore.expandSuggestions.length > 0">
+          <h2>附近暫時沒有新朋友了</h2>
+          <p>放寬一點條件，還有更多人等著認識你</p>
+          <div class="expand-actions">
+            <button
+              v-for="suggestion in discoveryStore.expandSuggestions"
+              :key="suggestion.type"
+              class="btn-expand"
+              :disabled="applyingSuggestion"
+              @click="applySuggestion(suggestion)"
+            >
+              <Icon
+                :name="suggestion.type === 'distance' ? 'location' : 'people'"
+                size="sm"
+                decorative
+              />
+              {{ formatSuggestion(suggestion) }}
+              <span class="expand-count">+{{ suggestion.additional_candidates }} 位</span>
+            </button>
+          </div>
+        </template>
+
+        <template v-else>
+          <h2>沒有更多候選人了</h2>
+          <p>請稍後再回來查看</p>
+        </template>
+
+        <div class="empty-secondary-actions">
+          <!-- 有放寬建議時，重新整理降為次要樣式，讓放寬按鈕成為唯一主 CTA -->
+          <button
+            :class="discoveryStore.expandSuggestions.length > 0 ? 'btn-adjust' : 'btn-refresh'"
+            @click="loadCandidates"
+          >
+            重新整理
+          </button>
+          <router-link to="/settings" class="btn-adjust">調整偏好</router-link>
+        </div>
       </div>
 
       <!-- 卡片堆疊區域 -->
@@ -321,8 +357,44 @@ const handleKeydown = (event) => {
 const loadCandidates = async () => {
   try {
     await discoveryStore.browseCandidates(20)
+    // 空池時才查放寬建議（失敗由 store 吞掉，不影響空池畫面）
+    if (!discoveryStore.hasCandidates) {
+      await discoveryStore.fetchExpandSuggestions()
+    }
   } catch (error) {
     logger.error('載入候選人失敗:', error)
+  }
+}
+
+// 放寬建議
+const applyingSuggestion = ref(false)
+
+/**
+ * 放寬建議的按鈕文案
+ * @param {{ type: 'distance' | 'age' }} suggestion
+ */
+const formatSuggestion = (suggestion) => {
+  if (suggestion.type === 'distance') {
+    return `距離放寬到 ${suggestion.suggested_max_distance_km} 公里`
+  }
+  return `年齡放寬到 ${suggestion.suggested_min_age}–${suggestion.suggested_max_age} 歲`
+}
+
+const applySuggestion = async (suggestion) => {
+  if (applyingSuggestion.value) return
+  applyingSuggestion.value = true
+  try {
+    await discoveryStore.applyExpandSuggestion(suggestion)
+    message.success(`已${formatSuggestion(suggestion)}`)
+    // 放寬後仍是空池 → 再查一次還能不能放寬
+    if (!discoveryStore.hasCandidates) {
+      await discoveryStore.fetchExpandSuggestions()
+    }
+  } catch (error) {
+    logger.error('套用放寬建議失敗:', error)
+    message.error(discoveryStore.error || '更新偏好失敗，請稍後再試')
+  } finally {
+    applyingSuggestion.value = false
   }
 }
 
@@ -578,6 +650,77 @@ onUnmounted(() => {
 .btn-refresh:hover {
   background: var(--color-like-hover);
   transform: translateY(-2px);
+}
+
+/* 放寬建議 */
+.expand-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.btn-expand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: var(--space-3) var(--space-6);
+  background: var(--color-primary-gradient);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  transition: all var(--duration-slow) var(--easing-default);
+}
+
+.btn-expand:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.btn-expand:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.expand-count {
+  padding: 2px var(--space-2);
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+}
+
+.empty-secondary-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.btn-adjust {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: var(--space-3) var(--space-6);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-primary-accessible);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  border-radius: var(--radius-full);
+  transition: background var(--duration-slow) var(--easing-default);
+}
+
+.btn-adjust:hover {
+  background: var(--color-primary-alpha-10);
 }
 
 /* 鍵盤操作提示 */
