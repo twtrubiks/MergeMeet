@@ -269,13 +269,59 @@ score += _calculate_trust_score_weight(trust_score)
 MIN_MATCH_SCORE = 15.0  # 最低配對分數門檻
 
 # 計算分數後過濾（browse_candidates 中）
-12. ✅ 配對分數 >= 15% 才會顯示
+12. ✅ 配對分數 >= 15% 才會顯示（兩個例外見下）
 ```
 
 **設計理由**:
 - 低於 15% 的配對幾乎沒有共同點，顯示無意義
 - 提升推薦品質，避免用戶滑過一堆不相關的人
-- 若無符合條件的候選人，返回空列表（前端顯示「沒有更多候選人」）
+
+**門檻的兩個例外**:
+- **已喜歡我的人豁免**：配對必成，不該被門檻擋掉（見下方「優先曝光」）
+- **合格池耗盡時自動放寬**：掃描過程中低於門檻者另存，若合格者為零則改回傳這批低分候選人，
+  避免用戶撞上「沒有更多候選人」死路。門檻是內部實作細節，用戶無感，API 回傳格式不變。
+  只要還有任何合格候選人就不會混入低分者。
+
+---
+
+## 💘 已喜歡我的人優先曝光
+
+`likes` 表中「對方已喜歡我、我尚未回應」的候選人，原本就在候選池內（排除條件只看我發出的 like），
+但可能被門檻擋掉或排在很後面。為了把註定會成的配對推到眼前：
+
+```python
+# backend/app/services/matching_service.py（模組層級常數）
+LIKED_ME_SORT_BONUS = 15.0  # 只影響排序，不寫進回傳的 match_score
+```
+
+1. **DB 掃描順序排前**：`ORDER BY CASE(EXISTS likes) , user_id`——browse 是分批掃描、湊滿 limit 就停，
+   若不在 SQL 層排前，排在後面批次的人永遠撈不到
+2. **豁免 `MIN_MATCH_SCORE`**
+3. **排序加 +15**：保守加分而非強制置頂，避免低品質暗戀者洗版整個卡堆
+
+**紅線**：此訊號只用於排序。卡片上的 `match_score` 維持真實分數，`ProfileCard` **不新增任何欄位**
+透露「他喜歡你」（等同免費送出 Likes You 功能，且會讓用戶只滑那些人）。
+`test_browse_does_not_expose_liked_me_signal` 鎖住此約束。
+
+---
+
+## 🧭 空池放寬建議（expand-suggestions）
+
+距離、年齡是用戶自訂的偏好，後端**不會**暗中覆寫。候選池為空時，前端另呼叫：
+
+```
+GET /api/discovery/expand-suggestions
+→ { "suggestions": [
+      { "type": "distance", "current_max_distance_km": 50, "suggested_max_distance_km": 100, "additional_candidates": 12 },
+      { "type": "age", "current_min_age": 22, "current_max_age": 27, "suggested_min_age": 18, "suggested_max_age": 32, "additional_candidates": 3 }
+  ] }
+```
+
+- 距離 ×2（上限 500 km）、年齡 ±5（18–99），各自試算「放寬後可多看到幾位」，**只回傳有增加的建議**
+- 計數使用與 browse 完全相同的篩選與排除條件（共用 `_candidate_query()`），不套 `MIN_MATCH_SCORE`
+- 前端顯示「距離放寬到 100 公里（+12 位）」一鍵按鈕，點擊後 `PATCH /api/profile` 真的更新偏好再重新載入
+- 已是上限（距離 500 / 年齡 18–99）時不建議；放寬後仍無人則不回任何建議
+- **不會**放回 24 小時內跳過的人——用戶剛明確拒絕的人不該馬上回來，24h 後自然重現
 
 ---
 
@@ -367,16 +413,18 @@ MIN_MATCH_SCORE = 15.0  # 最低配對分數門檻
    a. 取得用戶檔案和偏好設定
    b. PostGIS 地理查詢（距離篩選）
    c. 排除已互動用戶（喜歡、配對、封鎖、跳過）
-   d. 取 limit × 3 個候選人
+   d. 取 limit × 3 個候選人，已喜歡我的人排在掃描順序最前
       （候選人不足時會分批續撈，每批 limit×3，最多 10 批）
-   e. 計算每個候選人的配對分數
-   f. 依分數排序
-   g. 返回 top limit 個
+   e. 計算每個候選人的配對分數與共同興趣（common_interests）
+   f. 門檻過濾（已喜歡我的豁免；低分者另存，合格池空時作為放寬結果）
+   g. 依排序分數（match_score + 已喜歡我 +15）排序
+   h. 返回 top limit 個
 
 3. 前端顯示:
    - 卡片堆疊（顯示前 3 張）
-   - 顯示配對分數百分比
+   - 顯示配對分數百分比、共同興趣排前並高亮（詳情彈窗另有「你們都喜歡」區塊）
    - 用戶可透過按鈕或鍵盤快捷鍵喜歡或跳過
+   - 候選池為空 → 呼叫 expand-suggestions，顯示一鍵放寬距離／年齡按鈕
 ```
 
 ### 分數計算流程
