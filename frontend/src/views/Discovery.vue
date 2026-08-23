@@ -142,7 +142,7 @@
               class="card-interests"
             >
               <span
-                v-for="tag in displayInterests(candidate)"
+                v-for="tag in displayInterests(candidate, MAX_CARD_INTERESTS)"
                 :key="tag.name"
                 class="interest-tag"
                 :class="{ 'interest-tag--common': tag.common }"
@@ -242,6 +242,7 @@ import UserDetailModal from '@/components/UserDetailModal.vue'
 import HeartLoader from '@/components/ui/HeartLoader.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
 import { logger } from '@/utils/logger'
+import { displayInterests } from '@/utils/interests'
 
 const message = useMessage()
 const discoveryStore = useDiscoveryStore()
@@ -251,19 +252,6 @@ const defaultAvatar = '/default-avatar.svg'
 
 // 卡片最多顯示的興趣數
 const MAX_CARD_INTERESTS = 5
-
-/**
- * 卡片興趣顯示順序：共同興趣排前（高亮），其餘補後，總數封頂
- * @param {{ interests?: string[], common_interests?: string[] }} candidate
- * @returns {{ name: string, common: boolean }[]}
- */
-const displayInterests = (candidate) => {
-  const common = new Set(candidate.common_interests || [])
-  const interests = candidate.interests || []
-  return [...interests.filter((i) => common.has(i)), ...interests.filter((i) => !common.has(i))]
-    .slice(0, MAX_CARD_INTERESTS)
-    .map((name) => ({ name, common: common.has(name) }))
-}
 
 // 螢幕閱讀器播報文字
 const srAnnouncement = ref('')

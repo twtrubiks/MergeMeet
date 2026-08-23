@@ -31,11 +31,15 @@ MAX_AGE = 99
 AGE_EXPAND_STEP = 5
 
 
-def _common_interests(viewer_interests: list[str], candidate_interests: list[str]) -> list[str]:
+def compute_common_interests(
+    viewer_interests: list[str], candidate_interests: list[str]
+) -> list[str]:
     """取出雙方共同興趣，依候選人興趣順序輸出（去重）
 
     與 calculate_match_score 內的交集邏輯一致，但獨立成純函式
     以免更動既有評分函式簽名；回傳 list 而非 set 是為了輸出順序穩定。
+
+    探索候選人（browse_candidates）與配對列表（get_matches）共用，故為公開函式。
     """
     viewer_set = set(viewer_interests)
     seen: set[str] = set()
@@ -399,7 +403,7 @@ class MatchingService:
                     location_name=profile.location_name,
                     distance_km=round(distance_km, 1) if distance_km else None,
                     interests=interests,
-                    common_interests=_common_interests(user_data["interests"], interests),
+                    common_interests=compute_common_interests(user_data["interests"], interests),
                     photos=photos,
                     match_score=round(match_score, 1),
                 )

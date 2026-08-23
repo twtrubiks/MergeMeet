@@ -53,7 +53,7 @@ from app.schemas.discovery import (
     ProfileCard,
     UnmatchResponse,
 )
-from app.services.matching_service import matching_service
+from app.services.matching_service import compute_common_interests, matching_service
 from app.services.redis_client import redis_client
 from app.services.trust_score import TrustScoreService
 
@@ -572,6 +572,15 @@ async def get_matches(
     if not matches:
         return []
 
+    # 瀏覽者自己的興趣（用於算共同興趣）；未建檔視為無興趣，不阻擋配對列表
+    viewer_result = await db.execute(
+        select(Profile)
+        .options(selectinload(Profile.interests))
+        .where(Profile.user_id == current_user.id)
+    )
+    viewer_profile = viewer_result.scalar_one_or_none()
+    viewer_interests = [i.name for i in viewer_profile.interests] if viewer_profile else []
+
     # 批次載入：收集所有需要的 ID
     match_ids = [match.id for match in matches]
     matched_user_ids = [
@@ -636,6 +645,7 @@ async def get_matches(
             bio=matched_profile.bio,
             location_name=matched_profile.location_name,
             interests=interests,
+            common_interests=compute_common_interests(viewer_interests, interests),
             photos=photos,
         )
 

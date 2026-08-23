@@ -1023,6 +1023,46 @@ async def test_get_matches_after_match(client: AsyncClient, completed_profiles: 
     assert match["matched_user"]["display_name"] == "Bob"
 
 
+async def test_matches_return_common_interests_with_viewer(
+    client: AsyncClient, completed_profiles: dict
+):
+    """配對列表也回傳共同興趣（與探索卡片同一套配對理由）
+
+    fixture：Alice 持有 tags[0:4]、Bob 持有 tags[1:5] → 共同興趣 3 個。
+    雙方各自查配對列表時，都應看到以「自己」為基準算出的共同興趣。
+    """
+    alice_headers = completed_profiles["alice"]["headers"]
+    bob_headers = completed_profiles["bob"]["headers"]
+    alice = (await client.get("/api/profile", headers=alice_headers)).json()
+    bob = (await client.get("/api/profile", headers=bob_headers)).json()
+    expected = {i["name"] for i in alice["interests"]} & {i["name"] for i in bob["interests"]}
+    assert len(expected) == 3  # fixture 前提，變了就該更新這個測試
+
+    # 互相喜歡以建立配對
+    await client.post(f"/api/discovery/like/{bob['user_id']}", headers=alice_headers)
+    await client.post(f"/api/discovery/like/{alice['user_id']}", headers=bob_headers)
+
+    # Alice 視角
+    response = await client.get("/api/discovery/matches", headers=alice_headers)
+    assert response.status_code == 200
+    matched_bob = next(
+        m["matched_user"] for m in response.json() if m["matched_user"]["user_id"] == bob["user_id"]
+    )
+    assert set(matched_bob["common_interests"]) == expected
+    # 對方獨有的興趣不能混進共同興趣
+    assert set(matched_bob["interests"]) - set(matched_bob["common_interests"])
+
+    # Bob 視角（對稱）
+    response = await client.get("/api/discovery/matches", headers=bob_headers)
+    assert response.status_code == 200
+    matched_alice = next(
+        m["matched_user"]
+        for m in response.json()
+        if m["matched_user"]["user_id"] == alice["user_id"]
+    )
+    assert set(matched_alice["common_interests"]) == expected
+
+
 @pytest.mark.asyncio
 async def test_unmatch(client: AsyncClient, completed_profiles: dict):
     """測試：取消配對"""

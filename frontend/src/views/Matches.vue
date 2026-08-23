@@ -110,20 +110,28 @@
                 </Badge>
               </div>
 
-              <!-- 共同興趣 -->
+              <!-- 興趣標籤（共同興趣排前並高亮，作為配對理由） -->
               <div
                 v-if="match.matched_user.interests && match.matched_user.interests.length > 0"
                 class="match-interests"
               >
                 <span
-                  v-for="interest in match.matched_user.interests.slice(0, 3)"
-                  :key="interest"
+                  v-for="tag in displayInterests(match.matched_user, MAX_MATCH_INTERESTS)"
+                  :key="tag.name"
                   class="interest-tag"
+                  :class="{ 'interest-tag--common': tag.common }"
                 >
-                  {{ interest }}
+                  <template v-if="tag.common">
+                    <Icon name="heart" size="xs" decorative />
+                    <span class="sr-only">共同興趣：</span>
+                  </template>
+                  {{ tag.name }}
                 </span>
-                <span v-if="match.matched_user.interests.length > 3" class="interest-more">
-                  +{{ match.matched_user.interests.length - 3 }}
+                <span
+                  v-if="match.matched_user.interests.length > MAX_MATCH_INTERESTS"
+                  class="interest-more"
+                >
+                  +{{ match.matched_user.interests.length - MAX_MATCH_INTERESTS }}
                 </span>
               </div>
             </div>
@@ -219,7 +227,11 @@ import Badge from '@/components/ui/Badge.vue'
 import UserDetailModal from '@/components/UserDetailModal.vue'
 import Icon from '@/components/ui/Icon.vue'
 import { formatMatchDate } from '@/utils/dateFormat'
+import { displayInterests } from '@/utils/interests'
 import { logger } from '@/utils/logger'
+
+// 配對卡片最多顯示的興趣數
+const MAX_MATCH_INTERESTS = 3
 
 const router = useRouter()
 const discoveryStore = useDiscoveryStore()
@@ -754,9 +766,22 @@ onUnmounted(() => {
   transition: all 0.2s ease;
 }
 
+/* 共同興趣：實色主色底 + 白字（對比 ≈ 4.9:1，符合 WCAG AA 小字） */
+.interest-tag--common {
+  gap: var(--space-1);
+  background: var(--color-primary-600);
+  color: #fff;
+  border-color: var(--color-primary-600);
+}
+
 .interest-tag:hover {
   transform: scale(1.05);
   background: linear-gradient(135deg, rgba(225, 29, 72, 0.15), rgba(225, 29, 72, 0.15));
+}
+
+/* 覆蓋 .interest-tag:hover 的淡色底（同特異性，必須排在其後） */
+.interest-tag--common:hover {
+  background: var(--color-primary-600);
 }
 
 .interest-more {
