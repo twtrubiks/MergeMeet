@@ -370,7 +370,7 @@ const handleCardAction = async (direction, apiCall) => {
   discoveryStore.removeCurrentCandidate()
   exitDirection.value = ''
 
-  if (result?.matched) {
+  if (result?.is_match) {
     showMatchModal.value = true
   }
 

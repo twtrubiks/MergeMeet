@@ -52,7 +52,7 @@ export const useDiscoveryStore = defineStore('discovery', () => {
   /**
    * 喜歡某個用戶
    * @param {string} userId - 用戶 ID
-   * @returns {Object} { liked, matched, match_id? }
+   * @returns {Object} { liked, is_match, match_id? }（對齊後端 LikeResponse）
    */
   const likeUser = async (userId) => {
     loading.value = true
@@ -62,7 +62,7 @@ export const useDiscoveryStore = defineStore('discovery', () => {
       const result = response.data
 
       // 如果配對成功，保存配對用戶資訊用於顯示彈窗
-      if (result.matched) {
+      if (result.is_match) {
         lastMatchedUser.value = currentCandidate.value
         // 重新取得配對列表
         await fetchMatches()

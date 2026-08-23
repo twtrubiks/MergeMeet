@@ -106,14 +106,14 @@ describe('Discovery Store', () => {
       store.currentCandidate = store.candidates[0]
 
       apiClient.post.mockResolvedValue({
-        data: { liked: true, matched: false }
+        data: { liked: true, is_match: false }
       })
 
       const result = await store.likeUser('user1')
 
       expect(apiClient.post).toHaveBeenCalledWith('/discovery/like/user1')
       expect(result.liked).toBe(true)
-      expect(result.matched).toBe(false)
+      expect(result.is_match).toBe(false)
       // likeUser 不再移除候選人，移除改由呼叫端在退場動畫後呼叫
       expect(store.candidates.length).toBe(2)
       expect(store.currentCandidate.id).toBe('user1')
@@ -129,7 +129,7 @@ describe('Discovery Store', () => {
       store.currentCandidate = store.candidates[0]
 
       apiClient.post.mockResolvedValue({
-        data: { liked: true, matched: true, match_id: 'match123' }
+        data: { liked: true, is_match: true, match_id: 'match123' }
       })
 
       // Mock fetchMatches
@@ -139,7 +139,7 @@ describe('Discovery Store', () => {
 
       const result = await store.likeUser('user1')
 
-      expect(result.matched).toBe(true)
+      expect(result.is_match).toBe(true)
       expect(result.match_id).toBe('match123')
       expect(store.lastMatchedUser).toEqual({ id: 'user1', display_name: 'Alice' })
       expect(store.matches.length).toBe(1)
@@ -152,7 +152,7 @@ describe('Discovery Store', () => {
       store.currentCandidate = store.candidates[0]
 
       apiClient.post.mockResolvedValue({
-        data: { liked: true, matched: false }
+        data: { liked: true, is_match: false }
       })
 
       await store.likeUser('user1')
