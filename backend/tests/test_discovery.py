@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.discovery import FREE_DAILY_LIKE_LIMIT
-from app.models.match import Pass
+from app.models.match import Like, Pass
 from app.models.profile import InterestTag, Profile
 from app.models.user import User
 
@@ -348,6 +348,120 @@ async def test_browse_returns_all_qualified_when_fewer_than_limit(
     candidates = response.json()
     assert len(candidates) == 2
     assert all(c["display_name"].startswith("highscore") for c in candidates)
+
+
+async def _viewer_user_id(test_db: AsyncSession, viewer: dict) -> uuid.UUID:
+    return (
+        await test_db.execute(select(User.id).where(User.email == viewer["email"]))
+    ).scalar_one()
+
+
+async def _candidate_user_ids_sorted(test_db: AsyncSession, prefix: str) -> list[uuid.UUID]:
+    """依 user_id 升冪回傳候選人 id（browse 分批掃描即依此順序）"""
+    result = await test_db.execute(
+        select(User.id).where(User.email.like(f"{prefix}%")).order_by(User.id)
+    )
+    return list(result.scalars())
+
+
+async def _like_viewer(test_db: AsyncSession, from_user_id: uuid.UUID, viewer_id: uuid.UUID):
+    test_db.add(Like(from_user_id=from_user_id, to_user_id=viewer_id))
+    await test_db.commit()
+
+
+@pytest.mark.asyncio
+async def test_browse_liked_me_candidate_bypasses_score_threshold(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """喜歡我的人即使配對分數低於門檻（9 < 15），仍要出現在候選列表"""
+    await _create_candidate_pool(test_db, 3, prefix="lowscore", latitude=25.33)
+    viewer_id = await _viewer_user_id(test_db, viewer_with_profile)
+    admirer_id = (await _candidate_user_ids_sorted(test_db, "lowscore"))[1]
+    await _like_viewer(test_db, admirer_id, viewer_id)
+
+    response = await client.get(
+        "/api/discovery/browse?limit=5", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    candidates = response.json()
+    assert [c["user_id"] for c in candidates] == [str(admirer_id)]
+    # 分數本身維持真實值（低於門檻），只是豁免過濾
+    assert candidates[0]["match_score"] < 15
+
+
+@pytest.mark.asyncio
+async def test_browse_liked_me_candidate_ranked_first_among_equal_scores(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """同分情況下，喜歡我的人排在最前面；且 match_score 不因加權而改變"""
+    await _create_candidate_pool(
+        test_db, 5, prefix="highscore", latitude=25.034, last_active=datetime.now(UTC)
+    )
+    viewer_id = await _viewer_user_id(test_db, viewer_with_profile)
+    # 挑 user_id 最大者（穩定排序下原本會排最後）
+    admirer_id = (await _candidate_user_ids_sorted(test_db, "highscore"))[-1]
+    await _like_viewer(test_db, admirer_id, viewer_id)
+
+    response = await client.get(
+        "/api/discovery/browse?limit=5", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    candidates = response.json()
+    assert len(candidates) == 5
+    assert candidates[0]["user_id"] == str(admirer_id)
+    # 排序加權不可寫進回傳分數（卡片百分比須維持真實，避免洩漏訊號）
+    scores = {c["match_score"] for c in candidates}
+    assert len(scores) == 1, f"加權不應改變 match_score，實際出現多種分數：{scores}"
+
+
+@pytest.mark.asyncio
+async def test_browse_liked_me_candidate_found_beyond_first_batch(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """喜歡我的人排在掃描順序尾端時，仍須被撈到
+
+    limit=5 → 每批 15 筆；40 個高分候選人第一批就湊滿 limit 後停止掃描。
+    若 DB 查詢不把「喜歡我的人」排前，user_id 最大者永遠不會被掃到。
+    """
+    await _create_candidate_pool(
+        test_db, 40, prefix="highscore", latitude=25.034, last_active=datetime.now(UTC)
+    )
+    viewer_id = await _viewer_user_id(test_db, viewer_with_profile)
+    admirer_id = (await _candidate_user_ids_sorted(test_db, "highscore"))[-1]
+    await _like_viewer(test_db, admirer_id, viewer_id)
+
+    response = await client.get(
+        "/api/discovery/browse?limit=5", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    candidates = response.json()
+    assert len(candidates) == 5
+    assert candidates[0]["user_id"] == str(admirer_id)
+
+
+@pytest.mark.asyncio
+async def test_browse_does_not_expose_liked_me_signal(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """回傳欄位不得透露「對方已喜歡你」（等同免費送出 Likes You 功能）"""
+    await _create_candidate_pool(
+        test_db, 2, prefix="highscore", latitude=25.034, last_active=datetime.now(UTC)
+    )
+    viewer_id = await _viewer_user_id(test_db, viewer_with_profile)
+    admirer_id = (await _candidate_user_ids_sorted(test_db, "highscore"))[0]
+    await _like_viewer(test_db, admirer_id, viewer_id)
+
+    response = await client.get(
+        "/api/discovery/browse?limit=5", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    for candidate in response.json():
+        leaked = [k for k in candidate if "like" in k.lower()]
+        assert not leaked, f"回傳欄位洩漏喜歡訊號：{leaked}"
 
 
 @pytest.mark.asyncio

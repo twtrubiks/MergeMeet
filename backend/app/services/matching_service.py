@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 from dateutil.relativedelta import relativedelta
 from geoalchemy2.functions import ST_DWithin
-from sqlalchemy import and_, case, func, or_, select, union_all
+from sqlalchemy import and_, case, exists, func, or_, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -19,6 +19,10 @@ MIN_MATCH_SCORE = 15.0
 
 # browse_candidates 分批撈取的批次上限（避免極端情況下掃描整個候選池）
 MAX_BROWSE_BATCHES = 10
+
+# 「已喜歡我」的候選人排序加權（只影響排序，不寫進回傳的 match_score）
+# 把註定會成的配對推前，但採保守加分而非強制置頂，避免低品質暗戀者洗版整個卡堆
+LIKED_ME_SORT_BONUS = 15.0
 
 
 def _common_interests(viewer_interests: list[str], candidate_interests: list[str]) -> list[str]:
@@ -189,6 +193,10 @@ class MatchingService:
         依偏好設定（年齡、距離、性別）過濾，排除已喜歡、已配對、已封鎖（雙向）、
         24h 內跳過的用戶，計算配對分數後過濾低分者並依分數排序。
 
+        「已喜歡我」的候選人優先曝光：DB 掃描順序排前（確保會被撈到）、
+        豁免 MIN_MATCH_SCORE 門檻、排序加 LIKED_ME_SORT_BONUS。
+        此訊號只用於排序，**不可**透過 ProfileCard 洩漏給前端。
+
         分批撈取：每批 limit*3 筆，過濾低分者後不足 limit 筆就再撈下一批，
         直到湊滿、掃完候選池或達 MAX_BROWSE_BATCHES 上限。
 
@@ -287,8 +295,14 @@ class MatchingService:
         ).subquery("excluded")
         query = query.where(Profile.user_id.notin_(select(excluded_users.c.user_id)))
 
-        # 固定排序，確保 offset 分頁不重複、不遺漏
-        query = query.order_by(Profile.user_id)
+        # 已喜歡我的候選人先掃（否則湊滿 limit 就停，排在後面批次的永遠撈不到）
+        liked_me = exists(
+            select(Like.id).where(
+                Like.from_user_id == Profile.user_id, Like.to_user_id == viewer_id
+            )
+        )
+        # 固定排序（喜歡我的優先，其餘依 user_id），確保 offset 分頁不重複、不遺漏
+        query = query.order_by(case((liked_me, 0), else_=1), Profile.user_id)
 
         # 瀏覽者偏好資料（每批共用）
         user_data = {
@@ -299,8 +313,15 @@ class MatchingService:
             "gender_preference": gender_preference,
         }
 
+        liked_me_ids: set[uuid.UUID] = set(
+            (
+                await db.execute(select(Like.from_user_id).where(Like.to_user_id == viewer_id))
+            ).scalars()
+        )
+
         batch_size = limit * 3
-        profile_cards: list[ProfileCard] = []
+        # (排序分數, 卡片)：排序分數含 liked_me 加權，卡片的 match_score 維持真實分數
+        scored_cards: list[tuple[float, ProfileCard]] = []
 
         for batch_index in range(MAX_BROWSE_BATCHES):
             result = await db.execute(query.offset(batch_index * batch_size).limit(batch_size))
@@ -328,33 +349,38 @@ class MatchingService:
                     },
                 )
 
-                # 過濾低於門檻的用戶
-                if match_score < MIN_MATCH_SCORE:
+                # 過濾低於門檻的用戶（已喜歡我的豁免：配對必成，不該被門檻擋掉）
+                is_liked_me = profile.user_id in liked_me_ids
+                if match_score < MIN_MATCH_SCORE and not is_liked_me:
                     continue
 
-                profile_cards.append(
-                    ProfileCard(
-                        user_id=profile.user_id,
-                        display_name=profile.display_name,
-                        age=age,
-                        gender=profile.gender,
-                        bio=profile.bio,
-                        location_name=profile.location_name,
-                        distance_km=round(distance_km, 1) if distance_km else None,
-                        interests=interests,
-                        common_interests=_common_interests(user_data["interests"], interests),
-                        photos=photos,
-                        match_score=round(match_score, 1),
+                sort_score = match_score + (LIKED_ME_SORT_BONUS if is_liked_me else 0)
+                scored_cards.append(
+                    (
+                        sort_score,
+                        ProfileCard(
+                            user_id=profile.user_id,
+                            display_name=profile.display_name,
+                            age=age,
+                            gender=profile.gender,
+                            bio=profile.bio,
+                            location_name=profile.location_name,
+                            distance_km=round(distance_km, 1) if distance_km else None,
+                            interests=interests,
+                            common_interests=_common_interests(user_data["interests"], interests),
+                            photos=photos,
+                            match_score=round(match_score, 1),
+                        ),
                     )
                 )
 
             # 已湊滿或候選池已掃完
-            if len(profile_cards) >= limit or len(rows) < batch_size:
+            if len(scored_cards) >= limit or len(rows) < batch_size:
                 break
 
-        # 依配對分數排序（高到低）並限制返回數量
-        profile_cards.sort(key=lambda x: x.match_score or 0, reverse=True)
-        return profile_cards[:limit]
+        # 依排序分數（含 liked_me 加權）高到低排序並限制返回數量
+        scored_cards.sort(key=lambda item: item[0], reverse=True)
+        return [card for _, card in scored_cards[:limit]]
 
 
 # 單例模式
