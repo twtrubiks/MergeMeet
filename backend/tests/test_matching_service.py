@@ -18,6 +18,7 @@ from app.services.matching_service import (
     _calculate_completeness_score,
     _calculate_distance_score,
     _calculate_trust_score_weight,
+    _common_interests,
 )
 
 matching = MatchingService()
@@ -215,3 +216,31 @@ def test_one_common_interest_lifts_above_threshold():
     score = matching.calculate_match_score(user, candidate)
     assert score == 24.0
     assert score >= MIN_MATCH_SCORE
+
+
+# ---------------------------------------------------------------------------
+# 共同興趣（探索卡片「配對理由」）
+# ---------------------------------------------------------------------------
+
+
+def test_common_interests_preserves_candidate_order():
+    """輸出順序跟隨候選人的興趣順序，而非 set 的隨機順序"""
+    viewer = ["音樂", "旅遊", "美食"]
+    candidate = ["美食", "運動", "旅遊", "音樂"]
+    assert _common_interests(viewer, candidate) == ["美食", "旅遊", "音樂"]
+
+
+def test_common_interests_dedupes_candidate_duplicates():
+    assert _common_interests(["旅遊"], ["旅遊", "旅遊"]) == ["旅遊"]
+
+
+@pytest.mark.parametrize(
+    ("viewer", "candidate"),
+    [
+        ([], ["旅遊"]),
+        (["旅遊"], []),
+        (["旅遊"], ["美食"]),
+    ],
+)
+def test_common_interests_empty_when_no_overlap(viewer, candidate):
+    assert _common_interests(viewer, candidate) == []

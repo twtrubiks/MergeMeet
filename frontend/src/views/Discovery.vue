@@ -100,17 +100,22 @@
               {{ formatDistance(candidate.distance_km) }}
             </p>
 
-            <!-- 興趣標籤 -->
+            <!-- 興趣標籤（共同興趣排前並高亮，作為配對理由） -->
             <div
               v-if="candidate.interests && candidate.interests.length > 0"
               class="card-interests"
             >
               <span
-                v-for="interest in candidate.interests.slice(0, 5)"
-                :key="interest"
+                v-for="tag in displayInterests(candidate)"
+                :key="tag.name"
                 class="interest-tag"
+                :class="{ 'interest-tag--common': tag.common }"
               >
-                {{ interest }}
+                <template v-if="tag.common">
+                  <Icon name="heart" size="xs" decorative />
+                  <span class="sr-only">共同興趣：</span>
+                </template>
+                {{ tag.name }}
               </span>
             </div>
 
@@ -207,6 +212,22 @@ const discoveryStore = useDiscoveryStore()
 
 // 預設頭像（圖片加載失敗時使用）
 const defaultAvatar = '/default-avatar.svg'
+
+// 卡片最多顯示的興趣數
+const MAX_CARD_INTERESTS = 5
+
+/**
+ * 卡片興趣顯示順序：共同興趣排前（高亮），其餘補後，總數封頂
+ * @param {{ interests?: string[], common_interests?: string[] }} candidate
+ * @returns {{ name: string, common: boolean }[]}
+ */
+const displayInterests = (candidate) => {
+  const common = new Set(candidate.common_interests || [])
+  const interests = candidate.interests || []
+  return [...interests.filter((i) => common.has(i)), ...interests.filter((i) => !common.has(i))]
+    .slice(0, MAX_CARD_INTERESTS)
+    .map((name) => ({ name, common: common.has(name) }))
+}
 
 // 螢幕閱讀器播報文字
 const srAnnouncement = ref('')
@@ -803,6 +824,16 @@ onUnmounted(() => {
   border-radius: var(--radius-lg);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
+}
+
+/* 共同興趣：實色主色底 + 白字（對比 ≈ 4.9:1，符合 WCAG AA 小字） */
+.interest-tag--common {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: var(--color-primary-600);
+  color: #fff;
+  font-weight: var(--font-weight-semibold);
 }
 
 .card-bio {

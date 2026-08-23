@@ -19,6 +19,9 @@ class ProfileCard(BaseModel):
     location_name: str | None
     distance_km: float | None = Field(None, description="距離（公里）")
     interests: list[str] = []
+    common_interests: list[str] = Field(
+        default_factory=list, description="與瀏覽者的共同興趣（配對理由），依候選人興趣順序"
+    )
     photos: list[str] = []  # 照片 URL 列表
     match_score: float | None = Field(None, description="配對分數（0-100）")
 

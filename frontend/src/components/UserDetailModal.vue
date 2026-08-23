@@ -66,11 +66,31 @@
             {{ formatDistance(user.distance_km) }}
           </p>
 
-          <!-- 興趣標籤 -->
-          <div v-if="user.interests && user.interests.length > 0" class="user-interests">
-            <span v-for="interest in user.interests" :key="interest" class="interest-tag">
-              {{ interest }}
-            </span>
+          <!-- 共同興趣（配對理由） -->
+          <div v-if="commonInterests.length > 0" class="common-interests">
+            <h3 class="section-title">
+              <Icon name="heart" size="sm" decorative class="section-icon" />
+              你們都喜歡
+            </h3>
+            <div class="user-interests">
+              <span
+                v-for="interest in commonInterests"
+                :key="interest"
+                class="interest-tag interest-tag--common"
+              >
+                {{ interest }}
+              </span>
+            </div>
+          </div>
+
+          <!-- 其他興趣標籤（排除已列在共同興趣的） -->
+          <div v-if="otherInterests.length > 0" class="other-interests">
+            <h3 v-if="commonInterests.length > 0" class="section-title">其他興趣</h3>
+            <div class="user-interests">
+              <span v-for="interest in otherInterests" :key="interest" class="interest-tag">
+                {{ interest }}
+              </span>
+            </div>
           </div>
 
           <!-- 自我介紹 -->
@@ -116,6 +136,15 @@ const photos = computed(() => {
     return [props.user.profile_picture]
   }
   return []
+})
+
+// 共同興趣（配對理由），依候選人興趣順序
+const commonInterests = computed(() => props.user?.common_interests || [])
+
+// 其餘興趣（排除已列在共同興趣的，避免重複顯示）
+const otherInterests = computed(() => {
+  const common = new Set(commonInterests.value)
+  return (props.user?.interests || []).filter((i) => !common.has(i))
 })
 
 // 照片切換
@@ -414,6 +443,20 @@ onUnmounted(() => {
   margin-bottom: 20px;
 }
 
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin: 0 0 8px;
+}
+
+.section-icon {
+  color: var(--color-primary-600);
+}
+
 .interest-tag {
   display: inline-block;
   padding: 8px 16px;
@@ -422,6 +465,13 @@ onUnmounted(() => {
   border-radius: var(--radius-xl);
   font-size: var(--font-size-sm);
   font-weight: 500;
+}
+
+/* 共同興趣：實色主色底 + 白字（對比 ≈ 4.9:1，符合 WCAG AA 小字） */
+.interest-tag--common {
+  background: var(--color-primary-600);
+  color: #fff;
+  font-weight: 600;
 }
 
 /* 自我介紹 */

@@ -214,6 +214,33 @@ async def test_browse_users_success(client: AsyncClient, completed_profiles: dic
         assert "match_score" in candidate
 
 
+async def test_browse_returns_common_interests_with_viewer(
+    client: AsyncClient, completed_profiles: dict
+):
+    """探索卡片回傳與瀏覽者的共同興趣（配對理由）
+
+    fixture：Alice 持有 tags[0:4]、Bob 持有 tags[1:5]
+    → 共同興趣 = tags[1:4]（3 個），Bob 獨有 tags[4] 不得出現在 common_interests
+    """
+    alice_headers = completed_profiles["alice"]["headers"]
+    bob_headers = completed_profiles["bob"]["headers"]
+    alice_interests = {
+        i["name"]
+        for i in (await client.get("/api/profile", headers=alice_headers)).json()["interests"]
+    }
+    bob_user_id = (await client.get("/api/profile", headers=bob_headers)).json()["user_id"]
+
+    response = await client.get("/api/discovery/browse?limit=10", headers=alice_headers)
+    assert response.status_code == 200
+    bob = next(c for c in response.json() if c["user_id"] == bob_user_id)
+
+    assert "common_interests" in bob
+    assert len(bob["common_interests"]) == 3
+    assert set(bob["common_interests"]) == alice_interests & set(bob["interests"])
+    # Bob 獨有的興趣不能混進共同興趣
+    assert set(bob["interests"]) - set(bob["common_interests"])
+
+
 async def _create_candidate_pool(
     test_db: AsyncSession,
     count: int,

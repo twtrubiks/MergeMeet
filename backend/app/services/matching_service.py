@@ -21,6 +21,22 @@ MIN_MATCH_SCORE = 15.0
 MAX_BROWSE_BATCHES = 10
 
 
+def _common_interests(viewer_interests: list[str], candidate_interests: list[str]) -> list[str]:
+    """取出雙方共同興趣，依候選人興趣順序輸出（去重）
+
+    與 calculate_match_score 內的交集邏輯一致，但獨立成純函式
+    以免更動既有評分函式簽名；回傳 list 而非 set 是為了輸出順序穩定。
+    """
+    viewer_set = set(viewer_interests)
+    seen: set[str] = set()
+    common: list[str] = []
+    for name in candidate_interests:
+        if name in viewer_set and name not in seen:
+            seen.add(name)
+            common.append(name)
+    return common
+
+
 def _calculate_distance_score(distance_km: float) -> float:
     """計算距離分數（最高 20 分）
 
@@ -326,6 +342,7 @@ class MatchingService:
                         location_name=profile.location_name,
                         distance_km=round(distance_km, 1) if distance_km else None,
                         interests=interests,
+                        common_interests=_common_interests(user_data["interests"], interests),
                         photos=photos,
                         match_score=round(match_score, 1),
                     )

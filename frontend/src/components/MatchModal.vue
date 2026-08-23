@@ -43,19 +43,22 @@
               <h3 class="user-name">{{ matchedUser.display_name }}</h3>
               <p v-if="matchedUser.age" class="user-age">{{ matchedUser.age }} 歲</p>
 
-              <!-- 共同興趣 -->
+              <!-- 共同興趣（後端依瀏覽者計算，無共同興趣則不顯示） -->
               <div
-                v-if="matchedUser.interests && matchedUser.interests.length > 0"
+                v-if="matchedUser.common_interests && matchedUser.common_interests.length > 0"
                 class="common-interests"
               >
-                <p class="interests-title">共同興趣</p>
+                <p class="interests-title">你們都喜歡</p>
                 <div class="interests-tags">
                   <span
-                    v-for="interest in matchedUser.interests.slice(0, 3)"
+                    v-for="interest in matchedUser.common_interests.slice(0, 3)"
                     :key="interest"
                     class="interest-tag"
                   >
                     {{ interest }}
+                  </span>
+                  <span v-if="matchedUser.common_interests.length > 3" class="interest-tag">
+                    +{{ matchedUser.common_interests.length - 3 }}
                   </span>
                 </div>
               </div>
