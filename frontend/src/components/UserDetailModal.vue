@@ -116,7 +116,6 @@ const props = defineProps({
   },
   user: {
     type: Object,
-    required: true,
     default: () => ({})
   }
 })
@@ -128,15 +127,7 @@ const currentPhotoIndex = ref(0)
 
 // 計算照片列表
 const photos = computed(() => {
-  if (!props.user) return []
-  // 支援 photos 陣列或單一 profile_picture
-  if (Array.isArray(props.user.photos) && props.user.photos.length > 0) {
-    return props.user.photos
-  }
-  if (props.user.profile_picture) {
-    return [props.user.profile_picture]
-  }
-  return []
+  return Array.isArray(props.user?.photos) ? props.user.photos : []
 })
 
 // 共同興趣（配對理由），依候選人興趣順序
