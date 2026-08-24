@@ -80,8 +80,12 @@ Internet
 - [ ] VIP 會員系統
 - [ ] Super Like 功能
 - [ ] Boost 曝光功能
-- [ ] 查看誰喜歡我
 - [ ] 金流整合（綠界）
+
+> 「查看誰喜歡我」原本列在此階段變現，已改為 MVP **免費**功能上線（`/likes-you` 頁面）。
+> 理由：模糊化 teaser 的操弄感與品牌調性「安全感貫穿始終」衝突，且現階段談變現太早。
+> 同期上線的「Rewind 撤銷跳過」（`DELETE /api/discovery/pass/{user_id}`）基於同一理由也不設付費牆。
+> 詳見 FEATURES.md Week 3 與 MATCHING_ALGORITHM.md。
 
 ---
 
@@ -123,4 +127,4 @@ Internet
 
 ---
 
-最後更新：2026-06-19
+最後更新：2026-08-24

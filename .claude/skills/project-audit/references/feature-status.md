@@ -36,8 +36,12 @@
 | 瀏覽候選人 | `GET /api/discovery/browse` | Discovery.vue | ✅ |
 | 喜歡 | `POST /api/discovery/like/{user_id}` | Discovery.vue | ✅ |
 | Pass 跳過 | `POST /api/discovery/pass/{user_id}`（matching 排除 24h 內 pass，背景清理 `pass_cleanup.py`） | Discovery.vue | ✅ |
+| 撤銷跳過 Rewind | `DELETE /api/discovery/pass/{user_id}`（只撤 Pass 不撤 Like；無記錄回 404） | Discovery.vue「↩ 上一個」 | ✅ |
+| 誰喜歡我 | `GET /api/discovery/likes-you`（免費開放；排除已喜歡／已配對／雙向封鎖／24h 內跳過） | LikesYou.vue（`/likes-you`） | ✅ |
+| 空池放寬建議 | `GET /api/discovery/expand-suggestions`（距離 ×2、年齡 ±5 試算「+N 位」，後端不自動改偏好） | Discovery.vue 空池一鍵套用 → `PATCH /api/profile` | ✅ |
+| 已喜歡我優先曝光 | `LIKED_ME_SORT_BONUS=15`，豁免 `MIN_MATCH_SCORE`，只影響排序不外洩（matching_service.py） | 卡片不透露（刻意） | ✅ |
 | 每日 like 上限 | `FREE_DAILY_LIKE_LIMIT=50`，Redis 原子計數，超限回 HTTP 429（discovery.py:61,408,440） | Discovery.vue | ✅ |
-| 配對列表 | `GET /api/discovery/matches` | Matches.vue | ✅ |
+| 配對列表 | `GET /api/discovery/matches`（含 `distance_km`、`common_interests`、`last_active`） | Matches.vue（距離／共同興趣／在線狀態） | ✅ |
 
 ## 聊天系統
 

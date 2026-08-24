@@ -299,9 +299,44 @@ LIKED_ME_SORT_BONUS = 15.0  # 只影響排序，不寫進回傳的 match_score
 2. **豁免 `MIN_MATCH_SCORE`**
 3. **排序加 +15**：保守加分而非強制置頂，避免低品質暗戀者洗版整個卡堆
 
-**紅線**：此訊號只用於排序。卡片上的 `match_score` 維持真實分數，`ProfileCard` **不新增任何欄位**
-透露「他喜歡你」（等同免費送出 Likes You 功能，且會讓用戶只滑那些人）。
+**紅線**：此訊號只用於排序。卡片上的 `match_score` 維持真實分數，browse 回傳的 `ProfileCard`
+**不帶任何欄位**透露「他喜歡你」。名單要看是在 `/likes-you`（見下節）——那是使用者主動點進去、
+心裡有底的情境；卡堆若也標記出來，用戶會只滑那些人，等於讓演算法失去意義。
 `test_browse_does_not_expose_liked_me_signal` 鎖住此約束。
+
+---
+
+## 💌 誰喜歡我（likes-you）
+
+「已喜歡我的人」在卡堆裡是**暗的**（上一節），要看名單得走獨立端點。免費開放、不做模糊化 teaser。
+
+```
+GET /api/discovery/likes-you?limit=50
+→ list[ProfileCard]   # 依對方喜歡我的時間排序（新到舊）
+```
+
+- 語意是「喜歡我**但我尚未回應**」，從這頁按喜歡**必定觸發配對**（對方已喜歡我）
+- 排除條件刻意與 `_candidate_query()` 對齊：我已喜歡的（互相喜歡必成配對，涵蓋已配對與曾配對）、
+  已配對的（防禦性排除）、雙向封鎖、**24 小時內我跳過的**
+- 與 browse 不同，**不需完成個人檔案即可查看**；瀏覽者未設位置時 `distance_km` 回 `None`
+- 不套 `MIN_MATCH_SCORE`、不算 `match_score`——對方已經表態，分數在這裡沒有意義
+- 「有人喜歡你」通知的文案是「快去看看是誰吧」，點擊直接導向這一頁
+
+---
+
+## ↩️ 撤銷跳過（Rewind）
+
+滑錯是真實痛點，尤其鍵盤快捷鍵誤觸。
+
+```
+DELETE /api/discovery/pass/{user_id}
+→ { "rewound": true, "message": "已撤銷跳過" }   # 無記錄時 404
+```
+
+- 刪掉 `passes` 那筆記錄，對方立即重新回到候選池（24h 排除條件不再命中）
+- **只支援撤銷 Pass**：Like 可能已觸發配對與通知，對方甚至已發訊息，撤銷會傷及對方體驗
+- 前端只記「本 session 從卡堆跳過的最後一位」，撤銷後把卡片放回堆頂；
+  後端回 404（背景 `pass_cleanup.py` 已清掉記錄）視同成功——對方本來就不再被排除
 
 ---
 
@@ -424,8 +459,20 @@ GET /api/discovery/expand-suggestions
    - 卡片堆疊（顯示前 3 張）
    - 顯示配對分數百分比、共同興趣排前並高亮（詳情彈窗另有「你們都喜歡」區塊）
    - 用戶可透過按鈕或鍵盤快捷鍵喜歡或跳過
+   - 跳過後可按「↩ 上一個」撤銷（DELETE /api/discovery/pass/{user_id}）
    - 候選池為空 → 呼叫 expand-suggestions，顯示一鍵放寬距離／年齡按鈕
 ```
+
+### 配對列表流程
+
+`GET /api/discovery/matches` 除了配對本身，也回傳與探索卡片同一套衍生資訊，讓列表能呈現「為什麼配上」：
+
+- `distance_km`：與瀏覽者的距離，用 PostGIS `ST_Distance` 在同一次批次查詢裡算出（不額外發查詢）；
+  瀏覽者未設定位置時為 `None`。注意 **0 公里是合法值**，前端判斷有無資料要用 `!= null` 而非 falsy
+- `common_interests`：共用 `compute_common_interests()`，與卡片的配對理由同一份邏輯
+- `last_active`：供前端顯示在線狀態
+
+瀏覽者未建檔不阻擋配對列表（視為無興趣、無位置），畢竟配對早已成立。
 
 ### 分數計算流程
 

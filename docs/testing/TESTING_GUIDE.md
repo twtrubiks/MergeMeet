@@ -188,6 +188,41 @@ npm run dev
 - 卡片滑出，該用戶 24 小時內不再出現
 - Network: `POST /api/discovery/pass/{user_id}` 返回 `200`
 
+#### 測試案例：撤銷跳過（Rewind）
+
+1. 先跳過一位候選人
+2. 點擊卡堆上方的「↩ 上一個」按鈕
+
+**預期結果：**
+
+- 該用戶回到卡堆頂端，按鈕變回不可點（一次只能撤銷最後一位）
+- Network: `DELETE /api/discovery/pass/{user_id}` 返回 `200`
+- 重新整理後仍不再被 24h 規則排除（後端記錄已刪除）
+- 只支援撤銷跳過；喜歡（含已成配對者）不提供撤銷
+
+#### 測試案例：空池放寬建議
+
+1. 把偏好調到極窄（例如距離 1 公里）讓候選池為空
+2. 觀察空池畫面
+
+**預期結果：**
+
+- Network: `GET /api/discovery/expand-suggestions` 返回 `200`
+- 顯示「距離放寬到 N 公里（+M 位）」之類的一鍵按鈕（沒有幫助時不顯示）
+- 點擊後 `PATCH /api/profile` 真的更新偏好，並重新載入候選人
+
+#### 測試案例：誰喜歡我
+
+1. 用另一個帳號喜歡目前登入的用戶
+2. 訪問 http://localhost:5173/likes-you （或點擊「有人喜歡你」通知）
+
+**預期結果：**
+
+- Network: `GET /api/discovery/likes-you` 返回 `200`
+- 列出該用戶，依喜歡時間新到舊排序
+- 在這頁按喜歡 → **必定**顯示「配對成功」彈窗
+- 已回應（喜歡或 24h 內跳過）的人不再出現在列表
+
 ---
 
 ### 3.4 即時聊天
@@ -332,6 +367,18 @@ curl -H "Authorization: Bearer $TOKEN" \
 # 喜歡用戶
 curl -X POST -H "Authorization: Bearer $TOKEN" \
   "http://localhost:8000/api/discovery/like/{USER_ID}"
+
+# 撤銷跳過（Rewind，只支援撤銷 pass）
+curl -X DELETE -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8000/api/discovery/pass/{USER_ID}"
+
+# 誰喜歡我
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8000/api/discovery/likes-you"
+
+# 空池放寬建議
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8000/api/discovery/expand-suggestions"
 
 # 查看配對
 curl -H "Authorization: Bearer $TOKEN" \
