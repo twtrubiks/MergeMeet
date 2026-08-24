@@ -107,6 +107,7 @@
 <script setup>
 import { ref, computed, watch, onUnmounted } from 'vue'
 import Icon from '@/components/ui/Icon.vue'
+import { formatDistance } from '@/utils/distance'
 
 const props = defineProps({
   show: {
@@ -166,14 +167,6 @@ const nextPhoto = () => {
 
 const goToPhoto = (index) => {
   currentPhotoIndex.value = index
-}
-
-// 距離格式化
-const formatDistance = (km) => {
-  if (km === null || km === undefined) return ''
-  if (km < 1) return `${Math.round(km * 1000)}m`
-  if (km < 10) return `${km.toFixed(1)}km`
-  return `${Math.round(km)}km`
 }
 
 // 關閉 Modal

@@ -33,7 +33,7 @@ from datetime import UTC, datetime, timedelta
 import redis.asyncio as redis
 from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, func, null, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -588,8 +588,15 @@ async def get_matches(
     ]
 
     # 批次查詢 1：所有配對用戶的 profiles（1 次查詢取代 N 次，排除已停用/已刪除帳號）
+    # 一併計算與瀏覽者的距離（與探索卡片同一套球面算法）；瀏覽者未設定位置時距離為 None
+    if viewer_profile is not None and viewer_profile.location is not None:
+        distance_col = (
+            func.ST_Distance(Profile.location, viewer_profile.location, True) / 1000
+        ).label("distance_km")
+    else:
+        distance_col = null().label("distance_km")
     profiles_result = await db.execute(
-        select(Profile)
+        select(Profile, distance_col)
         .join(User, Profile.user_id == User.id)
         .options(
             selectinload(Profile.user),
@@ -598,7 +605,9 @@ async def get_matches(
         )
         .where(and_(Profile.user_id.in_(matched_user_ids), User.is_active.is_(True)))
     )
-    profiles_by_user_id = {p.user_id: p for p in profiles_result.scalars().all()}
+    profiles_by_user_id = {
+        profile.user_id: (profile, distance_km) for profile, distance_km in profiles_result.all()
+    }
 
     # 批次查詢 2：所有未讀訊息數（1 次查詢取代 N 次）
     unread_counts_result = await db.execute(
@@ -624,7 +633,7 @@ async def get_matches(
         matched_user_id = match.user2_id if match.user1_id == current_user.id else match.user1_id
 
         # 從批次載入的數據中獲取
-        matched_profile = profiles_by_user_id.get(matched_user_id)
+        matched_profile, distance_km = profiles_by_user_id.get(matched_user_id, (None, None))
 
         if not matched_profile:
             continue
@@ -644,9 +653,11 @@ async def get_matches(
             gender=matched_profile.gender,
             bio=matched_profile.bio,
             location_name=matched_profile.location_name,
+            distance_km=round(distance_km, 1) if distance_km is not None else None,
             interests=interests,
             common_interests=compute_common_interests(viewer_interests, interests),
             photos=photos,
+            last_active=matched_profile.last_active,
         )
 
         # 從批次載入的數據中獲取未讀數

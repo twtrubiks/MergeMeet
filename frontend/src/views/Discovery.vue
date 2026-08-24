@@ -131,7 +131,7 @@
             </div>
 
             <!-- 距離 -->
-            <p v-if="candidate.distance_km" class="card-distance">
+            <p v-if="candidate.distance_km != null" class="card-distance">
               <Icon name="location" size="xs" decorative class="distance-icon" />
               {{ formatDistance(candidate.distance_km) }}
             </p>
@@ -243,6 +243,7 @@ import HeartLoader from '@/components/ui/HeartLoader.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
 import { logger } from '@/utils/logger'
 import { displayInterests } from '@/utils/interests'
+import { formatDistance, isNearby } from '@/utils/distance'
 
 const message = useMessage()
 const discoveryStore = useDiscoveryStore()
@@ -276,25 +277,14 @@ const visibleCandidates = computed(() => {
   return discoveryStore.candidates.slice(0, 3)
 })
 
-/**
- * 格式化距離顯示
- */
-const formatDistance = (km) => {
-  if (km < 1) {
-    return `${Math.round(km * 1000)}m`
-  } else if (km < 10) {
-    return `${km.toFixed(1)}km`
-  } else {
-    return `${Math.round(km)}km`
-  }
-}
-
 // 當前候選人的 aria-label
 const currentCandidateAria = computed(() => {
   const c = discoveryStore.currentCandidate
   if (!c) return '沒有候選人'
   const parts = [`候選人：${c.display_name}，${c.age}歲`]
-  if (c.distance_km) parts.push(`距離${formatDistance(c.distance_km)}`)
+  if (c.distance_km != null) {
+    parts.push(isNearby(c.distance_km) ? '就在附近' : `距離${formatDistance(c.distance_km)}`)
+  }
   if (c.match_score) parts.push(`配對分數${c.match_score}%`)
   parts.push('按左方向鍵跳過，右方向鍵喜歡，Enter查看詳情')
   return parts.join('，')

@@ -25,6 +25,9 @@ class ProfileCard(BaseModel):
     )
     photos: list[str] = []  # 照片 URL 列表
     match_score: float | None = Field(None, description="配對分數（0-100）")
+    last_active: datetime | None = Field(
+        None, description="最後活躍時間（目前僅配對列表回傳，供前端顯示在線狀態）"
+    )
 
 
 class ExpandSuggestion(BaseModel):

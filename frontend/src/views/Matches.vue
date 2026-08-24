@@ -92,7 +92,7 @@
                 <span class="match-age">{{ match.matched_user.age }}</span>
               </div>
 
-              <p v-if="match.matched_user.distance_km" class="match-distance">
+              <p v-if="match.matched_user.distance_km != null" class="match-distance">
                 <Icon name="location" size="xs" decorative />
                 {{ formatDistance(match.matched_user.distance_km) }}
               </p>
@@ -228,6 +228,7 @@ import UserDetailModal from '@/components/UserDetailModal.vue'
 import Icon from '@/components/ui/Icon.vue'
 import { formatMatchDate } from '@/utils/dateFormat'
 import { displayInterests } from '@/utils/interests'
+import { formatDistance } from '@/utils/distance'
 import { logger } from '@/utils/logger'
 
 // 配對卡片最多顯示的興趣數
@@ -258,19 +259,6 @@ const openUserDetail = (match) => {
 const closeUserDetail = () => {
   showUserDetail.value = false
   selectedUser.value = null
-}
-
-/**
- * 格式化距離顯示
- */
-const formatDistance = (km) => {
-  if (km < 1) {
-    return `${Math.round(km * 1000)}m`
-  } else if (km < 10) {
-    return `${km.toFixed(1)}km`
-  } else {
-    return `${Math.round(km)}km`
-  }
 }
 
 /**

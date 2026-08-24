@@ -401,7 +401,7 @@ class MatchingService:
                     gender=profile.gender,
                     bio=profile.bio,
                     location_name=profile.location_name,
-                    distance_km=round(distance_km, 1) if distance_km else None,
+                    distance_km=round(distance_km, 1) if distance_km is not None else None,
                     interests=interests,
                     common_interests=compute_common_interests(user_data["interests"], interests),
                     photos=photos,

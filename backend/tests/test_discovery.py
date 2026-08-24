@@ -1064,6 +1064,110 @@ async def test_matches_return_common_interests_with_viewer(
 
 
 @pytest.mark.asyncio
+async def test_matches_return_last_active(
+    client: AsyncClient, completed_profiles: dict, test_db: AsyncSession
+):
+    """配對列表回傳對方的 last_active（前端據此顯示在線狀態）
+
+    回歸測試：前端 Matches 頁一直讀 matched_user.last_active 判斷在線，
+    但後端從未回傳此欄位，導致在線標記永遠不顯示。
+    """
+    alice_headers = completed_profiles["alice"]["headers"]
+    bob_headers = completed_profiles["bob"]["headers"]
+    alice = (await client.get("/api/profile", headers=alice_headers)).json()
+    bob = (await client.get("/api/profile", headers=bob_headers)).json()
+
+    # 互相喜歡以建立配對
+    await client.post(f"/api/discovery/like/{bob['user_id']}", headers=alice_headers)
+    await client.post(f"/api/discovery/like/{alice['user_id']}", headers=bob_headers)
+
+    # 直接設定 Bob 的最後活躍時間（配對建立後，避免被 like 請求的 middleware 覆蓋）
+    bob_active_at = datetime.now(UTC) - timedelta(minutes=2)
+    result = await test_db.execute(
+        select(Profile).where(Profile.user_id == uuid.UUID(bob["user_id"]))
+    )
+    bob_profile = result.scalar_one()
+    bob_profile.last_active = bob_active_at
+    await test_db.commit()
+
+    # Alice 查配對列表應看到 Bob 的 last_active
+    response = await client.get("/api/discovery/matches", headers=alice_headers)
+    assert response.status_code == 200
+    matched_bob = next(
+        m["matched_user"] for m in response.json() if m["matched_user"]["user_id"] == bob["user_id"]
+    )
+    assert matched_bob["last_active"] is not None
+    returned = datetime.fromisoformat(matched_bob["last_active"])
+    assert abs((returned - bob_active_at).total_seconds()) < 1
+
+
+@pytest.mark.asyncio
+async def test_matches_return_distance(client: AsyncClient, completed_profiles: dict):
+    """配對列表回傳與對方的距離（與探索卡片同一套算法）
+
+    回歸測試：前端 Matches 頁與 UserDetailModal 一直讀 matched_user.distance_km，
+    但 get_matches 從未計算距離，導致配對列表的距離永遠不顯示。
+    fixture：Alice 在信義區、Bob 在大安區，實際距離約 2.4 公里。
+    """
+    alice_headers = completed_profiles["alice"]["headers"]
+    bob_headers = completed_profiles["bob"]["headers"]
+    alice = (await client.get("/api/profile", headers=alice_headers)).json()
+    bob = (await client.get("/api/profile", headers=bob_headers)).json()
+
+    # 互相喜歡以建立配對
+    await client.post(f"/api/discovery/like/{bob['user_id']}", headers=alice_headers)
+    await client.post(f"/api/discovery/like/{alice['user_id']}", headers=bob_headers)
+
+    response = await client.get("/api/discovery/matches", headers=alice_headers)
+    assert response.status_code == 200
+    matched_bob = next(
+        m["matched_user"] for m in response.json() if m["matched_user"]["user_id"] == bob["user_id"]
+    )
+    assert matched_bob["distance_km"] is not None
+    assert 0 < matched_bob["distance_km"] < 10
+
+
+@pytest.mark.asyncio
+async def test_matches_return_zero_distance_when_same_location(
+    client: AsyncClient, completed_profiles: dict
+):
+    """兩人位置相同時距離回傳 0.0，而非 None
+
+    回歸測試：`round(distance_km, 1) if distance_km else None` 把 0.0 當成 falsy，
+    導致同一座標的配對對象距離被丟成 None，畫面上完全不顯示距離。
+    """
+    alice_headers = completed_profiles["alice"]["headers"]
+    bob_headers = completed_profiles["bob"]["headers"]
+    alice = (await client.get("/api/profile", headers=alice_headers)).json()
+
+    # 把 Bob 搬到與 Alice 完全相同的座標
+    response = await client.patch(
+        "/api/profile",
+        headers=bob_headers,
+        json={
+            "location": {
+                "latitude": 25.0330,
+                "longitude": 121.5654,
+                "location_name": "台北市信義區",
+            }
+        },
+    )
+    assert response.status_code == 200
+    bob = (await client.get("/api/profile", headers=bob_headers)).json()
+
+    # 互相喜歡以建立配對
+    await client.post(f"/api/discovery/like/{bob['user_id']}", headers=alice_headers)
+    await client.post(f"/api/discovery/like/{alice['user_id']}", headers=bob_headers)
+
+    response = await client.get("/api/discovery/matches", headers=alice_headers)
+    assert response.status_code == 200
+    matched_bob = next(
+        m["matched_user"] for m in response.json() if m["matched_user"]["user_id"] == bob["user_id"]
+    )
+    assert matched_bob["distance_km"] == 0.0
+
+
+@pytest.mark.asyncio
 async def test_unmatch(client: AsyncClient, completed_profiles: dict):
     """測試：取消配對"""
     # 先建立配對
