@@ -33,7 +33,7 @@ from datetime import UTC, datetime, timedelta
 import redis.asyncio as redis
 from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import and_, func, null, or_, select
+from sqlalchemy import and_, case, func, null, or_, select, union_all
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,7 +41,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
-from app.models.match import Like, Match, Message, Pass
+from app.models.match import BlockedUser, Like, Match, Message, Pass
 from app.models.notification import Notification
 from app.models.profile import Profile
 from app.models.user import User
@@ -117,6 +117,115 @@ async def get_expand_suggestions(
     my_profile = await _get_browse_profile(db, current_user.id)
     suggestions = await matching_service.expand_suggestions(db, current_user.id, my_profile)
     return ExpandSuggestionsResponse(suggestions=suggestions)
+
+
+@router.get("/likes-you", response_model=list[ProfileCard])
+async def get_likes_you(
+    limit: int = Query(50, ge=1, le=100, description="返回數量"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """誰喜歡我 - 喜歡我但我尚未回應的用戶列表
+
+    從這裡按喜歡必定觸發配對（對方已喜歡我）。
+
+    排除:
+    - 我已喜歡的用戶（互相喜歡時配對必已成立，涵蓋已配對與曾配對）
+    - 已封鎖（雙向）的用戶
+    - 24 小時內我跳過的用戶（與探索列表的排除規則一致）
+
+    不需完成個人檔案即可查看；瀏覽者未設定位置時距離為 None。
+    依對方喜歡我的時間排序（新到舊）。
+    """
+    # 瀏覽者自己的 profile（用於算共同興趣與距離）；未建檔不阻擋查看
+    viewer_result = await db.execute(
+        select(Profile)
+        .options(selectinload(Profile.interests))
+        .where(Profile.user_id == current_user.id)
+    )
+    viewer_profile = viewer_result.scalar_one_or_none()
+    viewer_interests = [i.name for i in viewer_profile.interests] if viewer_profile else []
+
+    if viewer_profile is not None and viewer_profile.location is not None:
+        distance_col = (
+            func.ST_Distance(Profile.location, viewer_profile.location, True) / 1000
+        ).label("distance_km")
+    else:
+        distance_col = null().label("distance_km")
+
+    # 排除清單（與 matching_service._candidate_query 的排除語意一致）
+    pass_cutoff = datetime.now(UTC) - timedelta(hours=24)
+    excluded_users = union_all(
+        # 我已喜歡的用戶（互相喜歡必成配對，故也涵蓋配對狀態）
+        select(Like.to_user_id.label("user_id")).where(Like.from_user_id == current_user.id),
+        # 已配對的用戶（防禦性排除：即使 like 記錄異常遺失也不洩漏）
+        select(
+            case((Match.user1_id == current_user.id, Match.user2_id), else_=Match.user1_id).label(
+                "user_id"
+            )
+        ).where(
+            or_(Match.user1_id == current_user.id, Match.user2_id == current_user.id),
+            Match.status == "ACTIVE",
+        ),
+        # 我封鎖的用戶
+        select(BlockedUser.blocked_id.label("user_id")).where(
+            BlockedUser.blocker_id == current_user.id
+        ),
+        # 封鎖我的用戶
+        select(BlockedUser.blocker_id.label("user_id")).where(
+            BlockedUser.blocked_id == current_user.id
+        ),
+        # 24h 內我跳過的用戶
+        select(Pass.to_user_id.label("user_id")).where(
+            Pass.from_user_id == current_user.id,
+            Pass.passed_at > pass_cutoff,
+        ),
+    ).subquery("excluded")
+
+    result = await db.execute(
+        select(Profile, distance_col)
+        .join(Like, Like.from_user_id == Profile.user_id)
+        .join(User, Profile.user_id == User.id)
+        .options(
+            selectinload(Profile.user),
+            selectinload(Profile.photos),
+            selectinload(Profile.interests),
+        )
+        .where(
+            and_(
+                Like.to_user_id == current_user.id,
+                Profile.is_visible.is_(True),
+                Profile.is_complete.is_(True),
+                User.is_active.is_(True),
+                Profile.user_id.notin_(select(excluded_users.c.user_id)),
+            )
+        )
+        .order_by(Like.created_at.desc())
+        .limit(limit)
+    )
+
+    today = datetime.today().date()
+    cards = []
+    for profile, distance_km in result.all():
+        age = relativedelta(today, profile.user.date_of_birth).years
+        interests = [interest.name for interest in profile.interests]
+        cards.append(
+            ProfileCard(
+                user_id=profile.user_id,
+                display_name=profile.display_name,
+                age=age,
+                gender=profile.gender,
+                bio=profile.bio,
+                location_name=profile.location_name,
+                distance_km=round(distance_km, 1) if distance_km is not None else None,
+                interests=interests,
+                common_interests=compute_common_interests(viewer_interests, interests),
+                photos=[photo.url for photo in profile.public_photos],
+                last_active=profile.last_active,
+            )
+        )
+
+    return cards
 
 
 # ========== like_user 輔助函數 ==========
@@ -388,14 +497,14 @@ async def _send_like_notifications(
     else:
         # 【通知類型 2】有人喜歡你通知 (notification_liked)
         # 對方還沒喜歡我，發送「有人喜歡你」通知給對方
-        # 注意：不透露是誰喜歡，保持神秘感
+        # 注意：通知本身不透露是誰喜歡，由「誰喜歡我」頁揭曉
 
         # 持久化通知到資料庫
         notification_liked = Notification(
             user_id=target_user_id,
             type="notification_liked",
             title="有人喜歡你！",
-            content="有人對你心動了，快去探索看看吧！",
+            content="有人對你心動了，快去看看是誰吧！",
             data={},
         )
         db.add(notification_liked)

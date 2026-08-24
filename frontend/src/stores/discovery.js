@@ -16,11 +16,14 @@ export const useDiscoveryStore = defineStore('discovery', () => {
   const lastMatchedUser = ref(null) // 用於顯示配對成功彈窗
   const expandSuggestions = ref([]) // 空池時的偏好放寬建議
   const suggestionsLoading = ref(false)
+  const likesYou = ref([]) // 誰喜歡我列表
+  const likesYouLoading = ref(false)
 
   // Getters
   const hasCandidates = computed(() => candidates.value.length > 0)
   const hasMatches = computed(() => matches.value.length > 0)
   const matchCount = computed(() => matches.value.length)
+  const hasLikesYou = computed(() => likesYou.value.length > 0)
 
   /**
    * 瀏覽候選人列表
@@ -97,9 +100,11 @@ export const useDiscoveryStore = defineStore('discovery', () => {
   /**
    * 喜歡某個用戶
    * @param {string} userId - 用戶 ID
+   * @param {Object|null} sourceCard - 發起喜歡的卡片資料（誰喜歡我頁傳入；
+   *   探索卡堆不用傳，預設取 currentCandidate），配對成功時用於彈窗顯示
    * @returns {Object} { liked, is_match, match_id? }（對齊後端 LikeResponse）
    */
-  const likeUser = async (userId) => {
+  const likeUser = async (userId, sourceCard = null) => {
     loading.value = true
     error.value = null
     try {
@@ -108,7 +113,7 @@ export const useDiscoveryStore = defineStore('discovery', () => {
 
       // 如果配對成功，保存配對用戶資訊用於顯示彈窗
       if (result.is_match) {
-        lastMatchedUser.value = currentCandidate.value
+        lastMatchedUser.value = sourceCard || currentCandidate.value
         // 重新取得配對列表
         await fetchMatches()
       }
@@ -146,6 +151,33 @@ export const useDiscoveryStore = defineStore('discovery', () => {
     } finally {
       loading.value = false
     }
+  }
+
+  /**
+   * 取得誰喜歡我列表
+   * 從這頁按喜歡必定觸發配對（對方已喜歡我）
+   */
+  const fetchLikesYou = async () => {
+    likesYouLoading.value = true
+    error.value = null
+    try {
+      const response = await apiClient.get('/discovery/likes-you')
+      likesYou.value = response.data
+      return response.data
+    } catch (err) {
+      error.value = err.response?.data?.detail || '無法取得誰喜歡我列表'
+      throw err
+    } finally {
+      likesYouLoading.value = false
+    }
+  }
+
+  /**
+   * 從誰喜歡我列表移除指定用戶（回喜歡或跳過後呼叫）
+   * @param {string} userId - 用戶 ID
+   */
+  const removeFromLikesYou = (userId) => {
+    likesYou.value = likesYou.value.filter((card) => card.user_id !== userId)
   }
 
   /**
@@ -224,6 +256,8 @@ export const useDiscoveryStore = defineStore('discovery', () => {
     lastMatchedUser.value = null
     expandSuggestions.value = []
     suggestionsLoading.value = false
+    likesYou.value = []
+    likesYouLoading.value = false
   }
 
   return {
@@ -236,11 +270,14 @@ export const useDiscoveryStore = defineStore('discovery', () => {
     lastMatchedUser,
     expandSuggestions,
     suggestionsLoading,
+    likesYou,
+    likesYouLoading,
 
     // Getters
     hasCandidates,
     hasMatches,
     matchCount,
+    hasLikesYou,
 
     // Actions
     browseCandidates,
@@ -248,6 +285,8 @@ export const useDiscoveryStore = defineStore('discovery', () => {
     applyExpandSuggestion,
     likeUser,
     passUser,
+    fetchLikesYou,
+    removeFromLikesYou,
     fetchMatches,
     unmatch,
     removeCurrentCandidate,

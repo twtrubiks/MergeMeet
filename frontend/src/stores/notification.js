@@ -170,8 +170,8 @@ export const useNotificationStore = defineStore('notification', () => {
       id: data.notification_id, // 使用資料庫通知 ID
       type: NotificationType.SOMEONE_LIKED_YOU,
       title: '有人喜歡你',
-      content: '有人對你表示好感，快去探索看看吧！',
-      data: {}, // 不透露是誰喜歡，保持神秘感
+      content: '有人對你表示好感，快去看看是誰吧！',
+      data: {}, // 通知本身不透露是誰喜歡，點擊導向誰喜歡我頁揭曉
       timestamp: data.timestamp,
       fromAPI: !!data.notification_id // 有資料庫 ID 則標記為 API 來源
     })

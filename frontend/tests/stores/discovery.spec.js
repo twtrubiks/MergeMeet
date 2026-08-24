@@ -478,4 +478,69 @@ describe('Discovery Store', () => {
       expect(store.expandSuggestions).toEqual([])
     })
   })
+
+  describe('誰喜歡我（Likes You）', () => {
+    const mockLikers = [
+      { user_id: 'user1', display_name: 'Alice', age: 25 },
+      { user_id: 'user2', display_name: 'Bob', age: 28 }
+    ]
+
+    it('應該成功取得誰喜歡我列表', async () => {
+      const store = useDiscoveryStore()
+      apiClient.get.mockResolvedValue({ data: mockLikers })
+
+      const result = await store.fetchLikesYou()
+
+      expect(apiClient.get).toHaveBeenCalledWith('/discovery/likes-you')
+      expect(store.likesYou).toEqual(mockLikers)
+      expect(store.hasLikesYou).toBe(true)
+      expect(result).toEqual(mockLikers)
+      expect(store.likesYouLoading).toBe(false)
+    })
+
+    it('應該處理取得列表失敗', async () => {
+      const store = useDiscoveryStore()
+      apiClient.get.mockRejectedValue({
+        response: { data: { detail: '無法取得誰喜歡我列表' } }
+      })
+
+      await expect(store.fetchLikesYou()).rejects.toBeDefined()
+      expect(store.error).toBe('無法取得誰喜歡我列表')
+    })
+
+    it('removeFromLikesYou 應該移除指定用戶', () => {
+      const store = useDiscoveryStore()
+      store.likesYou = [...mockLikers]
+
+      store.removeFromLikesYou('user1')
+
+      expect(store.likesYou).toHaveLength(1)
+      expect(store.likesYou[0].user_id).toBe('user2')
+    })
+
+    it('likeUser 帶 sourceCard 時配對成功應以其顯示彈窗（供誰喜歡我頁使用）', async () => {
+      const store = useDiscoveryStore()
+      const sourceCard = { user_id: 'user1', display_name: 'Alice' }
+      store.currentCandidate = { user_id: 'other', display_name: 'Other' }
+
+      apiClient.post.mockResolvedValue({
+        data: { liked: true, is_match: true, match_id: 'match123' }
+      })
+      apiClient.get.mockResolvedValue({ data: [] }) // fetchMatches
+
+      await store.likeUser('user1', sourceCard)
+
+      expect(store.lastMatchedUser).toEqual(sourceCard)
+    })
+
+    it('$reset 應清除誰喜歡我狀態', () => {
+      const store = useDiscoveryStore()
+      store.likesYou = [...mockLikers]
+
+      store.$reset()
+
+      expect(store.likesYou).toEqual([])
+    })
+  })
+
 })

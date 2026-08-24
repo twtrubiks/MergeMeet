@@ -23,6 +23,10 @@
           <Icon name="search" size="sm" decorative />
           <span class="nav-text">探索</span>
         </router-link>
+        <router-link to="/likes-you" class="nav-link" active-class="active">
+          <Icon name="heart-half" size="sm" decorative />
+          <span class="nav-text">喜歡你</span>
+        </router-link>
         <router-link to="/matches" class="nav-link" active-class="active">
           <Icon name="heart" size="sm" decorative />
           <span class="nav-text">配對</span>

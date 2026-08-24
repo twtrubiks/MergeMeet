@@ -76,6 +76,12 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresCompleteProfile: true }
     },
     {
+      path: '/likes-you',
+      name: 'likes-you',
+      component: () => import('@/views/LikesYou.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/matches',
       name: 'matches',
       component: () => import('@/views/Matches.vue'),

@@ -191,8 +191,8 @@ const handleNotificationClick = async (notification) => {
       break
 
     case NotificationType.SOMEONE_LIKED_YOU:
-      // 【通知類型 3】有人喜歡你 → 導航到探索頁面
-      router.push('/discovery')
+      // 【通知類型 3】有人喜歡你 → 導航到誰喜歡我頁面
+      router.push('/likes-you')
       break
 
     default:

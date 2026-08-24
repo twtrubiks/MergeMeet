@@ -1361,3 +1361,235 @@ async def test_like_redis_unavailable_fallback(client: AsyncClient, completed_pr
     # Redis 掛掉時應放行，不阻斷 like
     assert response.status_code == 200
     assert response.json()["liked"] is True
+
+
+# ==================== Likes You（誰喜歡我） ====================
+
+
+@pytest.mark.asyncio
+async def test_likes_you_empty(client: AsyncClient, completed_profiles: dict):
+    """測試：沒有人喜歡我時返回空列表"""
+    response = await client.get(
+        "/api/discovery/likes-you",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+@pytest.mark.asyncio
+async def test_likes_you_shows_liker(client: AsyncClient, completed_profiles: dict):
+    """測試：Bob 喜歡 Alice 後，Alice 的誰喜歡我列表看得到 Bob（含共同興趣與距離）"""
+    # Bob 瀏覽找到 Alice 並喜歡
+    response = await client.get(
+        "/api/discovery/browse?limit=10",
+        headers={"Authorization": f"Bearer {completed_profiles['bob']['token']}"},
+    )
+    alice_user_id = next(
+        (c["user_id"] for c in response.json() if c["display_name"] == "Alice"), None
+    )
+    if not alice_user_id:
+        pytest.skip("Bob 看不到 Alice")
+
+    response = await client.post(
+        f"/api/discovery/like/{alice_user_id}",
+        headers={"Authorization": f"Bearer {completed_profiles['bob']['token']}"},
+    )
+    assert response.status_code == 200
+
+    # Alice 查看誰喜歡我
+    response = await client.get(
+        "/api/discovery/likes-you",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+    )
+
+    assert response.status_code == 200
+    likers = response.json()
+    assert len(likers) == 1
+    liker = likers[0]
+    assert liker["display_name"] == "Bob"
+    # 共同興趣（fixture 中 Alice/Bob 有 3 個重疊興趣）與距離都應回傳
+    assert len(liker["common_interests"]) > 0
+    assert liker["distance_km"] is not None
+    # 此端點不計算配對分數
+    assert liker["match_score"] is None
+
+    # Bob 自己的列表不受影響（Alice 還沒喜歡 Bob）
+    response = await client.get(
+        "/api/discovery/likes-you",
+        headers={"Authorization": f"Bearer {completed_profiles['bob']['token']}"},
+    )
+    assert response.json() == []
+
+
+@pytest.mark.asyncio
+async def test_likes_you_excludes_matched_user(client: AsyncClient, completed_profiles: dict):
+    """測試：互相喜歡成為配對後，雙方的誰喜歡我列表都不再出現對方"""
+    # 互相喜歡建立配對
+    response = await client.get(
+        "/api/discovery/browse?limit=1",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+    )
+    candidates = response.json()
+    if len(candidates) == 0:
+        pytest.skip("沒有可配對的候選人")
+    bob_user_id = candidates[0]["user_id"]
+
+    response = await client.get(
+        "/api/discovery/browse?limit=10",
+        headers={"Authorization": f"Bearer {completed_profiles['bob']['token']}"},
+    )
+    alice_user_id = next(
+        (c["user_id"] for c in response.json() if c["display_name"] == "Alice"), None
+    )
+    if not alice_user_id:
+        pytest.skip("Bob 看不到 Alice")
+
+    await client.post(
+        f"/api/discovery/like/{alice_user_id}",
+        headers={"Authorization": f"Bearer {completed_profiles['bob']['token']}"},
+    )
+    response = await client.post(
+        f"/api/discovery/like/{bob_user_id}",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+    )
+    assert response.json()["is_match"] is True
+
+    # 雙方的誰喜歡我列表都應為空
+    for who in ("alice", "bob"):
+        response = await client.get(
+            "/api/discovery/likes-you",
+            headers={"Authorization": f"Bearer {completed_profiles[who]['token']}"},
+        )
+        assert response.json() == [], f"{who} 的誰喜歡我列表應排除已配對用戶"
+
+
+@pytest.mark.asyncio
+async def test_likes_you_excludes_passed_user_within_24h(
+    client: AsyncClient, completed_profiles: dict, test_db: AsyncSession
+):
+    """測試：24 小時內跳過的用戶不出現在誰喜歡我列表，過期後重新出現"""
+    result = await test_db.execute(
+        select(User.id).where(User.email == completed_profiles["alice"]["email"])
+    )
+    alice_user_id = result.scalar_one()
+
+    # Bob 喜歡 Alice
+    response = await client.get(
+        "/api/discovery/browse?limit=10",
+        headers={"Authorization": f"Bearer {completed_profiles['bob']['token']}"},
+    )
+    target_id = next((c["user_id"] for c in response.json() if c["display_name"] == "Alice"), None)
+    if not target_id:
+        pytest.skip("Bob 看不到 Alice")
+    await client.post(
+        f"/api/discovery/like/{target_id}",
+        headers={"Authorization": f"Bearer {completed_profiles['bob']['token']}"},
+    )
+
+    # Alice 跳過 Bob
+    result = await test_db.execute(
+        select(User.id).where(User.email == completed_profiles["bob"]["email"])
+    )
+    bob_user_id = result.scalar_one()
+    response = await client.post(
+        f"/api/discovery/pass/{bob_user_id}",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+    )
+    assert response.status_code == 200
+
+    # 24h 內：Bob 不出現
+    response = await client.get(
+        "/api/discovery/likes-you",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+    )
+    assert response.json() == []
+
+    # 模擬 25 小時後：Bob 重新出現
+    old_time = datetime.now(UTC) - timedelta(hours=25)
+    await test_db.execute(
+        Pass.__table__.update()
+        .where(Pass.from_user_id == alice_user_id, Pass.to_user_id == bob_user_id)
+        .values(passed_at=old_time)
+    )
+    await test_db.commit()
+
+    response = await client.get(
+        "/api/discovery/likes-you",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+    )
+    likers = response.json()
+    assert len(likers) == 1
+    assert likers[0]["display_name"] == "Bob"
+
+
+@pytest.mark.asyncio
+async def test_likes_you_excludes_blocked_user(
+    client: AsyncClient, completed_profiles: dict, test_db: AsyncSession
+):
+    """測試：封鎖後不再出現在誰喜歡我列表"""
+    # Bob 喜歡 Alice
+    response = await client.get(
+        "/api/discovery/browse?limit=10",
+        headers={"Authorization": f"Bearer {completed_profiles['bob']['token']}"},
+    )
+    target_id = next((c["user_id"] for c in response.json() if c["display_name"] == "Alice"), None)
+    if not target_id:
+        pytest.skip("Bob 看不到 Alice")
+    await client.post(
+        f"/api/discovery/like/{target_id}",
+        headers={"Authorization": f"Bearer {completed_profiles['bob']['token']}"},
+    )
+
+    # Alice 封鎖 Bob
+    result = await test_db.execute(
+        select(User.id).where(User.email == completed_profiles["bob"]["email"])
+    )
+    bob_user_id = result.scalar_one()
+    response = await client.post(
+        f"/api/safety/block/{bob_user_id}",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+        json={"reason": "測試封鎖"},
+    )
+    assert response.status_code == 201
+
+    response = await client.get(
+        "/api/discovery/likes-you",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+    )
+    assert response.json() == []
+
+
+@pytest.mark.asyncio
+async def test_likes_you_like_back_creates_match(client: AsyncClient, completed_profiles: dict):
+    """測試：從誰喜歡我列表按喜歡必定觸發配對"""
+    # Bob 喜歡 Alice
+    response = await client.get(
+        "/api/discovery/browse?limit=10",
+        headers={"Authorization": f"Bearer {completed_profiles['bob']['token']}"},
+    )
+    target_id = next((c["user_id"] for c in response.json() if c["display_name"] == "Alice"), None)
+    if not target_id:
+        pytest.skip("Bob 看不到 Alice")
+    await client.post(
+        f"/api/discovery/like/{target_id}",
+        headers={"Authorization": f"Bearer {completed_profiles['bob']['token']}"},
+    )
+
+    # Alice 從誰喜歡我列表拿到 Bob，回喜歡
+    response = await client.get(
+        "/api/discovery/likes-you",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+    )
+    likers = response.json()
+    assert len(likers) == 1
+
+    response = await client.post(
+        f"/api/discovery/like/{likers[0]['user_id']}",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["is_match"] is True
+    assert data["match_id"] is not None
