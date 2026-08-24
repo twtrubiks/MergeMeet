@@ -208,11 +208,15 @@ async def get_conversations(
         unread_count = unread_counts_by_match.get(match.id, 0)
 
         # 獲取對方的頭像（僅公開可見照片，排除審核駁回）
+        # 縮圖為正方形小圖，供列表/頭像顯示以節省流量；無縮圖時退回原圖
         other_user_avatar = None
+        other_user_avatar_thumb = None
         public_photos = other_profile.public_photos
         if public_photos:
             profile_photo = next((p for p in public_photos if p.is_profile_picture), None)
-            other_user_avatar = profile_photo.url if profile_photo else public_photos[0].url
+            avatar_photo = profile_photo or public_photos[0]
+            other_user_avatar = avatar_photo.url
+            other_user_avatar_thumb = avatar_photo.thumbnail_url or avatar_photo.url
 
         conversations.append(
             MatchWithLastMessageResponse(
@@ -220,6 +224,7 @@ async def get_conversations(
                 other_user_id=other_user_id,
                 other_user_name=other_profile.display_name if other_profile else "Unknown",
                 other_user_avatar=other_user_avatar,
+                other_user_avatar_thumb=other_user_avatar_thumb,
                 last_message=MessageResponse.model_validate(last_message) if last_message else None,
                 unread_count=unread_count,
                 matched_at=match.matched_at,

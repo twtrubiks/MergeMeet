@@ -49,10 +49,11 @@
             class="avatar-badge"
           >
             <n-avatar
-              :src="conversation.other_user_avatar"
+              :src="conversation.other_user_avatar_thumb || conversation.other_user_avatar"
               :fallback-src="defaultAvatar"
               size="large"
               round
+              object-fit="cover"
             />
           </n-badge>
 

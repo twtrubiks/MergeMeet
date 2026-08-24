@@ -204,6 +204,7 @@ async def test_conversation_avatar_skips_rejected_photo(
     conversations = response.json()
     assert len(conversations) == 1
     assert conversations[0]["other_user_avatar"] == pending["url"]
+    assert conversations[0]["other_user_avatar_thumb"] == pending["thumbnail_url"]
 
 
 @pytest.mark.asyncio
@@ -226,6 +227,7 @@ async def test_conversation_avatar_none_when_all_rejected(
     conversations = response.json()
     assert len(conversations) == 1
     assert conversations[0]["other_user_avatar"] is None
+    assert conversations[0]["other_user_avatar_thumb"] is None
 
 
 # ========== 完整度與 public_photos 單元測試（不需資料庫） ==========

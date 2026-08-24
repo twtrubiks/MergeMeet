@@ -95,5 +95,11 @@ main.with-navbar {
   padding-top: 56px; /* NavBar 高度 */
 }
 
+/* Naive UI n-avatar 的 object-fit prop 無預設值（undefined → fill），
+ * 非正方形照片會被拉伸變形，全域強制 cover 防漏（含 fallback-src 的 img） */
+.n-avatar img {
+  object-fit: cover;
+}
+
 /* prefers-reduced-motion 由 tokens.css 全域處理，此處不重複 */
 </style>

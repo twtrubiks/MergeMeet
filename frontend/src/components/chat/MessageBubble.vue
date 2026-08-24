@@ -2,7 +2,13 @@
   <div :class="['message-bubble', isOwn ? 'message-own' : 'message-other']">
     <!-- 對方頭像 (只在對方訊息顯示) -->
     <div v-if="!isOwn && showAvatar" class="message-avatar">
-      <n-avatar :src="otherUserAvatar" :fallback-src="defaultAvatar" size="small" round />
+      <n-avatar
+        :src="otherUserAvatar"
+        :fallback-src="defaultAvatar"
+        size="small"
+        round
+        object-fit="cover"
+      />
     </div>
 
     <!-- 訊息內容 -->

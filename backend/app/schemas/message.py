@@ -43,6 +43,9 @@ class MatchWithLastMessageResponse(BaseModel):
     other_user_id: UUID
     other_user_name: str
     other_user_avatar: str | None = None
+    other_user_avatar_thumb: str | None = Field(
+        None, description="頭像縮圖 URL（正方形小圖，供列表/頭像顯示；無縮圖時等同原圖）"
+    )
     last_message: MessageResponse | None = None
     unread_count: int
     matched_at: datetime

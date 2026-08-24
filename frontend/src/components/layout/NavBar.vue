@@ -41,7 +41,7 @@
         <!-- 用戶選單 -->
         <n-dropdown :options="userMenuOptions" @select="handleUserMenuSelect">
           <n-button text class="user-menu-btn">
-            <n-avatar v-if="userAvatar" :src="userAvatar" :size="32" round />
+            <n-avatar v-if="userAvatar" :src="userAvatar" :size="32" round object-fit="cover" />
             <n-avatar v-else :size="32" round>
               {{ userInitial }}
             </n-avatar>
@@ -67,13 +67,13 @@ const userStore = useUserStore()
 const profileStore = useProfileStore()
 
 /**
- * 用戶頭像
+ * 用戶頭像（優先用正方形縮圖節省流量，無縮圖時退回原圖）
  */
 const userAvatar = computed(() => {
   const profile = profileStore.profile
   if (profile?.photos?.length > 0) {
-    const primaryPhoto = profile.photos.find((p) => p.is_primary)
-    return primaryPhoto?.url || profile.photos[0]?.url
+    const primaryPhoto = profile.photos.find((p) => p.is_profile_picture) || profile.photos[0]
+    return primaryPhoto?.thumbnail_url || primaryPhoto?.url || null
   }
   return null
 })

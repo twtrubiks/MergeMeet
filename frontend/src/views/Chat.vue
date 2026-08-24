@@ -19,10 +19,13 @@
           @keydown.enter="openUserDetail"
         >
           <n-avatar
-            :src="currentConversation.other_user_avatar"
+            :src="
+              currentConversation.other_user_avatar_thumb || currentConversation.other_user_avatar
+            "
             :fallback-src="defaultAvatar"
             size="medium"
             round
+            object-fit="cover"
           />
           <div class="user-details">
             <div class="user-name">{{ currentConversation.other_user_name }}</div>
@@ -67,7 +70,9 @@
             :message="message"
             :is-own="message.sender_id === userStore.user?.id"
             :show-avatar="message.sender_id !== userStore.user?.id"
-            :other-user-avatar="currentConversation?.other_user_avatar"
+            :other-user-avatar="
+              currentConversation?.other_user_avatar_thumb || currentConversation?.other_user_avatar
+            "
             @delete="handleDeleteMessage"
             @preview-image="handlePreviewImage"
           />
