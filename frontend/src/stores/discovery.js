@@ -18,12 +18,14 @@ export const useDiscoveryStore = defineStore('discovery', () => {
   const suggestionsLoading = ref(false)
   const likesYou = ref([]) // 誰喜歡我列表
   const likesYouLoading = ref(false)
+  const lastPassedCandidate = ref(null) // 本 session 最後一次從卡堆跳過的候選人（供 Rewind）
 
   // Getters
   const hasCandidates = computed(() => candidates.value.length > 0)
   const hasMatches = computed(() => matches.value.length > 0)
   const matchCount = computed(() => matches.value.length)
   const hasLikesYou = computed(() => likesYou.value.length > 0)
+  const canRewind = computed(() => lastPassedCandidate.value !== null)
 
   /**
    * 瀏覽候選人列表
@@ -143,6 +145,11 @@ export const useDiscoveryStore = defineStore('discovery', () => {
     try {
       await apiClient.post(`/discovery/pass/${userId}`)
 
+      // 從卡堆跳過時記住這張卡，供 Rewind 撤銷（誰喜歡我頁的跳過不進卡堆，不記）
+      if (currentCandidate.value?.user_id === userId) {
+        lastPassedCandidate.value = currentCandidate.value
+      }
+
       // 候選人移除改由呼叫端在退場動畫結束後呼叫 removeCurrentCandidate()
       return true
     } catch (err) {
@@ -151,6 +158,33 @@ export const useDiscoveryStore = defineStore('discovery', () => {
     } finally {
       loading.value = false
     }
+  }
+
+  /**
+   * 撤銷上一次跳過（Rewind）
+   * 刪除後端跳過記錄並把該候選人放回卡堆頂端。
+   * 後端回 404（記錄已被清理）視同成功——對方本來就不再被排除。
+   * @returns {Object|null} 被撤銷的候選人卡片，無可撤銷時回 null
+   */
+  const rewindLastPass = async () => {
+    const card = lastPassedCandidate.value
+    if (!card) return null
+
+    error.value = null
+    try {
+      await apiClient.delete(`/discovery/pass/${card.user_id}`)
+    } catch (err) {
+      if (err.response?.status !== 404) {
+        error.value = err.response?.data?.detail || '撤銷失敗'
+        throw err
+      }
+    }
+
+    // 放回卡堆頂端
+    candidates.value.unshift(card)
+    currentCandidate.value = card
+    lastPassedCandidate.value = null
+    return card
   }
 
   /**
@@ -258,6 +292,7 @@ export const useDiscoveryStore = defineStore('discovery', () => {
     suggestionsLoading.value = false
     likesYou.value = []
     likesYouLoading.value = false
+    lastPassedCandidate.value = null
   }
 
   return {
@@ -272,12 +307,14 @@ export const useDiscoveryStore = defineStore('discovery', () => {
     suggestionsLoading,
     likesYou,
     likesYouLoading,
+    lastPassedCandidate,
 
     // Getters
     hasCandidates,
     hasMatches,
     matchCount,
     hasLikesYou,
+    canRewind,
 
     // Actions
     browseCandidates,
@@ -285,6 +322,7 @@ export const useDiscoveryStore = defineStore('discovery', () => {
     applyExpandSuggestion,
     likeUser,
     passUser,
+    rewindLastPass,
     fetchLikesYou,
     removeFromLikesYou,
     fetchMatches,

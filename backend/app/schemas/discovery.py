@@ -83,6 +83,13 @@ class PassResponse(BaseModel):
     message: str
 
 
+class RewindResponse(BaseModel):
+    """撤銷跳過（Rewind）回應"""
+
+    rewound: bool
+    message: str
+
+
 class UnmatchResponse(BaseModel):
     """取消配對回應"""
 

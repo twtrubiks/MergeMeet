@@ -1593,3 +1593,95 @@ async def test_likes_you_like_back_creates_match(client: AsyncClient, completed_
     data = response.json()
     assert data["is_match"] is True
     assert data["match_id"] is not None
+
+
+# ==================== Rewind（撤銷跳過） ====================
+
+
+@pytest.mark.asyncio
+async def test_rewind_pass_success(client: AsyncClient, completed_profiles: dict):
+    """測試：撤銷跳過後，用戶立即重新出現在探索列表"""
+    # Alice 跳過 Bob
+    response = await client.get(
+        "/api/discovery/browse?limit=10",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+    )
+    candidates = response.json()
+    if len(candidates) == 0:
+        pytest.skip("沒有可配對的候選人")
+    bob_user_id = candidates[0]["user_id"]
+
+    response = await client.post(
+        f"/api/discovery/pass/{bob_user_id}",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+    )
+    assert response.status_code == 200
+
+    # 確認 Bob 已被排除
+    response = await client.get(
+        "/api/discovery/browse?limit=10",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+    )
+    assert not any(c["user_id"] == bob_user_id for c in response.json())
+
+    # 撤銷跳過
+    response = await client.delete(
+        f"/api/discovery/pass/{bob_user_id}",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+    )
+    assert response.status_code == 200
+    assert response.json()["rewound"] is True
+
+    # Bob 立即重新出現
+    response = await client.get(
+        "/api/discovery/browse?limit=10",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+    )
+    assert any(c["user_id"] == bob_user_id for c in response.json()), "撤銷跳過後應重新出現"
+
+
+@pytest.mark.asyncio
+async def test_rewind_without_pass_returns_404(client: AsyncClient, completed_profiles: dict):
+    """測試：沒有跳過記錄時撤銷回 404"""
+    response = await client.delete(
+        f"/api/discovery/pass/{uuid.uuid4()}",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+    )
+
+    assert response.status_code == 404
+    assert "沒有可撤銷" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_rewind_only_deletes_own_pass(
+    client: AsyncClient, completed_profiles: dict, test_db: AsyncSession
+):
+    """測試：撤銷只刪自己的跳過記錄，不影響對方對我的跳過"""
+    result = await test_db.execute(
+        select(User.id).where(User.email == completed_profiles["alice"]["email"])
+    )
+    alice_user_id = result.scalar_one()
+    result = await test_db.execute(
+        select(User.id).where(User.email == completed_profiles["bob"]["email"])
+    )
+    bob_user_id = result.scalar_one()
+
+    # Bob 跳過 Alice
+    response = await client.post(
+        f"/api/discovery/pass/{alice_user_id}",
+        headers={"Authorization": f"Bearer {completed_profiles['bob']['token']}"},
+    )
+    assert response.status_code == 200
+
+    # Alice 撤銷「自己對 Bob」的跳過 → 沒有記錄，404
+    response = await client.delete(
+        f"/api/discovery/pass/{bob_user_id}",
+        headers={"Authorization": f"Bearer {completed_profiles['alice']['token']}"},
+    )
+    assert response.status_code == 404
+
+    # Bob 對 Alice 的跳過記錄仍存在
+    result = await test_db.execute(
+        select(Pass).where(Pass.from_user_id == bob_user_id, Pass.to_user_id == alice_user_id)
+    )
+    assert result.scalar_one_or_none() is not None

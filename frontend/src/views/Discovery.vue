@@ -61,6 +61,16 @@
         </template>
 
         <div class="empty-secondary-actions">
+          <!-- 跳過最後一張卡也能收回，不受卡堆是否為空限制 -->
+          <button
+            v-if="discoveryStore.canRewind"
+            class="btn-adjust"
+            :disabled="isAnimating"
+            @click="handleRewind"
+          >
+            <Icon name="undo" size="sm" decorative />
+            收回上一位
+          </button>
           <!-- 有放寬建議時，重新整理降為次要樣式，讓放寬按鈕成為唯一主 CTA -->
           <button
             :class="discoveryStore.expandSuggestions.length > 0 ? 'btn-adjust' : 'btn-refresh'"
@@ -178,6 +188,8 @@
         <span class="hint-key">→</span> 喜歡
         <span class="hint-separator">|</span>
         <span class="hint-key">Enter</span> 查看詳情
+        <span class="hint-separator">|</span>
+        <span class="hint-key">Backspace</span> 收回
       </div>
 
       <!-- 操作按鈕 -->
@@ -187,6 +199,17 @@
         role="group"
         aria-label="配對操作"
       >
+        <button
+          class="action-btn rewind-btn"
+          :disabled="isAnimating || !discoveryStore.canRewind"
+          aria-label="收回上一位跳過的用戶"
+          title="收回上一位跳過的用戶"
+          @click="handleRewind"
+        >
+          <Icon name="undo" size="md" decorative class="btn-icon" />
+          <span class="btn-text">收回</span>
+        </button>
+
         <button
           class="action-btn pass-btn"
           :disabled="isAnimating"
@@ -309,7 +332,16 @@ const handleKeydown = (event) => {
   const tag = event.target.tagName
   if (tag === 'INPUT' || tag === 'TEXTAREA' || event.target.isContentEditable) return
 
-  if (isAnimating.value || !discoveryStore.currentCandidate) return
+  if (isAnimating.value) return
+
+  // 收回不依賴 currentCandidate：跳過最後一張卡（空池）也能收回
+  if (event.key === 'Backspace') {
+    event.preventDefault()
+    handleRewind()
+    return
+  }
+
+  if (!discoveryStore.currentCandidate) return
 
   switch (event.key) {
     case 'ArrowLeft':
@@ -434,6 +466,28 @@ const handleCardAction = async (direction, apiCall) => {
 // isAnimating 已防止重複執行，不需額外 throttle
 const handleLike = () => handleCardAction('right', (uid) => discoveryStore.likeUser(uid))
 const handlePass = () => handleCardAction('left', (uid) => discoveryStore.passUser(uid))
+
+/**
+ * 收回上一位跳過的用戶（Rewind）
+ * 只支援撤銷跳過：喜歡可能已觸發配對與通知，不可撤銷
+ */
+const handleRewind = async () => {
+  if (isAnimating.value || !discoveryStore.canRewind) return
+
+  isAnimating.value = true
+  try {
+    const card = await discoveryStore.rewindLastPass()
+    if (card) {
+      announce(`已收回 ${card.display_name}`)
+      message.success(`已收回 ${card.display_name}`)
+    }
+  } catch (error) {
+    logger.error('收回失敗:', error)
+    message.error(discoveryStore.error || '收回失敗，請稍後再試')
+  } finally {
+    isAnimating.value = false
+  }
+}
 
 /**
  * 關閉配對成功彈窗
@@ -1044,6 +1098,22 @@ onUnmounted(() => {
   cursor: not-allowed;
 }
 
+/* 收回按鈕：比主按鈕小一號，amber 色系與跳過/喜歡區隔 */
+.rewind-btn {
+  width: 64px;
+  height: 64px;
+  align-self: center;
+  background: var(--color-surface);
+  color: var(--color-warning-600);
+  border: 3px solid var(--color-warning-400);
+}
+
+.rewind-btn:hover:not(:disabled) {
+  background: var(--color-warning-400);
+  color: white;
+  box-shadow: 0 10px 30px rgba(234, 179, 8, 0.35);
+}
+
 .pass-btn {
   background: var(--color-background-light);
   color: var(--color-text-muted);
@@ -1116,6 +1186,11 @@ onUnmounted(() => {
     height: 75px;
   }
 
+  .action-btn.rewind-btn {
+    width: 56px;
+    height: 56px;
+  }
+
   .btn-icon {
     font-size: 32px;
   }
@@ -1137,6 +1212,11 @@ onUnmounted(() => {
   .action-btn {
     width: 70px;
     height: 70px;
+  }
+
+  .action-btn.rewind-btn {
+    width: 52px;
+    height: 52px;
   }
 }
 

@@ -46,6 +46,7 @@ import {
   ShieldOutline,
   ShieldCheckmarkOutline,
   ArrowBackOutline,
+  ArrowUndoOutline,
   RefreshOutline,
   TrashOutline,
   CheckmarkOutline,
@@ -84,7 +85,7 @@ import {
 const props = defineProps({
   /**
    * 圖標名稱
-   * @type {'home' | 'heart' | 'heart-outline' | 'heart-half' | 'heart-dislike' | 'close' | 'close-outline' | 'close-circle' | 'alert' | 'alert-outline' | 'location' | 'search' | 'chat' | 'chatbubbles' | 'person' | 'people' | 'settings' | 'logout' | 'shield' | 'shield-check' | 'back' | 'refresh' | 'trash' | 'check' | 'check-circle' | 'checkmark-done' | 'warning' | 'info' | 'star' | 'star-outline' | 'camera' | 'time' | 'hourglass' | 'clipboard' | 'lock' | 'flash' | 'rocket' | 'edit' | 'eye' | 'eye-off' | 'male' | 'female' | 'male-female' | 'save' | 'sync' | 'hand' | 'stats' | 'image' | 'flag' | 'ban' | 'document-text' | 'chevron-forward' | 'send' | 'ellipsis-vertical'}
+   * @type {'home' | 'heart' | 'heart-outline' | 'heart-half' | 'heart-dislike' | 'close' | 'close-outline' | 'close-circle' | 'alert' | 'alert-outline' | 'location' | 'search' | 'chat' | 'chatbubbles' | 'person' | 'people' | 'settings' | 'logout' | 'shield' | 'shield-check' | 'back' | 'undo' | 'refresh' | 'trash' | 'check' | 'check-circle' | 'checkmark-done' | 'warning' | 'info' | 'star' | 'star-outline' | 'camera' | 'time' | 'hourglass' | 'clipboard' | 'lock' | 'flash' | 'rocket' | 'edit' | 'eye' | 'eye-off' | 'male' | 'female' | 'male-female' | 'save' | 'sync' | 'hand' | 'stats' | 'image' | 'flag' | 'ban' | 'document-text' | 'chevron-forward' | 'send' | 'ellipsis-vertical'}
    */
   name: {
     type: String,
@@ -138,6 +139,7 @@ const iconMap = {
   shield: ShieldOutline,
   'shield-check': ShieldCheckmarkOutline,
   back: ArrowBackOutline,
+  undo: ArrowUndoOutline,
   refresh: RefreshOutline,
   trash: TrashOutline,
   check: CheckmarkOutline,

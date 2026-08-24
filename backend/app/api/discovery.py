@@ -33,7 +33,7 @@ from datetime import UTC, datetime, timedelta
 import redis.asyncio as redis
 from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import and_, case, func, null, or_, select, union_all
+from sqlalchemy import and_, case, delete, func, null, or_, select, union_all
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,6 +51,7 @@ from app.schemas.discovery import (
     MatchSummary,
     PassResponse,
     ProfileCard,
+    RewindResponse,
     UnmatchResponse,
 )
 from app.services.matching_service import compute_common_interests, matching_service
@@ -652,6 +653,29 @@ async def pass_user(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用戶不存在") from None
 
     return {"passed": True, "message": "已跳過此用戶"}
+
+
+@router.delete("/pass/{user_id}", response_model=RewindResponse)
+async def rewind_pass(
+    user_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """撤銷跳過（Rewind）
+
+    刪除我對該用戶的跳過記錄，讓對方立即重新出現在探索列表。
+    只支援撤銷 Pass：Like 可能已觸發配對與通知（對方甚至已發訊息），
+    撤銷會傷及對方體驗，故不提供。
+    """
+    result = await db.execute(
+        delete(Pass).where(and_(Pass.from_user_id == current_user.id, Pass.to_user_id == user_id))
+    )
+    await db.commit()
+
+    if result.rowcount == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="沒有可撤銷的跳過記錄")
+
+    return {"rewound": True, "message": "已撤銷跳過"}
 
 
 @router.get("/matches", response_model=list[MatchSummary])

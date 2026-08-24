@@ -543,4 +543,90 @@ describe('Discovery Store', () => {
     })
   })
 
+  describe('收回上一位（Rewind）', () => {
+    const aliceCard = { user_id: 'user1', display_name: 'Alice' }
+
+    it('從卡堆跳過時應記住該卡供收回', async () => {
+      const store = useDiscoveryStore()
+      store.candidates = [aliceCard]
+      store.currentCandidate = aliceCard
+      apiClient.post.mockResolvedValue({ data: { passed: true } })
+
+      await store.passUser('user1')
+
+      expect(store.lastPassedCandidate).toEqual(aliceCard)
+      expect(store.canRewind).toBe(true)
+    })
+
+    it('非卡堆跳過（誰喜歡我頁）不應記住卡片', async () => {
+      const store = useDiscoveryStore()
+      store.currentCandidate = { user_id: 'other', display_name: 'Other' }
+      apiClient.post.mockResolvedValue({ data: { passed: true } })
+
+      await store.passUser('user1')
+
+      expect(store.lastPassedCandidate).toBeNull()
+      expect(store.canRewind).toBe(false)
+    })
+
+    it('收回應刪除跳過記錄並把卡片放回卡堆頂端', async () => {
+      const store = useDiscoveryStore()
+      store.candidates = [{ user_id: 'user2', display_name: 'Bob' }]
+      store.currentCandidate = store.candidates[0]
+      store.lastPassedCandidate = aliceCard
+      apiClient.delete.mockResolvedValue({ data: { rewound: true } })
+
+      const card = await store.rewindLastPass()
+
+      expect(apiClient.delete).toHaveBeenCalledWith('/discovery/pass/user1')
+      expect(card).toEqual(aliceCard)
+      expect(store.candidates[0]).toEqual(aliceCard)
+      expect(store.currentCandidate).toEqual(aliceCard)
+      expect(store.lastPassedCandidate).toBeNull()
+    })
+
+    it('沒有可收回的卡片時應回 null 且不呼叫 API', async () => {
+      const store = useDiscoveryStore()
+
+      const card = await store.rewindLastPass()
+
+      expect(card).toBeNull()
+      expect(apiClient.delete).not.toHaveBeenCalled()
+    })
+
+    it('後端回 404（記錄已被清理）視同成功，仍放回卡片', async () => {
+      const store = useDiscoveryStore()
+      store.lastPassedCandidate = aliceCard
+      apiClient.delete.mockRejectedValue({ response: { status: 404 } })
+
+      const card = await store.rewindLastPass()
+
+      expect(card).toEqual(aliceCard)
+      expect(store.candidates[0]).toEqual(aliceCard)
+      expect(store.lastPassedCandidate).toBeNull()
+    })
+
+    it('其他錯誤應設定錯誤並拋出，不放回卡片', async () => {
+      const store = useDiscoveryStore()
+      store.lastPassedCandidate = aliceCard
+      apiClient.delete.mockRejectedValue({
+        response: { status: 500, data: { detail: '撤銷失敗' } }
+      })
+
+      await expect(store.rewindLastPass()).rejects.toBeDefined()
+      expect(store.error).toBe('撤銷失敗')
+      expect(store.candidates).toEqual([])
+      expect(store.lastPassedCandidate).toEqual(aliceCard)
+    })
+
+    it('$reset 應清除收回狀態', () => {
+      const store = useDiscoveryStore()
+      store.lastPassedCandidate = aliceCard
+
+      store.$reset()
+
+      expect(store.lastPassedCandidate).toBeNull()
+      expect(store.canRewind).toBe(false)
+    })
+  })
 })
