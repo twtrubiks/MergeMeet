@@ -10,6 +10,10 @@ mutmut 會 fork 多個 worker 同時跑測試，但本專案測試共用同一�
 
 worker 結束（含逾時被 kill）時 fd 關閉，flock 自動釋放。
 
+另需搭配 ``process_isolation = "forkserver"``：預設的 fork 模式會在同一個行程裡
+連續跑多次 pytest session，ContentModerationService 等單例持有的 Redis 連線
+會綁在上一個 session 已關閉的 event loop 上（Event loop is closed）。
+
 僅供 mutmut 使用（pyproject.toml 的 ``[tool.mutmut]`` 以 ``-p tests.mutmut_isolation`` 載入），
 一般 ``pytest`` 不會載入此模組。
 """
@@ -76,6 +80,10 @@ def _drop_leftover_tables(sync_url: str) -> None:
 
 
 def pytest_sessionstart(session):
+    # forkserver 暖機只做 --collect-only，不連 DB，不需要 slot
+    if session.config.option.collectonly:
+        return
+
     conftest = sys.modules.get("tests.conftest")
     if conftest is None:
         raise RuntimeError("tests.conftest 尚未載入，無法套用 mutmut 隔離")

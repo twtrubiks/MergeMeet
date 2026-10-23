@@ -44,6 +44,8 @@ only_mutate = [
     "app/services/content_moderation.py",
 ]
 also_copy = ["pytest.ini", ".env"]
+# 每個 pytest session 都從只做過 collect 的乾淨行程 fork，避免單例跨 session 殘留狀態
+process_isolation = "forkserver"
 # 平行 worker 各自使用獨立的 PostgreSQL 測試庫與 Redis db（見 tests/mutmut_isolation.py）
 pytest_add_cli_args = ["-p", "no:cacheprovider", "-p", "tests.mutmut_isolation"]
 # test_rate_limit 的 slowapi storage 在 import 時綁定 Redis db 0，平行執行會互相干擾
