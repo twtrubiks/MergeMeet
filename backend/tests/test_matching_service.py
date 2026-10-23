@@ -11,6 +11,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from app.services import matching_service as matching_service_module
 from app.services.matching_service import (
     MIN_MATCH_SCORE,
     MatchingService,
@@ -22,6 +23,24 @@ from app.services.matching_service import (
 )
 
 matching = MatchingService()
+
+
+@pytest.fixture
+def frozen_now(monkeypatch):
+    """凍結 matching_service 內的 datetime.now
+
+    測試與被測函式各呼叫一次 now()，兩者之間的微秒差會讓「剛好 1 小時」
+    變成 1.000001 小時，`<` 與 `<=` 就無從區分（變異測試抓到的盲點）。
+    """
+    now = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
+
+    class _FrozenDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now
+
+    monkeypatch.setattr(matching_service_module, "datetime", _FrozenDatetime)
+    return now
 
 
 # ---------------------------------------------------------------------------
@@ -68,9 +87,9 @@ def test_distance_score_tiers(distance_km, expected):
         (500, 0),
     ],
 )
-def test_activity_score_tiers(hours_ago, expected):
+def test_activity_score_tiers(frozen_now, hours_ago, expected):
     """活躍度分層邊界：1h / 24h / 72h / 168h，邊界值落入較低分層"""
-    last_active = datetime.now(UTC) - timedelta(hours=hours_ago)
+    last_active = frozen_now - timedelta(hours=hours_ago)
     assert _calculate_activity_score(last_active) == expected
 
 
@@ -93,6 +112,15 @@ def test_activity_score_accepts_iso_string_with_z_suffix():
 
 def test_completeness_empty_profile_is_zero():
     assert _calculate_completeness_score({}) == 0
+
+
+@pytest.mark.parametrize(
+    ("photo_count", "expected"),
+    [(1, 0.5), (2, 1.0), (5, 2.5), (6, 3.0)],
+)
+def test_completeness_photo_score_per_photo(photo_count, expected):
+    """照片每張 0.5 分（封頂前的線性區段）"""
+    assert _calculate_completeness_score({"photo_count": photo_count}) == expected
 
 
 def test_completeness_photo_score_caps_at_three():
