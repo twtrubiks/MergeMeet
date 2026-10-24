@@ -6,8 +6,8 @@ def mask_email(email: str) -> str:
     Email 脫敏處理，保護用戶隱私
 
     示例:
-    - user@example.com -> us***@example.com
-    - a@test.com -> a***@test.com
+    - user@example.com -> us***r@example.com
+    - abc@test.com -> a***@test.com
     - longname@domain.com -> lo***e@domain.com
 
     Args:
@@ -21,10 +21,7 @@ def mask_email(email: str) -> str:
 
     local, domain = email.split("@", 1)
 
-    if len(local) <= 1 or len(local) <= 3:
-        masked_local = local[0] + "***"
-    else:
-        # 保留前兩個和最後一個字符，中間替換為 ***
-        masked_local = local[:2] + "***" + local[-1]
+    # 短的只保留第一個字符；其餘保留前兩個和最後一個字符，中間替換為 ***
+    masked_local = local[:1] + "***" if len(local) <= 3 else local[:2] + "***" + local[-1]
 
     return f"{masked_local}@{domain}"
