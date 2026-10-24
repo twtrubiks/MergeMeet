@@ -180,7 +180,7 @@ async def test_upload_image_unauthorized(client: AsyncClient, matched_users_for_
     )
 
     assert response.status_code == 404
-    assert "無權上傳" in response.json()["detail"]
+    assert response.json()["detail"] == "配對不存在或您無權上傳"
 
 
 @pytest.mark.asyncio
@@ -198,7 +198,7 @@ async def test_upload_image_invalid_format(client: AsyncClient, matched_users_fo
     )
 
     assert response.status_code == 400
-    assert "不支援的圖片格式" in response.json()["detail"]
+    assert response.json()["detail"] == "不支援的圖片格式，僅支援 JPEG, PNG, GIF, WebP"
 
 
 @pytest.mark.asyncio
@@ -214,7 +214,7 @@ async def test_upload_image_empty_file(client: AsyncClient, matched_users_for_im
     )
 
     assert response.status_code == 400
-    assert "不能為空" in response.json()["detail"]
+    assert response.json()["detail"] == "檔案不能為空"
 
 
 @pytest.mark.asyncio
@@ -240,7 +240,7 @@ async def test_upload_image_to_inactive_match(
     )
 
     assert response.status_code == 404
-    assert "不存在或您無權" in response.json()["detail"]
+    assert response.json()["detail"] == "配對不存在或您無權上傳"
 
 
 @pytest.mark.asyncio
