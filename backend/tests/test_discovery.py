@@ -1036,6 +1036,84 @@ async def test_expand_suggestions_excludes_liked_and_blocked(
     assert distance["additional_candidates"] == 1
 
 
+async def _clear_viewer_preferences(test_db: AsyncSession, viewer: dict) -> None:
+    """把瀏覽者的年齡／距離偏好設為 NULL（模擬欄位加上預設值之前建立的舊資料）"""
+    viewer_id = await _viewer_user_id(test_db, viewer)
+    await test_db.execute(
+        update(Profile)
+        .where(Profile.user_id == viewer_id)
+        .values(min_age_preference=None, max_age_preference=None, max_distance_km=None)
+    )
+    await test_db.commit()
+
+
+@pytest.mark.asyncio
+async def test_browse_null_preferences_fall_back_to_defaults(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """偏好為 NULL 時套用預設 18–99 歲、50 公里
+
+    距離以 PostGIS 球面距離計算：緯度 25.47 約 48.4km、25.4889 約 50.5km（viewer 在 25.0330）
+    """
+    await _clear_viewer_preferences(test_db, viewer_with_profile)
+    now = datetime.now(UTC)
+    for prefix, age, latitude in [
+        ("age18_", 18, 25.034),
+        ("age99_", 99, 25.034),
+        ("age100_", 100, 25.034),
+        ("km48_", 30, 25.47),
+        ("km50_5_", 30, 25.4889),
+    ]:
+        await _create_candidate_pool(
+            test_db,
+            1,
+            prefix=prefix,
+            latitude=latitude,
+            last_active=now,
+            date_of_birth=_birth_date(age),
+        )
+
+    response = await client.get(
+        "/api/discovery/browse?limit=10", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    assert sorted(c["display_name"] for c in response.json()) == ["age18_0", "age99_0", "km48_0"]
+
+
+@pytest.mark.asyncio
+async def test_expand_suggestions_null_preferences_use_defaults(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """偏好為 NULL 時，放寬建議以預設 50km、18–99 歲為基準
+
+    約 60km 外有 30 歲與 100 歲各一人：放寬到 100km 只多 1 人（100 歲超出預設年齡上限）；
+    18 歲的人已在預設範圍內，因此不給年齡建議。
+    """
+    await _clear_viewer_preferences(test_db, viewer_with_profile)
+    await _create_candidate_pool(
+        test_db, 1, prefix="near18_", latitude=25.034, date_of_birth=_birth_date(18)
+    )
+    for prefix, age in [("far30_", 30), ("far100_", 100)]:
+        await _create_candidate_pool(
+            test_db, 1, prefix=prefix, latitude=25.575, date_of_birth=_birth_date(age)
+        )
+
+    response = await client.get(
+        "/api/discovery/expand-suggestions", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    assert response.json()["suggestions"] == [
+        {
+            "type": "distance",
+            "additional_candidates": 1,
+            "current_max_distance_km": 50,
+            "suggested_max_distance_km": 100,
+        }
+    ]
+
+
 @pytest.mark.asyncio
 async def test_expand_suggestions_requires_profile(client: AsyncClient, auth_user: dict):
     response = await client.get("/api/discovery/expand-suggestions", headers=auth_user["headers"])
