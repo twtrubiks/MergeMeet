@@ -568,6 +568,46 @@ async def test_browse_excludes_blocks_both_ways_and_only_my_passes(
     ]
 
 
+@pytest.mark.asyncio
+async def test_browse_age_preference_boundaries(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """測試：年齡偏好 30–35 的邊界以生日當天為準
+
+    今天滿 30 → 納入；明天才滿 30（29 歲）→ 排除；
+    明天才滿 36（仍 35 歲）→ 納入；今天滿 36 → 排除。
+    """
+    response = await client.patch(
+        "/api/profile",
+        headers=viewer_with_profile["headers"],
+        json={"min_age_preference": 30, "max_age_preference": 35},
+    )
+    assert response.status_code == 200
+    today = date.today()
+    for prefix, date_of_birth in [
+        ("turns30today", today - relativedelta(years=30)),
+        ("turns30tomorrow", today - relativedelta(years=30) + timedelta(days=1)),
+        ("turns36tomorrow", today - relativedelta(years=36) + timedelta(days=1)),
+        ("turns36today", today - relativedelta(years=36)),
+    ]:
+        await _create_candidate_pool(
+            test_db,
+            1,
+            prefix=prefix,
+            latitude=25.034,
+            last_active=datetime.now(UTC),
+            date_of_birth=date_of_birth,
+        )
+
+    response = await client.get(
+        "/api/discovery/browse?limit=10", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    cards = {c["display_name"]: c["age"] for c in response.json()}
+    assert cards == {"turns30today0": 30, "turns36tomorrow0": 35}
+
+
 async def _viewer_user_id(test_db: AsyncSession, viewer: dict) -> uuid.UUID:
     return (
         await test_db.execute(select(User.id).where(User.email == viewer["email"]))
