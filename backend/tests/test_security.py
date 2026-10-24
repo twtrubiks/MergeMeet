@@ -1,4 +1,4 @@
-"""安全工具測試（JWT 過期時間）"""
+"""安全工具測試（密碼雜湊與驗證、JWT 過期時間）"""
 
 from datetime import UTC, datetime, timedelta
 
@@ -7,7 +7,12 @@ import pytest
 
 from app.core import security
 from app.core.config import settings
-from app.core.security import create_access_token, create_refresh_token
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    get_password_hash,
+    verify_password,
+)
 
 FROZEN_NOW = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
 
@@ -49,3 +54,33 @@ def test_token_expiry_counted_from_utc_now(create_token, token_type, lifetime):
     assert claims["type"] == token_type
     assert claims["exp"] == int((FROZEN_NOW + lifetime).timestamp())
     assert claims["iat"] == int(FROZEN_NOW.timestamp())
+
+
+class TestPassword:
+    """密碼雜湊與驗證"""
+
+    def test_verify_correct_and_wrong_password(self):
+        hashed = get_password_hash("Correct123")
+
+        assert verify_password("Correct123", hashed) is True
+        assert verify_password("Wrong12345", hashed) is False
+
+    def test_malformed_stored_hash_rejects_any_password(self):
+        """資料庫中的雜湊格式錯誤時一律驗證失敗：不可拋錯，更不可放行"""
+        assert verify_password("anything", "not-a-bcrypt-hash") is False
+
+    def test_passwords_differ_only_beyond_bcrypt_72_bytes(self):
+        """SHA256 預處理：bcrypt 只看前 72 bytes，後段不同的長密碼仍須能區分"""
+        prefix = "a" * 80
+        hashed = get_password_hash(prefix + "1")
+
+        assert verify_password(prefix + "2", hashed) is False
+
+    def test_password_length_limit(self):
+        """128 字元以內可用；超過時拒絕雜湊，驗證則視為失敗（登入回 401 而非 500）"""
+        hashed = get_password_hash("a" * 128)
+
+        assert verify_password("a" * 128, hashed) is True
+        assert verify_password("a" * 129, hashed) is False
+        with pytest.raises(ValueError, match="128"):
+            get_password_hash("a" * 129)

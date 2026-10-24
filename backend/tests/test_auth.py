@@ -168,6 +168,25 @@ async def test_login_wrong_password(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_login_overlong_password(client: AsyncClient):
+    """測試超過長度上限（128 字元）的密碼視為密碼錯誤，而非 500"""
+    await client.post(
+        "/api/auth/register",
+        json={
+            "email": "longpass@example.com",
+            "password": "Password123",
+            "date_of_birth": "1995-01-01",
+        },
+    )
+
+    response = await client.post(
+        "/api/auth/login", json={"email": "longpass@example.com", "password": "x" * 200}
+    )
+
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_login_nonexistent_user(client: AsyncClient):
     """測試不存在的用戶"""
     response = await client.post(
