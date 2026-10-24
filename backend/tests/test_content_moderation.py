@@ -2,7 +2,7 @@
 
 import json
 import uuid
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 import pytest_asyncio
@@ -211,7 +211,7 @@ class TestSuspiciousPatterns:
 
         # 可疑模式預設為 WARN，仍算通過但有警告
         assert is_approved is True
-        assert len(violations) > 0
+        assert violations == [r"包含可疑內容: line\s*[:：]?\s*\w+"]
         assert action == "WARN"
 
     async def test_detect_phone_number(
@@ -330,8 +330,8 @@ class TestProfileContentCheck:
 
         # "投資" 是 WARN 級別，仍然通過但有警告
         assert is_approved is True
-        assert len(violations) > 0
-        assert any("個人簡介" in v for v in violations)
+        assert violations == ["個人簡介 - SCAM: 投資"]
+        assert action == "WARN"
 
     async def test_check_rejected_bio(
         self, test_db: AsyncSession, test_user: User, sensitive_words
@@ -359,8 +359,72 @@ class TestProfileContentCheck:
         )
 
         assert is_approved is False
-        assert len(violations) > 0
-        assert any("興趣標籤" in v for v in violations)
+        assert violations == ["興趣標籤 '色情' - SEXUAL: 色情"]
+        assert action == "REJECT"
+
+    async def test_check_warned_interest(
+        self, test_db: AsyncSession, test_user: User, sensitive_words
+    ):
+        """測試興趣標籤只命中 WARN 級別：通過但仍回報違規"""
+        is_approved, violations, action = await ContentModerationService.check_profile_content(
+            db=test_db, user_id=test_user.id, interests=["投資"]
+        )
+
+        assert (is_approved, action) == (True, "WARN")
+        assert violations == ["興趣標籤 '投資' - SCAM: 投資"]
+
+    async def test_later_warning_does_not_downgrade_reject(
+        self, test_db: AsyncSession, test_user: User, sensitive_words
+    ):
+        """測試簡介已被拒絕時，後面興趣標籤的 WARN 不會把結果降級成通過"""
+        is_approved, violations, action = await ContentModerationService.check_profile_content(
+            db=test_db, user_id=test_user.id, bio="約炮嗎", interests=["投資"]
+        )
+
+        assert (is_approved, action) == (False, "REJECT")
+        assert violations == ["個人簡介 - HARASSMENT: 約炮", "興趣標籤 '投資' - SCAM: 投資"]
+
+    @pytest.mark.parametrize("field", ["bio", "interests"])
+    async def test_auto_ban_word_rejects_profile(
+        self, test_db: AsyncSession, test_user: User, field: str
+    ):
+        """測試命中 AUTO_BAN 敏感詞時不通過，且動作為 AUTO_BAN"""
+        test_db.add(
+            SensitiveWord(
+                word="炸彈",
+                category="VIOLENCE",
+                severity="CRITICAL",
+                action="AUTO_BAN",
+                is_regex=False,
+                is_active=True,
+            )
+        )
+        await test_db.commit()
+        await ContentModerationService.clear_cache()
+        kwargs = {"bio": "我有炸彈"} if field == "bio" else {"interests": ["炸彈"]}
+
+        is_approved, _, action = await ContentModerationService.check_profile_content(
+            db=test_db, user_id=test_user.id, **kwargs
+        )
+
+        assert (is_approved, action) == (False, "AUTO_BAN")
+
+    async def test_profile_violations_logged_as_profile(
+        self, test_db: AsyncSession, test_user: User, sensitive_words
+    ):
+        """測試簡介與興趣標籤的違規都以 PROFILE 類型記錄在該用戶名下"""
+        await ContentModerationService.check_profile_content(
+            db=test_db, user_id=test_user.id, bio="想投資嗎", interests=["色情"]
+        )
+
+        result = await test_db.execute(
+            select(ModerationLog).where(ModerationLog.user_id == test_user.id)
+        )
+        logs = result.scalars().all()
+        assert sorted((log.original_content, log.content_type) for log in logs) == [
+            ("想投資嗎", "PROFILE"),
+            ("色情", "PROFILE"),
+        ]
 
     async def test_check_profile_with_none_values(
         self, test_db: AsyncSession, test_user: User, sensitive_words
@@ -469,6 +533,25 @@ class TestModerationLogging:
         assert log.is_approved is True
         assert log.triggered_word_ids is None
 
+    async def test_clean_content_not_logged(
+        self, test_db: AsyncSession, test_user: User, sensitive_words
+    ):
+        """測試正常內容不寫審核日誌（避免每則聊天訊息都進日誌表）"""
+        await ContentModerationService.check_content("你好", test_db, test_user.id, "MESSAGE")
+
+        result = await test_db.execute(select(ModerationLog))
+        assert result.scalars().all() == []
+
+    async def test_violation_without_user_not_logged(self, test_db: AsyncSession, sensitive_words):
+        """測試未提供 user_id 時只回傳審核結果，不寫日誌"""
+        is_approved, _, _, _ = await ContentModerationService.check_content(
+            "色情內容", test_db, None, "MESSAGE"
+        )
+
+        result = await test_db.execute(select(ModerationLog))
+        assert is_approved is False
+        assert result.scalars().all() == []
+
 
 @pytest.mark.asyncio
 class TestEdgeCases:
@@ -560,6 +643,26 @@ class TestCaching:
         assert result2[0] is False  # 命中快取
         assert result3[0] is True  # 清除快取後重新載入
 
+    async def test_memory_cache_expires_after_ttl(
+        self, test_db: AsyncSession, test_user: User, sensitive_words
+    ):
+        """測試內存快取超過 TTL 後重新從資料庫載入"""
+        await ContentModerationService.check_content("色情內容", test_db, test_user.id, "MESSAGE")
+        await test_db.execute(
+            update(SensitiveWord).where(SensitiveWord.word == "色情").values(is_active=False)
+        )
+        await test_db.commit()
+
+        # 把快取時間往前推到剛好過期
+        ContentModerationService._cache_time["words"] -= timedelta(
+            seconds=ContentModerationService._cache_ttl
+        )
+        is_approved, _, _, _ = await ContentModerationService.check_content(
+            "色情內容", test_db, test_user.id, "MESSAGE"
+        )
+
+        assert is_approved is True
+
     async def test_clear_cache(self, test_db: AsyncSession):
         """測試清除快取"""
         # 清除快取不應該拋出異常
@@ -585,6 +688,18 @@ class TestRegexSensitiveWords:
         assert violations == [r"SCAM: free\s*money"]
         assert word_ids == [regex_words[1].id]
 
+    async def test_plain_word_matches_case_insensitively(
+        self, test_db: AsyncSession, test_user: User, regex_words
+    ):
+        """測試英文純文字敏感詞不分大小寫比對"""
+        is_approved, violations, word_ids, action = await ContentModerationService.check_content(
+            "NO SPAM please", test_db, test_user.id, "MESSAGE"
+        )
+
+        assert (is_approved, action) == (True, "WARN")
+        assert violations == ["OTHER: spam"]
+        assert word_ids == [regex_words[2].id]
+
     async def test_invalid_regex_never_matches(
         self, test_db: AsyncSession, test_user: User, regex_words
     ):
@@ -594,6 +709,44 @@ class TestRegexSensitiveWords:
         )
 
         assert (is_approved, violations, action) == (True, [], "APPROVED")
+
+
+class TestSeverityPriority:
+    """多個敏感詞同時命中時的嚴重程度排序"""
+
+    @staticmethod
+    def _word(word: str, severity: str, action: str) -> dict:
+        return {
+            "id": str(uuid.uuid4()),
+            "word": word,
+            "category": "OTHER",
+            "severity": severity,
+            "action": action,
+            "is_regex": False,
+            "description": None,
+        }
+
+    @pytest.mark.parametrize(
+        "lower,higher",
+        [
+            (("LOW", "WARN"), ("MEDIUM", "REJECT")),
+            (("MEDIUM", "WARN"), ("HIGH", "REJECT")),
+            (("HIGH", "REJECT"), ("CRITICAL", "AUTO_BAN")),
+        ],
+    )
+    @pytest.mark.parametrize("higher_first", [False, True])
+    def test_highest_severity_decides_action(self, lower, higher, higher_first):
+        """測試以最高嚴重程度那個詞的動作為準，與詞庫順序無關"""
+        words = [self._word("甲", *lower), self._word("乙", *higher)]
+        if higher_first:
+            words.reverse()
+
+        violations, word_ids, max_severity, action = (
+            ContentModerationService._check_sensitive_words(words, "甲乙", "甲乙")
+        )
+
+        assert (max_severity, action) == higher
+        assert len(violations) == len(word_ids) == 2
 
 
 @pytest.mark.asyncio
@@ -650,13 +803,34 @@ class TestRedisCache:
     async def test_redis_error_falls_back_to_db(
         self, test_db: AsyncSession, test_user: User, sensitive_words, mock_redis_error
     ):
-        """測試 Redis 故障時回退資料庫，審核照常運作，且之後不再寫 Redis"""
+        """測試 Redis 故障時回退資料庫，審核照常運作，且之後不再讀寫 Redis"""
         await ContentModerationService.set_redis(mock_redis_error)
 
-        is_approved, _, _, _ = await ContentModerationService.check_content(
-            "色情內容", test_db, test_user.id, "MESSAGE"
-        )
+        results = [
+            await ContentModerationService.check_content(
+                "色情內容", test_db, test_user.id, "MESSAGE"
+            )
+            for _ in range(2)
+        ]
 
-        assert is_approved is False
+        assert [r[0] for r in results] == [False, False]
         assert ContentModerationService.is_using_redis() is False
+        mock_redis_error.get.assert_called_once()  # 第二次不再嘗試故障的 Redis
         mock_redis_error.set.assert_not_called()
+
+    async def test_clear_cache_deletes_redis_key(self, mock_redis):
+        """測試清除快取時一併刪除 Redis 中的敏感詞快取（否則其他 worker 仍讀到舊詞庫）"""
+        mock_redis._storage["moderation:words"] = "[]"
+        await ContentModerationService.set_redis(mock_redis)
+
+        await ContentModerationService.clear_cache()
+
+        assert "moderation:words" not in mock_redis._storage
+
+    async def test_clear_cache_tolerates_redis_error(self, mock_redis_error):
+        """測試 Redis 故障時清除快取不拋錯"""
+        await ContentModerationService.set_redis(mock_redis_error)
+
+        await ContentModerationService.clear_cache()
+
+        mock_redis_error.delete.assert_called_once_with("moderation:words")
