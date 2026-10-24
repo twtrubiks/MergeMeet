@@ -7,15 +7,16 @@ from io import BytesIO
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from dateutil.relativedelta import relativedelta
 from geoalchemy2.functions import ST_MakePoint, ST_SetSRID
 from httpx import AsyncClient
 from PIL import Image
-from sqlalchemy import select
+from sqlalchemy import insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.discovery import FREE_DAILY_LIKE_LIMIT
 from app.models.match import Like, Pass
-from app.models.profile import InterestTag, Profile
+from app.models.profile import InterestTag, Photo, Profile, profile_interests
 from app.models.user import User
 
 
@@ -203,15 +204,13 @@ async def test_browse_users_success(client: AsyncClient, completed_profiles: dic
     assert response.status_code == 200
     candidates = response.json()
 
-    # Alice 應該看到 Bob
-    assert isinstance(candidates, list)
-    if len(candidates) > 0:
-        candidate = candidates[0]
-        assert "display_name" in candidate
-        assert "age" in candidate
-        assert "distance_km" in candidate
-        assert "interests" in candidate
-        assert "match_score" in candidate
+    # Alice 應該看到 Bob（原本以 if len > 0 包住斷言，回傳空陣列也會通過）
+    assert [c["display_name"] for c in candidates] == ["Bob"]
+    candidate = candidates[0]
+    assert "age" in candidate
+    assert "distance_km" in candidate
+    assert "interests" in candidate
+    assert "match_score" in candidate
 
 
 async def test_browse_returns_common_interests_with_viewer(
@@ -248,19 +247,25 @@ async def _create_candidate_pool(
     prefix: str,
     latitude: float,
     last_active: datetime | None = None,
+    date_of_birth: date = date(1995, 1, 1),
+    id_start: int | None = None,
 ):
     """直接在 DB 建立候選人（繞過 API 以加速大量建立）
 
     分數構成（viewer 位於台北 25.0330, 121.5654）：
     - latitude=25.33（約 33km）+ last_active=None：距離 5 + 信任 4 = 9 分（低於門檻 15）
     - latitude=25.034（約 0.1km）+ last_active=now：距離 20 + 活躍 20 + 信任 4 = 44 分
+
+    id_start：指定 user_id 為 UUID(int=id_start + i)。browse 依 user_id 分批掃描，
+    需要控制候選人落在哪一批時使用（預設隨機 UUID，批次歸屬不可預期）。
     """
     users = []
     for i in range(count):
         user = User(
+            id=uuid.UUID(int=id_start + i) if id_start is not None else uuid.uuid4(),
             email=f"{prefix}{i}@example.com",
             password_hash="test-hash",
-            date_of_birth=date(1995, 1, 1),
+            date_of_birth=date_of_birth,
             is_active=True,
         )
         test_db.add(user)
@@ -311,11 +316,16 @@ async def test_browse_fills_limit_when_first_batch_is_low_score(
     回歸測試：舊實作只撈 limit*3 筆（且無排序）再過濾低分者，
     當低分者集中在前段時會回傳不足 limit 筆，即使資料庫還有高分候選人。
     """
-    # 15 個低分候選人先插入（佔滿舊實作 limit*3 的緩衝）
-    await _create_candidate_pool(test_db, 15, prefix="lowscore", latitude=25.33)
-    # 5 個高分候選人後插入
+    # 15 個低分候選人 user_id 較小 → 第一批（limit*3 = 15 筆）全是低分
+    await _create_candidate_pool(test_db, 15, prefix="lowscore", latitude=25.33, id_start=1)
+    # 5 個高分候選人 user_id 較大 → 只會出現在第二批
     await _create_candidate_pool(
-        test_db, 5, prefix="highscore", latitude=25.034, last_active=datetime.now(UTC)
+        test_db,
+        5,
+        prefix="highscore",
+        latitude=25.034,
+        last_active=datetime.now(UTC),
+        id_start=1000,
     )
 
     response = await client.get(
@@ -327,6 +337,7 @@ async def test_browse_fills_limit_when_first_batch_is_low_score(
     candidates = response.json()
     assert len(candidates) == 5, f"應回傳 5 筆高分候選人，實際只有 {len(candidates)} 筆"
     assert all(c["display_name"].startswith("highscore") for c in candidates)
+    assert len({c["user_id"] for c in candidates}) == 5  # 分批 offset 正確，不重複
 
 
 @pytest.mark.asyncio
@@ -348,6 +359,104 @@ async def test_browse_returns_all_qualified_when_fewer_than_limit(
     candidates = response.json()
     assert len(candidates) == 2
     assert all(c["display_name"].startswith("highscore") for c in candidates)
+
+
+def _birth_date(age: int) -> date:
+    """昨天剛滿 age 歲的生日（避開生日當天的邊界）"""
+    return date.today() - relativedelta(years=age, days=1)
+
+
+@pytest.mark.asyncio
+async def test_browse_card_age_and_match_score_use_candidate_data(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """測試：卡片年齡與配對分數由候選人實際資料算出
+
+    評分函式本身有單元測試；這裡驗證 browse 把每個欄位都正確傳了進去，
+    因此每個因素都設成非預設值：
+    共同興趣 2 個 20 + 距離約 0.1km 20 + 剛上線 20 + 照片 2 張 1 + 自介 2 + 信任 80 分 5 = 68
+    """
+    await _create_candidate_pool(
+        test_db,
+        1,
+        prefix="wired",
+        latitude=25.034,
+        last_active=datetime.now(UTC),
+        date_of_birth=_birth_date(30),
+    )
+    candidate = (
+        await test_db.execute(select(Profile).where(Profile.display_name == "wired0"))
+    ).scalar_one()
+    viewer_id = await _viewer_user_id(test_db, viewer_with_profile)
+    viewer = (
+        await test_db.execute(select(Profile).where(Profile.user_id == viewer_id))
+    ).scalar_one()
+
+    tags = [InterestTag(name=f"評分興趣{i}", category="test") for i in range(3)]
+    test_db.add_all(tags)
+    await test_db.flush()
+    await test_db.execute(
+        insert(profile_interests),
+        [{"profile_id": viewer.id, "interest_id": tag.id} for tag in tags[:2]]
+        + [{"profile_id": candidate.id, "interest_id": tag.id} for tag in tags],
+    )
+    test_db.add_all(
+        Photo(
+            profile_id=candidate.id,
+            url=f"/uploads/wired{i}.jpg",
+            display_order=i,
+            moderation_status="APPROVED",
+        )
+        for i in range(2)
+    )
+    candidate.bio = "喜歡爬山"
+    await test_db.execute(update(User).where(User.id == candidate.user_id).values(trust_score=80))
+    await test_db.commit()
+    test_db.expire_all()  # 興趣以 core insert 寫入，讓已載入的 relationship 重新讀取
+
+    response = await client.get(
+        "/api/discovery/browse?limit=10", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    [card] = response.json()
+    assert card["age"] == 30
+    assert card["match_score"] == 68.0
+
+
+@pytest.mark.asyncio
+async def test_browse_respects_viewer_age_and_distance_preferences(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """測試：瀏覽者自訂的年齡與距離偏好會過濾候選人"""
+    response = await client.patch(
+        "/api/profile",
+        headers=viewer_with_profile["headers"],
+        json={"min_age_preference": 30, "max_age_preference": 35, "max_distance_km": 10},
+    )
+    assert response.status_code == 200
+    now = datetime.now(UTC)
+    for prefix, latitude, age in [
+        ("match", 25.034, 32),
+        ("far", 25.30, 32),  # 約 30km，超出 10km
+        ("young", 25.034, 25),
+        ("old", 25.034, 40),
+    ]:
+        await _create_candidate_pool(
+            test_db,
+            1,
+            prefix=prefix,
+            latitude=latitude,
+            last_active=now,
+            date_of_birth=_birth_date(age),
+        )
+
+    response = await client.get(
+        "/api/discovery/browse?limit=10", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    assert [c["display_name"] for c in response.json()] == ["match0"]
 
 
 async def _viewer_user_id(test_db: AsyncSession, viewer: dict) -> uuid.UUID:
@@ -582,6 +691,62 @@ async def test_expand_suggestions_age(
     assert age["additional_candidates"] == 2
     # 50km 內已有人但被年齡擋掉；距離放寬不會多出任何人 → 不建議距離
     assert not [s for s in data["suggestions"] if s["type"] == "distance"]
+
+
+@pytest.mark.asyncio
+async def test_expand_suggestions_count_only_additional_candidates(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """建議人數只計「放寬後多出來的」，不含目前已看得到的人
+
+    目前可見 1 人（近、32 歲）；距離放寬到 100km 多 3 人（約 80km、32 歲）；
+    年齡放寬到 20–40 多 1 人（近、38 歲）。
+    """
+    await client.patch(
+        "/api/profile",
+        headers=viewer_with_profile["headers"],
+        json={"min_age_preference": 25, "max_age_preference": 35, "max_distance_km": 50},
+    )
+    for prefix, count, latitude, age in [
+        ("visible", 1, 25.034, 32),
+        ("far", 3, 25.75, 32),
+        ("older", 1, 25.034, 38),
+    ]:
+        await _create_candidate_pool(
+            test_db, count, prefix=prefix, latitude=latitude, date_of_birth=_birth_date(age)
+        )
+
+    response = await client.get(
+        "/api/discovery/expand-suggestions", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    by_type = {s["type"]: s for s in response.json()["suggestions"]}
+    assert by_type["distance"]["additional_candidates"] == 3
+    assert (by_type["age"]["suggested_min_age"], by_type["age"]["suggested_max_age"]) == (20, 40)
+    assert by_type["age"]["additional_candidates"] == 1
+
+
+@pytest.mark.asyncio
+async def test_expand_suggestions_omit_age_when_it_adds_nobody(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """年齡還能放寬，但放寬後沒有多出任何人 → 只給距離建議"""
+    await client.patch(
+        "/api/profile",
+        headers=viewer_with_profile["headers"],
+        json={"min_age_preference": 25, "max_age_preference": 35},
+    )
+    await _create_candidate_pool(
+        test_db, 2, prefix="far", latitude=25.75, date_of_birth=_birth_date(32)
+    )
+
+    response = await client.get(
+        "/api/discovery/expand-suggestions", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    assert [s["type"] for s in response.json()["suggestions"]] == ["distance"]
 
 
 @pytest.mark.asyncio
