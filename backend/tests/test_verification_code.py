@@ -153,6 +153,17 @@ class TestVerificationCodeStoreFallback:
         assert email.lower() in store._fallback
 
     @pytest.mark.asyncio
+    async def test_delete_after_fallback_skips_redis(self, mock_redis_error):
+        """測試：回退後刪除只動內存，不再呼叫故障的 Redis"""
+        store = VerificationCodeStore(ttl_minutes=10, redis_client=mock_redis_error)
+        await store.set("fallback@example.com", "999888")
+
+        await store.delete("fallback@example.com")
+
+        assert await store.get("fallback@example.com") is None
+        mock_redis_error.delete.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_fallback_on_redis_error_get(self, mock_redis_error):
         """測試：Redis 錯誤時回退到內存（get）"""
         store = VerificationCodeStore(ttl_minutes=10, redis_client=mock_redis_error)

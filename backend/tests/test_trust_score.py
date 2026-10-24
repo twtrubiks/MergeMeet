@@ -1,7 +1,7 @@
 """信任分數服務測試"""
 
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
@@ -9,6 +9,7 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
+from app.services import trust_score as trust_score_module
 from app.services.trust_score import TrustScoreService
 
 
@@ -318,6 +319,32 @@ class TestMessageRateLimiting:
         key = f"trust:daily_messages:{user_id}:{datetime.now(UTC):%Y-%m-%d}"
         assert list(counts) == [key]
         mock_redis.expire.assert_called_with(key, 86400)
+
+    async def test_daily_key_uses_utc_date_on_utc8_host(self, mock_redis, monkeypatch):
+        """測試：當日計數 key 以 UTC 日期命名，與主機時區無關
+
+        模擬部署在 UTC+8 主機的台灣時間 1/2 00:30（UTC 仍是 1/1）。記錄與檢查若有一邊
+        誤用不帶時區的 now()，凌晨 0–8 點兩邊會用不同日期的 key，每日上限失效。
+        """
+        utc_now = datetime(2026, 1, 1, 16, 30, tzinfo=UTC)
+
+        class _Utc8Datetime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                if tz is None:
+                    return (utc_now + timedelta(hours=8)).replace(tzinfo=None)
+                return utc_now.astimezone(tz)
+
+        monkeypatch.setattr(trust_score_module, "datetime", _Utc8Datetime)
+        mock_redis.incr = AsyncMock(return_value=1)
+        user_id = uuid.uuid4()
+
+        await TrustScoreService.record_message_sent(user_id, mock_redis)
+        await TrustScoreService.check_message_rate_limit(user_id, 15, mock_redis)
+
+        key = f"trust:daily_messages:{user_id}:2026-01-01"
+        mock_redis.incr.assert_called_once_with(key)
+        mock_redis.get.assert_called_once_with(key)
 
 
 # =============================================================================

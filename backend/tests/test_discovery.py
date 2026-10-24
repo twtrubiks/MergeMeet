@@ -18,6 +18,7 @@ from app.api.discovery import FREE_DAILY_LIKE_LIMIT
 from app.models.match import BlockedUser, Like, Pass
 from app.models.profile import InterestTag, Photo, Profile, profile_interests
 from app.models.user import User
+from app.services import matching_service
 
 
 @pytest.fixture
@@ -1217,6 +1218,52 @@ async def test_passed_user_not_shown_in_browse(client: AsyncClient, completed_pr
     # Bob 不應該出現在列表中（24 小時內）
     bob_in_list = any(c["user_id"] == bob_user_id for c in candidates_after)
     assert not bob_in_list, f"{bob_name} 應該被排除但仍出現在候選人列表"
+
+
+@pytest.mark.asyncio
+async def test_pass_window_counted_in_utc_on_utc8_host(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession, monkeypatch
+):
+    """測試：跳過 24 小時的期限以 UTC 計算，與主機時區無關
+
+    模擬部署在 UTC+8 主機：若誤用不帶時區的 now()，期限會少算 8 小時，
+    20 小時前跳過的人就會提早重新出現。
+    """
+    real_datetime = matching_service.datetime
+
+    class _Utc8Datetime(real_datetime):
+        @classmethod
+        def now(cls, tz=None):
+            utc_now = real_datetime.now(UTC)
+            if tz is None:
+                return (utc_now + timedelta(hours=8)).replace(tzinfo=None)
+            return utc_now.astimezone(tz)
+
+        @classmethod
+        def today(cls):
+            return cls.now()
+
+    await _create_candidate_pool(
+        test_db, 1, prefix="passed", latitude=25.034, last_active=datetime.now(UTC)
+    )
+    viewer_id = await _viewer_user_id(test_db, viewer_with_profile)
+    [passed_id] = await _candidate_user_ids_sorted(test_db, "passed")
+    test_db.add(
+        Pass(
+            from_user_id=viewer_id,
+            to_user_id=passed_id,
+            passed_at=datetime.now(UTC) - timedelta(hours=20),
+        )
+    )
+    await test_db.commit()
+    monkeypatch.setattr(matching_service, "datetime", _Utc8Datetime)
+
+    response = await client.get(
+        "/api/discovery/browse?limit=5", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
 
 
 @pytest.mark.asyncio

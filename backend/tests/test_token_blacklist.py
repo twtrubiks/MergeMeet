@@ -1,5 +1,6 @@
 """Token 黑名單測試"""
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
@@ -7,6 +8,7 @@ import pytest
 import redis.asyncio as aioredis
 from httpx import AsyncClient
 
+from app.services import token_blacklist as token_blacklist_module
 from app.services.token_blacklist import TokenBlacklist
 
 
@@ -320,6 +322,32 @@ class TestTokenBlacklistWithRedis:
         assert blacklist._cleanup_task is None
 
     @pytest.mark.asyncio
+    async def test_periodic_cleanup_survives_errors_until_cancelled(self, monkeypatch):
+        """測試：每 5 分鐘清理一次；單輪失敗不中止迴圈，取消時結束"""
+        blacklist = TokenBlacklist()
+        sleeps: list[int] = []
+        runs = 0
+
+        async def _sleep(seconds):
+            sleeps.append(seconds)
+            if len(sleeps) == 3:
+                raise asyncio.CancelledError
+
+        async def _cleanup():
+            nonlocal runs
+            runs += 1
+            if runs == 1:
+                raise RuntimeError("第一輪失敗")
+
+        monkeypatch.setattr(token_blacklist_module.asyncio, "sleep", _sleep)
+        monkeypatch.setattr(blacklist, "cleanup_expired", _cleanup)
+
+        await blacklist._periodic_cleanup()
+
+        assert sleeps == [300, 300, 300]
+        assert runs == 2
+
+    @pytest.mark.asyncio
     async def test_hash_token_shortens_key(self):
         """測試：Token hash 縮短 Key 長度"""
         long_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
@@ -349,6 +377,15 @@ class TestTokenBlacklistFallback:
         # 恢復後才登出的 Token 也要寫進同一處（內存），否則檢查時查不到
         await blacklist.add("logged_out_later", datetime.now(UTC) + timedelta(hours=1))
         assert await blacklist.is_blacklisted("logged_out_later") is True
+
+    @pytest.mark.asyncio
+    async def test_remove_after_fallback_skips_redis(self, mock_redis_error):
+        """測試：回退後移除只動內存，不再呼叫故障的 Redis"""
+        blacklist = TokenBlacklist(redis_client=mock_redis_error)
+        await blacklist.add("fallback_token", datetime.now(UTC) + timedelta(hours=1))
+
+        assert await blacklist.remove("fallback_token") is True
+        mock_redis_error.delete.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_fallback_on_redis_error_add(self, mock_redis_error):

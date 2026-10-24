@@ -8,8 +8,10 @@
 - 所有恢復寫入審計日誌
 """
 
+import asyncio
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
+from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
@@ -25,9 +27,12 @@ from app.services import trust_score_recovery
 from app.services.redis_client import redis_client
 from app.services.trust_score import TrustScoreService
 from app.services.trust_score_recovery import (
+    RECOVERY_CHECK_INTERVAL_SECONDS,
     RECOVERY_LOCK_TTL_SECONDS,
     apply_daily_recovery,
     run_daily_recovery_once,
+    start_recovery_task,
+    stop_recovery_task,
 )
 
 # ==================== Fixtures ====================
@@ -219,6 +224,102 @@ class TestDailyRecoveryLock:
         monkeypatch.undo()
 
         assert await run_daily_recovery_once(test_db) == 1
+
+
+class TestDailyRecoveryLockEdgeCases:
+    """日期鎖的時區與 Redis 故障情境（以假 Redis 模擬，不需資料庫）"""
+
+    @pytest.fixture
+    def fake_redis(self, monkeypatch):
+        redis = AsyncMock()
+        redis.set = AsyncMock(return_value=True)
+
+        async def _get_connection():
+            return redis
+
+        monkeypatch.setattr(redis_client, "get_connection", _get_connection)
+        return redis
+
+    async def test_lock_key_uses_utc_date_on_utc8_host(self, fake_redis, monkeypatch):
+        """模擬 UTC+8 主機的台灣時間 1/2 00:30（UTC 仍是 1/1）：鎖以 UTC 日期命名"""
+        utc_now = datetime(2026, 1, 1, 16, 30, tzinfo=UTC)
+
+        class _Utc8Datetime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                if tz is None:
+                    return (utc_now + timedelta(hours=8)).replace(tzinfo=None)
+                return utc_now.astimezone(tz)
+
+        monkeypatch.setattr(trust_score_recovery, "datetime", _Utc8Datetime)
+        monkeypatch.setattr(trust_score_recovery, "apply_daily_recovery", AsyncMock(return_value=0))
+
+        await run_daily_recovery_once()
+
+        fake_redis.set.assert_called_once_with(
+            "trust:daily_recovery:2026-01-01", "1", nx=True, ex=RECOVERY_LOCK_TTL_SECONDS
+        )
+
+    async def test_lock_release_failure_keeps_original_error(self, fake_redis, monkeypatch):
+        """恢復失敗後釋放鎖時 Redis 也故障：拋出的仍是原本的恢復錯誤"""
+        fake_redis.delete = AsyncMock(side_effect=ConnectionError("Redis down"))
+        monkeypatch.setattr(
+            trust_score_recovery,
+            "apply_daily_recovery",
+            AsyncMock(side_effect=RuntimeError("DB error")),
+        )
+
+        with pytest.raises(RuntimeError, match="DB error"):
+            await run_daily_recovery_once()
+
+
+class TestRecoveryTask:
+    """背景任務：啟動／停止與每小時迴圈"""
+
+    async def test_start_is_idempotent_and_stop_cancels(self, monkeypatch):
+        running = asyncio.Event()
+
+        async def _forever():
+            running.set()
+            await asyncio.Event().wait()
+
+        monkeypatch.setattr(trust_score_recovery, "_periodic_recovery", _forever)
+
+        await start_recovery_task()
+        task = trust_score_recovery._recovery_task
+        await start_recovery_task()  # 已啟動時不重複建立
+        assert trust_score_recovery._recovery_task is task
+        await running.wait()
+
+        await stop_recovery_task()
+
+        assert task.cancelled()
+        assert trust_score_recovery._recovery_task is None
+
+    async def test_periodic_loop_survives_errors_until_cancelled(self, monkeypatch):
+        """每輪先等待間隔再執行；單輪失敗不中止迴圈，取消時結束"""
+        sleeps: list[int] = []
+        runs = 0
+
+        async def _sleep(seconds):
+            sleeps.append(seconds)
+            if len(sleeps) == 3:
+                raise asyncio.CancelledError
+
+        async def _run():
+            nonlocal runs
+            runs += 1
+            if runs == 1:
+                raise RuntimeError("第一輪失敗")
+            return 0
+
+        monkeypatch.setattr(trust_score_recovery.asyncio, "sleep", _sleep)
+        monkeypatch.setattr(trust_score_recovery, "run_daily_recovery_once", _run)
+
+        await trust_score_recovery._periodic_recovery()
+
+        assert sleeps == [RECOVERY_CHECK_INTERVAL_SECONDS] * 3
+        assert runs == 2
 
 
 # ==================== 舉報駁回補償 ====================
