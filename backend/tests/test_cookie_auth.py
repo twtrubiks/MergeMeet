@@ -120,7 +120,7 @@ async def test_cookie_auth_without_csrf_fails(client: AsyncClient):
 
     # 應該返回 403 CSRF 驗證失敗
     assert response.status_code == 403
-    assert "CSRF" in response.json()["detail"]
+    assert response.json()["detail"] == "CSRF 驗證失敗：缺少 CSRF Token"
 
 
 @pytest.mark.asyncio
@@ -141,7 +141,7 @@ async def test_cookie_auth_wrong_csrf_fails(client: AsyncClient):
 
     # 應該返回 403 CSRF 驗證失敗
     assert response.status_code == 403
-    assert "CSRF" in response.json()["detail"]
+    assert response.json()["detail"] == "CSRF 驗證失敗：Token 不匹配"
 
 
 # ==================== Bearer Token 向後兼容測試 ====================
@@ -199,8 +199,18 @@ async def test_logout_clears_cookies(client: AsyncClient):
     assert data["message"] == "登出成功"
     assert "tokens_invalidated" in data
 
-    # 驗證 Cookie 被清除（Set-Cookie 設置為過期）
-    # httpx 處理後 cookies 應該被清除或設為空
+    # 驗證 Cookie 被清除：三個 Cookie 都以 Max-Age=0 覆寫，且 path 與設置時相同
+    cleared = {}
+    for header in response.headers.get_list("set-cookie"):
+        name = header.split("=", 1)[0]
+        attrs = {part.strip().lower() for part in header.split(";")[1:]}
+        cleared[name] = "max-age=0" in attrs and next(a for a in attrs if a.startswith("path="))
+    assert cleared == {
+        "access_token": "path=/",
+        "refresh_token": "path=/api/auth",
+        "csrf_token": "path=/",
+    }
+    assert "access_token" not in client.cookies
 
 
 @pytest.mark.asyncio

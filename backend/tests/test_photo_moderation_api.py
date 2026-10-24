@@ -128,6 +128,7 @@ class TestPhotoModerationAPIPermissions:
             "/api/admin/photos/pending", headers={"Authorization": f"Bearer {user_token}"}
         )
         assert response.status_code == 403
+        assert response.json()["detail"] == "需要管理員權限"
 
     async def test_get_pending_photos_requires_auth(self, client: AsyncClient):
         """測試：未認證無法存取待審核照片列表"""
