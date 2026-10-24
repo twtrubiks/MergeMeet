@@ -17,6 +17,7 @@ from app.core.security import get_password_hash
 from app.models.moderation import ContentAppeal, SensitiveWord
 from app.models.profile import Photo, Profile
 from app.models.user import User
+from app.services.content_moderation import ContentModerationService
 
 # ==================== Fixtures ====================
 
@@ -196,6 +197,40 @@ class TestCreateSensitiveWord:
 
         assert response.status_code == 400
         assert "已存在" in response.json()["detail"]
+
+    async def test_create_literal_word_is_lowercased(
+        self, client: AsyncClient, admin_headers: dict
+    ):
+        """測試：純文字敏感詞統一存小寫（比對時內容也會轉小寫）"""
+        response = await client.post(
+            "/api/moderation/sensitive-words",
+            json={"word": "SPAM", "category": "OTHER"},
+            headers=admin_headers,
+        )
+
+        assert response.status_code == 201
+        assert response.json()["word"] == "spam"
+
+    async def test_create_regex_word_keeps_original_case(
+        self, client: AsyncClient, admin_headers: dict, test_db: AsyncSession
+    ):
+        """測試：正則敏感詞保留原樣
+
+        正則以 IGNORECASE 比對，不需轉小寫；轉了反而改變語意
+        （\\S 非空白 → \\s 空白），導致規則永遠比對不到。
+        """
+        response = await client.post(
+            "/api/moderation/sensitive-words",
+            json={"word": r"\S+@\S+", "category": "PERSONAL_INFO", "is_regex": True},
+            headers=admin_headers,
+        )
+
+        assert response.status_code == 201
+        assert response.json()["word"] == r"\S+@\S+"
+        _, violations, _, _ = await ContentModerationService.check_content(
+            "寫信給我 me@example.com", test_db
+        )
+        assert violations == [r"PERSONAL_INFO: \S+@\S+"]
 
 
 # ==================== 統計 API 測試 ====================

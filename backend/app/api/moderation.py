@@ -90,10 +90,12 @@ async def create_sensitive_word(
     """
     新增敏感詞（管理員）
     """
+    # 純文字統一小寫（比對時內容也轉小寫）；正則以 IGNORECASE 比對，不可轉小寫，
+    # 否則 \S、\D、\W 會變成語意相反的 \s、\d、\w
+    word = word_data.word if word_data.is_regex else word_data.word.lower()
+
     # 檢查是否已存在
-    result = await db.execute(
-        select(SensitiveWord).where(SensitiveWord.word == word_data.word.lower())
-    )
+    result = await db.execute(select(SensitiveWord).where(SensitiveWord.word == word))
     existing_word = result.scalar_one_or_none()
 
     if existing_word:
@@ -103,7 +105,7 @@ async def create_sensitive_word(
 
     # 創建新敏感詞
     new_word = SensitiveWord(
-        word=word_data.word.lower(),
+        word=word,
         category=word_data.category,
         severity=word_data.severity,
         action=word_data.action,
