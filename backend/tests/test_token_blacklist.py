@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
+import redis.asyncio as aioredis
 from httpx import AsyncClient
 
 from app.services.token_blacklist import TokenBlacklist
@@ -36,15 +37,17 @@ class TestTokenBlacklist:
 
     @pytest.mark.asyncio
     async def test_expired_token_auto_remove(self, blacklist):
-        """測試過期 Token 自動從黑名單移除"""
-        token = "expired_token"
-        # 設置已過期的時間
-        expires_at = datetime.now(UTC) - timedelta(seconds=1)
+        """測試過期 Token 自動從黑名單移除
 
-        await blacklist.add(token, expires_at)
+        add() 會直接略過已過期的 Token（見 test_expired_token_not_added），
+        因此直接放入內存，模擬「加入時有效、之後才過期」的 Token。
+        """
+        token = "expired_token"
+        blacklist._fallback[token] = datetime.now(UTC) - timedelta(seconds=1)
 
         # 檢查時應該自動移除
         assert await blacklist.is_blacklisted(token) is False
+        assert token not in blacklist._fallback
 
     @pytest.mark.asyncio
     async def test_remove_token(self, blacklist):
@@ -326,6 +329,20 @@ class TestTokenBlacklistWithRedis:
 
 class TestTokenBlacklistFallback:
     """Token 黑名單回退測試（Redis 不可用時）"""
+
+    @pytest.mark.asyncio
+    async def test_logout_during_outage_still_honored_after_redis_recovers(self, mock_redis):
+        """測試：Redis 故障期間登出的 Token，Redis 恢復後仍視為已登出
+
+        回退後固定使用內存；若改回去查 Redis（查不到），已登出的 Token 會重新生效。
+        """
+        blacklist = TokenBlacklist(redis_client=mock_redis)
+        working_set = mock_redis.set.side_effect
+        mock_redis.set.side_effect = aioredis.RedisError("Connection refused")
+        await blacklist.add("logged_out_token", datetime.now(UTC) + timedelta(hours=1))
+        mock_redis.set.side_effect = working_set  # Redis 恢復
+
+        assert await blacklist.is_blacklisted("logged_out_token") is True
 
     @pytest.mark.asyncio
     async def test_fallback_on_redis_error_add(self, mock_redis_error):
