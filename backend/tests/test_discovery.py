@@ -15,7 +15,7 @@ from sqlalchemy import insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.discovery import FREE_DAILY_LIKE_LIMIT
-from app.models.match import Like, Pass
+from app.models.match import BlockedUser, Like, Pass
 from app.models.profile import InterestTag, Photo, Profile, profile_interests
 from app.models.user import User
 
@@ -248,6 +248,7 @@ async def _create_candidate_pool(
     latitude: float,
     last_active: datetime | None = None,
     date_of_birth: date = date(1995, 1, 1),
+    gender: str = "male",
     id_start: int | None = None,
 ):
     """直接在 DB 建立候選人（繞過 API 以加速大量建立）
@@ -277,7 +278,7 @@ async def _create_candidate_pool(
             Profile(
                 user_id=user.id,
                 display_name=f"{prefix}{i}",
-                gender="male",
+                gender=gender,
                 location=ST_SetSRID(ST_MakePoint(121.5654, latitude), 4326),
                 is_complete=True,
                 is_visible=True,
@@ -457,6 +458,114 @@ async def test_browse_respects_viewer_age_and_distance_preferences(
 
     assert response.status_code == 200
     assert [c["display_name"] for c in response.json()] == ["match0"]
+
+
+@pytest.mark.asyncio
+async def test_browse_excludes_hidden_incomplete_inactive_and_self(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """測試：隱藏、未完成、停權的用戶與瀏覽者自己都不會出現在探索
+
+    瀏覽者自己的檔案也設為完整可見，確保是 user_id 條件（而非其他條件）把自己排除。
+    """
+    now = datetime.now(UTC)
+    for prefix in ["visible", "hidden", "incomplete", "banned"]:
+        await _create_candidate_pool(test_db, 1, prefix=prefix, latitude=25.034, last_active=now)
+    viewer_id = await _viewer_user_id(test_db, viewer_with_profile)
+    for condition, values in [
+        (Profile.display_name == "hidden0", {"is_visible": False}),
+        (Profile.display_name == "incomplete0", {"is_complete": False}),
+        (Profile.user_id == viewer_id, {"is_complete": True, "is_visible": True}),
+    ]:
+        await test_db.execute(update(Profile).where(condition).values(**values))
+    await test_db.execute(
+        update(User).where(User.email == "banned0@example.com").values(is_active=False)
+    )
+    await test_db.commit()
+    test_db.expire_all()
+
+    response = await client.get(
+        "/api/discovery/browse?limit=10", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    assert [c["display_name"] for c in response.json()] == ["visible0"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("preference", "expected"),
+    [
+        ("male", ["male0"]),
+        ("female", ["female0"]),
+        ("both", ["female0", "male0"]),
+        ("all", ["female0", "male0", "non_binary0"]),
+    ],
+)
+async def test_browse_gender_preference(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession, preference, expected
+):
+    """測試：性別偏好過濾（both = 男 + 女；all = 不限）"""
+    response = await client.patch(
+        "/api/profile",
+        headers=viewer_with_profile["headers"],
+        json={"gender_preference": preference},
+    )
+    assert response.status_code == 200
+    for gender in ["male", "female", "non_binary"]:
+        await _create_candidate_pool(
+            test_db, 1, prefix=gender, latitude=25.034, last_active=datetime.now(UTC), gender=gender
+        )
+
+    response = await client.get(
+        "/api/discovery/browse?limit=10", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    assert sorted(c["display_name"] for c in response.json()) == expected
+
+
+@pytest.mark.asyncio
+async def test_browse_excludes_blocks_both_ways_and_only_my_passes(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """測試：排除我封鎖的、封鎖我的、我 24h 內跳過的；別人之間的跳過不影響我"""
+    now = datetime.now(UTC)
+    prefixes = ["visible", "blocked_by_me", "blocked_me", "passed_by_me", "passed_by_other"]
+    for prefix in prefixes:
+        await _create_candidate_pool(test_db, 1, prefix=prefix, latitude=25.034, last_active=now)
+    ids = dict(
+        (
+            await test_db.execute(
+                select(User.email, User.id).where(
+                    User.email.in_([f"{p}0@example.com" for p in prefixes])
+                )
+            )
+        ).all()
+    )
+    viewer_id = await _viewer_user_id(test_db, viewer_with_profile)
+    test_db.add_all(
+        [
+            BlockedUser(blocker_id=viewer_id, blocked_id=ids["blocked_by_me0@example.com"]),
+            BlockedUser(blocker_id=ids["blocked_me0@example.com"], blocked_id=viewer_id),
+            Pass(from_user_id=viewer_id, to_user_id=ids["passed_by_me0@example.com"]),
+            Pass(
+                from_user_id=ids["visible0@example.com"],
+                to_user_id=ids["passed_by_other0@example.com"],
+            ),
+        ]
+    )
+    await test_db.commit()
+
+    response = await client.get(
+        "/api/discovery/browse?limit=10", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    assert sorted(c["display_name"] for c in response.json()) == [
+        "passed_by_other0",
+        "visible0",
+    ]
 
 
 async def _viewer_user_id(test_db: AsyncSession, viewer: dict) -> uuid.UUID:
