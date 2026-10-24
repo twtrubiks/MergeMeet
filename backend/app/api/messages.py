@@ -1,6 +1,7 @@
 """聊天訊息 REST API"""
 
 import logging
+import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
@@ -30,8 +31,8 @@ logger = logging.getLogger(__name__)
 
 @router.get("/matches/{match_id}/messages", response_model=ChatHistoryResponse)
 async def get_chat_history(
-    match_id: str,
-    before_id: str = Query(None, description="Cursor: 載入比此訊息 ID 更早的訊息"),
+    match_id: uuid.UUID,
+    before_id: uuid.UUID | None = Query(None, description="Cursor: 載入比此訊息 ID 更早的訊息"),
     limit: int = Query(50, ge=1, le=100, description="每次載入訊息數"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -293,7 +294,7 @@ async def mark_messages_as_read(
 
 @router.post("/matches/{match_id}/read-all", status_code=status.HTTP_204_NO_CONTENT)
 async def mark_all_messages_as_read(
-    match_id: str,
+    match_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -373,7 +374,7 @@ async def mark_all_messages_as_read(
 
 @router.delete("/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_message(
-    message_id: str,
+    message_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -414,7 +415,7 @@ async def delete_message(
         match_id,
         {
             "type": "message_deleted",
-            "message_id": message_id,
+            "message_id": str(message_id),
             "match_id": match_id,
             "deleted_by": str(current_user.id),
         },
@@ -426,7 +427,7 @@ async def delete_message(
 
 @router.post("/matches/{match_id}/upload-image", response_model=ChatImageUploadResponse)
 async def upload_chat_image(
-    match_id: str,
+    match_id: uuid.UUID,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -491,7 +492,7 @@ async def upload_chat_image(
             height,
             is_gif,
         ) = await file_storage.save_chat_image(
-            match_id=match_id,
+            match_id=str(match_id),
             user_id=str(current_user.id),
             file_content=file_content,
             filename=file.filename or "image",
