@@ -198,6 +198,33 @@ class TestCreateSensitiveWord:
         assert response.status_code == 400
         assert "已存在" in response.json()["detail"]
 
+    @pytest.mark.parametrize(
+        "field,value", [("severity", "high"), ("severity", "URGENT"), ("action", "BAN")]
+    )
+    async def test_create_rejects_unknown_severity_or_action(
+        self, client: AsyncClient, admin_headers: dict, field: str, value: str
+    ):
+        """測試：嚴重程度／動作只接受固定值（打錯會讓該詞永遠不擋）"""
+        new_word = {"word": "打錯欄位", "category": "OTHER", field: value}
+
+        response = await client.post(
+            "/api/moderation/sensitive-words", json=new_word, headers=admin_headers
+        )
+
+        assert response.status_code == 422
+
+    async def test_update_rejects_unknown_severity(
+        self, client: AsyncClient, admin_headers: dict, sensitive_words: list
+    ):
+        """測試：更新敏感詞時同樣驗證嚴重程度"""
+        response = await client.patch(
+            f"/api/moderation/sensitive-words/{sensitive_words[0].id}",
+            json={"severity": "high"},
+            headers=admin_headers,
+        )
+
+        assert response.status_code == 422
+
     async def test_create_literal_word_is_lowercased(
         self, client: AsyncClient, admin_headers: dict
     ):

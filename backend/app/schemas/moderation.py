@@ -1,11 +1,17 @@
 """內容審核相關 Schema"""
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
 # ============ Sensitive Word Schemas ============
+
+# 審核邏輯依這兩個欄位決定嚴重度排序與是否通過，只接受固定值
+# （輸入打錯例如 "high" 會讓該詞嚴重度視為 0、永遠不擋）
+Severity = Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+ModerationAction = Literal["WARN", "REJECT", "AUTO_BAN"]
 
 
 class SensitiveWordCreate(BaseModel):
@@ -15,8 +21,8 @@ class SensitiveWordCreate(BaseModel):
     category: str = Field(
         ..., description="分類: SEXUAL, SCAM, HARASSMENT, VIOLENCE, PERSONAL_INFO, OTHER"
     )
-    severity: str = Field("MEDIUM", description="嚴重程度: LOW, MEDIUM, HIGH, CRITICAL")
-    action: str = Field("WARN", description="處理動作: WARN, REJECT, AUTO_BAN")
+    severity: Severity = Field("MEDIUM", description="嚴重程度: LOW, MEDIUM, HIGH, CRITICAL")
+    action: ModerationAction = Field("WARN", description="處理動作: WARN, REJECT, AUTO_BAN")
     is_regex: bool = Field(False, description="是否為正則表達式")
     description: str | None = Field(None, max_length=500, description="描述說明")
 
@@ -25,8 +31,8 @@ class SensitiveWordUpdate(BaseModel):
     """更新敏感詞請求"""
 
     category: str | None = None
-    severity: str | None = None
-    action: str | None = None
+    severity: Severity | None = None
+    action: ModerationAction | None = None
     is_regex: bool | None = None
     description: str | None = None
     is_active: bool | None = None
