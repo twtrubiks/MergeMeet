@@ -70,6 +70,24 @@ class TestLoginLimiter:
         assert result.lockout_seconds == 0
 
     @pytest.mark.asyncio
+    async def test_check_status_locked_with_one_second_left(self, limiter, mock_redis):
+        """測試：鎖定只剩 1 秒時仍是鎖定狀態"""
+        mock_redis.ttl.return_value = 1
+
+        result = await limiter.check_status("test@example.com")
+
+        assert (result.is_locked, result.lockout_seconds) == (True, 1)
+
+    @pytest.mark.asyncio
+    async def test_check_status_remaining_never_negative(self, limiter, mock_redis):
+        """測試：失敗次數超過上限（例如鎖定剛過期）時剩餘次數為 0，不會是負數或 1"""
+        mock_redis.get.return_value = str(MAX_ATTEMPTS + 2)
+
+        result = await limiter.check_status("test@example.com")
+
+        assert (result.is_locked, result.remaining_attempts) == (False, 0)
+
+    @pytest.mark.asyncio
     async def test_record_failure_first_attempt(self, limiter, mock_redis):
         """測試：記錄第一次失敗"""
         mock_redis.incr.return_value = 1
@@ -78,6 +96,7 @@ class TestLoginLimiter:
 
         assert result.is_locked is False
         assert result.remaining_attempts == MAX_ATTEMPTS - 1
+        assert result.lockout_seconds == 0
         mock_redis.incr.assert_called_once_with("login_attempts:test@example.com")
         # 首次失敗要設置 TTL（否則計數永不過期，舊的失敗會一直累積）
         mock_redis.expire.assert_called_once_with("login_attempts:test@example.com", ATTEMPT_WINDOW)
