@@ -12,7 +12,6 @@ import json
 import logging
 import re
 import uuid
-from collections import OrderedDict
 from datetime import UTC, datetime
 
 import redis.asyncio as aioredis
@@ -38,11 +37,10 @@ class ContentModerationService:
     _redis: aioredis.Redis | None = None
     _use_redis: bool = False
 
-    # 內存回退快取
-    _cache: OrderedDict = OrderedDict()  # 使用 OrderedDict 支持 LRU 策略
-    _cache_time: dict[str, datetime] = {}  # 每個快取項的時間戳
+    # 內存回退快取（只快取一份完整的敏感詞列表）
+    _cache: list[dict] | None = None
+    _cache_time: datetime | None = None
     _cache_ttl: int = 300  # 快取 5 分鐘
-    _max_cache_size: int = 500  # 最大快取項數
     _cache_lock: asyncio.Lock | None = None  # 快取鎖（延遲初始化）
 
     # Session factory（供測試注入）
@@ -133,31 +131,20 @@ class ContentModerationService:
         return None
 
     @classmethod
-    def _try_load_from_memory_cache(cls, cache_key: str) -> list[dict] | None:
+    def _try_load_from_memory_cache(cls) -> list[dict] | None:
         """嘗試從內存快取載入敏感詞
-
-        Args:
-            cache_key: 快取鍵
 
         Returns:
             敏感詞列表（如果快取有效），否則 None
         """
-        now = datetime.now(UTC)
-        cache_timestamp = cls._cache_time.get(cache_key)
-
-        if not cache_timestamp:
+        if cls._cache is None or cls._cache_time is None:
             return None
 
-        if (now - cache_timestamp).total_seconds() >= cls._cache_ttl:
+        if (datetime.now(UTC) - cls._cache_time).total_seconds() >= cls._cache_ttl:
             return None
 
-        cached_words = cls._cache.get(cache_key)
-        if cached_words is not None:
-            cls._cache.move_to_end(cache_key)
-            logger.debug("Sensitive words loaded from memory cache")
-            return cached_words
-
-        return None
+        logger.debug("Sensitive words loaded from memory cache")
+        return cls._cache
 
     @classmethod
     async def _cache_to_redis(cls, words_data: list[dict]) -> None:
@@ -180,21 +167,14 @@ class ContentModerationService:
             logger.warning(f"Failed to cache sensitive words to Redis: {e}")
 
     @classmethod
-    def _cache_to_memory(cls, cache_key: str, words_data: list[dict]) -> None:
+    def _cache_to_memory(cls, words_data: list[dict]) -> None:
         """將敏感詞快取到內存
 
         Args:
-            cache_key: 快取鍵
             words_data: 敏感詞列表
         """
-        if len(cls._cache) >= cls._max_cache_size:
-            oldest_key = next(iter(cls._cache))
-            cls._cache.pop(oldest_key)
-            cls._cache_time.pop(oldest_key, None)
-            logger.warning(f"Memory cache evicted due to size limit: {oldest_key}")
-
-        cls._cache[cache_key] = words_data
-        cls._cache_time[cache_key] = datetime.now(UTC)
+        cls._cache = words_data
+        cls._cache_time = datetime.now(UTC)
         logger.info(f"Sensitive words cached to memory ({len(words_data)} words)")
 
     @classmethod
@@ -218,11 +198,9 @@ class ContentModerationService:
         if redis_result is not None:
             return redis_result
 
-        cache_key = "words"
-
         # 2. 嘗試內存快取（需要鎖保護）
         async with cls._get_lock():
-            memory_result = cls._try_load_from_memory_cache(cache_key)
+            memory_result = cls._try_load_from_memory_cache()
             if memory_result is not None:
                 return memory_result
 
@@ -241,7 +219,6 @@ class ContentModerationService:
                     "severity": w.severity,
                     "action": w.action,
                     "is_regex": w.is_regex,
-                    "description": w.description,
                 }
                 for w in words
             ]
@@ -250,7 +227,7 @@ class ContentModerationService:
             await cls._cache_to_redis(words_data)
 
             # 5. 存入內存快取
-            cls._cache_to_memory(cache_key, words_data)
+            cls._cache_to_memory(words_data)
 
             return words_data
 
@@ -267,8 +244,8 @@ class ContentModerationService:
 
         # 清除內存快取
         async with cls._get_lock():
-            cls._cache.clear()
-            cls._cache_time.clear()
+            cls._cache = None
+            cls._cache_time = None
             logger.info("Memory cache cleared")
 
     @classmethod

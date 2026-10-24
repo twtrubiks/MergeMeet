@@ -654,7 +654,7 @@ class TestCaching:
         await test_db.commit()
 
         # 把快取時間往前推到剛好過期
-        ContentModerationService._cache_time["words"] -= timedelta(
+        ContentModerationService._cache_time -= timedelta(
             seconds=ContentModerationService._cache_ttl
         )
         is_approved, _, _, _ = await ContentModerationService.check_content(
@@ -723,7 +723,6 @@ class TestSeverityPriority:
             "severity": severity,
             "action": action,
             "is_regex": False,
-            "description": None,
         }
 
     @pytest.mark.parametrize(
@@ -787,7 +786,6 @@ class TestRedisCache:
                 "severity": "HIGH",
                 "action": "REJECT",
                 "is_regex": False,
-                "description": None,
             }
         ]
         mock_redis._storage["moderation:words"] = json.dumps(cached, ensure_ascii=False)
