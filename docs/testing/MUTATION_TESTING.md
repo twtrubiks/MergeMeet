@@ -69,6 +69,12 @@ mutmut 以多個 worker 平行跑測試，但本專案的測試：
   等 class 層級單例持有的 Redis 連線會綁在上一個 session 已關閉的 event loop 上（`Event loop is closed`）
 - **排除 `test_rate_limit.py`**：slowapi 的 storage 在 import 時就綁定 Redis db 0，無法隔離
 
+測試本身也必須在重複執行時穩定：mutmut 會在同一個 slot 連續跑上百次測試。`conftest.py` 的 `client`
+fixture 在每個測試前清除登入失敗、驗證碼嘗試、Email 發送次數等限流計數；否則固定 email 的計數會跨 session
+累積（第 5 次就被鎖定回 429），測試隨機失敗，變異體被誤判為 killed。
+
+**檢查誤判的方法**：只改 log 文字的變異體不可能被測試抓到，若結果是 killed，就代表有測試在隨機失敗。
+
 ---
 
 ## 範圍
@@ -91,43 +97,58 @@ mutmut 以多個 worker 平行跑測試，但本專案的測試：
 
 ## 結果
 
-- **基準線**：導入變異測試前的測試，對 9 個模組全部 1605 個變異體執行
-- **改善後**：補完測試後，重跑基準線中 survived 與 no tests 的 540 個變異體
-  （基準線已 killed 的變異體未重跑：這段期間對既有測試的修改都是加嚴斷言或改得更貼近邊界，沒有拿掉會殺死它們的斷言）
+- **基準線**：導入變異測試前的程式與測試，9 個模組共 1605 個變異體（已更正誤判，見「測量誤判與更正」）
+- **改善後**：目前的程式與測試。依測量結果刪除冗餘程式碼後共 1528 個變異體。
+  在 repo 跑過的變異體取 repo 結果；少數從未在 repo 重跑的（所在函式未改動、基準線已 killed，
+  且涵蓋測試不含會隨機失敗的測試）沿用基準線結果
 - 環境：4 核心、mutmut 3.8.0、`--max-children 4`
 
 ### 變異分數
 
-| 模組 | 變異體 | 基準線 killed / survived / no tests | 分數 | 改善後 killed / survived / no tests | 分數 |
-|------|-------:|------|-----:|------|-----:|
-| `core.security` | 91 | 86 / 5 / 0 | 94.5% | 89 / 2 / 0 | 97.8% |
-| `services.content_moderation` | 424 | 212 / 212 / 0 | 50.0% | 371 / 53 / 0 | 87.5% |
-| `services.email_rate_limiter` | 66 | 50 / 16 / 0 | 75.8% | 64 / 2 / 0 | 97.0% |
-| `services.login_limiter` | 85 | 76 / 9 / 0 | 89.4% | 83 / 2 / 0 | 97.6% |
-| `services.matching_service` | 572 | 409 / 163 / 0 | 71.5% | 491 / 81 / 0 | 85.8% |
-| `services.token_blacklist` | 105 | 54 / 25 / 26 | 68.4% | 70 / 22 / 13 | 76.1% |
-| `services.trust_score` | 102 | 78 / 24 / 0 | 76.5% | 99 / 3 / 0 | 97.1% |
-| `services.trust_score_recovery` | 94 | 51 / 17 / 26 | 75.0% | 61 / 7 / 26 | 89.7% |
-| `services.verification_code` | 66 | 49 / 17 / 0 | 74.2% | 52 / 14 / 0 | 78.8% |
-| **合計** | **1605** | 1065 / 488 / 52 | **68.6%** | 1380 / 186 / 39 | **88.1%** |
+| 模組 | 基準線 變異體 | killed / survived / no tests | 分數 | 改善後 變異體 | killed / survived / no tests | 分數 |
+|------|------:|------|-----:|------:|------|-----:|
+| `core.security` | 91 | 72 / 19 / 0 | 79.1% | 91 | 84 / 7 / 0 | 92.3% |
+| `services.content_moderation` | 424 | 201 / 223 / 0 | 47.4% | 364 | 310 / 54 / 0 | 85.2% |
+| `services.email_rate_limiter` | 66 | 49 / 17 / 0 | 74.2% | 66 | 64 / 2 / 0 | 97.0% |
+| `services.login_limiter` | 85 | 66 / 19 / 0 | 77.6% | 85 | 81 / 4 / 0 | 95.3% |
+| `services.matching_service` | 572 | 409 / 163 / 0 | 71.5% | 555 | 493 / 62 / 0 | 88.8% |
+| `services.token_blacklist` | 105 | 50 / 29 / 26 | 63.3% | 105 | 73 / 32 / 0 | 69.5% |
+| `services.trust_score` | 102 | 78 / 24 / 0 | 76.5% | 102 | 102 / 0 / 0 | 100.0% |
+| `services.trust_score_recovery` | 94 | 51 / 17 / 26 | 75.0% | 94 | 73 / 21 / 0 | 77.7% |
+| `services.verification_code` | 66 | 49 / 17 / 0 | 74.2% | 66 | 53 / 13 / 0 | 80.3% |
+| **合計** | **1605** | 1025 / 528 / 52 | **66.0%** | **1528** | 1333 / 195 / 0 | **87.2%** |
 
-分數 = killed ÷（killed + survived），no tests 不計入。整體從 **68.6% → 88.1%**，存活者從 488 個降到 186 個；剩下的存活者逐一判讀過，都屬於下方「剩餘存活者」的類別。
+分數 = killed ÷（killed + survived），timeout 算 killed，no tests 不計入。整體從 **66.0% → 87.2%**：
+存活者從 528 個降到 195 個，沒有任何測試執行到的變異體從 52 個降到 0 個。
+剩下的 195 個存活者逐一判讀過，歸類見「剩餘存活者」。
+
+### 測量誤判與更正
+
+第一版報告寫的是 68.6% → 88.1%，兩邊都高估了。原因是有些測試會隨機失敗，
+存活的變異體因此被誤判為 killed：
+
+1. **限流計數跨 session 累積**：測試用固定 email，登入失敗、驗證碼嘗試、Email 發送次數存在 Redis
+   且不會清除。mutmut 在同一個 slot 重複跑同一批測試，第 5 次起 `test_login_wrong_password` 等測試
+   就收到 429。一般開發時連續執行 `pytest tests/test_auth.py` 5 次也會失敗
+2. **舊版 `test_redis_integration.py` 洩漏 Redis 連線**：把已關閉的連線留在 `ContentModerationService`
+   的 class 屬性，排在它後面的測試跟著失敗
+
+**怎麼發現的**：只改 log 文字的變異體不可能被測試抓到，卻被標成 killed（`clear_cache` 的 11 個變異體全數「killed」，另有 5 個只改 log 的變異體也是）。修正 `conftest.py` 後，
+把涵蓋測試含這些測試檔的 killed 變異體全部重跑：基準線有 40 個、改善後有 19 個其實存活。
+其中包括 `verify_password` 的例外分支和密碼長度上限，追查後又找到一個 bug（見下表第 3 項）。
 
 ### 找到的 bug（已修正）
 
-| 位置 | 問題 | 怎麼發現的 |
-|------|------|-----------|
-| `api/moderation.py` 新增敏感詞 | 無條件 `.lower()`，正則也被轉小寫：`\S`（非空白）變成 `\s`（空白），`\D`、`\W` 語意反轉，`\Z` 變成無效的 `\z`。管理員新增的正則規則因此永遠比對不到 | `_match_sensitive_word` 正則分支的變異體全部存活 → 補測試時發現正則根本存不進去 |
-| `matching_service._candidate_query` 年齡上限 | `date_of_birth >= today - (max_age + 1) 年` 會納入**今天剛滿 max_age + 1 歲**的人：偏好 30–35 歲會看到卡片顯示 36 歲的人。改為 `>` | `>=` → `>` 的變異體存活，追查後發現存活的那個才是正確版本 |
+| # | 位置 | 問題 | 怎麼發現的 |
+|---|------|------|-----------|
+| 1 | `api/moderation.py` 新增敏感詞 | 無條件 `.lower()`，正則也被轉小寫：`\S`（非空白）變成 `\s`（空白），`\D`、`\W` 語意反轉，`\Z` 變成無效的 `\z`。管理員新增的正則規則永遠比對不到 | `_match_sensitive_word` 正則分支的變異體全部存活，補測試時發現正則根本存不進去 |
+| 2 | `matching_service._candidate_query` 年齡上限 | `date_of_birth >= today - (max_age + 1) 年` 會納入**今天剛滿 max_age + 1 歲**的人：偏好 30–35 歲會看到 36 歲的人。改為 `>` | `>=` → `>` 的變異體存活，追查後發現存活的那個才是正確版本 |
+| 3 | `core/security.verify_password` | 登入 schema 沒限制密碼長度，超過 128 字元時預處理在 `try` 之外拋 `ValueError`，登入回 **500**。改為視為密碼錯誤（401） | 更正誤判後，密碼長度相關的變異體存活 |
+| 4 | `content_moderation.check_profile_content` | 依欄位順序覆寫動作：簡介命中 `AUTO_BAN`、之後的興趣標籤命中 `REJECT`，結果被降級成 `REJECT`。改為取最嚴重者 | 動作判斷的條件變異體存活，追查時發現 |
+| 5 | `schemas/moderation.py` 敏感詞輸入 | `severity`／`action` 接受任意字串；`severity` 打錯（例如 `high`）時嚴重度視為 0，該詞命中也照樣通過。改用 `Literal` 限制（回應 schema 不變，既有資料照常讀取） | 未知嚴重度預設權重的變異體存活 |
+| 6 | `tests/conftest.py` | 限流計數不清除，連續執行測試會隨機失敗（見上節） | 只改 log 卻被 killed 的變異體 |
 
 修正 1 之後，既有資料庫中已被轉成小寫的正則敏感詞需要由管理員重建。
-
-### 潛在問題（未修正，記錄供評估）
-
-- **`check_profile_content` 的動作可能被降級**：簡介命中 `AUTO_BAN`、之後某個興趣標籤命中 `REJECT` 時，
-  `max_action` 會被覆寫成 `REJECT`。目前所有呼叫端只傳 `bio`，觸發不到。
-- **敏感詞的 `severity` / `action` 沒有列舉驗證**：管理 API 接受任意字串。`severity` 打錯（例如 `high`）時，
-  該詞命中後嚴重度視為 0，動作停在 `APPROVED`，等於沒有作用。
 
 ### 名不符實的測試（已修正）
 
@@ -147,50 +168,52 @@ mutmut 以多個 worker 平行跑測試，但本專案的測試：
 | `test_passed_user_reappears_after_24_hours` | 把跳過時間設成 25 小時前，期限寫成 25 小時也會通過（改為 24 小時 1 分） |
 | `test_browse_liked_me_candidate_ranked_first_among_equal_scores` | 同分時靠 DB 掃描順序就排第一，拿掉排序加權也會通過 |
 
-另外，以不同順序執行測試時發現 `test_cache_to_redis` 會把已關閉的 Redis 連線留在
-`ContentModerationService` 的 class 屬性上，讓排在它之後的內容審核測試失敗（已改用 monkeypatch 還原）。
-
 ### 補上的缺口
 
 | 模組 | 原本沒有測到的行為 |
 |------|-------------------|
-| matching_service | 候選人過濾整段可刪除而不被發現（74 個存活者）：隱藏／未完成／停權用戶、自己、性別偏好（male / female / both / all）、雙向封鎖、只排除「我」24 小時內跳過的人；年齡邊界；卡片內容（年齡、性別、自介、地點、距離與分數的四捨五入）由候選人實際資料算出；分數剛好等於門檻 15 算合格；「喜歡我」的排序加權與優先掃描（只看喜歡我、不含喜歡別人的人）；分批 offset；放寬建議只計多出來的人數；活躍度 1h / 24h / 168h 邊界（凍結時間）；照片逐張計分 |
-| content_moderation | 審核日誌逐欄位；快取命中、TTL 過期、清除（含 Redis key）；正則敏感詞與無效正則；Redis 快取讀寫與故障回退（之後不再重試）；多個詞命中時的嚴重度排序；個人檔案的 AUTO_BAN、WARN 標籤、REJECT 不被降級；正常內容與未帶 user_id 不寫日誌 |
-| trust_score | 分數剛好 20 不受限；今日尚未發訊；剩最後 1 則；記錄與檢查共用同一個當日計數 key 與 24h TTL |
-| trust_score_recovery | 日期鎖 key 以 UTC 日期命名、48h TTL；Redis 不可用時跳過；失敗時釋放鎖以便重試；未注入 session 的正式環境路徑 |
-| login_limiter | 鎖定時寫入的 key / 值 / TTL 與清除的計數 key（原本只驗證「有呼叫 set」） |
-| email_rate_limiter | 第 5 封仍允許（`>` vs `>=`）；冷卻剩 1 秒仍擋下；cooldown key；距 UTC 午夜秒數（模擬 UTC+8 主機） |
-| token_blacklist / verification_code | Redis 故障期間寫入內存的資料，Redis 恢復後仍有效；寫入 Redis 的值與 TTL |
-| core/security | access / refresh Token 的 `exp`、`iat` 以 UTC 計算（模擬 UTC+8 主機；PyJWT 把 naive datetime 當 UTC，誤用 `now()` 會讓 Token 多活 8 小時） |
+| matching_service | 候選人過濾整段可刪除而不被發現：隱藏／未完成／停權用戶、自己、性別偏好、雙向封鎖、只排除「我」24 小時內跳過的人；年齡邊界；卡片內容（年齡、性別、自介、地點、距離與分數的四捨五入）；分數剛好等於門檻 15；「喜歡我」的排序加權與優先掃描；分批 offset；放寬建議只計多出來的人數；偏好為 NULL 時的預設 18–99 歲、50 公里；活躍度邊界與跳過期限以 UTC 計算（模擬 UTC+8 主機） |
+| content_moderation | 審核日誌逐欄位；快取命中、TTL 過期、清除（含 Redis key、回退後不再呼叫 Redis）；正則與無效正則；Redis 快取讀寫與故障回退；多個詞命中時的嚴重度排序；個人檔案的 AUTO_BAN 與動作優先序；正常內容與未帶 user_id 不寫日誌；管理 API 拒絕未知的嚴重度／動作 |
+| core/security | 密碼驗證：正確／錯誤、雜湊格式錯誤時不可放行、bcrypt 72 bytes 以外的差異、128／129 字元上限；Token 的 `exp`、`iat` 以 UTC 計算（模擬 UTC+8 主機）；自訂 `expires_delta` |
+| trust_score | 分數剛好 20 不受限；今日尚未發訊；剩最後 1 則；記錄與檢查共用同一個當日 key 與 24h TTL，且以 UTC 日期命名；調整不存在的用戶要拋錯 |
+| trust_score_recovery | 日期鎖以 UTC 日期命名、48h TTL；Redis 不可用時跳過；失敗時釋放鎖、釋放時 Redis 也故障仍拋出原本的錯誤；未注入 session 的正式環境路徑；背景任務的啟動／停止與每小時迴圈 |
+| login_limiter | 鎖定時寫入的 key／值／TTL 與清除的計數 key；鎖定剩 1 秒仍有效；剩餘次數不會是負數；未鎖定時鎖定秒數為 0 |
+| email_rate_limiter | 第 5 封仍允許；冷卻剩 1 秒仍擋下；cooldown key；距 UTC 午夜秒數（模擬 UTC+8 主機） |
+| token_blacklist / verification_code | Redis 故障期間寫入內存的資料，Redis 恢復後仍有效；寫入 Redis 的值與 TTL；回退後刪除不再呼叫 Redis；剩不到 1 秒的 Token 不寫 Redis（`ex=0` 會讓黑名單永久回退）；清理迴圈 |
+
+### 依測量結果整理的程式碼
+
+**已刪除**（沒有任何作用的程式碼）：
+
+- `ContentModerationService` 內存快取的 LRU 淘汰：快取只會存一份 `"words"`，永遠到不了 500 筆上限
+- 傳給評分函式但沒被讀取的欄位：`user_data` 的偏好欄位、候選人的 `age`；敏感詞快取的 `description`
+- `check_profile_content` 的重複邏輯、只可能在第一輪成立的條件、從未回傳的 `all_triggered_word_ids`
+- `_log_moderation` 未使用的 `db` 參數（日誌一律以獨立 session 寫入）
+- `fromisoformat` 前多餘的 `"Z"` 轉換（專案需求 Python 3.13+，3.11 起已支援）
+
+**刻意保留**：
+
+- `_candidate_query` 排除「已配對」的子查詢：目前已被「排除我喜歡過的人」涵蓋（配對必來自互相 Like，
+  且 Like 從不刪除），但這是**刻意的防禦性排除**，`api/discovery.py` 的「誰喜歡我」使用同一套條件並註明
+  「即使 like 記錄異常遺失也不洩漏」
+- `min(score, 100)`、`func.least` 上限：防止日後調整權重或加分幅度時超出範圍
+- 公開介面的預設值（`calculate_match_score` 的字典預設值、`content_type="TEXT"`、`ttl_minutes=10`）
+
+**未修改（會破壞相容性）**：`create_access_token` 的 `expires_delta` 參數目前沒有呼叫端使用，
+但刪除會改變公開函式簽名，改為補上測試。
 
 ### 剩餘存活者
 
-186 個存活者逐一判讀後的分類。這些不補測試：補了也只是把實作細節寫死在測試裡，無法多抓到真正的錯誤。
-
-| 類別 | 數量 | 例子 |
+| 類別 | 數量 | 說明與例子 |
 |------|-----:|------|
-| 日誌與錯誤訊息文字 | 56 | `logger.info(...)` 的內容、`ValueError` 的訊息 |
-| 冗餘或不可達的程式碼 | 58 | 見下方說明 |
-| 語意等價 | 44 | SQL label／subquery 名稱、`join` 省略條件（由外鍵推得）、`EXISTS (SELECT NULL ...)`、初始值為 0 時 `=` 與 `+=`、`ensure_ascii=None`（falsy）、`"utf-8"` 與 `"UTF-8"`、Redis 鎖的值 `"1"`、Python 3.11 起 `fromisoformat` 已支援 `Z` |
+| 日誌與錯誤訊息文字 | 91 | `logger.info(...)` 的內容與參數 |
+| 語意等價 | 53 | SQL label／subquery 名稱、`join` 省略條件（由外鍵推得）、`EXISTS (SELECT NULL ...)`、初始值為 0 時 `=` 與 `+=`、`ensure_ascii=None`（falsy）、`"utf-8"` 與 `"UTF-8"`、Redis 鎖的值 `"1"`、`break` 與 `return`、`jwt.encode` 省略演算法（預設即 HS256）、輸入已驗證後不會出現的未知嚴重度／動作 |
+| 冗餘但刻意保留 | 31 | 見上節「刻意保留」（其中 18 個是排除已配對的子查詢） |
 | 效能或精度取捨 | 12 | 分批大小 `limit * 3` 與 `* 4`、湊滿後是否多掃一批、`use_spheroid`、公尺／公里換算 `1000` 與 `1001` |
-| 微秒級時間邊界 | 7 | 過期判斷 `<` 與 `<=`（兩次 `now()` 不會剛好相等） |
-| 時區（主機為 UTC 時等價） | 4 | 日期字串的 `datetime.now(UTC)` 與 `now(None)`；JWT 與 Email 冷卻的同類問題已用模擬 UTC+8 的測試蓋住 |
-| Redis 雙重故障 | 3 | Redis 已回退時刪除失敗、釋放鎖時 Redis 又故障 |
-| 輸入未驗證／排序未定義 | 2 | 未知 `severity` 的預設權重（見「潛在問題」）、同嚴重度時取先命中或後命中者 |
+| 微秒／次秒級時間邊界 | 7 | 過期判斷 `<` 與 `<=`（兩次 `now()` 不會剛好相等）、Redis TTL 剛好為 0 |
+| 同分時的先後 | 1 | 兩個同嚴重度的敏感詞同時命中時取先命中或後命中者（規格未定義） |
 
-**冗餘或不可達的程式碼（58）**，可考慮直接簡化：
-
-- `_candidate_query` 排除「已配對」的子查詢（18）：配對必然來自雙方互相 Like，而 Like 從不刪除（解除配對也不刪），
-  已被「排除我喜歡過的人」涵蓋
-- `ContentModerationService` 內存快取的 LRU 淘汰（8）：快取 key 只有 `"words"` 一個，永遠到不了 500 筆上限
-- 傳給評分函式但沒被讀取的欄位（12）：`user_data` 的偏好欄位、候選人的 `age`、敏感詞的 `description`
-- 不會用到的預設值（11）：`or 18 / 99 / 50`（資料庫欄位已有預設）、`get("distance_km", 999)` 等字典預設值、`content_type="TEXT"` 與 `ttl_minutes=10`（呼叫端都有傳）
-- 其他（9）：`min(score, 100)`（權重總和剛好 100）、`func.least` 上限（WHERE 已限定低於預設分數，且每次只 +1）、
-  個人檔案審核中只可能在第一輪成立的條件、只有測試會呼叫的 `reset_session_factory` 等
-
-**no tests（39）**：Token 黑名單清理迴圈 `_periodic_cleanup`、信任分數恢復的 `_periodic_recovery` 與
-`start_recovery_task` / `stop_recovery_task`。它們是 `while True: sleep()` 的背景任務外殼，
-實際工作（`cleanup_expired`、`run_daily_recovery_once`）都已有測試。
+這些不補測試：補了也只是把實作細節寫死在測試裡，無法多抓到真正的錯誤。
 
 ---
 
@@ -198,6 +221,8 @@ mutmut 以多個 worker 平行跑測試，但本專案的測試：
 
 - **不建議放進每次 CI**：9 個模組完整跑一次在 4 核心約 5 小時（內容審核與配對的變異體會觸發大量 API 整合測試）。
   修改這些模組時，用 `mutmut run "app.services.<模組>.*"` 只跑該模組即可
+- **先確認測試穩定**：結果裡若有「只改 log 卻被 killed」的變異體，代表有測試會隨機失敗，分數不可信
 - **寫測試時避開這次找到的模式**：只用 `in`／`len > 0` 的弱斷言、包在 `if` 裡的斷言、`except Exception: skip`、
-  靠插入順序或隨機 UUID 才成立的前提、離邊界太遠的測試值（25 小時測不出 24 小時的期限、整數分數測不出四捨五入）
+  靠插入順序或隨機 UUID 才成立的前提、離邊界太遠的測試值（25 小時測不出 24 小時的期限、整數分數測不出四捨五入）、
+  不清除的共享狀態（Redis 計數、class 屬性）
 - **涉及時間的邏輯**：凍結 `datetime.now`，並模擬非 UTC 主機（例如 UTC+8），否則 `now()` 與 `now(UTC)` 的錯誤在 CI 上看不出來
