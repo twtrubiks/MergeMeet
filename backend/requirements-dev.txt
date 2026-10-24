@@ -1,3 +1,4 @@
 # 開發工具
 ruff>=0.15.0          # Python linter + formatter
 pre-commit>=4.0.0     # Git pre-commit hooks
+mutmut>=3.8.0,<4     # 變異測試（設定見 pyproject.toml [tool.mutmut]，需 process_isolation）
