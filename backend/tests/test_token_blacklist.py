@@ -444,3 +444,16 @@ class TestTokenBlacklistFallback:
         mock_redis.set.assert_not_called()
         # 內存也不應有
         assert token not in blacklist._fallback
+
+    @pytest.mark.asyncio
+    async def test_token_expiring_within_a_second_not_sent_to_redis(self, mock_redis):
+        """測試：剩不到 1 秒的 Token 不寫入 Redis
+
+        TTL 取整後為 0，以 ex=0 寫入 Redis 會出錯，進而讓整個黑名單永久回退到內存。
+        """
+        blacklist = TokenBlacklist(redis_client=mock_redis)
+
+        await blacklist.add("almost_expired", datetime.now(UTC) + timedelta(milliseconds=500))
+
+        mock_redis.set.assert_not_called()
+        assert blacklist.is_using_redis() is True

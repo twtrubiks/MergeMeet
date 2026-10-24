@@ -166,6 +166,13 @@ class TestScoreBoundaries:
         with pytest.raises(ValueError, match="未知的行為類型"):
             await TrustScoreService.adjust_score(test_db, test_user.id, "invalid_action")
 
+    async def test_unknown_user_raises_error(self, test_db: AsyncSession):
+        """測試：調整不存在的用戶會拋錯並指出是哪個用戶（不可靜默略過）"""
+        user_id = uuid.uuid4()
+
+        with pytest.raises(ValueError, match=f"用戶不存在: {user_id}"):
+            await TrustScoreService.adjust_score(test_db, user_id, "email_verified")
+
 
 # =============================================================================
 # 測試：獲取分數

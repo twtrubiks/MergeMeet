@@ -56,6 +56,18 @@ def test_token_expiry_counted_from_utc_now(create_token, token_type, lifetime):
     assert claims["iat"] == int(FROZEN_NOW.timestamp())
 
 
+def test_access_token_custom_lifetime():
+    """測試：指定 expires_delta 時以它計算過期時間（同樣以 UTC 為準）"""
+    claims = jwt.decode(
+        create_access_token({"sub": "user-1"}, expires_delta=timedelta(minutes=5)),
+        settings.SECRET_KEY,
+        algorithms=[settings.ALGORITHM],
+        options={"verify_exp": False},
+    )
+
+    assert claims["exp"] == int((FROZEN_NOW + timedelta(minutes=5)).timestamp())
+
+
 class TestPassword:
     """密碼雜湊與驗證"""
 
