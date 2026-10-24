@@ -46,6 +46,9 @@ class ContentModerationService:
     # Session factory（供測試注入）
     _session_factory: async_sessionmaker | None = None
 
+    # 處理動作的嚴重程度（多個欄位取最嚴重者）
+    ACTION_PRIORITY = {"APPROVED": 0, "WARN": 1, "REJECT": 2, "AUTO_BAN": 3}
+
     # 可疑模式（正則表達式）- 保留靜態模式
     SUSPICIOUS_PATTERNS = [
         r"\b\d{10,16}\b",  # 可能的信用卡號或手機號碼
@@ -510,36 +513,17 @@ class ContentModerationService:
         Returns:
             (is_approved, violations, action): (是否通過, 違規項目列表, 應採取的動作)
         """
+        fields = [("個人簡介", bio)] if bio else []
+        fields += [(f"興趣標籤 '{interest}'", interest) for interest in interests or []]
+
         all_violations = []
-        all_triggered_word_ids = []
         max_action = "APPROVED"
-
-        # 檢查個人簡介
-        if bio:
-            is_approved, violations, word_ids, action = await cls.check_content(
-                bio, db, user_id, "PROFILE"
-            )
-            if not is_approved or violations:
-                all_violations.extend([f"個人簡介 - {v}" for v in violations])
-                all_triggered_word_ids.extend(word_ids)
-                if action in ["AUTO_BAN", "REJECT"]:
-                    max_action = action
-                elif action == "WARN" and max_action == "APPROVED":
-                    max_action = "WARN"
-
-        # 檢查興趣標籤
-        if interests:
-            for interest in interests:
-                is_approved, violations, word_ids, action = await cls.check_content(
-                    interest, db, user_id, "PROFILE"
-                )
-                if not is_approved or violations:
-                    all_violations.extend([f"興趣標籤 '{interest}' - {v}" for v in violations])
-                    all_triggered_word_ids.extend(word_ids)
-                    if action in ["AUTO_BAN", "REJECT"]:
-                        max_action = action
-                    elif action == "WARN" and max_action == "APPROVED":
-                        max_action = "WARN"
+        for label, text in fields:
+            _, violations, _, action = await cls.check_content(text, db, user_id, "PROFILE")
+            all_violations.extend(f"{label} - {v}" for v in violations)
+            # 取最嚴重的動作（與檢查順序無關：AUTO_BAN 不可被之後的 REJECT 覆寫）
+            if cls.ACTION_PRIORITY.get(action, 0) > cls.ACTION_PRIORITY[max_action]:
+                max_action = action
 
         is_approved = max_action in ["APPROVED", "WARN"]
         return is_approved, all_violations, max_action

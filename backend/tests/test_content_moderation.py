@@ -384,11 +384,8 @@ class TestProfileContentCheck:
         assert (is_approved, action) == (False, "REJECT")
         assert violations == ["個人簡介 - HARASSMENT: 約炮", "興趣標籤 '投資' - SCAM: 投資"]
 
-    @pytest.mark.parametrize("field", ["bio", "interests"])
-    async def test_auto_ban_word_rejects_profile(
-        self, test_db: AsyncSession, test_user: User, field: str
-    ):
-        """測試命中 AUTO_BAN 敏感詞時不通過，且動作為 AUTO_BAN"""
+    @pytest.fixture
+    async def auto_ban_word(self, test_db: AsyncSession, sensitive_words):
         test_db.add(
             SensitiveWord(
                 word="炸彈",
@@ -401,6 +398,12 @@ class TestProfileContentCheck:
         )
         await test_db.commit()
         await ContentModerationService.clear_cache()
+
+    @pytest.mark.parametrize("field", ["bio", "interests"])
+    async def test_auto_ban_word_rejects_profile(
+        self, test_db: AsyncSession, test_user: User, auto_ban_word, field: str
+    ):
+        """測試命中 AUTO_BAN 敏感詞時不通過，且動作為 AUTO_BAN"""
         kwargs = {"bio": "我有炸彈"} if field == "bio" else {"interests": ["炸彈"]}
 
         is_approved, _, action = await ContentModerationService.check_profile_content(
@@ -408,6 +411,17 @@ class TestProfileContentCheck:
         )
 
         assert (is_approved, action) == (False, "AUTO_BAN")
+
+    async def test_later_reject_does_not_downgrade_auto_ban(
+        self, test_db: AsyncSession, test_user: User, auto_ban_word
+    ):
+        """測試簡介命中 AUTO_BAN 時，之後興趣標籤的 REJECT 不會把動作降級"""
+        is_approved, violations, action = await ContentModerationService.check_profile_content(
+            db=test_db, user_id=test_user.id, bio="我有炸彈", interests=["色情"]
+        )
+
+        assert (is_approved, action) == (False, "AUTO_BAN")
+        assert violations == ["個人簡介 - VIOLENCE: 炸彈", "興趣標籤 '色情' - SEXUAL: 色情"]
 
     async def test_profile_violations_logged_as_profile(
         self, test_db: AsyncSession, test_user: User, sensitive_words
