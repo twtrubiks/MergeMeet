@@ -261,10 +261,12 @@ class TestTokenBlacklistWithRedis:
 
         await blacklist.add(token, expires_at)
 
-        # 驗證 Redis set 被調用
+        # 驗證 Redis set 被調用，且 TTL 為 Token 剩餘有效期（否則每次登出都留下永久 key）
         mock_redis.set.assert_called_once()
         call_args = mock_redis.set.call_args
         assert call_args[0][0].startswith("blacklist:")
+        assert call_args[0][1] == "1"
+        assert 3590 <= call_args.kwargs["ex"] <= 3600
         assert blacklist.is_using_redis() is True
 
     @pytest.mark.asyncio
@@ -344,6 +346,10 @@ class TestTokenBlacklistFallback:
 
         assert await blacklist.is_blacklisted("logged_out_token") is True
 
+        # 恢復後才登出的 Token 也要寫進同一處（內存），否則檢查時查不到
+        await blacklist.add("logged_out_later", datetime.now(UTC) + timedelta(hours=1))
+        assert await blacklist.is_blacklisted("logged_out_later") is True
+
     @pytest.mark.asyncio
     async def test_fallback_on_redis_error_add(self, mock_redis_error):
         """測試：Redis 錯誤時回退到內存（add）"""
@@ -356,6 +362,7 @@ class TestTokenBlacklistFallback:
 
         # 驗證 _use_redis 被設為 False
         assert blacklist._use_redis is False
+        assert blacklist.is_using_redis() is False
         # 驗證 Token 在內存中
         assert token in blacklist._fallback
 
