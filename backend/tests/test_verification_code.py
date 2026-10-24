@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
+import redis.asyncio as aioredis
 
 from app.services.verification_code import VerificationCodeStore
 
@@ -166,6 +167,19 @@ class TestVerificationCodeStoreFallback:
 
         assert result == code
         assert store._use_redis is False
+
+    @pytest.mark.asyncio
+    async def test_memory_code_still_readable_after_redis_recovers(self, mock_redis):
+        """測試：Redis 故障時存進內存的驗證碼，Redis 恢復後仍讀得到
+
+        回退後固定使用內存；若改回去 Redis 讀，會找不到驗證碼而讓用戶驗證失敗。
+        """
+        store = VerificationCodeStore(ttl_minutes=10, redis_client=mock_redis)
+        mock_redis.set.side_effect = aioredis.RedisError("Connection refused")
+        await store.set("flaky@example.com", "123456")
+
+        assert store.is_using_redis() is False
+        assert await store.get("flaky@example.com") == "123456"
 
     @pytest.mark.asyncio
     async def test_set_redis_enables_redis_mode(self):

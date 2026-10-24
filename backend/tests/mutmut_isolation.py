@@ -53,7 +53,9 @@ def _with_path(url: str, path: str) -> str:
 
 
 def _ensure_database(base_sync_url: str, db_name: str) -> None:
-    engine = create_engine(base_sync_url, isolation_level="AUTOCOMMIT")
+    # 連到 postgres 維護庫：若連到測試庫，同時執行的一般 pytest 會
+    # pg_terminate_backend 掉這條連線
+    engine = create_engine(_with_path(base_sync_url, "/postgres"), isolation_level="AUTOCOMMIT")
     with engine.connect() as conn:
         exists = conn.execute(
             text("SELECT 1 FROM pg_database WHERE datname = :name"), {"name": db_name}

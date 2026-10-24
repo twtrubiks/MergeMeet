@@ -292,6 +292,29 @@ class TestTokenBlacklistWithRedis:
         mock_redis.delete.assert_called()
 
     @pytest.mark.asyncio
+    async def test_remove_nonexistent_from_redis(self, mock_redis):
+        """測試：Redis 中不存在的 Token 移除回傳 False"""
+        blacklist = TokenBlacklist(redis_client=mock_redis)
+
+        assert await blacklist.remove("never_added_token") is False
+
+    @pytest.mark.asyncio
+    async def test_cleanup_task_lifecycle(self):
+        """測試：清理任務重複啟動不會建立第二個，停止後可再啟動"""
+        blacklist = TokenBlacklist()
+
+        await blacklist.start_cleanup_task()
+        task = blacklist._cleanup_task
+        assert task is not None and not task.done()
+
+        await blacklist.start_cleanup_task()
+        assert blacklist._cleanup_task is task
+
+        await blacklist.stop_cleanup_task()
+        assert task.done()
+        assert blacklist._cleanup_task is None
+
+    @pytest.mark.asyncio
     async def test_hash_token_shortens_key(self):
         """測試：Token hash 縮短 Key 長度"""
         long_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
