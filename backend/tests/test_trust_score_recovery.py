@@ -289,7 +289,7 @@ class TestRecoveryTask:
         task = trust_score_recovery._recovery_task
         await start_recovery_task()  # 已啟動時不重複建立
         assert trust_score_recovery._recovery_task is task
-        await running.wait()
+        await asyncio.wait_for(running.wait(), timeout=1)  # 任務沒啟動時直接失敗而非卡住
 
         await stop_recovery_task()
 
