@@ -839,6 +839,18 @@ class TestRedisCache:
 
         assert "moderation:words" not in mock_redis._storage
 
+    async def test_clear_cache_after_fallback_skips_redis(
+        self, test_db: AsyncSession, test_user: User, sensitive_words, mock_redis_error
+    ):
+        """測試 Redis 故障回退後，清除快取只清內存，不再呼叫故障的 Redis"""
+        await ContentModerationService.set_redis(mock_redis_error)
+        await ContentModerationService.check_content("你好", test_db, test_user.id, "MESSAGE")
+
+        await ContentModerationService.clear_cache()
+
+        mock_redis_error.delete.assert_not_called()
+        assert ContentModerationService._cache is None
+
     async def test_clear_cache_tolerates_redis_error(self, mock_redis_error):
         """測試 Redis 故障時清除快取不拋錯"""
         await ContentModerationService.set_redis(mock_redis_error)

@@ -84,7 +84,7 @@ def _calculate_activity_score(last_active) -> float:
         return 0
 
     if isinstance(last_active, str):
-        last_active = datetime.fromisoformat(last_active.replace("Z", "+00:00"))
+        last_active = datetime.fromisoformat(last_active)  # Python 3.11+ 已支援 "Z" 結尾
 
     hours_ago = (datetime.now(UTC) - last_active).total_seconds() / 3600
 

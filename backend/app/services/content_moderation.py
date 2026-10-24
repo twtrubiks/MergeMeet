@@ -396,7 +396,6 @@ class ContentModerationService:
         # 5. 記錄審核日誌
         if cls._should_log_moderation(user_id, violations, is_approved):
             await cls._log_moderation(
-                db=db,
                 user_id=user_id,
                 content_type=content_type,
                 content=content,
@@ -411,7 +410,6 @@ class ContentModerationService:
     @classmethod
     async def _log_moderation(
         cls,
-        db: AsyncSession,
         user_id: uuid.UUID,
         content_type: str,
         content: str,
@@ -424,7 +422,6 @@ class ContentModerationService:
         記錄審核日誌（獨立事務，確保日誌永久保存）
 
         Args:
-            db: 資料庫 session
             user_id: 用戶 ID
             content_type: 內容類型
             content: 原始內容
