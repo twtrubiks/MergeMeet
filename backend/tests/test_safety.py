@@ -7,7 +7,9 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.match import Match
+from app.models.match import BlockedUser, Match
+from app.models.profile import Profile
+from app.models.report import Report
 from app.models.user import User
 
 
@@ -70,7 +72,7 @@ async def test_cannot_block_self(
     )
 
     assert response.status_code == 400
-    assert "無法封鎖自己" in response.json()["detail"]
+    assert response.json()["detail"] == "無法封鎖自己"
 
 
 @pytest.mark.asyncio
@@ -98,7 +100,7 @@ async def test_cannot_block_twice(
     )
 
     assert response.status_code == 400
-    assert "已經封鎖" in response.json()["detail"]
+    assert response.json()["detail"] == "已經封鎖此用戶"
 
 
 @pytest.mark.asyncio
@@ -271,7 +273,7 @@ async def test_cannot_report_self(
     )
 
     assert response.status_code == 400
-    assert "無法舉報自己" in response.json()["detail"]
+    assert response.json()["detail"] == "無法舉報自己"
 
 
 @pytest.mark.asyncio
@@ -296,7 +298,9 @@ async def test_report_requires_valid_type(
     )
 
     assert response.status_code == 400
-    assert "無效的舉報類型" in response.json()["detail"]
+    assert response.json()["detail"] == (
+        "無效的舉報類型。有效類型：INAPPROPRIATE, HARASSMENT, FAKE, SCAM, OTHER"
+    )
 
 
 @pytest.mark.asyncio
@@ -316,7 +320,7 @@ async def test_report_nonexistent_user(client: AsyncClient, test_users_for_safet
     )
 
     assert response.status_code == 404
-    assert "被舉報用戶不存在" in response.json()["detail"]
+    assert response.json()["detail"] == "被舉報用戶不存在"
 
 
 @pytest.mark.asyncio
@@ -436,4 +440,259 @@ async def test_duplicate_report_rejected(
         json=report_data,
     )
     assert response2.status_code == 400
-    assert "已對該用戶提交過舉報" in response2.json()["detail"]
+    assert response2.json()["detail"] == "您已對該用戶提交過舉報，目前正在處理中"
+
+
+# ==================== 封鎖／舉報的歸屬與邊界 ====================
+
+
+async def _users(db: AsyncSession, users: dict) -> dict[str, User]:
+    result = await db.execute(select(User))
+    by_email = {user.email: user for user in result.scalars().all()}
+    return {name: by_email[info["email"]] for name, info in users.items()}
+
+
+def _headers(users: dict, name: str) -> dict:
+    return {"Authorization": f"Bearer {users[name]['token']}"}
+
+
+@pytest.mark.asyncio
+async def test_block_nonexistent_user(client: AsyncClient, test_users_for_safety: dict):
+    response = await client.post(
+        f"/api/safety/block/{uuid.uuid4()}",
+        headers=_headers(test_users_for_safety, "alice"),
+        json={},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "用戶不存在"
+
+
+@pytest.mark.asyncio
+async def test_block_not_prevented_by_others_block(
+    client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession
+):
+    """別人封鎖過 Bob，不影響 Alice 封鎖 Bob"""
+    users = await _users(test_db, test_users_for_safety)
+    test_db.add(BlockedUser(blocker_id=users["charlie"].id, blocked_id=users["bob"].id))
+    await test_db.commit()
+
+    response = await client.post(
+        f"/api/safety/block/{users['bob'].id}",
+        headers=_headers(test_users_for_safety, "alice"),
+        json={},
+    )
+
+    assert response.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_block_cancels_match_whichever_side_blocks(
+    client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession
+):
+    """配對中 user1 封鎖 user2、或 user2 封鎖 user1，都會取消配對並記錄時間與執行者"""
+    users = await _users(test_db, test_users_for_safety)
+    names = {user.id: name for name, user in users.items()}
+    pairs = [
+        sorted([users["alice"].id, users["bob"].id]),
+        sorted([users["alice"].id, users["charlie"].id]),
+    ]
+    matches = [Match(user1_id=low, user2_id=high, status="ACTIVE") for low, high in pairs]
+    test_db.add_all(matches)
+    await test_db.commit()
+
+    # 第一組由 user1（id 較小者）封鎖，第二組由 user2 封鎖
+    for (blocker, blocked), match in zip(
+        [(pairs[0][0], pairs[0][1]), (pairs[1][1], pairs[1][0])], matches, strict=True
+    ):
+        response = await client.post(
+            f"/api/safety/block/{blocked}",
+            headers=_headers(test_users_for_safety, names[blocker]),
+            json={},
+        )
+        assert response.status_code == 201
+        assert response.json()["match_cancelled"] is True
+
+        await test_db.refresh(match)
+        assert (match.status, match.unmatched_by) == ("UNMATCHED", blocker)
+        assert match.unmatched_at is not None
+
+
+@pytest.mark.asyncio
+async def test_blocked_list_newest_first_with_names_and_reasons(
+    client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession
+):
+    """封鎖列表：最新的在前；有檔案顯示名稱、沒有檔案顯示「未知用戶」；保留封鎖原因"""
+    users = await _users(test_db, test_users_for_safety)
+    test_db.add(Profile(user_id=users["bob"].id, display_name="Bob 的名字"))
+    await test_db.commit()
+    alice = _headers(test_users_for_safety, "alice")
+
+    await client.post(
+        f"/api/safety/block/{users['bob'].id}", headers=alice, json={"reason": "騷擾"}
+    )
+    await client.post(f"/api/safety/block/{users['charlie'].id}", headers=alice, json={})
+    response = await client.get("/api/safety/blocked", headers=alice)
+
+    assert response.status_code == 200
+    blocks = (await test_db.execute(select(BlockedUser))).scalars().all()
+    block_ids = {block.blocked_id: str(block.id) for block in blocks}
+    assert [
+        {key: item[key] for key in ("id", "blocked_user_id", "blocked_user_display_name", "reason")}
+        for item in response.json()
+    ] == [
+        {
+            "id": block_ids[users["charlie"].id],
+            "blocked_user_id": str(users["charlie"].id),
+            "blocked_user_display_name": "未知用戶",
+            "reason": None,
+        },
+        {
+            "id": block_ids[users["bob"].id],
+            "blocked_user_id": str(users["bob"].id),
+            "blocked_user_display_name": "Bob 的名字",
+            "reason": "騷擾",
+        },
+    ]
+
+
+@pytest.mark.asyncio
+async def test_unblock_only_removes_own_block_of_that_user(
+    client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession
+):
+    """只能解除自己對該用戶的封鎖：不能解除別人的封鎖，也不會動到自己對其他人的封鎖"""
+    users = await _users(test_db, test_users_for_safety)
+    test_db.add_all(
+        [
+            BlockedUser(blocker_id=users["charlie"].id, blocked_id=users["bob"].id),
+            BlockedUser(blocker_id=users["alice"].id, blocked_id=users["charlie"].id),
+        ]
+    )
+    await test_db.commit()
+    alice = _headers(test_users_for_safety, "alice")
+
+    response = await client.delete(f"/api/safety/block/{users['bob'].id}", headers=alice)
+    assert response.status_code == 404
+    assert response.json()["detail"] == "未封鎖此用戶"
+
+    test_db.add(BlockedUser(blocker_id=users["alice"].id, blocked_id=users["bob"].id))
+    await test_db.commit()
+    response = await client.delete(f"/api/safety/block/{users['bob'].id}", headers=alice)
+    assert response.status_code == 200
+
+    remaining = (await test_db.execute(select(BlockedUser))).scalars().all()
+    assert {(b.blocker_id, b.blocked_id) for b in remaining} == {
+        (users["charlie"].id, users["bob"].id),
+        (users["alice"].id, users["charlie"].id),
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("report_type", ["INAPPROPRIATE", "HARASSMENT", "FAKE", "SCAM", "OTHER"])
+async def test_report_accepts_every_valid_type(
+    client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession, report_type: str
+):
+    users = await _users(test_db, test_users_for_safety)
+
+    response = await client.post(
+        "/api/safety/report",
+        headers=_headers(test_users_for_safety, "alice"),
+        json={
+            "reported_user_id": str(users["bob"].id),
+            "report_type": report_type,
+            "reason": "這是一段至少十個字的舉報原因",
+            "evidence": "截圖說明",
+        },
+    )
+
+    assert response.status_code == 201
+    [report] = (await test_db.execute(select(Report))).scalars().all()
+    assert response.json()["id"] == str(report.id)
+    assert (report.report_type, report.evidence, report.status) == (
+        report_type,
+        "截圖說明",
+        "PENDING",
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("existing_reporter", "existing_status", "expected"),
+    [
+        ("alice", "UNDER_REVIEW", 400),  # 處理中的舉報仍算重複
+        ("alice", "APPROVED", 201),  # 先前的舉報已審結，可再次舉報
+        ("alice", "REJECTED", 201),
+        ("charlie", "PENDING", 201),  # 別人的舉報不影響自己舉報
+    ],
+)
+async def test_duplicate_report_only_counts_own_open_reports(
+    client: AsyncClient,
+    test_users_for_safety: dict,
+    test_db: AsyncSession,
+    existing_reporter: str,
+    existing_status: str,
+    expected: int,
+):
+    users = await _users(test_db, test_users_for_safety)
+    test_db.add(
+        Report(
+            reporter_id=users[existing_reporter].id,
+            reported_user_id=users["bob"].id,
+            report_type="FAKE",
+            reason="先前提交的舉報原因",
+            status=existing_status,
+        )
+    )
+    await test_db.commit()
+
+    response = await client.post(
+        "/api/safety/report",
+        headers=_headers(test_users_for_safety, "alice"),
+        json={
+            "reported_user_id": str(users["bob"].id),
+            "report_type": "HARASSMENT",
+            "reason": "這是一段至少十個字的舉報原因",
+        },
+    )
+
+    assert response.status_code == expected
+
+
+@pytest.mark.asyncio
+async def test_my_reports_newest_first_and_only_mine(
+    client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession
+):
+    users = await _users(test_db, test_users_for_safety)
+    alice = _headers(test_users_for_safety, "alice")
+    for target in ("bob", "charlie"):
+        await client.post(
+            "/api/safety/report",
+            headers=alice,
+            json={
+                "reported_user_id": str(users[target].id),
+                "report_type": "OTHER",
+                "reason": "這是一段至少十個字的舉報原因",
+            },
+        )
+    await client.post(
+        "/api/safety/report",
+        headers=_headers(test_users_for_safety, "charlie"),
+        json={
+            "reported_user_id": str(users["bob"].id),
+            "report_type": "OTHER",
+            "reason": "這是一段至少十個字的舉報原因",
+        },
+    )
+
+    response = await client.get("/api/safety/reports", headers=alice)
+
+    reports = (
+        (await test_db.execute(select(Report).where(Report.reporter_id == users["alice"].id)))
+        .scalars()
+        .all()
+    )
+    report_ids = {report.reported_user_id: str(report.id) for report in reports}
+    assert [(r["id"], r["reported_user_id"]) for r in response.json()] == [
+        (report_ids[users["charlie"].id], str(users["charlie"].id)),
+        (report_ids[users["bob"].id], str(users["bob"].id)),
+    ]
