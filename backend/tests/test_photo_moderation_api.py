@@ -2,7 +2,7 @@
 
 import io
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime
 from unittest.mock import patch
 
 import pytest
@@ -188,6 +188,37 @@ class TestGetPendingPhotosAPI:
 
         assert response.status_code == 200
 
+    async def test_page_and_status_are_applied(
+        self, client: AsyncClient, test_db: AsyncSession, admin_token: str, test_profile: Profile
+    ):
+        """分頁參數與狀態篩選確實傳給查詢（不只是原樣回傳）"""
+        photos = [
+            Photo(
+                profile_id=test_profile.id,
+                url=f"/uploads/photos/test/{status.lower()}{i}.jpg",
+                display_order=i,
+                moderation_status=status,
+                created_at=datetime(2026, 1, 1, i, tzinfo=UTC),
+            )
+            for i, status in enumerate(["PENDING", "PENDING", "PENDING", "APPROVED"])
+        ]
+        test_db.add_all(photos)
+        await test_db.commit()
+        headers = {"Authorization": f"Bearer {admin_token}"}
+
+        page2 = (
+            await client.get("/api/admin/photos/pending?page=2&page_size=2", headers=headers)
+        ).json()
+        approved = (
+            await client.get("/api/admin/photos/pending?status=APPROVED", headers=headers)
+        ).json()
+
+        assert (page2["total"], [p["id"] for p in page2["photos"]]) == (3, [str(photos[2].id)])
+        assert (approved["total"], [p["id"] for p in approved["photos"]]) == (
+            1,
+            [str(photos[3].id)],
+        )
+
 
 @pytest.mark.asyncio
 class TestGetPhotoStatsAPI:
@@ -237,6 +268,7 @@ class TestGetPhotoDetailAPI:
         )
 
         assert response.status_code == 404
+        assert response.json()["detail"] == "照片不存在"
 
     async def test_get_photo_detail_invalid_id(self, client: AsyncClient, admin_token: str):
         """測試：無效照片 ID"""
@@ -293,6 +325,7 @@ class TestReviewPhotoAPI:
         )
 
         assert response.status_code == 400
+        assert response.json()["detail"] == "拒絕照片時必須提供原因"
 
     async def test_review_photo_invalid_status(
         self, client: AsyncClient, admin_token: str, pending_photo: Photo
@@ -316,6 +349,30 @@ class TestReviewPhotoAPI:
         )
 
         assert response.status_code == 400
+        assert response.json()["detail"] == "照片不存在"
+
+    async def test_review_records_admin_and_returns_photo_id(
+        self,
+        client: AsyncClient,
+        test_db: AsyncSession,
+        admin_user: User,
+        admin_token: str,
+        pending_photo: Photo,
+    ):
+        response = await client.post(
+            f"/api/admin/photos/{pending_photo.id}/review",
+            headers={"Authorization": f"Bearer {admin_token}"},
+            json={"status": "APPROVED"},
+        )
+
+        assert response.json() == {
+            "success": True,
+            "message": "審核完成",
+            "photo_id": str(pending_photo.id),
+            "status": "APPROVED",
+        }
+        await test_db.refresh(pending_photo)
+        assert pending_photo.reviewed_by == admin_user.id
 
 
 @pytest.mark.asyncio
@@ -399,3 +456,4 @@ class TestQuarantinePhotoAPI:
             )
 
         assert response.status_code == 404
+        assert response.json()["detail"] == "隔離照片不存在"
