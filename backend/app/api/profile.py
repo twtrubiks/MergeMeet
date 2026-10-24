@@ -384,7 +384,7 @@ async def _read_file_with_size_limit(
         if total_size > max_size:
             return (
                 False,
-                status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                status.HTTP_413_CONTENT_TOO_LARGE,
                 f"檔案過大，最大允許 {max_size / 1024 / 1024:.0f}MB",
                 None,
             )
