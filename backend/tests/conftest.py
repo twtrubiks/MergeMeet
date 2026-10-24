@@ -5,6 +5,7 @@ import os
 from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock
 
+import bcrypt
 import pytest
 import pytest_asyncio
 from dotenv import load_dotenv
@@ -15,6 +16,11 @@ from sqlalchemy.pool import NullPool
 
 # 載入 .env 檔案（讓 os.getenv 可以讀取）
 load_dotenv()
+
+# bcrypt 預設 12 rounds，每次雜湊或比對約 0.3 秒；註冊／登入密集的測試大半時間花在這裡。
+# 測試只驗證雜湊與比對的行為，不需要正式環境的運算成本（rounds 會記在雜湊值內，比對不受影響）
+_bcrypt_gensalt = bcrypt.gensalt
+bcrypt.gensalt = lambda rounds=4, prefix=b"2b": _bcrypt_gensalt(rounds, prefix)
 
 from app.core.database import Base, get_db  # noqa: E402
 from app.core.rate_limit import limiter as ip_limiter  # noqa: E402
