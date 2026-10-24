@@ -2,16 +2,19 @@
 
 import io
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
 from PIL import Image
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.moderation import ModerationLog
 from app.models.profile import InterestTag, Photo, Profile
 from app.models.user import User
+from app.services import photo_moderation
 from app.services.photo_moderation import PhotoModerationService
 
 # ========== Fixtures ==========
@@ -169,7 +172,7 @@ class TestPhotoModerationService:
         )
 
         assert success is True
-        assert "完成" in message
+        assert message == "審核完成"
 
         # 驗證狀態已更新
         await test_db.refresh(pending_photo)
@@ -208,7 +211,7 @@ class TestPhotoModerationService:
         )
 
         assert success is False
-        assert "必須提供原因" in message
+        assert message == "拒絕時必須提供原因"
 
     async def test_review_photo_invalid_status_fails(
         self, test_db: AsyncSession, pending_photo: Photo, admin_user: User
@@ -219,7 +222,7 @@ class TestPhotoModerationService:
         )
 
         assert success is False
-        assert "無效" in message
+        assert message == "無效的審核狀態"
 
     async def test_review_nonexistent_photo_fails(self, test_db: AsyncSession, admin_user: User):
         """測試：審核不存在的照片應失敗"""
@@ -229,7 +232,7 @@ class TestPhotoModerationService:
         )
 
         assert success is False
-        assert "不存在" in message
+        assert message == "照片不存在"
 
     async def test_get_stats(
         self, test_db: AsyncSession, pending_photo: Photo, approved_photo: Photo
@@ -261,7 +264,9 @@ class TestPhotoModerationService:
     async def test_mask_email(self):
         """測試：Email 遮罩"""
         assert PhotoModerationService._mask_email("test@example.com") == "t***t@example.com"
+        assert PhotoModerationService._mask_email("abc@example.com") == "a***c@example.com"
         assert PhotoModerationService._mask_email("ab@example.com") == "a***@example.com"
+        assert PhotoModerationService._mask_email("@example.com") == "***@example.com"
         assert PhotoModerationService._mask_email("") == ""
         assert PhotoModerationService._mask_email("noemail") == "noemail"
 
@@ -447,7 +452,7 @@ class TestRejectionTakedown:
         )
 
         assert success is False
-        assert "重新上傳" in message
+        assert message == "照片已駁回下架，重新上架請透過申訴或重新上傳"
 
     async def test_approve_keeps_primary_and_file(
         self, test_db: AsyncSession, pending_photo: Photo, admin_user: User
@@ -468,3 +473,221 @@ class TestRejectionTakedown:
         mock_quarantine.assert_not_awaited()
         await test_db.refresh(pending_photo)
         assert pending_photo.is_profile_picture is True
+
+
+def make_photo(profile: Profile, name: str, status: str, **fields) -> Photo:
+    return Photo(
+        id=uuid.uuid4(),
+        profile_id=profile.id,
+        url=f"/uploads/photos/test/{name}.jpg",
+        thumbnail_url=f"/uploads/photos/test/{name}_thumb.jpg",
+        display_order=0,
+        moderation_status=status,
+        file_size=1000,
+        width=100,
+        height=80,
+        mime_type="image/jpeg",
+        **fields,
+    )
+
+
+@pytest.mark.asyncio
+class TestModerationLog:
+    """審核結果寫入審核日誌（獨立 session，審核失敗也不遺失）"""
+
+    async def _logs(self, db: AsyncSession, user: User) -> list[ModerationLog]:
+        result = await db.execute(select(ModerationLog).where(ModerationLog.user_id == user.id))
+        return result.scalars().all()
+
+    async def test_approve_logged(
+        self, test_db: AsyncSession, test_user: User, pending_photo: Photo, admin_user: User
+    ):
+        await PhotoModerationService.review_photo(
+            db=test_db, photo_id=pending_photo.id, admin_id=admin_user.id, status="APPROVED"
+        )
+
+        [log] = await self._logs(test_db, test_user)
+        assert (
+            log.content_type,
+            log.original_content,
+            log.is_approved,
+            log.violations,
+            log.action_taken,
+        ) == ("PHOTO", str(pending_photo.id), True, "[]", "APPROVED")
+
+    async def test_reject_logged_with_reason(
+        self, test_db: AsyncSession, test_user: User, pending_photo: Photo, admin_user: User
+    ):
+        await PhotoModerationService.review_photo(
+            db=test_db,
+            photo_id=pending_photo.id,
+            admin_id=admin_user.id,
+            status="REJECTED",
+            rejection_reason="包含不當內容",
+        )
+
+        [log] = await self._logs(test_db, test_user)
+        assert (
+            log.content_type,
+            log.original_content,
+            log.is_approved,
+            log.violations,
+            log.action_taken,
+        ) == ("PHOTO", str(pending_photo.id), False, '["包含不當內容"]', "REJECTED")
+
+
+@pytest.mark.asyncio
+class TestPhotoQueries:
+    """列表分頁、詳情欄位與統計數字"""
+
+    async def test_pending_list_paginates_oldest_first(
+        self, test_db: AsyncSession, test_user: User, test_profile: Profile, admin_user: User
+    ):
+        """依上傳時間由舊到新分頁；列表欄位屬於照片擁有者而非審核者"""
+        base = datetime(2026, 1, 1, tzinfo=UTC)
+        # 依新到舊插入，避免結果碰巧符合插入順序
+        photos = [
+            make_photo(test_profile, f"page{i}", "PENDING", created_at=base + timedelta(hours=i))
+            for i in (2, 0, 1)
+        ]
+        approved = make_photo(
+            test_profile, "approved", "APPROVED", created_at=base, reviewed_by=admin_user.id
+        )
+        test_db.add_all([*photos, approved])
+        await test_db.commit()
+        by_hour = {p.created_at.hour: p for p in photos}
+
+        page1, total1 = await PhotoModerationService.get_pending_photos(
+            db=test_db, page=1, page_size=2
+        )
+        page2, total2 = await PhotoModerationService.get_pending_photos(
+            db=test_db, page=2, page_size=2
+        )
+
+        assert (total1, total2) == (3, 3)
+        assert [p["id"] for p in page1] == [str(by_hour[0].id), str(by_hour[1].id)]
+        assert [p["id"] for p in page2] == [str(by_hour[2].id)]
+        assert page1[0] == {
+            "id": str(by_hour[0].id),
+            "url": "/uploads/photos/test/page0.jpg",
+            "thumbnail_url": "/uploads/photos/test/page0_thumb.jpg",
+            "profile_id": str(test_profile.id),
+            "user_id": str(test_user.id),
+            "user_email": "p***t@example.com",
+            "display_name": "測試用戶",
+            "moderation_status": "PENDING",
+            "created_at": base.isoformat(),
+            "file_size": 1000,
+            "width": 100,
+            "height": 80,
+        }
+
+        # 依狀態篩選時，使用者欄位仍是照片擁有者（照片也以 reviewed_by 關聯到審核者）
+        [approved_row], _ = await PhotoModerationService.get_pending_photos(
+            db=test_db, status="APPROVED"
+        )
+        assert approved_row["user_id"] == str(test_user.id)
+
+    async def test_detail_includes_review_fields(
+        self, test_db: AsyncSession, test_user: User, test_profile: Profile, admin_user: User
+    ):
+        created = datetime(2026, 1, 1, tzinfo=UTC)
+        reviewed = datetime(2026, 1, 2, tzinfo=UTC)
+        photo = make_photo(
+            test_profile,
+            "detail",
+            "REJECTED",
+            created_at=created,
+            reviewed_at=reviewed,
+            reviewed_by=admin_user.id,
+            rejection_reason="裸露內容",
+            auto_moderation_score=12,
+            auto_moderation_labels='["label"]',
+        )
+        test_db.add(photo)
+        await test_db.commit()
+
+        detail = await PhotoModerationService.get_photo_detail(test_db, photo.id)
+
+        assert detail == {
+            "id": str(photo.id),
+            "url": "/uploads/photos/test/detail.jpg",
+            "thumbnail_url": "/uploads/photos/test/detail_thumb.jpg",
+            "profile_id": str(test_profile.id),
+            "user_id": str(test_user.id),
+            "user_email": "p***t@example.com",
+            "display_name": "測試用戶",
+            "moderation_status": "REJECTED",
+            "rejection_reason": "裸露內容",
+            "reviewed_at": reviewed.isoformat(),
+            "created_at": created.isoformat(),
+            "file_size": 1000,
+            "width": 100,
+            "height": 80,
+            "mime_type": "image/jpeg",
+            "auto_moderation_score": 12,
+            "auto_moderation_labels": '["label"]',
+        }
+
+    async def test_detail_of_unreviewed_photo(self, test_db: AsyncSession, pending_photo: Photo):
+        detail = await PhotoModerationService.get_photo_detail(test_db, pending_photo.id)
+
+        assert (detail["reviewed_at"], detail["rejection_reason"]) == (None, None)
+
+    async def test_stats_counts_today_by_utc_date(
+        self, test_db: AsyncSession, test_profile: Profile, monkeypatch
+    ):
+        """「今日」以 UTC 日期計算，從 00:00:00 起算（含）
+
+        模擬部署在 UTC+8 主機、UTC 時間 1/1 20:00（當地已是 1/2 04:00）。
+        """
+        frozen_utc = datetime(2026, 1, 1, 20, 0, tzinfo=UTC)
+        real_datetime = photo_moderation.datetime
+
+        class _Utc8Datetime(real_datetime):
+            @classmethod
+            def now(cls, tz=None):
+                if tz is None:
+                    return (frozen_utc + timedelta(hours=8)).replace(tzinfo=None)
+                return frozen_utc.astimezone(tz)
+
+        today = datetime(2026, 1, 1, tzinfo=UTC)
+        just_before = today - timedelta(seconds=1)
+        test_db.add_all(
+            [
+                make_photo(test_profile, "p_today", "PENDING", created_at=today),
+                make_photo(test_profile, "p_yesterday", "PENDING", created_at=just_before),
+                make_photo(test_profile, "a_today", "APPROVED", reviewed_at=today),
+                make_photo(test_profile, "a_yesterday", "APPROVED", reviewed_at=just_before),
+                make_photo(
+                    test_profile,
+                    "r_today",
+                    "REJECTED",
+                    created_at=today + timedelta(hours=5),
+                    reviewed_at=today + timedelta(hours=6),
+                ),
+            ]
+        )
+        await test_db.commit()
+        monkeypatch.setattr(photo_moderation, "datetime", _Utc8Datetime)
+
+        stats = await PhotoModerationService.get_stats(test_db)
+
+        assert stats == {
+            "total_photos": 5,
+            "pending_photos": 2,
+            "approved_photos": 2,
+            "rejected_photos": 1,
+            "today_pending": 1,
+            "today_reviewed": 2,
+        }
+
+    async def test_stats_empty(self, test_db: AsyncSession):
+        assert await PhotoModerationService.get_stats(test_db) == {
+            "total_photos": 0,
+            "pending_photos": 0,
+            "approved_photos": 0,
+            "rejected_photos": 0,
+            "today_pending": 0,
+            "today_reviewed": 0,
+        }

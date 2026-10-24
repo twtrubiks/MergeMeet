@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_password_hash
 from app.models.moderation import ContentAppeal, SensitiveWord
-from app.models.profile import Photo, Profile
+from app.models.profile import InterestTag, Photo, Profile
 from app.models.user import User
 from app.services.content_moderation import ContentModerationService
 
@@ -558,7 +558,7 @@ class TestAppealPhotoRestore:
             patch(
                 "app.services.photo_moderation.file_storage.get_quarantined_path",
                 return_value="/quarantine/rejected.jpg",
-            ),
+            ) as mock_path,
             patch(
                 "app.services.photo_moderation.file_storage.restore_photo",
                 new_callable=AsyncMock,
@@ -580,8 +580,59 @@ class TestAppealPhotoRestore:
         # 原本沒有主頭像，還原的照片遞補
         assert rejected_photo.is_profile_picture is True
 
+        mock_path.assert_called_once_with(rejected_photo.url)
         mock_restore.assert_awaited_once_with(rejected_photo.url)
         mock_purge.assert_not_called()
+
+    async def test_approve_restores_profile_completeness(
+        self,
+        client: AsyncClient,
+        test_db: AsyncSession,
+        admin_headers: dict,
+        normal_user: User,
+        rejected_photo: Photo,
+    ):
+        """還原唯一照片後檔案恢復完整（重新進入探索池）"""
+        profile = await test_db.get(Profile, rejected_photo.profile_id)
+        tags = [InterestTag(name=f"還原測試-{i}", category="lifestyle") for i in range(3)]
+        test_db.add_all(tags)
+        await test_db.commit()
+        await test_db.refresh(profile, ["interests"])
+        profile.interests.extend(tags)
+        profile.is_complete = False
+        await test_db.commit()
+
+        appeal = ContentAppeal(
+            id=uuid.uuid4(),
+            user_id=normal_user.id,
+            appeal_type="PHOTO",
+            rejected_content=rejected_photo.url,
+            violations='["仇恨言論"]',
+            reason=APPEAL_REASON,
+        )
+        test_db.add(appeal)
+        await test_db.commit()
+
+        with (
+            patch(
+                "app.services.photo_moderation.file_storage.get_quarantined_path",
+                return_value="/quarantine/rejected.jpg",
+            ),
+            patch(
+                "app.services.photo_moderation.file_storage.restore_photo",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+        ):
+            response = await client.post(
+                f"/api/moderation/appeals/{appeal.id}/review",
+                headers=admin_headers,
+                json={"status": "APPROVED", "admin_response": "確認為誤判，照片已恢復上架"},
+            )
+
+        assert response.status_code == 200
+        await test_db.refresh(profile)
+        assert profile.is_complete is True
 
     async def test_approve_not_owned_photo_no_restore(
         self,
@@ -604,6 +655,11 @@ class TestAppealPhotoRestore:
         await test_db.commit()
 
         with (
+            # 隔離檔存在，確保擋下還原的是歸屬檢查而非檔案遺失
+            patch(
+                "app.services.photo_moderation.file_storage.get_quarantined_path",
+                return_value="/quarantine/rejected.jpg",
+            ),
             patch(
                 "app.services.photo_moderation.file_storage.restore_photo",
                 new_callable=AsyncMock,
