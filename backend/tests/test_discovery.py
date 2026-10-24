@@ -371,11 +371,11 @@ def _birth_date(age: int) -> date:
 async def test_browse_card_age_and_match_score_use_candidate_data(
     client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
 ):
-    """測試：卡片年齡與配對分數由候選人實際資料算出
+    """測試：卡片內容與配對分數由候選人實際資料算出
 
     評分函式本身有單元測試；這裡驗證 browse 把每個欄位都正確傳了進去，
     因此每個因素都設成非預設值：
-    共同興趣 2 個 20 + 距離約 0.1km 20 + 剛上線 20 + 照片 2 張 1 + 自介 2 + 信任 80 分 5 = 68
+    共同興趣 2 個 20 + 距離約 0.1km 20 + 剛上線 20 + 照片 1 張 0.5 + 自介 2 + 信任 80 分 5 = 67.5
     """
     await _create_candidate_pool(
         test_db,
@@ -401,16 +401,16 @@ async def test_browse_card_age_and_match_score_use_candidate_data(
         [{"profile_id": viewer.id, "interest_id": tag.id} for tag in tags[:2]]
         + [{"profile_id": candidate.id, "interest_id": tag.id} for tag in tags],
     )
-    test_db.add_all(
+    test_db.add(
         Photo(
             profile_id=candidate.id,
-            url=f"/uploads/wired{i}.jpg",
-            display_order=i,
+            url="/uploads/wired0.jpg",
+            display_order=0,
             moderation_status="APPROVED",
         )
-        for i in range(2)
     )
     candidate.bio = "喜歡爬山"
+    candidate.location_name = "台北市信義區"
     await test_db.execute(update(User).where(User.id == candidate.user_id).values(trust_score=80))
     await test_db.commit()
     test_db.expire_all()  # 興趣以 core insert 寫入，讓已載入的 relationship 重新讀取
@@ -422,7 +422,14 @@ async def test_browse_card_age_and_match_score_use_candidate_data(
     assert response.status_code == 200
     [card] = response.json()
     assert card["age"] == 30
-    assert card["match_score"] == 68.0
+    assert card["match_score"] == 67.5  # 保留一位小數
+    assert card["distance_km"] == 0.1  # 約 111 公尺，四捨五入到一位小數
+    assert (card["gender"], card["bio"], card["location_name"]) == (
+        "male",
+        "喜歡爬山",
+        "台北市信義區",
+    )
+    assert card["photos"] == ["/uploads/wired0.jpg"]
 
 
 @pytest.mark.asyncio
@@ -698,6 +705,82 @@ async def test_browse_liked_me_candidate_found_beyond_first_batch(
     candidates = response.json()
     assert len(candidates) == 5
     assert candidates[0]["user_id"] == str(admirer_id)
+
+
+@pytest.mark.asyncio
+async def test_browse_liked_me_bonus_outranks_slightly_higher_scores(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """喜歡我的人分數略低（差距小於 LIKED_ME_SORT_BONUS）時，排序加權讓他排在前面"""
+    await _create_candidate_pool(
+        test_db, 3, prefix="highscore", latitude=25.034, last_active=datetime.now(UTC)
+    )
+    viewer_id = await _viewer_user_id(test_db, viewer_with_profile)
+    admirer_id, *others = await _candidate_user_ids_sorted(test_db, "highscore")
+    # 其他人多了自介（+2 分），不加權時會排在喜歡我的人前面
+    await test_db.execute(update(Profile).where(Profile.user_id.in_(others)).values(bio="嗨"))
+    await test_db.commit()
+    await _like_viewer(test_db, admirer_id, viewer_id)
+
+    response = await client.get(
+        "/api/discovery/browse?limit=5", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    candidates = response.json()
+    assert [c["user_id"] for c in candidates] == [str(i) for i in [admirer_id, *others]]
+    assert [c["match_score"] for c in candidates] == [44.0, 46.0, 46.0]
+
+
+@pytest.mark.asyncio
+async def test_browse_only_likes_to_me_are_scanned_first(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """優先掃描只看「喜歡我」，喜歡別人的候選人不會插隊
+
+    limit=5 → 每批 15 筆。19 個候選人喜歡的是別人（不是我），若誤把他們也排前，
+    第一批就被他們佔滿，user_id 最大的喜歡我的人掃不到。
+    """
+    await _create_candidate_pool(
+        test_db, 40, prefix="highscore", latitude=25.034, last_active=datetime.now(UTC)
+    )
+    viewer_id = await _viewer_user_id(test_db, viewer_with_profile)
+    ids = await _candidate_user_ids_sorted(test_db, "highscore")
+    admirer_id = ids[-1]
+    test_db.add_all(Like(from_user_id=uid, to_user_id=ids[0]) for uid in ids[20:-1])
+    await test_db.commit()
+    await _like_viewer(test_db, admirer_id, viewer_id)
+
+    response = await client.get(
+        "/api/discovery/browse?limit=5", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    # 同分時依 user_id 排序（分批 offset 依賴固定順序）
+    assert [c["user_id"] for c in response.json()] == [str(i) for i in [admirer_id, *ids[:4]]]
+
+
+@pytest.mark.asyncio
+async def test_browse_score_exactly_at_threshold_is_qualified(
+    client: AsyncClient, viewer_with_profile: dict, test_db: AsyncSession
+):
+    """配對分數剛好等於門檻（15）算合格，此時不混入低分者
+
+    約 13km 距離 10 + 信任 70 分 5 = 15
+    """
+    await _create_candidate_pool(test_db, 1, prefix="boundary", latitude=25.15)
+    await _create_candidate_pool(test_db, 1, prefix="lowscore", latitude=25.33)
+    [boundary_id] = await _candidate_user_ids_sorted(test_db, "boundary")
+    await test_db.execute(update(User).where(User.id == boundary_id).values(trust_score=70))
+    await test_db.commit()
+
+    response = await client.get(
+        "/api/discovery/browse?limit=5", headers=viewer_with_profile["headers"]
+    )
+
+    assert response.status_code == 200
+    candidates = response.json()
+    assert [(c["display_name"], c["match_score"]) for c in candidates] == [("boundary0", 15.0)]
 
 
 @pytest.mark.asyncio
@@ -1167,8 +1250,8 @@ async def test_passed_user_reappears_after_24_hours(
     )
     assert response.status_code == 200
 
-    # 手動修改跳過時間為 25 小時前（模擬時間過去）
-    old_time = datetime.now(UTC) - timedelta(hours=25)
+    # 手動修改跳過時間為剛超過 24 小時（模擬時間過去；25 小時無法區分 24h 與 25h 的期限）
+    old_time = datetime.now(UTC) - timedelta(hours=24, minutes=1)
     await test_db.execute(
         Pass.__table__.update()
         .where(Pass.from_user_id == alice_user_id, Pass.to_user_id == bob_user_id)
