@@ -94,23 +94,3 @@ def generate_csrf_token() -> str:
         str: URL 安全的隨機 CSRF Token
     """
     return secrets.token_urlsafe(settings.CSRF_TOKEN_LENGTH)
-
-
-def get_cookie_value(cookie_string: str | None, cookie_name: str) -> str | None:
-    """從 Cookie 字串中提取特定 Cookie 值
-
-    Args:
-        cookie_string: 完整的 Cookie 字串
-        cookie_name: 要提取的 Cookie 名稱
-
-    Returns:
-        Optional[str]: Cookie 值，不存在則返回 None
-    """
-    if not cookie_string:
-        return None
-
-    cookies = cookie_string.split("; ")
-    for cookie in cookies:
-        if cookie.startswith(f"{cookie_name}="):
-            return cookie[len(cookie_name) + 1 :]
-    return None

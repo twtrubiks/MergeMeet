@@ -33,7 +33,6 @@ backend/
 │   │   ├── dependencies.py     # 依賴注入
 │   │   ├── database.py         # 資料庫連線
 │   │   ├── utils.py            # 工具函數
-│   │   ├── csrf.py             # CSRF 保護
 │   │   └── cookie_utils.py     # Cookie 處理
 │   ├── models/                 # SQLAlchemy 模型
 │   ├── schemas/                # Pydantic schemas
