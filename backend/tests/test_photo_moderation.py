@@ -639,9 +639,10 @@ class TestPhotoQueries:
     ):
         """「今日」以 UTC 日期計算，從 00:00:00 起算（含）
 
-        模擬部署在 UTC+8 主機、UTC 時間 1/1 20:00（當地已是 1/2 04:00）。
+        模擬部署在 UTC+8 主機、UTC 時間 1/1 20:34:56.789（當地已是 1/2 04:34）。
+        時分秒都不為 0，才看得出「今日起點」是否歸零到 00:00:00.000000。
         """
-        frozen_utc = datetime(2026, 1, 1, 20, 0, tzinfo=UTC)
+        frozen_utc = datetime(2026, 1, 1, 20, 34, 56, 789000, tzinfo=UTC)
         real_datetime = photo_moderation.datetime
 
         class _Utc8Datetime(real_datetime):
@@ -681,6 +682,33 @@ class TestPhotoQueries:
             "today_pending": 1,
             "today_reviewed": 2,
         }
+
+    async def test_pending_list_empty(self, test_db: AsyncSession):
+        assert await PhotoModerationService.get_pending_photos(db=test_db) == ([], 0)
+
+    async def test_reviewed_at_is_utc_on_utc8_host(
+        self, test_db: AsyncSession, pending_photo: Photo, admin_user: User, monkeypatch
+    ):
+        """審核時間以 UTC 記錄：在 UTC+8 主機誤用 now() 會存成 8 小時後"""
+        real_datetime = photo_moderation.datetime
+
+        class _Utc8Datetime(real_datetime):
+            @classmethod
+            def now(cls, tz=None):
+                utc_now = real_datetime.now(UTC)
+                if tz is None:
+                    return (utc_now + timedelta(hours=8)).replace(tzinfo=None)
+                return utc_now.astimezone(tz)
+
+        monkeypatch.setattr(photo_moderation, "datetime", _Utc8Datetime)
+        before = datetime.now(UTC)
+
+        await PhotoModerationService.review_photo(
+            db=test_db, photo_id=pending_photo.id, admin_id=admin_user.id, status="APPROVED"
+        )
+
+        await test_db.refresh(pending_photo)
+        assert before <= pending_photo.reviewed_at <= datetime.now(UTC)
 
     async def test_stats_empty(self, test_db: AsyncSession):
         assert await PhotoModerationService.get_stats(test_db) == {

@@ -32,7 +32,7 @@ def cookie_settings(monkeypatch):
     monkeypatch.setattr(settings, "COOKIE_SECURE", True)
     monkeypatch.setattr(settings, "COOKIE_SAMESITE", "strict")
     monkeypatch.setattr(settings, "COOKIE_DOMAIN", "mergemeet.example")
-    monkeypatch.setattr(settings, "COOKIE_PATH", "/")
+    monkeypatch.setattr(settings, "COOKIE_PATH", "/app")
     monkeypatch.setattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 30)
     monkeypatch.setattr(settings, "REFRESH_TOKEN_EXPIRE_DAYS", 7)
 
@@ -48,7 +48,7 @@ def test_set_auth_cookies_attributes(cookie_settings):
             "value": "access-jwt",
             "httponly": True,
             "max-age": "1800",
-            "path": "/",
+            "path": "/app",
             **common,
         },
         # refresh token 只送往 /api/auth，其他 API 請求不會帶上
@@ -60,7 +60,7 @@ def test_set_auth_cookies_attributes(cookie_settings):
             **common,
         },
         # 前端 JS 要讀取後放進 X-CSRF-Token header，不可 HttpOnly
-        "csrf_token": {"value": "csrf-value", "max-age": "1800", "path": "/", **common},
+        "csrf_token": {"value": "csrf-value", "max-age": "1800", "path": "/app", **common},
     }
 
 
@@ -72,9 +72,9 @@ def test_clear_auth_cookies_matches_set_path_and_domain(cookie_settings):
     cookies = parse_set_cookies(response)
     assert set(cookies) == {"access_token", "refresh_token", "csrf_token"}
     assert {name: (c["path"], c["domain"], c["max-age"]) for name, c in cookies.items()} == {
-        "access_token": ("/", "mergemeet.example", "0"),
+        "access_token": ("/app", "mergemeet.example", "0"),
         "refresh_token": ("/api/auth", "mergemeet.example", "0"),
-        "csrf_token": ("/", "mergemeet.example", "0"),
+        "csrf_token": ("/app", "mergemeet.example", "0"),
     }
 
 
@@ -90,9 +90,11 @@ def test_empty_domain_omits_domain_attribute(monkeypatch):
         assert all("domain" not in c for c in parse_set_cookies(response).values())
 
 
-def test_generate_csrf_token_is_random_and_long_enough():
+def test_generate_csrf_token_is_random_with_configured_length(monkeypatch):
+    monkeypatch.setattr(settings, "CSRF_TOKEN_LENGTH", 48)
+
     tokens = {generate_csrf_token() for _ in range(5)}
 
     assert len(tokens) == 5
-    # token_urlsafe(n) 產生 n bytes 亂數的 base64url 字串
-    assert all(len(token) >= settings.CSRF_TOKEN_LENGTH * 4 // 3 for token in tokens)
+    # token_urlsafe(n) 以 n bytes 亂數產生 base64url 字串：48 bytes 為 64 字元
+    assert {len(token) for token in tokens} == {64}

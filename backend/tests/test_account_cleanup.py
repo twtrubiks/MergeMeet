@@ -74,6 +74,31 @@ class TestPurgeExpiredAccounts:
         assert await purge_expired_accounts(test_db) == 1
         assert await remaining_emails(test_db) == {"in_grace@example.com", "active@example.com"}
 
+    async def test_grace_period_counted_in_utc_on_utc8_host(
+        self, test_db: AsyncSession, redis_conn, monkeypatch
+    ):
+        """寬限期以 UTC 計算：在 UTC+8 主機誤用 now() 會提早 8 小時永久刪除帳號"""
+        real_datetime = account_cleanup.datetime
+
+        class _Utc8Datetime(real_datetime):
+            @classmethod
+            def now(cls, tz=None):
+                utc_now = real_datetime.now(UTC)
+                if tz is None:
+                    return (utc_now + timedelta(hours=8)).replace(tzinfo=None)
+                return utc_now.astimezone(tz)
+
+        test_db.add(
+            make_deleted_user(
+                "almost@example.com",
+                datetime.now(UTC) - timedelta(days=GRACE_PERIOD_DAYS) + timedelta(hours=1),
+            )
+        )
+        await test_db.commit()
+        monkeypatch.setattr(account_cleanup, "datetime", _Utc8Datetime)
+
+        assert await purge_expired_accounts(test_db) == 0
+
     async def test_cleans_chat_dirs_of_all_matches(self, test_db: AsyncSession, redis_conn):
         """無論是配對的 user1 或 user2，所有配對的聊天圖片目錄都清除；計數為實際清除的帳號數"""
         deleted_at = datetime.now(UTC) - timedelta(days=31)
