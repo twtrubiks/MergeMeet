@@ -251,7 +251,6 @@ class PhotoModerationService:
 
         # 記錄審核日誌
         await cls._log_moderation(
-            db=db,
             user_id=profile.user_id,
             photo_id=photo_id,
             is_approved=(status == cls.STATUS_APPROVED),
@@ -384,7 +383,6 @@ class PhotoModerationService:
     @classmethod
     async def _log_moderation(
         cls,
-        db: AsyncSession,
         user_id: uuid.UUID,
         photo_id: uuid.UUID,
         is_approved: bool,
