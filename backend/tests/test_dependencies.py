@@ -5,15 +5,17 @@ Cookie／Bearer 的 API 整合流程見 test_cookie_auth.py。
 """
 
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from unittest.mock import AsyncMock
 
+import jwt
 import pytest
 from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import dependencies
+from app.core.config import settings
 from app.core.dependencies import (
     get_current_active_user,
     get_current_admin_user,
@@ -160,6 +162,24 @@ class TestGetCurrentUser:
             "Token 已失效（密碼已變更），請重新登入",
             BEARER,
         )
+
+    async def test_token_without_iat_checked_as_issued_at_epoch(
+        self, test_db: AsyncSession, user: User, invalidator
+    ):
+        """缺少 iat 視為最早簽發：只要有全局失效記錄就無效"""
+        token = jwt.encode(
+            {
+                "sub": str(user.id),
+                "type": "access",
+                "exp": datetime.now(UTC) + timedelta(minutes=5),
+            },
+            settings.SECRET_KEY,
+            algorithm=settings.ALGORITHM,
+        )
+
+        await authenticate(test_db, credentials=bearer(token))
+
+        invalidator.assert_awaited_once_with(str(user.id), 0)
 
     async def test_unknown_user(self, test_db: AsyncSession):
         token = create_access_token({"sub": str(uuid.uuid4())})
