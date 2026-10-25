@@ -42,6 +42,16 @@ only_mutate = [
     "app/services/verification_code.py",
     "app/services/token_blacklist.py",
     "app/services/content_moderation.py",
+    # 第二批
+    "app/core/dependencies.py",
+    "app/core/cookie_utils.py",
+    "app/core/utils.py",
+    "app/services/verification_limiter.py",
+    "app/services/token_invalidator.py",
+    "app/services/photo_moderation.py",
+    "app/services/account_cleanup.py",
+    "app/services/pass_cleanup.py",
+    # api/ 的路由函式有裝飾器，mutmut 會跳過；請用 scripts/mutmut_unwrap_routes.py 建立副本再跑
 ]
 also_copy = ["pytest.ini", ".env"]
 # 每個 pytest session 都從只做過 collect 的乾淨行程 fork，避免單例跨 session 殘留狀態
