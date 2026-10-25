@@ -166,6 +166,17 @@ async def test_conversations(client: AsyncClient, chat: dict, test_db: AsyncSess
     """只列出自己進行中的配對；每個對話各自的最後一則（排除已刪除）與未讀數（只算對方未讀未刪）；
     有訊息的依最後訊息時間、沒有的依配對時間，由新到舊；對方已停用的對話跳過"""
     users, matches = chat["users"], chat["matches"]
+    # Bob 已解除的配對、與 Bob 無關的進行中配對，都不能出現
+    frank = User(email="frank@chat.example", password_hash="x", date_of_birth=date(1995, 1, 1))
+    test_db.add(frank)
+    await test_db.commit()
+    test_db.add(Profile(user_id=frank.id, display_name="Frank", gender="male", bio="bio"))
+    test_db.add_all(
+        [
+            make_match(users["bob"], frank, status="UNMATCHED", matched_minutes=70),
+            make_match(users["alice"], users["dave"], matched_minutes=80),
+        ]
+    )
     alice_photo = Photo(
         profile_id=(await profile_of(test_db, users["alice"])).id,
         url="/uploads/alice.jpg",
@@ -189,8 +200,12 @@ async def test_conversations(client: AsyncClient, chat: dict, test_db: AsyncSess
             message(matches["ab"], users["alice"], "a1", 10),
             message(matches["ab"], users["bob"], "b1", 20),
             message(matches["ab"], users["alice"], "a2 deleted", 25, deleted_at=at(26)),
-            message(matches["bc"], users["charlie"], "c1", 40),
-            message(matches["bc"], users["charlie"], "c2 read", 45, is_read=at(46)),
+            # 最後一則依 (sent_at, id) 由新到舊：c1 的 id 最大但最舊；c2、c3 同時送出時取 id 較大者
+            message(matches["bc"], users["charlie"], "c1", 40, id=uuid.UUID(int=9)),
+            message(matches["bc"], users["charlie"], "c2", 45, id=uuid.UUID(int=5)),
+            message(
+                matches["bc"], users["charlie"], "c3 read", 45, id=uuid.UUID(int=6), is_read=at(46)
+            ),
             message(matches["ac"], users["charlie"], "unmatched", 60),
         ]
     )
@@ -211,7 +226,7 @@ async def test_conversations(client: AsyncClient, chat: dict, test_db: AsyncSess
         for c in response.json()
     ] == [
         # 主頭像（第二張、無縮圖時退回原圖）優先於第一張照片
-        (str(matches["bc"].id), "Charlie", "c2 read", 1, "/uploads/c1.jpg", "/uploads/c1.jpg"),
+        (str(matches["bc"].id), "Charlie", "c3 read", 2, "/uploads/c1.jpg", "/uploads/c1.jpg"),
         (str(matches["bd"].id), "Dave", None, 0, None, None),
         (
             str(matches["ab"].id),

@@ -1,6 +1,7 @@
 """安全功能測試 - 封鎖與舉報"""
 
 import uuid
+from datetime import date
 
 import pytest
 from httpx import AsyncClient
@@ -498,7 +499,25 @@ async def test_block_cancels_match_whichever_side_blocks(
         sorted([users["alice"].id, users["charlie"].id]),
     ]
     matches = [Match(user1_id=low, user2_id=high, status="ACTIVE") for low, high in pairs]
-    test_db.add_all(matches)
+    # 每個人都另有與 id 最小、最大者的配對：條件只比對一邊時會找到這些無關的配對
+    lowest = User(
+        id=uuid.UUID(int=1),
+        email="low@example.com",
+        password_hash="x",
+        date_of_birth=date(1995, 1, 1),
+    )
+    highest = User(
+        id=uuid.UUID(int=2**128 - 1),
+        email="high@example.com",
+        password_hash="x",
+        date_of_birth=date(1995, 1, 1),
+    )
+    test_db.add_all([lowest, highest])
+    await test_db.commit()
+    unrelated = [
+        Match(user1_id=lowest.id, user2_id=user.id, status="ACTIVE") for user in users.values()
+    ] + [Match(user1_id=user.id, user2_id=highest.id, status="ACTIVE") for user in users.values()]
+    test_db.add_all([*matches, *unrelated])
     await test_db.commit()
 
     # 第一組由 user1（id 較小者）封鎖，第二組由 user2 封鎖
@@ -516,6 +535,32 @@ async def test_block_cancels_match_whichever_side_blocks(
         await test_db.refresh(match)
         assert (match.status, match.unmatched_by) == ("UNMATCHED", blocker)
         assert match.unmatched_at is not None
+
+    for match in unrelated:
+        await test_db.refresh(match)
+    assert {match.status for match in unrelated} == {"ACTIVE"}
+
+
+@pytest.mark.asyncio
+async def test_block_leaves_already_unmatched_match_untouched(
+    client: AsyncClient, test_users_for_safety: dict, test_db: AsyncSession
+):
+    """已解除的配對不會再被「取消」一次（不覆寫原本的解除者）"""
+    users = await _users(test_db, test_users_for_safety)
+    low, high = sorted([users["alice"].id, users["bob"].id])
+    match = Match(user1_id=low, user2_id=high, status="UNMATCHED", unmatched_by=users["bob"].id)
+    test_db.add(match)
+    await test_db.commit()
+
+    response = await client.post(
+        f"/api/safety/block/{users['bob'].id}",
+        headers=_headers(test_users_for_safety, "alice"),
+        json={},
+    )
+
+    assert response.json()["match_cancelled"] is False
+    await test_db.refresh(match)
+    assert match.unmatched_by == users["bob"].id
 
 
 @pytest.mark.asyncio
