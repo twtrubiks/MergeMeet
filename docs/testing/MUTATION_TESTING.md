@@ -14,6 +14,16 @@
 **變異分數** = killed ÷（killed + survived）。存活者不一定都是缺口：有些修改在語意上與原碼等價
 （例如把 log 訊息換掉），稱為**等價變異體**，需要人工判讀。
 
+## 總覽
+
+| 批次 | 模組 | 改善後變異體 | 基準線分數 | 改善後分數 |
+|------|------|------:|-----:|-----:|
+| 第一批 | 配對、信任分數、登入與 Email 限流、驗證碼、Token 黑名單、內容審核、密碼與 JWT（9 個） | 1528 | 66.0% | 87.2% |
+| 第二批 | 認證依賴、Cookie、驗證碼嘗試限制、Token 全局失效、照片審核、清理任務、聊天／封鎖檢舉／照片審核 API（11 個） | 1845 | 66.4% | 92.8% |
+
+兩批共修正 9 項問題（見各批的「找到的 bug」）與 14 項名不符實的測試；剩下的存活者逐一判讀過，
+都是 log、語意等價、效能取捨或刻意保留的防禦性程式碼。
+
 ---
 
 ## 執行方式
@@ -29,7 +39,7 @@
 ```bash
 cd backend
 
-# 全部目標模組（4 核心約需 5 小時）
+# 全部目標模組（只建議在修改這些模組時，針對該模組執行）
 mutmut run --max-children 4
 
 # 只跑特定模組 / 函式（支援 fnmatch 萬用字元；指定名稱時一律重跑）
@@ -42,6 +52,23 @@ mutmut browse             # 互動式瀏覽
 
 結果存在 `backend/mutants/`（已加入 `.gitignore`）。中斷後重新執行 `mutmut run` 會跳過已有結果的變異體；
 修改測試後若要重新驗證，請刪除 `mutants/` 或明確指定變異體名稱。
+
+**修改 `only_mutate` 後請刪除 `mutants/`**：不在清單內的模組會被原樣複製進 `mutants/`，之後加入清單時，
+mutmut 只要看到原始碼沒有比副本新，就不會重新產生變異體（結果裡完全不會出現該模組）；
+舊的 `mutmut-stats.json` 也沒有這些函式的測試對應，會被誤判為 `no tests`。
+
+### API 路由模組
+
+mutmut 會跳過有裝飾器的函式（`@staticmethod`、`@classmethod` 除外），FastAPI 的路由函式都有
+`@router.get(...)`，所以 `api/` 模組不會產生任何變異體。`scripts/mutmut_unwrap_routes.py` 會建立一份
+backend 副本，把指定模組的路由改寫成語意相同的「定義後再註冊」（`f = router.get(...)(f)`），
+並把副本的 `only_mutate` 設為這些模組：
+
+```bash
+cd backend
+python scripts/mutmut_unwrap_routes.py /tmp/mm-api app/api/safety.py app/api/messages.py
+cd /tmp/mm-api && mutmut run --max-children 4
+```
 
 ### 設定（`backend/pyproject.toml` 的 `[tool.mutmut]`）
 
@@ -79,7 +106,10 @@ fixture 在每個測試前清除登入失敗、驗證碼嘗試、Email 發送次
 
 ## 範圍
 
-挑選商業邏輯與安全性最關鍵、且多為純邏輯的 9 個模組：
+分兩批進行。第一批是商業邏輯與安全性最關鍵、且多為純邏輯的 9 個模組；
+第二批是認證依賴、照片審核、清理任務，以及聊天、封鎖與檢舉的 API（見「第二批」）。
+
+第一批的 9 個模組：
 
 | 模組 | 職責 |
 |------|------|
@@ -95,7 +125,7 @@ fixture 在每個測試前清除登入失敗、驗證碼嘗試、Email 發送次
 
 ---
 
-## 結果
+## 第一批結果
 
 - **基準線**：導入變異測試前的程式與測試，9 個模組共 1605 個變異體（已更正誤判，見「測量誤判與更正」）
 - **改善後**：目前的程式與測試。依測量結果刪除冗餘程式碼後共 1528 個變異體。
@@ -217,12 +247,130 @@ fixture 在每個測試前清除登入失敗、驗證碼嘗試、Email 發送次
 
 ---
 
+## 第二批：認證、照片審核、聊天、封鎖與檢舉
+
+### 範圍
+
+| 模組 | 職責 |
+|------|------|
+| `core/dependencies.py` | 取得目前用戶：Cookie + CSRF／Bearer 雙模式、黑名單、全局失效、停權、管理員 |
+| `core/cookie_utils.py` | 認證 Cookie 的屬性與清除 |
+| `core/utils.py` | Email 遮罩 |
+| `services/verification_limiter.py` | 驗證碼嘗試限制（5 次鎖 15 分鐘） |
+| `services/token_invalidator.py` | 密碼變更後使舊 Token 全局失效 |
+| `services/photo_moderation.py` | 照片審核、統計、申訴還原 |
+| `services/account_cleanup.py` | 刪除帳號寬限期到期後的清理 |
+| `services/pass_cleanup.py` | 過期跳過記錄清理 |
+| `api/messages.py` | 聊天 REST API（記錄、對話列表、已讀、刪除、上傳圖片） |
+| `api/safety.py` | 封鎖與檢舉 |
+| `api/photo_moderation.py` | 照片審核管理 API |
+
+`api/` 三個模組要先用 `scripts/mutmut_unwrap_routes.py` 建立副本才能產生變異體（見「執行方式」）。
+
+### 結果
+
+- **基準線**：導入前的程式與測試；`api/` 三個模組以改寫路由的副本測量
+- **改善後**：目前的程式與測試。刪除 `get_cookie_value`、移除不可能走到的分支與未使用參數後共 1845 個變異體
+- 分數計算同第一批（timeout 算 killed：`api.messages` 改善後有 6 個 timeout，皆為迴圈條件被改壞後無法結束）
+
+| 模組 | 基準線 變異體 | killed / survived / no tests | 分數 | 改善後 變異體 | killed / survived / no tests | 分數 |
+|------|------:|------|-----:|------:|------|-----:|
+| `core.dependencies` | 174 | 73 / 101 / 0 | 42.0% | 174 | 174 / 0 / 0 | 100.0% |
+| `core.cookie_utils` | 109 | 32 / 70 / 7 | 31.4% | 102 | 98 / 4 / 0 | 96.1% |
+| `core.utils` | 29 | 9 / 20 / 0 | 31.0% | 27 | 24 / 3 / 0 | 88.9% |
+| `services.verification_limiter` | 85 | 55 / 30 / 0 | 64.7% | 85 | 81 / 4 / 0 | 95.3% |
+| `services.token_invalidator` | 48 | 23 / 25 / 0 | 47.9% | 48 | 31 / 17 / 0 | 64.6% |
+| `services.photo_moderation` | 407 | 262 / 130 / 15 | 66.8% | 405 | 366 / 24 / 15 | 93.8% |
+| `services.account_cleanup` | 76 | 29 / 19 / 28 | 60.4% | 76 | 50 / 26 / 0 | 65.8% |
+| `services.pass_cleanup` | 42 | 12 / 2 / 28 | 85.7% | 42 | 23 / 19 / 0 | 54.8% |
+| `api.messages` | 541 | 423 / 118 / 0 | 78.2% | 538 | 508 / 30 / 0 | 94.4% |
+| `api.safety` | 268 | 206 / 62 / 0 | 76.9% | 268 | 265 / 3 / 0 | 98.9% |
+| `api.photo_moderation` | 80 | 59 / 21 / 0 | 73.8% | 80 | 78 / 2 / 0 | 97.5% |
+| **合計** | **1859** | 1183 / 598 / 78 | **66.4%** | **1845** | 1698 / 132 / 15 | **92.8%** |
+
+整體從 **66.4% → 92.8%**：存活者從 598 個降到 132 個，沒有任何測試執行到的從 78 個降到 15 個
+（剩下的 15 個是沒有呼叫端的預留介面，見下方「刻意保留」）。
+
+`pass_cleanup` 與 `account_cleanup` 的分數看起來沒有進步甚至下降，原因是基準線有 28 個 `no tests`
+（背景任務的啟動、停止與迴圈完全沒有測試），不計入分數；補上測試後，這些函式裡只改 log 文字的變異體
+都成為存活者計入分母。兩個模組剩下的 45 個存活者中，除了 5 個等價或微秒級邊界，其餘 40 個都是 log。
+
+`core.dependencies` 基準線只有 42.0%：每個拒絕分支只測了狀態碼，訊息、`WWW-Authenticate` header、
+CSRF 缺少 header 或缺少 Cookie 的區別都沒有測。
+
+### 找到的 bug（已修正）
+
+| # | 位置 | 問題 | 怎麼發現的 |
+|---|------|------|-----------|
+| 7 | 聊天 API 4 個端點、處理檢舉、查詢信任分數紀錄、刪除照片 | ID 以 `str` 接收後直接查資料庫，格式錯誤時 asyncpg 拋 `DataError`，回 **500**。改用 `uuid.UUID` 參數，由 FastAPI 回 422（有效 ID 行為不變） | 補聊天 API 授權測試時，以無效 ID 試打各端點 |
+| 8 | `core/utils.mask_email`、`PhotoModerationService._mask_email` | `@` 前為空字串時 `local[0]` 拋 `IndexError`；docstring 的範例與實際輸出不符，且有多餘的條件（`len <= 1 or len <= 3`） | `mask_email` 的變異體全數存活，補測試時發現 |
+| 9 | `docs/SECURITY.md` | 寫 CSRF 驗證在 `core/csrf.py`、且 GET/HEAD/OPTIONS 豁免。實際上 `csrf.py` 從未被使用，驗證在 `get_current_user`，Cookie 認證的 GET 也要驗證 | `csrf.py` 沒有任何呼叫端 |
+
+### 名不符實的測試（已修正）
+
+| 測試 | 問題 |
+|------|------|
+| `test_logout_clears_cookies` | 只有註解「驗證 Cookie 被清除」，**沒有任何斷言**；`clear_auth_cookies` 的 23 個變異體全數存活。refresh token 的 path 若寫錯，瀏覽器根本不會刪除該 Cookie |
+| `test_approve_not_owned_photo_no_restore` | 測「申訴人不是照片擁有者時不還原」，但沒有 mock 隔離檔，實際是因「檔案不存在」才不還原；拿掉歸屬檢查也會通過 |
+| 照片審核、CSRF、封鎖、檢舉、聊天的錯誤訊息 | `"無效" in message` 這類斷言，訊息被改成 `XX無效的審核狀態XX` 也會通過 |
+
+### 補上的缺口
+
+| 模組 | 原本沒有測到的行為 |
+|------|-------------------|
+| api/messages | **只能存取自己、且進行中的配對**：拿掉「配對 ID 相符」或「是配對成員」的條件時，原本的測試都不會失敗（只要自己有任何一個配對，就能讀取或標記別人配對的訊息）；已解除的配對；批次已讀只標記指定、未刪除的訊息；全部已讀只限本配對、不覆寫既有已讀時間、回條的時間帶時區；同一時間的訊息分頁；總數不含其他配對與已刪除訊息；對話列表各自的最後一則與未讀數、排序、主頭像、跳過停用的對方而不中斷；上傳超過一個區塊（64KB）的內容完整、WebP、大小上限邊界、儲存失敗 |
+| api/safety | 只能解除**自己**的封鎖（拿掉條件可刪除別人的封鎖）；別人的封鎖或舉報不影響自己；配對中任一方封鎖都取消配對；封鎖列表內容與排序；五種舉報類型；只有處理中的舉報算重複 |
+| api/photo_moderation | 分頁與篩選參數確實生效；記錄審核者；回應的 photo_id |
+| core/dependencies | 每個拒絕分支的狀態碼、訊息與 `WWW-Authenticate`；Cookie 優先於 Bearer；CSRF header 或 Cookie 任一缺少；缺少 `iat` 的 Token 視為最早簽發 |
+| core/cookie_utils | HttpOnly、Secure、SameSite、Domain、Max-Age，refresh token 只送往 `/api/auth`；清除時 path／domain 與設置時相同 |
+| verification_limiter | 原本沒有單元測試：首次失敗才設 TTL（否則計數永不過期）、剩餘次數逐次扣減、鎖定的 key／值／TTL、驗證成功清除計數 |
+| token_invalidator | 寫入帶 7 天 TTL（否則 key 永不過期）、同一秒簽發的 Token 仍有效、無 Redis 或故障時拒絕 |
+| photo_moderation | 審核日誌逐欄位；統計與審核時間以 UTC 計算（模擬 UTC+8 主機）；「今日」從 00:00:00 起算；分頁依上傳時間；詳情欄位；申訴還原的歸屬檢查與完整度重算 |
+| account_cleanup / pass_cleanup | 寬限期與保留期邊界，寬限期以 UTC 計算（在 UTC+8 主機誤用 `now()` 會提早 8 小時永久刪除帳號）；不論是配對的 user1 或 user2，聊天圖片目錄都清除；清除 Redis key；單筆失敗不影響其他帳號；未注入 session 的正式環境路徑；背景任務 |
+
+### 依測量結果整理的程式碼
+
+**已刪除**：`core/csrf.py`（從未被使用）、`cookie_utils.get_cookie_value`（從未被使用）、對話列表不可能走到的 `"Unknown"` 預設名稱、
+`PhotoModerationService._log_moderation` 未使用的 `db` 參數（與第一批內容審核的情況相同）。
+另外把已被 Starlette 標為棄用的 `HTTP_413_REQUEST_ENTITY_TOO_LARGE` 換成同值的 `HTTP_413_CONTENT_TOO_LARGE`
+
+**刻意保留**：
+
+- `PhotoModerationService.auto_moderate`、`process_auto_moderation_result`：沒有呼叫端（`no tests`），但註明為串接第三方圖片審核的預留介面
+- `upload_chat_image` 以 64KB 分塊讀取：結果與一次讀完相同，用意是限制記憶體用量
+- `mark_messages_as_read` 只在有更新時 commit：沒有更新時 commit 也不會改變任何資料
+
+**建議但未修改**：
+
+- `LoginLimiter` 與 `VerificationLimiter` 除了 key 前綴與 log 文字外完全相同，可以合併成一個參數化的類別
+- `mask_email` 與 `PhotoModerationService._mask_email` 的遮罩規則不同（`us***r@` 與 `u***r@`），管理後台的舉報列表與照片審核列表顯示方式不一致
+
+### 剩餘存活者
+
+| 類別 | 數量 | 說明與例子 |
+|------|-----:|------|
+| 日誌與錯誤訊息文字 | 74 | `logger.info(...)` 的內容與參數；只決定要不要記 warning 的條件（檔案搬移失敗時） |
+| 語意等價 | 40 | `func.count(None)` 即 `count(*)`；`join` 省略條件（由外鍵推得）；結果會再排序的 `order_by`；`split("@")` 與 `rsplit`（合法 email 只有一個 `@`）；空字串 Domain 本來就不會輸出；`httponly=None`（falsy）；naive `now().timestamp()` 與 UTC 相同；`break` 與 `return`；只在有更新時 commit；欄位預設值 `"PENDING"`；照片固定存成 `.jpg`，`FileResponse` 推得的 media type 相同；上傳的檔名不會用到（副檔名依 content type） |
+| 效能或資源取捨 | 10 | 64KB 分塊讀取與一次讀完；`limit + 1` 與 `+ 2`；多查無關的資料再以 id 取用 |
+| 防禦性程式碼 | 4 | `created_at` 為 NULL 的分支（有 server default）；照片的個人檔案不存在（外鍵 CASCADE） |
+| 微秒／次秒級時間邊界 | 3 | 過期判斷 `<` 與 `<=`、Redis TTL 剛好為 0 |
+| 公開介面的預設值 | 1 | `get_pending_photos` 的 `page_size=20`（API 一律明確傳入） |
+
+同第一批，這些不補測試。
+
+---
+
 ## 建議
 
-- **不建議放進每次 CI**：9 個模組完整跑一次在 4 核心約 5 小時（內容審核與配對的變異體會觸發大量 API 整合測試）。
+- **不建議放進每次 CI**：第一批 9 個模組完整跑一次在 4 核心約 5 小時；第二批的認證依賴、Cookie、
+  `mask_email` 幾乎每個 API 測試都會執行到，每個存活的變異體都要跑完 250–330 個測試。
   修改這些模組時，用 `mutmut run "app.services.<模組>.*"` 只跑該模組即可
+- **測試速度**：測試改用 4 rounds 的 bcrypt（正式環境仍是 12），資料表每個 session 只建立一次、
+  測試結束以 TRUNCATE 清空，API 測試約快 25%
 - **先確認測試穩定**：結果裡若有「只改 log 卻被 killed」的變異體，代表有測試會隨機失敗，分數不可信
+- **授權條件要用「自己也有其他資料」的情境測**：只用「完全沒有配對的人」測權限，拿掉「是不是這個配對」的條件也不會失敗
 - **寫測試時避開這次找到的模式**：只用 `in`／`len > 0` 的弱斷言、包在 `if` 裡的斷言、`except Exception: skip`、
+  只有註解沒有斷言、靠「檔案不存在」等其他條件才成立的前提、
   靠插入順序或隨機 UUID 才成立的前提、離邊界太遠的測試值（25 小時測不出 24 小時的期限、整數分數測不出四捨五入）、
   不清除的共享狀態（Redis 計數、class 屬性）
 - **涉及時間的邏輯**：凍結 `datetime.now`，並模擬非 UTC 主機（例如 UTC+8），否則 `now()` 與 `now(UTC)` 的錯誤在 CI 上看不出來
