@@ -223,7 +223,7 @@ async def get_conversations(
             MatchWithLastMessageResponse(
                 match_id=match.id,
                 other_user_id=other_user_id,
-                other_user_name=other_profile.display_name if other_profile else "Unknown",
+                other_user_name=other_profile.display_name,
                 other_user_avatar=other_user_avatar,
                 other_user_avatar_thumb=other_user_avatar_thumb,
                 last_message=MessageResponse.model_validate(last_message) if last_message else None,
@@ -475,7 +475,7 @@ async def upload_chat_image(
         file_content += chunk
         if len(file_content) > max_size:
             raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
                 detail=f"檔案過大，最大允許 {max_size // 1024 // 1024}MB",
             )
 

@@ -31,7 +31,7 @@ AsyncSessionLocal = async_sessionmaker(
 Base = declarative_base()
 
 
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
+async def get_db() -> AsyncGenerator[AsyncSession]:
     """取得資料庫 Session（依賴注入）
 
     Transaction 由 handler 自行管理，需明確呼叫 await db.commit()。

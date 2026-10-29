@@ -84,7 +84,7 @@ def _calculate_activity_score(last_active) -> float:
         return 0
 
     if isinstance(last_active, str):
-        last_active = datetime.fromisoformat(last_active.replace("Z", "+00:00"))
+        last_active = datetime.fromisoformat(last_active)  # Python 3.11+ 已支援 "Z" 結尾
 
     hours_ago = (datetime.now(UTC) - last_active).total_seconds() / 3600
 
@@ -345,14 +345,8 @@ class MatchingService:
             .order_by(case((liked_me, 0), else_=1), Profile.user_id)
         )
 
-        # 瀏覽者偏好資料（每批共用）
-        user_data = {
-            "interests": [interest.name for interest in my_profile.interests],
-            "min_age_preference": min_age,
-            "max_age_preference": max_age,
-            "max_distance_km": max_distance_km,
-            "gender_preference": my_profile.gender_preference,
-        }
+        # 瀏覽者資料（每批共用；評分只用到興趣，偏好條件已在查詢中過濾）
+        user_data = {"interests": [interest.name for interest in my_profile.interests]}
 
         liked_me_ids: set[uuid.UUID] = set(
             (
@@ -387,7 +381,6 @@ class MatchingService:
                         "last_active": profile.last_active,
                         "photo_count": len(photos),
                         "bio": profile.bio,
-                        "age": age,
                         "trust_score": profile.user.trust_score,
                     },
                 )

@@ -25,7 +25,7 @@ MergeMeet 支援兩種認證方式，優先使用 HttpOnly Cookie 提供更高�
 
 **技術實現位置：**
 - Cookie 工具: `backend/app/core/cookie_utils.py`
-- CSRF 驗證: `backend/app/core/csrf.py`
+- CSRF 驗證: `backend/app/core/dependencies.py`（`get_current_user`）
 - 前端整合: `frontend/src/stores/user.js`
 
 **JWT Token Payload：**
@@ -64,13 +64,14 @@ MergeMeet 支援兩種認證方式，優先使用 HttpOnly Cookie 提供更高�
    - 比對 Header 和 Cookie 中的 Token
    - 兩者一致才允許請求
 
-**豁免情況：**
-- GET/HEAD/OPTIONS 等安全方法（不修改資料）
-- 使用 Bearer Token 認證（Token 本身即防護）
+**適用範圍：**
+- 以 Cookie 認證的所有請求（含 GET）都必須帶 `X-CSRF-Token`，缺少或不一致回 403
+- 使用 Bearer Token 認證時不需要（Token 本身即防護）
+- `/api/auth/refresh` 不經 `get_current_user`，不要求 CSRF Header
 
 **實作位置：**
 - CSRF 生成: `backend/app/core/cookie_utils.py:generate_csrf_token()`
-- CSRF 驗證: `backend/app/core/csrf.py:verify_csrf_token()`
+- CSRF 驗證: `backend/app/core/dependencies.py:_extract_token_from_cookie()`
 
 ---
 
