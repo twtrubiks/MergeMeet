@@ -5,6 +5,7 @@ import os
 from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock
 
+import bcrypt
 import pytest
 import pytest_asyncio
 from dotenv import load_dotenv
@@ -15,6 +16,11 @@ from sqlalchemy.pool import NullPool
 
 # 載入 .env 檔案（讓 os.getenv 可以讀取）
 load_dotenv()
+
+# bcrypt 預設 12 rounds，每次雜湊或比對約 0.3 秒；註冊／登入密集的測試大半時間花在這裡。
+# 測試只驗證雜湊與比對的行為，不需要正式環境的運算成本（rounds 會記在雜湊值內，比對不受影響）
+_bcrypt_gensalt = bcrypt.gensalt
+bcrypt.gensalt = lambda rounds=4, prefix=b"2b": _bcrypt_gensalt(rounds, prefix)
 
 from app.core.database import Base, get_db  # noqa: E402
 from app.core.rate_limit import limiter as ip_limiter  # noqa: E402
@@ -71,8 +77,28 @@ def event_loop():
     loop.close()
 
 
+@pytest.fixture(scope="session")
+def test_schema(cleanup_stale_connections):
+    """整個 pytest session 只建立一次資料表，每個測試結束後由 db_session 以 TRUNCATE 清空
+
+    每個測試都 create_all／drop_all 約 0.3–0.4 秒，TRUNCATE 約 0.1 秒（API 測試整體約快 25%）。
+    開始時先 drop_all，清掉上次中斷殘留或模型修改前的舊結構。
+    """
+    from sqlalchemy import create_engine
+
+    engine = create_engine(TEST_DATABASE_URL_SYNC)
+    with engine.begin() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
+        Base.metadata.drop_all(conn)
+        Base.metadata.create_all(conn)
+    yield ", ".join(f'"{table.name}"' for table in Base.metadata.sorted_tables)
+    with engine.begin() as conn:
+        Base.metadata.drop_all(conn)
+    engine.dispose()
+
+
 @pytest.fixture(scope="function")
-async def db_session() -> AsyncGenerator[AsyncSession]:
+async def db_session(test_schema: str) -> AsyncGenerator[AsyncSession]:
     """測試資料庫 Session（主要使用名稱）"""
     # 建立測試引擎
     engine = create_async_engine(
@@ -80,10 +106,6 @@ async def db_session() -> AsyncGenerator[AsyncSession]:
         echo=False,
         poolclass=NullPool,
     )
-
-    async with engine.begin() as conn:
-        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
-        await conn.run_sync(Base.metadata.create_all)
 
     TestSessionLocal = async_sessionmaker(
         engine,
@@ -106,7 +128,7 @@ async def db_session() -> AsyncGenerator[AsyncSession]:
     reset_throttle_seconds()
 
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        await conn.execute(text(f"TRUNCATE {test_schema} RESTART IDENTITY CASCADE"))
 
     await engine.dispose()
 
@@ -139,10 +161,20 @@ async def client(test_db: AsyncSession) -> AsyncGenerator[AsyncClient]:
         redis_conn = await get_redis()
         await token_blacklist.set_redis(redis_conn)
         TokenInvalidator.set_redis(redis_conn)
-        # 清除興趣標籤快取，避免真實 Redis 快取干擾測試
-        keys = [key async for key in redis_conn.scan_iter(match=f"{INTEREST_TAGS_CACHE_KEY}*")]
-        if keys:
-            await redis_conn.delete(*keys)
+        # 清除興趣標籤快取與各種限流計數，避免殘留狀態干擾測試：
+        # 測試用固定 email，計數跨 pytest session 累積（例如登入失敗 5 次即鎖定 15 分鐘，
+        # 連續跑 5 次 test_login_wrong_password 第 5 次就會收到 429）
+        for pattern in (
+            f"{INTEREST_TAGS_CACHE_KEY}*",
+            "login_attempts:*",
+            "login_lockout:*",
+            "verify_attempts:*",
+            "verify_lockout:*",
+            "email_rate:*",
+        ):
+            keys = [key async for key in redis_conn.scan_iter(match=pattern)]
+            if keys:
+                await redis_conn.delete(*keys)
     except Exception:
         pass  # Redis 不可用時回退到內存模式
 
