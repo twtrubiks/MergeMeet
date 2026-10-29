@@ -602,7 +602,7 @@ async def upload_photo(
 
 @router.delete("/photos/{photo_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_photo(
-    photo_id: str,
+    photo_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

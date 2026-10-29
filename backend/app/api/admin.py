@@ -2,6 +2,7 @@
 
 import logging
 import re
+import uuid
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -171,7 +172,7 @@ async def get_all_reports(
 
 @router.post("/reports/{report_id}/review", response_model=ReviewReportResponse)
 async def review_report(
-    report_id: str,
+    report_id: uuid.UUID,
     request: ReviewReportRequest,
     current_admin: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db),
@@ -329,7 +330,7 @@ async def get_all_users(
 
 @router.get("/users/{user_id}/trust-logs", response_model=list[TrustScoreLogResponse])
 async def get_user_trust_logs(
-    user_id: str,
+    user_id: uuid.UUID,
     limit: int = Query(50, ge=1, le=200, description="回傳筆數上限"),
     current_admin: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db),
