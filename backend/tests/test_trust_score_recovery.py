@@ -8,24 +8,31 @@
 - 所有恢復寫入審計日誌
 """
 
+import asyncio
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
+from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.security import get_password_hash
 from app.models.report import Report
 from app.models.trust_score_log import TrustScoreLog
 from app.models.user import User
+from app.services import trust_score_recovery
 from app.services.redis_client import redis_client
 from app.services.trust_score import TrustScoreService
 from app.services.trust_score_recovery import (
+    RECOVERY_CHECK_INTERVAL_SECONDS,
+    RECOVERY_LOCK_TTL_SECONDS,
     apply_daily_recovery,
     run_daily_recovery_once,
+    start_recovery_task,
+    stop_recovery_task,
 )
 
 # ==================== Fixtures ====================
@@ -136,6 +143,21 @@ class TestDailyRecovery:
 
         assert await apply_daily_recovery(test_db) == 0
 
+    async def test_creates_own_session_when_not_injected(self, test_db: AsyncSession, monkeypatch):
+        """未注入 session 時自建 session（正式環境背景任務走的路徑）"""
+        user = make_user("own-session@example.com", 30)
+        test_db.add(user)
+        await test_db.commit()
+        monkeypatch.setattr(
+            trust_score_recovery,
+            "AsyncSessionLocal",
+            async_sessionmaker(test_db.bind, expire_on_commit=False),
+        )
+
+        assert await apply_daily_recovery() == 1
+        scores = await get_scores(test_db, [user])
+        assert scores["own-session@example.com"] == 31
+
 
 @pytest.mark.asyncio
 class TestDailyRecoveryLock:
@@ -154,6 +176,150 @@ class TestDailyRecoveryLock:
 
         scores = await get_scores(test_db, [user])
         assert scores["once@example.com"] == 31
+
+    async def test_lock_key_is_today_utc_date_with_ttl(
+        self, test_db: AsyncSession, recovery_lock_cleanup
+    ):
+        """日期鎖以當日 UTC 日期命名並帶 48h TTL
+
+        key 格式若跑掉（例如 %M 誤用成分鐘），每小時檢查都會重複加分；
+        沒有 TTL 則每天的鎖永久殘留在 Redis。
+        """
+        await run_daily_recovery_once(test_db)
+
+        redis_conn = await redis_client.get_connection()
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
+        ttl = await redis_conn.ttl(f"trust:daily_recovery:{today}")
+        assert RECOVERY_LOCK_TTL_SECONDS - 60 < ttl <= RECOVERY_LOCK_TTL_SECONDS
+
+    async def test_redis_unavailable_skips_recovery(self, test_db: AsyncSession, monkeypatch):
+        """Redis 不可用時跳過本輪（寧可延後也不冒重複加分的風險）"""
+        user = make_user("no-redis@example.com", 30)
+        test_db.add(user)
+        await test_db.commit()
+
+        async def _unavailable():
+            raise ConnectionError("Redis down")
+
+        monkeypatch.setattr(redis_client, "get_connection", _unavailable)
+
+        assert await run_daily_recovery_once(test_db) == 0
+        scores = await get_scores(test_db, [user])
+        assert scores["no-redis@example.com"] == 30
+
+    async def test_failure_releases_lock_for_retry(
+        self, test_db: AsyncSession, recovery_lock_cleanup, monkeypatch
+    ):
+        """恢復失敗時釋放日期鎖，下一輪檢查可重試"""
+        user = make_user("retry@example.com", 30)
+        test_db.add(user)
+        await test_db.commit()
+
+        async def _fail(db=None):
+            raise RuntimeError("DB error")
+
+        monkeypatch.setattr(trust_score_recovery, "apply_daily_recovery", _fail)
+        with pytest.raises(RuntimeError):
+            await run_daily_recovery_once(test_db)
+        monkeypatch.undo()
+
+        assert await run_daily_recovery_once(test_db) == 1
+
+
+class TestDailyRecoveryLockEdgeCases:
+    """日期鎖的時區與 Redis 故障情境（以假 Redis 模擬，不需資料庫）"""
+
+    @pytest.fixture
+    def fake_redis(self, monkeypatch):
+        redis = AsyncMock()
+        redis.set = AsyncMock(return_value=True)
+
+        async def _get_connection():
+            return redis
+
+        monkeypatch.setattr(redis_client, "get_connection", _get_connection)
+        return redis
+
+    async def test_lock_key_uses_utc_date_on_utc8_host(self, fake_redis, monkeypatch):
+        """模擬 UTC+8 主機的台灣時間 1/2 00:30（UTC 仍是 1/1）：鎖以 UTC 日期命名"""
+        utc_now = datetime(2026, 1, 1, 16, 30, tzinfo=UTC)
+
+        class _Utc8Datetime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                if tz is None:
+                    return (utc_now + timedelta(hours=8)).replace(tzinfo=None)
+                return utc_now.astimezone(tz)
+
+        monkeypatch.setattr(trust_score_recovery, "datetime", _Utc8Datetime)
+        monkeypatch.setattr(trust_score_recovery, "apply_daily_recovery", AsyncMock(return_value=0))
+
+        await run_daily_recovery_once()
+
+        fake_redis.set.assert_called_once_with(
+            "trust:daily_recovery:2026-01-01", "1", nx=True, ex=RECOVERY_LOCK_TTL_SECONDS
+        )
+
+    async def test_lock_release_failure_keeps_original_error(self, fake_redis, monkeypatch):
+        """恢復失敗後釋放鎖時 Redis 也故障：拋出的仍是原本的恢復錯誤"""
+        fake_redis.delete = AsyncMock(side_effect=ConnectionError("Redis down"))
+        monkeypatch.setattr(
+            trust_score_recovery,
+            "apply_daily_recovery",
+            AsyncMock(side_effect=RuntimeError("DB error")),
+        )
+
+        with pytest.raises(RuntimeError, match="DB error"):
+            await run_daily_recovery_once()
+
+
+class TestRecoveryTask:
+    """背景任務：啟動／停止與每小時迴圈"""
+
+    async def test_start_is_idempotent_and_stop_cancels(self, monkeypatch):
+        running = asyncio.Event()
+
+        async def _forever():
+            running.set()
+            await asyncio.Event().wait()
+
+        monkeypatch.setattr(trust_score_recovery, "_periodic_recovery", _forever)
+
+        await start_recovery_task()
+        task = trust_score_recovery._recovery_task
+        await start_recovery_task()  # 已啟動時不重複建立
+        assert trust_score_recovery._recovery_task is task
+        await asyncio.wait_for(running.wait(), timeout=1)  # 任務沒啟動時直接失敗而非卡住
+
+        await stop_recovery_task()
+
+        assert task.cancelled()
+        assert trust_score_recovery._recovery_task is None
+
+    async def test_periodic_loop_survives_errors_until_cancelled(self, monkeypatch):
+        """每輪先等待間隔再執行；單輪失敗不中止迴圈，取消時結束"""
+        sleeps: list[int] = []
+        runs = 0
+
+        async def _sleep(seconds):
+            sleeps.append(seconds)
+            if len(sleeps) == 3:
+                raise asyncio.CancelledError
+
+        async def _run():
+            nonlocal runs
+            runs += 1
+            if runs == 1:
+                raise RuntimeError("第一輪失敗")
+            return 0
+
+        monkeypatch.setattr(trust_score_recovery.asyncio, "sleep", _sleep)
+        monkeypatch.setattr(trust_score_recovery, "run_daily_recovery_once", _run)
+
+        await trust_score_recovery._periodic_recovery()
+
+        assert sleeps == [RECOVERY_CHECK_INTERVAL_SECONDS] * 3
+        assert runs == 2
 
 
 # ==================== 舉報駁回補償 ====================

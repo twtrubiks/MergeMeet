@@ -1,7 +1,7 @@
 """信任分數服務測試"""
 
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
@@ -9,6 +9,7 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
+from app.services import trust_score as trust_score_module
 from app.services.trust_score import TrustScoreService
 
 
@@ -165,6 +166,13 @@ class TestScoreBoundaries:
         with pytest.raises(ValueError, match="未知的行為類型"):
             await TrustScoreService.adjust_score(test_db, test_user.id, "invalid_action")
 
+    async def test_unknown_user_raises_error(self, test_db: AsyncSession):
+        """測試：調整不存在的用戶會拋錯並指出是哪個用戶（不可靜默略過）"""
+        user_id = uuid.uuid4()
+
+        with pytest.raises(ValueError, match=f"用戶不存在: {user_id}"):
+            await TrustScoreService.adjust_score(test_db, user_id, "email_verified")
+
 
 # =============================================================================
 # 測試：獲取分數
@@ -262,6 +270,88 @@ class TestMessageRateLimiting:
 
         mock_redis.incr.assert_called_once()
         mock_redis.expire.assert_called_once()
+
+    async def test_threshold_score_not_rate_limited(self, mock_redis):
+        """測試：信任分數剛好 20（閾值）不受限，與 is_restricted 的 < 20 一致"""
+        can_send, remaining = await TrustScoreService.check_message_rate_limit(
+            uuid.uuid4(), TrustScoreService.RESTRICTION_THRESHOLD, mock_redis
+        )
+
+        assert (can_send, remaining) == (True, -1)
+        mock_redis.get.assert_not_called()
+
+    async def test_low_trust_user_no_messages_today(self, mock_redis):
+        """測試：今日尚未發訊（Redis 無計數）→ 額度完整"""
+        can_send, remaining = await TrustScoreService.check_message_rate_limit(
+            uuid.uuid4(), 15, mock_redis
+        )
+
+        assert (can_send, remaining) == (True, TrustScoreService.LOW_TRUST_MESSAGE_LIMIT)
+
+    async def test_last_message_of_the_day_allowed(self, mock_redis):
+        """測試：已發 19 則時仍可發第 20 則"""
+        mock_redis.get.return_value = str(TrustScoreService.LOW_TRUST_MESSAGE_LIMIT - 1).encode()
+
+        can_send, remaining = await TrustScoreService.check_message_rate_limit(
+            uuid.uuid4(), 15, mock_redis
+        )
+
+        assert (can_send, remaining) == (True, 1)
+
+    async def test_record_and_check_share_daily_key(self, mock_redis):
+        """測試：記錄與檢查使用同一個當日計數 key，且 TTL 24 小時
+
+        兩個函式各自組 key，任一邊格式跑掉，低信任用戶的每日上限就形同虛設。
+        """
+        counts: dict[str, int] = {}
+
+        async def incr(key):
+            counts[key] = counts.get(key, 0) + 1
+            return counts[key]
+
+        async def get(key):
+            return str(counts[key]).encode() if key in counts else None
+
+        mock_redis.incr.side_effect = incr
+        mock_redis.get.side_effect = get
+        user_id = uuid.uuid4()
+
+        for _ in range(TrustScoreService.LOW_TRUST_MESSAGE_LIMIT):
+            await TrustScoreService.record_message_sent(user_id, mock_redis)
+        can_send, remaining = await TrustScoreService.check_message_rate_limit(
+            user_id, 15, mock_redis
+        )
+
+        assert (can_send, remaining) == (False, 0)
+        key = f"trust:daily_messages:{user_id}:{datetime.now(UTC):%Y-%m-%d}"
+        assert list(counts) == [key]
+        mock_redis.expire.assert_called_with(key, 86400)
+
+    async def test_daily_key_uses_utc_date_on_utc8_host(self, mock_redis, monkeypatch):
+        """測試：當日計數 key 以 UTC 日期命名，與主機時區無關
+
+        模擬部署在 UTC+8 主機的台灣時間 1/2 00:30（UTC 仍是 1/1）。記錄與檢查若有一邊
+        誤用不帶時區的 now()，凌晨 0–8 點兩邊會用不同日期的 key，每日上限失效。
+        """
+        utc_now = datetime(2026, 1, 1, 16, 30, tzinfo=UTC)
+
+        class _Utc8Datetime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                if tz is None:
+                    return (utc_now + timedelta(hours=8)).replace(tzinfo=None)
+                return utc_now.astimezone(tz)
+
+        monkeypatch.setattr(trust_score_module, "datetime", _Utc8Datetime)
+        mock_redis.incr = AsyncMock(return_value=1)
+        user_id = uuid.uuid4()
+
+        await TrustScoreService.record_message_sent(user_id, mock_redis)
+        await TrustScoreService.check_message_rate_limit(user_id, 15, mock_redis)
+
+        key = f"trust:daily_messages:{user_id}:2026-01-01"
+        mock_redis.incr.assert_called_once_with(key)
+        mock_redis.get.assert_called_once_with(key)
 
 
 # =============================================================================

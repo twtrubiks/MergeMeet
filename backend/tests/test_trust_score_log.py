@@ -186,6 +186,22 @@ class TestTrustLogsEndpoint:
 
         assert response.status_code == 404
 
+    @pytest.mark.parametrize(
+        ("method", "path"),
+        [
+            ("get", "/api/admin/users/not-a-uuid/trust-logs"),
+            ("post", "/api/admin/reports/not-a-uuid/review"),
+        ],
+    )
+    async def test_invalid_id_returns_422(
+        self, client: AsyncClient, admin_headers: dict, method: str, path: str
+    ):
+        """ID 格式錯誤由參數驗證擋下（422），而非查詢資料庫時拋錯（500）"""
+        kwargs = {"json": {"status": "REJECTED"}} if method == "post" else {}
+        response = await getattr(client, method)(path, headers=admin_headers, **kwargs)
+
+        assert response.status_code == 422
+
     async def test_requires_admin(self, client: AsyncClient, test_user: User, auth_headers: dict):
         """一般用戶無法存取"""
         response = await client.get(

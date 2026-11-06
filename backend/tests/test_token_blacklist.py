@@ -1,11 +1,14 @@
 """Token 黑名單測試"""
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
+import redis.asyncio as aioredis
 from httpx import AsyncClient
 
+from app.services import token_blacklist as token_blacklist_module
 from app.services.token_blacklist import TokenBlacklist
 
 
@@ -36,15 +39,17 @@ class TestTokenBlacklist:
 
     @pytest.mark.asyncio
     async def test_expired_token_auto_remove(self, blacklist):
-        """測試過期 Token 自動從黑名單移除"""
-        token = "expired_token"
-        # 設置已過期的時間
-        expires_at = datetime.now(UTC) - timedelta(seconds=1)
+        """測試過期 Token 自動從黑名單移除
 
-        await blacklist.add(token, expires_at)
+        add() 會直接略過已過期的 Token（見 test_expired_token_not_added），
+        因此直接放入內存，模擬「加入時有效、之後才過期」的 Token。
+        """
+        token = "expired_token"
+        blacklist._fallback[token] = datetime.now(UTC) - timedelta(seconds=1)
 
         # 檢查時應該自動移除
         assert await blacklist.is_blacklisted(token) is False
+        assert token not in blacklist._fallback
 
     @pytest.mark.asyncio
     async def test_remove_token(self, blacklist):
@@ -258,10 +263,12 @@ class TestTokenBlacklistWithRedis:
 
         await blacklist.add(token, expires_at)
 
-        # 驗證 Redis set 被調用
+        # 驗證 Redis set 被調用，且 TTL 為 Token 剩餘有效期（否則每次登出都留下永久 key）
         mock_redis.set.assert_called_once()
         call_args = mock_redis.set.call_args
         assert call_args[0][0].startswith("blacklist:")
+        assert call_args[0][1] == "1"
+        assert 3590 <= call_args.kwargs["ex"] <= 3600
         assert blacklist.is_using_redis() is True
 
     @pytest.mark.asyncio
@@ -292,6 +299,55 @@ class TestTokenBlacklistWithRedis:
         mock_redis.delete.assert_called()
 
     @pytest.mark.asyncio
+    async def test_remove_nonexistent_from_redis(self, mock_redis):
+        """測試：Redis 中不存在的 Token 移除回傳 False"""
+        blacklist = TokenBlacklist(redis_client=mock_redis)
+
+        assert await blacklist.remove("never_added_token") is False
+
+    @pytest.mark.asyncio
+    async def test_cleanup_task_lifecycle(self):
+        """測試：清理任務重複啟動不會建立第二個，停止後可再啟動"""
+        blacklist = TokenBlacklist()
+
+        await blacklist.start_cleanup_task()
+        task = blacklist._cleanup_task
+        assert task is not None and not task.done()
+
+        await blacklist.start_cleanup_task()
+        assert blacklist._cleanup_task is task
+
+        await blacklist.stop_cleanup_task()
+        assert task.done()
+        assert blacklist._cleanup_task is None
+
+    @pytest.mark.asyncio
+    async def test_periodic_cleanup_survives_errors_until_cancelled(self, monkeypatch):
+        """測試：每 5 分鐘清理一次；單輪失敗不中止迴圈，取消時結束"""
+        blacklist = TokenBlacklist()
+        sleeps: list[int] = []
+        runs = 0
+
+        async def _sleep(seconds):
+            sleeps.append(seconds)
+            if len(sleeps) == 3:
+                raise asyncio.CancelledError
+
+        async def _cleanup():
+            nonlocal runs
+            runs += 1
+            if runs == 1:
+                raise RuntimeError("第一輪失敗")
+
+        monkeypatch.setattr(token_blacklist_module.asyncio, "sleep", _sleep)
+        monkeypatch.setattr(blacklist, "cleanup_expired", _cleanup)
+
+        await blacklist._periodic_cleanup()
+
+        assert sleeps == [300, 300, 300]
+        assert runs == 2
+
+    @pytest.mark.asyncio
     async def test_hash_token_shortens_key(self):
         """測試：Token hash 縮短 Key 長度"""
         long_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
@@ -305,6 +361,33 @@ class TestTokenBlacklistFallback:
     """Token 黑名單回退測試（Redis 不可用時）"""
 
     @pytest.mark.asyncio
+    async def test_logout_during_outage_still_honored_after_redis_recovers(self, mock_redis):
+        """測試：Redis 故障期間登出的 Token，Redis 恢復後仍視為已登出
+
+        回退後固定使用內存；若改回去查 Redis（查不到），已登出的 Token 會重新生效。
+        """
+        blacklist = TokenBlacklist(redis_client=mock_redis)
+        working_set = mock_redis.set.side_effect
+        mock_redis.set.side_effect = aioredis.RedisError("Connection refused")
+        await blacklist.add("logged_out_token", datetime.now(UTC) + timedelta(hours=1))
+        mock_redis.set.side_effect = working_set  # Redis 恢復
+
+        assert await blacklist.is_blacklisted("logged_out_token") is True
+
+        # 恢復後才登出的 Token 也要寫進同一處（內存），否則檢查時查不到
+        await blacklist.add("logged_out_later", datetime.now(UTC) + timedelta(hours=1))
+        assert await blacklist.is_blacklisted("logged_out_later") is True
+
+    @pytest.mark.asyncio
+    async def test_remove_after_fallback_skips_redis(self, mock_redis_error):
+        """測試：回退後移除只動內存，不再呼叫故障的 Redis"""
+        blacklist = TokenBlacklist(redis_client=mock_redis_error)
+        await blacklist.add("fallback_token", datetime.now(UTC) + timedelta(hours=1))
+
+        assert await blacklist.remove("fallback_token") is True
+        mock_redis_error.delete.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_fallback_on_redis_error_add(self, mock_redis_error):
         """測試：Redis 錯誤時回退到內存（add）"""
         blacklist = TokenBlacklist(redis_client=mock_redis_error)
@@ -316,6 +399,7 @@ class TestTokenBlacklistFallback:
 
         # 驗證 _use_redis 被設為 False
         assert blacklist._use_redis is False
+        assert blacklist.is_using_redis() is False
         # 驗證 Token 在內存中
         assert token in blacklist._fallback
 
@@ -360,3 +444,16 @@ class TestTokenBlacklistFallback:
         mock_redis.set.assert_not_called()
         # 內存也不應有
         assert token not in blacklist._fallback
+
+    @pytest.mark.asyncio
+    async def test_token_expiring_within_a_second_not_sent_to_redis(self, mock_redis):
+        """測試：剩不到 1 秒的 Token 不寫入 Redis
+
+        TTL 取整後為 0，以 ex=0 寫入 Redis 會出錯，進而讓整個黑名單永久回退到內存。
+        """
+        blacklist = TokenBlacklist(redis_client=mock_redis)
+
+        await blacklist.add("almost_expired", datetime.now(UTC) + timedelta(milliseconds=500))
+
+        mock_redis.set.assert_not_called()
+        assert blacklist.is_using_redis() is True

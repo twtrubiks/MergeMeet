@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
+import redis.asyncio as aioredis
 
 from app.services.verification_code import VerificationCodeStore
 
@@ -152,6 +153,17 @@ class TestVerificationCodeStoreFallback:
         assert email.lower() in store._fallback
 
     @pytest.mark.asyncio
+    async def test_delete_after_fallback_skips_redis(self, mock_redis_error):
+        """測試：回退後刪除只動內存，不再呼叫故障的 Redis"""
+        store = VerificationCodeStore(ttl_minutes=10, redis_client=mock_redis_error)
+        await store.set("fallback@example.com", "999888")
+
+        await store.delete("fallback@example.com")
+
+        assert await store.get("fallback@example.com") is None
+        mock_redis_error.delete.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_fallback_on_redis_error_get(self, mock_redis_error):
         """測試：Redis 錯誤時回退到內存（get）"""
         store = VerificationCodeStore(ttl_minutes=10, redis_client=mock_redis_error)
@@ -166,6 +178,25 @@ class TestVerificationCodeStoreFallback:
 
         assert result == code
         assert store._use_redis is False
+
+    @pytest.mark.asyncio
+    async def test_memory_code_still_readable_after_redis_recovers(self, mock_redis):
+        """測試：Redis 故障時存進內存的驗證碼，Redis 恢復後仍讀得到
+
+        回退後固定使用內存；若改回去 Redis 讀，會找不到驗證碼而讓用戶驗證失敗。
+        """
+        store = VerificationCodeStore(ttl_minutes=10, redis_client=mock_redis)
+        working_set = mock_redis.set.side_effect
+        mock_redis.set.side_effect = aioredis.RedisError("Connection refused")
+        await store.set("flaky@example.com", "123456")
+        mock_redis.set.side_effect = working_set  # Redis 恢復
+
+        assert store.is_using_redis() is False
+        assert await store.get("flaky@example.com") == "123456"
+
+        # 重寄驗證碼：仍寫入內存（若改寫 Redis，get 讀內存會拿到舊碼）
+        await store.set("flaky@example.com", "654321")
+        assert await store.get("flaky@example.com") == "654321"
 
     @pytest.mark.asyncio
     async def test_set_redis_enables_redis_mode(self):

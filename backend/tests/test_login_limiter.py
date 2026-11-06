@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.services.login_limiter import (
+    ATTEMPT_WINDOW,
     LOCKOUT_SECONDS,
     MAX_ATTEMPTS,
     LoginAttemptResult,
@@ -69,6 +70,24 @@ class TestLoginLimiter:
         assert result.lockout_seconds == 0
 
     @pytest.mark.asyncio
+    async def test_check_status_locked_with_one_second_left(self, limiter, mock_redis):
+        """測試：鎖定只剩 1 秒時仍是鎖定狀態"""
+        mock_redis.ttl.return_value = 1
+
+        result = await limiter.check_status("test@example.com")
+
+        assert (result.is_locked, result.lockout_seconds) == (True, 1)
+
+    @pytest.mark.asyncio
+    async def test_check_status_remaining_never_negative(self, limiter, mock_redis):
+        """測試：失敗次數超過上限（例如鎖定剛過期）時剩餘次數為 0，不會是負數或 1"""
+        mock_redis.get.return_value = str(MAX_ATTEMPTS + 2)
+
+        result = await limiter.check_status("test@example.com")
+
+        assert (result.is_locked, result.remaining_attempts) == (False, 0)
+
+    @pytest.mark.asyncio
     async def test_record_failure_first_attempt(self, limiter, mock_redis):
         """測試：記錄第一次失敗"""
         mock_redis.incr.return_value = 1
@@ -77,8 +96,10 @@ class TestLoginLimiter:
 
         assert result.is_locked is False
         assert result.remaining_attempts == MAX_ATTEMPTS - 1
-        mock_redis.incr.assert_called_once()
-        mock_redis.expire.assert_called_once()  # 首次失敗要設置 TTL
+        assert result.lockout_seconds == 0
+        mock_redis.incr.assert_called_once_with("login_attempts:test@example.com")
+        # 首次失敗要設置 TTL（否則計數永不過期，舊的失敗會一直累積）
+        mock_redis.expire.assert_called_once_with("login_attempts:test@example.com", ATTEMPT_WINDOW)
 
     @pytest.mark.asyncio
     async def test_record_failure_subsequent_attempt(self, limiter, mock_redis):
@@ -101,8 +122,11 @@ class TestLoginLimiter:
         assert result.is_locked is True
         assert result.remaining_attempts == 0
         assert result.lockout_seconds == LOCKOUT_SECONDS
-        mock_redis.set.assert_called_once()  # 設置鎖定
-        mock_redis.delete.assert_called_once()  # 清除嘗試計數
+        # 鎖定標記必須寫到 check_status 會檢查的 key，且帶 TTL（否則永久鎖死）
+        mock_redis.set.assert_called_once_with(
+            "login_lockout:test@example.com", "1", ex=LOCKOUT_SECONDS
+        )
+        mock_redis.delete.assert_called_once_with("login_attempts:test@example.com")
 
     @pytest.mark.asyncio
     async def test_clear_attempts(self, limiter, mock_redis):

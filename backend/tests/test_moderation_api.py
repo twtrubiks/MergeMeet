@@ -15,8 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_password_hash
 from app.models.moderation import ContentAppeal, SensitiveWord
-from app.models.profile import Photo, Profile
+from app.models.profile import InterestTag, Photo, Profile
 from app.models.user import User
+from app.services.content_moderation import ContentModerationService
 
 # ==================== Fixtures ====================
 
@@ -196,6 +197,67 @@ class TestCreateSensitiveWord:
 
         assert response.status_code == 400
         assert "已存在" in response.json()["detail"]
+
+    @pytest.mark.parametrize(
+        "field,value", [("severity", "high"), ("severity", "URGENT"), ("action", "BAN")]
+    )
+    async def test_create_rejects_unknown_severity_or_action(
+        self, client: AsyncClient, admin_headers: dict, field: str, value: str
+    ):
+        """測試：嚴重程度／動作只接受固定值（打錯會讓該詞永遠不擋）"""
+        new_word = {"word": "打錯欄位", "category": "OTHER", field: value}
+
+        response = await client.post(
+            "/api/moderation/sensitive-words", json=new_word, headers=admin_headers
+        )
+
+        assert response.status_code == 422
+
+    async def test_update_rejects_unknown_severity(
+        self, client: AsyncClient, admin_headers: dict, sensitive_words: list
+    ):
+        """測試：更新敏感詞時同樣驗證嚴重程度"""
+        response = await client.patch(
+            f"/api/moderation/sensitive-words/{sensitive_words[0].id}",
+            json={"severity": "high"},
+            headers=admin_headers,
+        )
+
+        assert response.status_code == 422
+
+    async def test_create_literal_word_is_lowercased(
+        self, client: AsyncClient, admin_headers: dict
+    ):
+        """測試：純文字敏感詞統一存小寫（比對時內容也會轉小寫）"""
+        response = await client.post(
+            "/api/moderation/sensitive-words",
+            json={"word": "SPAM", "category": "OTHER"},
+            headers=admin_headers,
+        )
+
+        assert response.status_code == 201
+        assert response.json()["word"] == "spam"
+
+    async def test_create_regex_word_keeps_original_case(
+        self, client: AsyncClient, admin_headers: dict, test_db: AsyncSession
+    ):
+        """測試：正則敏感詞保留原樣
+
+        正則以 IGNORECASE 比對，不需轉小寫；轉了反而改變語意
+        （\\S 非空白 → \\s 空白），導致規則永遠比對不到。
+        """
+        response = await client.post(
+            "/api/moderation/sensitive-words",
+            json={"word": r"\S+@\S+", "category": "PERSONAL_INFO", "is_regex": True},
+            headers=admin_headers,
+        )
+
+        assert response.status_code == 201
+        assert response.json()["word"] == r"\S+@\S+"
+        _, violations, _, _ = await ContentModerationService.check_content(
+            "寫信給我 me@example.com", test_db
+        )
+        assert violations == [r"PERSONAL_INFO: \S+@\S+"]
 
 
 # ==================== 統計 API 測試 ====================
@@ -496,7 +558,7 @@ class TestAppealPhotoRestore:
             patch(
                 "app.services.photo_moderation.file_storage.get_quarantined_path",
                 return_value="/quarantine/rejected.jpg",
-            ),
+            ) as mock_path,
             patch(
                 "app.services.photo_moderation.file_storage.restore_photo",
                 new_callable=AsyncMock,
@@ -518,8 +580,59 @@ class TestAppealPhotoRestore:
         # 原本沒有主頭像，還原的照片遞補
         assert rejected_photo.is_profile_picture is True
 
+        mock_path.assert_called_once_with(rejected_photo.url)
         mock_restore.assert_awaited_once_with(rejected_photo.url)
         mock_purge.assert_not_called()
+
+    async def test_approve_restores_profile_completeness(
+        self,
+        client: AsyncClient,
+        test_db: AsyncSession,
+        admin_headers: dict,
+        normal_user: User,
+        rejected_photo: Photo,
+    ):
+        """還原唯一照片後檔案恢復完整（重新進入探索池）"""
+        profile = await test_db.get(Profile, rejected_photo.profile_id)
+        tags = [InterestTag(name=f"還原測試-{i}", category="lifestyle") for i in range(3)]
+        test_db.add_all(tags)
+        await test_db.commit()
+        await test_db.refresh(profile, ["interests"])
+        profile.interests.extend(tags)
+        profile.is_complete = False
+        await test_db.commit()
+
+        appeal = ContentAppeal(
+            id=uuid.uuid4(),
+            user_id=normal_user.id,
+            appeal_type="PHOTO",
+            rejected_content=rejected_photo.url,
+            violations='["仇恨言論"]',
+            reason=APPEAL_REASON,
+        )
+        test_db.add(appeal)
+        await test_db.commit()
+
+        with (
+            patch(
+                "app.services.photo_moderation.file_storage.get_quarantined_path",
+                return_value="/quarantine/rejected.jpg",
+            ),
+            patch(
+                "app.services.photo_moderation.file_storage.restore_photo",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+        ):
+            response = await client.post(
+                f"/api/moderation/appeals/{appeal.id}/review",
+                headers=admin_headers,
+                json={"status": "APPROVED", "admin_response": "確認為誤判，照片已恢復上架"},
+            )
+
+        assert response.status_code == 200
+        await test_db.refresh(profile)
+        assert profile.is_complete is True
 
     async def test_approve_not_owned_photo_no_restore(
         self,
@@ -542,6 +655,11 @@ class TestAppealPhotoRestore:
         await test_db.commit()
 
         with (
+            # 隔離檔存在，確保擋下還原的是歸屬檢查而非檔案遺失
+            patch(
+                "app.services.photo_moderation.file_storage.get_quarantined_path",
+                return_value="/quarantine/rejected.jpg",
+            ),
             patch(
                 "app.services.photo_moderation.file_storage.restore_photo",
                 new_callable=AsyncMock,

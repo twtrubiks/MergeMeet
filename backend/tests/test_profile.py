@@ -473,6 +473,17 @@ async def test_delete_nonexistent_photo(client: AsyncClient, user_with_profile: 
 
 
 @pytest.mark.asyncio
+async def test_delete_photo_invalid_id(client: AsyncClient, user_with_profile: dict):
+    """照片 ID 格式錯誤回 422（而非查詢資料庫時拋錯 500）"""
+    response = await client.delete(
+        "/api/profile/photos/not-a-uuid",
+        headers={"Authorization": f"Bearer {user_with_profile['token']}"},
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_cannot_delete_other_users_photo(
     client: AsyncClient, user_with_profile: dict, test_db: AsyncSession
 ):

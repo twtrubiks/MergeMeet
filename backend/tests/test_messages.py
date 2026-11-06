@@ -279,7 +279,7 @@ async def test_get_chat_history_unauthorized(client: AsyncClient, matched_users:
     )
 
     assert response.status_code == 404
-    assert "不存在或您無權查看" in response.json()["detail"]
+    assert response.json()["detail"] == "配對不存在或您無權查看"
 
 
 @pytest.mark.asyncio
@@ -518,7 +518,7 @@ async def test_delete_message_not_owner(
     )
 
     assert response.status_code == 403
-    assert "只能刪除自己的訊息" in response.json()["detail"]
+    assert response.json()["detail"] == "您只能刪除自己的訊息"
 
 
 @pytest.mark.asyncio
@@ -533,7 +533,7 @@ async def test_delete_nonexistent_message(client: AsyncClient, matched_users: di
     )
 
     assert response.status_code == 404
-    assert "訊息不存在" in response.json()["detail"]
+    assert response.json()["detail"] == "訊息不存在"
 
 
 @pytest.mark.asyncio
@@ -731,7 +731,7 @@ async def test_mark_all_messages_as_read_unauthorized(client: AsyncClient, match
     )
 
     assert response.status_code == 404
-    assert "配對不存在或您無權操作" in response.json()["detail"]
+    assert response.json()["detail"] == "配對不存在或您無權操作"
 
 
 @pytest.mark.asyncio
@@ -940,3 +940,27 @@ async def test_mark_all_messages_no_notification_when_no_unread(
 
         # 驗證沒有發送任何 WebSocket 通知
         assert mock_send.call_count == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("get", "/api/messages/matches/not-a-uuid/messages"),
+        ("get", "/api/messages/matches/{match_id}/messages?before_id=not-a-uuid"),
+        ("post", "/api/messages/matches/not-a-uuid/read-all"),
+        ("delete", "/api/messages/not-a-uuid"),
+        ("post", "/api/messages/matches/not-a-uuid/upload-image"),
+    ],
+)
+async def test_invalid_id_returns_422(
+    client: AsyncClient, matched_users: dict, method: str, path: str
+):
+    """ID 格式錯誤由參數驗證擋下（422），而非查詢資料庫時拋錯（500）"""
+    response = await getattr(client, method)(
+        path.format(match_id=matched_users["match_id"]),
+        headers={"Authorization": f"Bearer {matched_users['alice']['token']}"},
+    )
+
+    assert response.status_code == 422
+    assert any(error["type"] == "uuid_parsing" for error in response.json()["detail"])
