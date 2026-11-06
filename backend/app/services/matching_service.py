@@ -221,8 +221,8 @@ class MatchingService:
                     Profile.is_visible.is_(True),
                     Profile.is_complete.is_(True),
                     User.is_active.is_(True),
-                    # 年齡篩選
-                    User.date_of_birth >= min_birth_date,
+                    # 年齡篩選：生日恰為 min_birth_date 者今天滿 max_age + 1 歲，須排除
+                    User.date_of_birth > min_birth_date,
                     User.date_of_birth <= max_birth_date,
                     # 距離篩選 (PostGIS)
                     ST_DWithin(

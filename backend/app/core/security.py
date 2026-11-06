@@ -43,8 +43,9 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         密碼是否正確
     """
     # 先對密碼進行 SHA256 預處理，再用 bcrypt 驗證
-    pre_hashed = _pre_hash_password(plain_password)
+    # 超過長度上限的密碼不可能是有效密碼（預處理拋 ValueError），視為驗證失敗而非 500
     try:
+        pre_hashed = _pre_hash_password(plain_password)
         return bcrypt.checkpw(pre_hashed.encode("utf-8"), hashed_password.encode("utf-8"))
     except (ValueError, TypeError):
         return False

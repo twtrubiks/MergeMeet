@@ -417,7 +417,7 @@ class PhotoModerationService:
             return email
         local, domain = email.split("@", 1)
         masked_local = (  # noqa: SIM108
-            local[0] + "***" if len(local) <= 2 else local[0] + "***" + local[-1]
+            local[:1] + "***" if len(local) <= 2 else local[0] + "***" + local[-1]
         )
         return f"{masked_local}@{domain}"
 
