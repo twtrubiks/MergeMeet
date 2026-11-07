@@ -1,6 +1,7 @@
 """安全相關工具：JWT 認證、密碼加密"""
 
 import hashlib
+import uuid
 from datetime import UTC, datetime, timedelta
 
 import bcrypt
@@ -85,8 +86,9 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
         expire = datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
     # iat (issued at) 用於 Token 全局失效檢查（密碼重置後）
+    # jti 確保同一秒內簽發的 Token 字串不同，避免黑名單誤封新 Token
     iat = int(datetime.now(UTC).timestamp())
-    to_encode.update({"exp": expire, "type": "access", "iat": iat})
+    to_encode.update({"exp": expire, "type": "access", "iat": iat, "jti": uuid.uuid4().hex})
 
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
@@ -107,8 +109,9 @@ def create_refresh_token(data: dict) -> str:
     expire = datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
     # iat (issued at) 用於 Token 全局失效檢查（密碼重置後）
+    # jti 確保同一秒內輪換出的新 Token 與舊 Token 不同，否則舊 Token 進黑名單會連新 Token 一起封掉
     iat = int(datetime.now(UTC).timestamp())
-    to_encode.update({"exp": expire, "type": "refresh", "iat": iat})
+    to_encode.update({"exp": expire, "type": "refresh", "iat": iat, "jti": uuid.uuid4().hex})
 
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 

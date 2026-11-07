@@ -96,3 +96,22 @@ class TestPassword:
         assert verify_password("a" * 129, hashed) is False
         with pytest.raises(ValueError, match="128"):
             get_password_hash("a" * 129)
+
+
+@pytest.mark.parametrize("create_token", [create_access_token, create_refresh_token])
+def test_tokens_issued_in_same_second_are_distinct(create_token):
+    """測試：同一秒內簽發的兩個 Token 字串不同（jti 隨機）
+
+    Refresh Token 輪換時會把舊 Token 加入黑名單；若新舊 Token 完全相同
+    （iat/exp 皆為秒級），新 Token 會一起被封掉，下一次刷新必失敗。
+    """
+    first = create_token({"sub": "user-1"})
+    second = create_token({"sub": "user-1"})
+
+    assert first != second
+
+    decode = lambda t: jwt.decode(  # noqa: E731
+        t, settings.SECRET_KEY, algorithms=[settings.ALGORITHM], options={"verify_exp": False}
+    )
+    assert decode(first)["iat"] == decode(second)["iat"]
+    assert decode(first)["jti"] != decode(second)["jti"]

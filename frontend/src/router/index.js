@@ -124,25 +124,27 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const userStore = useUserStore()
 
-  // 檢查是否需要認證
-  if (to.meta.requiresAuth && !userStore.isAuthenticated) {
-    // 曾登入過（localStorage 留有 access token）→ 先以 refresh cookie 靜默續期，
-    // 避免回訪用戶 access token 過期（30 分鐘）就被踢回登入頁
-    if (localStorage.getItem('access_token')) {
-      try {
-        // 成功時 'token-refreshed' 事件會同步更新 Pinia Store
-        await refreshAuthToken()
-      } catch {
-        // 續期失敗（refresh cookie 過期或失效），清除殘留 token 走登入流程
+  // 曾登入過（localStorage 留有 access token）但已過期 → 先以 refresh cookie 靜默續期。
+  // 不限 requiresAuth 路由：首頁等公開頁重整時也要恢復登入狀態，否則會看起來像被登出
+  if (!userStore.isAuthenticated && localStorage.getItem('access_token')) {
+    try {
+      // 成功時 'token-refreshed' 事件會同步更新 Pinia Store
+      await refreshAuthToken()
+    } catch (error) {
+      // 只有後端明確拒絕（401：refresh cookie 過期、失效或未帶上）才清除殘留 token。
+      // 網路錯誤或 5xx（例如電腦喚醒瞬間、後端重啟中）保留 token，下次導航再試，
+      // 否則一次瞬斷就會永久登出，即使 refresh cookie 還有效
+      if (error.response?.status === 401) {
         userStore.clearTokens()
       }
     }
+  }
 
-    if (!userStore.isAuthenticated) {
-      // 需要認證但未登入，導向登入頁
-      next('/login')
-      return
-    }
+  // 檢查是否需要認證
+  if (to.meta.requiresAuth && !userStore.isAuthenticated) {
+    // 需要認證但未登入，導向登入頁
+    next('/login')
+    return
   }
 
   // 檢查是否需要 Email 驗證（已登入但未驗證）

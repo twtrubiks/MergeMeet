@@ -173,9 +173,13 @@ apiClient.interceptors.response.use(
         // 重新發送原本的請求
         return apiClient(originalRequest)
       } catch (refreshError) {
-        // 只有第一個失敗的請求顯示提示並跳轉
-        // 避免多個請求同時跳轉造成多次提示
-        await handleSessionExpired()
+        // 只有後端明確拒絕 refresh（401）才視為 Session 過期；
+        // 網路錯誤或 5xx 屬瞬斷，保留登入狀態，讓原請求以錯誤回報即可
+        if (refreshError.response?.status === 401) {
+          // 只有第一個失敗的請求顯示提示並跳轉
+          // 避免多個請求同時跳轉造成多次提示
+          await handleSessionExpired()
+        }
 
         return Promise.reject(refreshError)
       }

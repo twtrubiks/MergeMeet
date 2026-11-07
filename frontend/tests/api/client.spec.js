@@ -5,7 +5,8 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import axios from 'axios'
-import { refreshAuthToken } from '@/api/client'
+import { refreshAuthToken, resetRedirectFlag } from '@/api/client'
+import { showSessionExpiredMessage } from '@/utils/discreteApi'
 
 // Mock axios
 vi.mock('axios', () => {
@@ -26,6 +27,14 @@ vi.mock('axios', () => {
 vi.mock('@/utils/discreteApi', () => ({
   showSessionExpiredMessage: vi.fn(() => Promise.resolve())
 }))
+
+// handleSessionExpired 會動態 import router
+vi.mock('@/router', () => ({ default: { push: vi.fn() } }))
+
+// 模組載入時 axios.create 已被呼叫，先把 response 攔截器的錯誤處理函式抓出來
+// （後續 beforeEach 的 vi.clearAllMocks 會清掉 mock.results）
+const responseErrorHandler =
+  axios.create.mock.results[0].value.interceptors.response.use.mock.calls[0][1]
 
 describe('Token Refresh Mutex', () => {
   let refreshPromise = null
@@ -152,5 +161,44 @@ describe('refreshAuthToken', () => {
 
     await expect(refreshAuthToken()).rejects.toThrow('Refresh failed')
     expect(localStorage.setItem).not.toHaveBeenCalled()
+  })
+})
+
+describe('Response 攔截器：401 後刷新失敗的處理', () => {
+  const unauthorized = (url = '/api/profile') => ({
+    config: { url },
+    response: { status: 401 }
+  })
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetRedirectFlag()
+  })
+
+  it('刷新回 401 → 視為 Session 過期，顯示提示並跳轉', async () => {
+    const refreshError = { response: { status: 401 } }
+    axios.post.mockRejectedValueOnce(refreshError)
+
+    await expect(responseErrorHandler(unauthorized())).rejects.toBe(refreshError)
+
+    expect(showSessionExpiredMessage).toHaveBeenCalledTimes(1)
+  })
+
+  it('刷新遇網路錯誤 → 不視為 Session 過期，不跳轉，只回報錯誤', async () => {
+    const refreshError = new Error('Network Error')
+    axios.post.mockRejectedValueOnce(refreshError)
+
+    await expect(responseErrorHandler(unauthorized())).rejects.toBe(refreshError)
+
+    expect(showSessionExpiredMessage).not.toHaveBeenCalled()
+  })
+
+  it('刷新回 5xx → 不視為 Session 過期', async () => {
+    const refreshError = { response: { status: 502 } }
+    axios.post.mockRejectedValueOnce(refreshError)
+
+    await expect(responseErrorHandler(unauthorized())).rejects.toBe(refreshError)
+
+    expect(showSessionExpiredMessage).not.toHaveBeenCalled()
   })
 })
