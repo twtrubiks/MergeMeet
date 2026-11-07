@@ -621,3 +621,27 @@ class TestPositiveInteractionMatchLimit:
         # 應該得到 [1, 2, 3, 4, 5]（順序可能不同）
         assert sorted(results) == [1, 2, 3, 4, 5]
         # 只有前 3 個應該獲得獎勵
+
+
+@pytest.mark.asyncio
+async def test_authenticate_websocket_closes_with_1008_when_token_rejected(monkeypatch):
+    """首次訊息認證失敗（token 過期/撤銷）時，應以 1008 明確關閉連線
+
+    連線已 accept，manager.connect(already_accepted=True) 不會代為關閉；
+    若端點直接 return，框架會以 1000（正常關閉）收尾，前端會誤判為正常斷線而不重連。
+    """
+    from app.api.websocket import _authenticate_websocket
+
+    websocket = AsyncMock()
+    websocket.receive_json.return_value = {
+        "type": "auth",
+        "token": "expired-or-revoked-token",
+        "user_id": str(uuid.uuid4()),
+    }
+    monkeypatch.setattr(manager, "connect", AsyncMock(return_value=False))
+
+    user_id, user_uuid = await _authenticate_websocket(websocket)
+
+    assert (user_id, user_uuid) == (None, None)
+    websocket.close.assert_awaited_once_with(code=1008, reason="Authentication failed")
+    websocket.send_json.assert_not_awaited()

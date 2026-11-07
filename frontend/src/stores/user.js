@@ -17,6 +17,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authAPI } from '@/api/auth'
 import { logger } from '@/utils/logger'
+import { decodeJwtPayload, isJwtExpired } from '@/utils/jwt'
 
 export const useUserStore = defineStore('user', () => {
   // 遷移清理：舊版本曾將 refresh token 鏡射到 localStorage，現已改為僅存 HttpOnly Cookie
@@ -42,17 +43,7 @@ export const useUserStore = defineStore('user', () => {
    * 檢查 JWT Token 是否已過期
    * @returns {boolean} true 表示已過期或無法解析
    */
-  const isTokenExpired = () => {
-    if (!accessToken.value) return true
-    try {
-      const payload = accessToken.value.split('.')[1]
-      const { exp } = JSON.parse(base64UrlDecode(payload))
-      if (!exp) return false // 沒有 exp 欄位則不判定過期
-      return Date.now() >= exp * 1000
-    } catch {
-      return true
-    }
-  }
+  const isTokenExpired = () => isJwtExpired(accessToken.value)
 
   // 計算屬性
   const isAuthenticated = computed(() => !!accessToken.value && !isTokenExpired())
@@ -274,30 +265,6 @@ export const useUserStore = defineStore('user', () => {
   }
 
   /**
-   * Base64URL 解碼（JWT 使用 base64url 編碼，非標準 base64）
-   *
-   * JWT 的 base64url 編碼：
-   * - 使用 '-' 代替 '+'
-   * - 使用 '_' 代替 '/'
-   * - 不使用 padding '='
-   *
-   * @param {string} str - Base64URL 編碼的字串
-   * @returns {string} 解碼後的字串
-   */
-  const base64UrlDecode = (str) => {
-    // 將 base64url 轉換為標準 base64
-    let base64 = str.replace(/-/g, '+').replace(/_/g, '/')
-
-    // 補齊 padding
-    const pad = base64.length % 4
-    if (pad) {
-      base64 += '='.repeat(4 - pad)
-    }
-
-    return atob(base64)
-  }
-
-  /**
    * 從 JWT Token 解析用戶資料並初始化
    * is_admin 直接從 token 解析，更安全（無法被用戶偽造）
    */
@@ -306,24 +273,23 @@ export const useUserStore = defineStore('user', () => {
       return
     }
 
-    try {
-      // 解析 JWT token (格式: header.payload.signature)
-      const payload = accessToken.value.split('.')[1]
-      const decodedPayload = JSON.parse(base64UrlDecode(payload))
-
-      // 從 token 提取用戶資訊（包含 is_admin）
-      if (decodedPayload.sub) {
-        user.value = {
-          id: decodedPayload.sub,
-          email: decodedPayload.email || null,
-          email_verified: decodedPayload.email_verified || false,
-          is_admin: decodedPayload.is_admin || false
-        }
-      }
-    } catch (err) {
-      logger.error('Failed to decode token:', err)
+    // 解析 JWT token (格式: header.payload.signature)
+    const decodedPayload = decodeJwtPayload(accessToken.value)
+    if (!decodedPayload) {
+      logger.error('Failed to decode token')
       // Token 無效，清除
       clearTokens()
+      return
+    }
+
+    // 從 token 提取用戶資訊（包含 is_admin）
+    if (decodedPayload.sub) {
+      user.value = {
+        id: decodedPayload.sub,
+        email: decodedPayload.email || null,
+        email_verified: decodedPayload.email_verified || false,
+        is_admin: decodedPayload.is_admin || false
+      }
     }
   }
 

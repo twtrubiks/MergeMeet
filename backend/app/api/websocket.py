@@ -477,6 +477,9 @@ async def _authenticate_websocket(websocket: WebSocket) -> tuple[str | None, uui
     # 建立連接並驗證 Token（連接已接受，傳入 already_accepted=True）
     connected = await manager.connect(websocket, user_id_str, token, already_accepted=True)
     if not connected:
+        # 連接已 accept，manager 不會代為關閉；以 1008 明確關閉讓前端能辨識是認證失敗
+        # （而非框架預設的 1000 正常關閉），前端據此刷新 token 後重連
+        await websocket.close(code=1008, reason="Authentication failed")
         return None, None
 
     # 發送認證成功回應

@@ -89,6 +89,28 @@ export function refreshAuthToken() {
   return refreshPromise
 }
 
+/**
+ * 處理 Session 過期（refresh token 也失效）
+ *
+ * 顯示提示、通知 Pinia Store 清除認證狀態、導向登入頁。
+ * 以旗標確保多個請求同時失敗時只跳轉一次。
+ * 供 axios 攔截器與 WebSocket Store（連線前刷新 token 失敗）共用。
+ *
+ * @returns {Promise<void>}
+ */
+export async function handleSessionExpired() {
+  if (isRedirectingToLogin) return
+  isRedirectingToLogin = true
+
+  await showSessionExpiredMessage()
+  // 通知 Pinia Store 清除認證狀態（避免循環依賴，使用 CustomEvent）
+  // 必須在 router.push 之前，否則 router guard 會因 isAuthenticated=true 擋住跳轉
+  window.dispatchEvent(new CustomEvent('session-expired'))
+  // 使用 dynamic import 避免與 router → stores → client 的循環依賴
+  const { default: router } = await import('@/router')
+  router.push('/login')
+}
+
 // 建立 axios 實例
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -153,16 +175,7 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         // 只有第一個失敗的請求顯示提示並跳轉
         // 避免多個請求同時跳轉造成多次提示
-        if (!isRedirectingToLogin) {
-          isRedirectingToLogin = true
-          await showSessionExpiredMessage()
-          // 通知 Pinia Store 清除認證狀態（避免循環依賴，使用 CustomEvent）
-          // 必須在 router.push 之前，否則 router guard 會因 isAuthenticated=true 擋住跳轉
-          window.dispatchEvent(new CustomEvent('session-expired'))
-          // 使用 dynamic import 避免與 router → stores → client 的循環依賴
-          const { default: router } = await import('@/router')
-          router.push('/login')
-        }
+        await handleSessionExpired()
 
         return Promise.reject(refreshError)
       }
